@@ -4,6 +4,9 @@ Sample Data/
 # Config gerado pelo container (credenciais reais — nunca versionar)
 js/config.js
 
+# Skills — instrucoes de desenvolvimento, nao fazem parte do app
+skills/
+
 # Arquivos de sistema Windows
 Thumbs.db
 desktop.ini

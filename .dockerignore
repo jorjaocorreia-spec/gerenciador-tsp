@@ -1,0 +1,7 @@
+skills/
+Documentation/
+*.bat
+*.md
+.gitignore
+.dockerignore
+js/config.js

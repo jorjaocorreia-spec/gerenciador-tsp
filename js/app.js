@@ -25,6 +25,16 @@ const Toast = {
 
 const spinnerHtml = '<div class="spinner-wrap"><div class="spinner"></div></div>';
 
+function escapeHtml(str) {
+    if (str === null || str === undefined) return '';
+    return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+}
+
 class AppController {
     constructor() {
         this.currentView = 'dashboard';
@@ -520,7 +530,7 @@ class AppController {
 
             card.innerHTML = `
                 <div class="stat-header">
-                    <span class="client-name">${stat.client.name}</span>
+                    <span class="client-name">${escapeHtml(stat.client.name)}</span>
                     <span style="font-weight: 600; color: ${statusColor}">${stat.hoursUsed}h / ${stat.hoursTotal}h</span>
                 </div>
                 <div class="progress-container">
@@ -560,17 +570,17 @@ class AppController {
             const consultantReceives = (c.clientPays && !isNaN(c.clientPays)) ? formatMoney(c.clientPays * 0.43) : 'R$ 0,00';
             const detailsHtml = `
                 <div style="font-size: 0.85rem; margin-top: 4px; color: var(--text-muted)">
-                    <span><strong>CS:</strong> ${c.csName || '-'}</span> | 
-                    <span><strong>Proj:</strong> ${c.projectNum || '-'}</span> <br>
-                    <span><strong>Paga:</strong> ${clientPaysStr}</span> | 
+                    <span><strong>CS:</strong> ${escapeHtml(c.csName) || '-'}</span> |
+                    <span><strong>Proj:</strong> ${escapeHtml(c.projectNum) || '-'}</span> <br>
+                    <span><strong>Paga:</strong> ${clientPaysStr}</span> |
                     <span><strong>Recebe:</strong> ${consultantReceives}</span>
-                    <div style="margin-top:2px; font-style:italic; font-size: 0.8rem">Obs: ${c.notes || '-'}</div>
+                    <div style="margin-top:2px; font-style:italic; font-size: 0.8rem">Obs: ${escapeHtml(c.notes) || '-'}</div>
                 </div>
             `;
 
             tr.innerHTML = `
                 <td>
-                    <strong>${c.name}</strong> ${overLimitBadge}
+                    <strong>${escapeHtml(c.name)}</strong> ${overLimitBadge}
                     ${detailsHtml}
                 </td>
                 <td style="vertical-align: top; padding-top: 20px;">${c.hoursTotal}h</td>
@@ -645,7 +655,7 @@ class AppController {
 
         records.forEach(r => {
             const client = clientsMap[r.clientId];
-            const clientName = client ? client.name : '<Deletado>';
+            const clientName = client ? escapeHtml(client.name) : '&lt;Deletado&gt;';
             const hoursStr = (r.minutes / 60).toFixed(2) + 'h';
             const timeRange = (r.startTime && r.endTime) ? `<br><small class="text-muted">${r.startTime} às ${r.endTime}</small>` : '';
 
@@ -653,7 +663,7 @@ class AppController {
             tr.innerHTML = `
                 <td>${r.date.split('-').reverse().join('/')}${timeRange}</td>
                 <td><strong>${clientName}</strong></td>
-                <td>${r.description}</td>
+                <td>${escapeHtml(r.description)}</td>
                 <td>${r.minutes} min <span class="text-muted">(${hoursStr})</span></td>
                 <td>
                     <div style="display: flex; gap: 8px;">
@@ -841,7 +851,7 @@ class AppController {
 
             card.innerHTML = `
                 <div class="stat-header">
-                    <span class="client-name">${stat.monthName}</span>
+                    <span class="client-name">${escapeHtml(stat.monthName)}</span>
                     <span style="font-weight: 600; color: var(--primary-color)">${hoursUsed}h utilizadas</span>
                 </div>
                 <div style="margin-top: 12px; font-size: 0.9rem;">
@@ -890,7 +900,7 @@ class AppController {
             const tr = document.createElement('tr');
             tr.innerHTML = `
                 <td>${r.date.split('-').reverse().join('/')}${timeRange}</td>
-                <td>${r.description}</td>
+                <td>${escapeHtml(r.description)}</td>
                 <td>${r.minutes} min <span class="text-muted">(${hoursStr})</span></td>
                 <td>
                     <div style="display: flex; gap: 8px;">
@@ -949,7 +959,7 @@ class AppController {
 
         tasks.forEach(task => {
             const client = clientsMap[task.clientId];
-            const clientName = client ? client.name : '<Desconhecido>';
+            const clientName = client ? escapeHtml(client.name) : '&lt;Desconhecido&gt;';
 
             const status = task.status || 'new';
             if (counts[status] !== undefined) counts[status]++;
@@ -987,7 +997,7 @@ class AppController {
 
             card.innerHTML = `
                 <div class="task-priority-bar ${priorityClass}"></div>
-                <div class="task-title">${task.title}</div>
+                <div class="task-title">${escapeHtml(task.title)}</div>
                 <div class="task-client-name">${clientName}</div>
                 <div class="task-meta">
                     ${delayHtml ? `<div>${delayHtml}</div>` : ''}
@@ -1366,16 +1376,16 @@ class AppController {
         let clientName = '';
         if (ev.clientId) {
             const client = clientsMap[ev.clientId];
-            if (client) clientName = `<div style="display:flex; align-items:center; gap:4px;"><i data-lucide="user" style="width:10px; height:10px;"></i> ${client.name}</div>`;
+            if (client) clientName = `<div style="display:flex; align-items:center; gap:4px;"><i data-lucide="user" style="width:10px; height:10px;"></i> ${escapeHtml(client.name)}</div>`;
         }
 
         return `
-            <div class="event-block ${typeClass}" 
-                 style="top: ${top}px; height: ${height}px; width: ${width};" 
+            <div class="event-block ${typeClass}"
+                 style="top: ${top}px; height: ${height}px; width: ${width};"
                  onclick="app.editAgendaEvent('${ev.id}')">
-                
+
                 <div style="display: flex; justify-content: space-between; align-items: flex-start;">
-                    <div class="event-title">${ev.title}</div>
+                    <div class="event-title">${escapeHtml(ev.title)}</div>
                     <button class="btn btn-danger" style="padding: 2px 4px; font-size: 0.6rem; border-radius: 4px; background: rgba(0,0,0,0.3); border:none; color:white;"
                             onclick="app.deleteAgendaEvent('${ev.id}', event)">
                         <i data-lucide="x" style="width: 12px; height: 12px;"></i>
