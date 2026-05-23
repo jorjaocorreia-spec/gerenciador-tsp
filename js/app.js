@@ -126,7 +126,7 @@ class AppController {
     // ===================================
     // FORM SUBMITS
     // ===================================
-    handleClientSubmit(e) {
+    async handleClientSubmit(e) {
         e.preventDefault();
         const id = document.getElementById('client-id').value;
         const name = document.getElementById('client-name').value;
@@ -138,17 +138,15 @@ class AppController {
         const status = document.getElementById('client-status').value;
 
         if (id) {
-            // Edição
-            store.updateClient(id, name, hours, csName, projectNum, clientPays, notes, status);
+            await store.updateClient(id, name, hours, csName, projectNum, clientPays, notes, status);
         } else {
-            // Criação
-            store.addClient(name, hours, csName, projectNum, clientPays, notes, status);
+            await store.addClient(name, hours, csName, projectNum, clientPays, notes, status);
         }
 
         e.target.reset();
         document.getElementById('client-id').value = '';
         this.closeModal('modal-client');
-        this.renderAll();
+        await this.renderAll();
     }
 
     calculateConsultantValue() {
@@ -187,7 +185,7 @@ class AppController {
         }
     }
 
-    handleRecordSubmit(e) {
+    async handleRecordSubmit(e) {
         e.preventDefault();
         const recordId = document.getElementById('record-id').value;
         const clientId = document.getElementById('record-client').value;
@@ -203,9 +201,9 @@ class AppController {
         }
 
         if (recordId) {
-            store.updateRecord(recordId, clientId, date, startTime, endTime, minutes, desc);
+            await store.updateRecord(recordId, clientId, date, startTime, endTime, minutes, desc);
         } else {
-            store.addRecord(clientId, date, startTime, endTime, minutes, desc);
+            await store.addRecord(clientId, date, startTime, endTime, minutes, desc);
         }
 
         e.target.reset();
@@ -213,25 +211,25 @@ class AppController {
         document.getElementById('record-calculated').dataset.minutes = 0;
         document.getElementById('record-date').valueAsDate = new Date();
         this.closeModal('modal-record');
-        this.renderAll();
+        await this.renderAll();
     }
 
-    handleDeleteClient(id) {
+    async handleDeleteClient(id) {
         if (confirm("Tem certeza que deseja excluir este cliente e TODOS os seus atendimentos?")) {
-            store.deleteClient(id);
-            this.renderAll();
+            await store.deleteClient(id);
+            await this.renderAll();
         }
     }
 
-    handleDeleteRecord(id) {
+    async handleDeleteRecord(id) {
         if (confirm("Deseja realmente apagar este lançamento?")) {
-            store.deleteRecord(id);
-            this.renderAll();
+            await store.deleteRecord(id);
+            await this.renderAll();
         }
     }
 
-    handleEditRecord(id) {
-        const r = store.getRecord(id);
+    async handleEditRecord(id) {
+        const r = await store.getRecord(id);
         if (!r) return;
         document.getElementById('record-id').value = r.id;
         document.getElementById('record-client').value = r.clientId;
@@ -246,10 +244,10 @@ class AppController {
         this.openModal('modal-record');
     }
 
-    handleViewRecord(id) {
-        const r = store.getRecord(id);
+    async handleViewRecord(id) {
+        const r = await store.getRecord(id);
         if (!r) return;
-        const client = store.getClient(r.clientId);
+        const client = await store.getClient(r.clientId);
 
         document.getElementById('view-record-client').value = client ? client.name : '<Deletado>';
         document.getElementById('view-record-date').value = r.date.split('-').reverse().join('/');
@@ -265,7 +263,7 @@ class AppController {
     // ===================================
     // TAREFAS (Ações e Submits)
     // ===================================
-    handleTaskSubmit(e) {
+    async handleTaskSubmit(e) {
         e.preventDefault();
         const id = document.getElementById('task-id').value;
         const clientId = document.getElementById('task-client').value;
@@ -297,31 +295,29 @@ class AppController {
 
         if (id) {
             taskData.id = id;
-            store.updateTask(taskData);
+            await store.updateTask(taskData);
         } else {
-            store.addTask(taskData);
+            await store.addTask(taskData);
         }
 
         this.closeModal('modal-task');
-        this.renderAll();
+        await this.renderAll();
     }
 
-    handleTaskTimeSubmit(e) {
+    async handleTaskTimeSubmit(e) {
         e.preventDefault();
         const id = document.getElementById('time-task-id').value;
         const minutes = document.getElementById('time-task-minutes').value;
-        const desc = document.getElementById('time-task-desc').value;
 
         if (id && minutes) {
-            // Pode expandir para salvar tb em atendimentos no futuro se desejar
-            store.addTaskTime(id, minutes);
+            await store.addTaskTime(id, minutes);
             this.closeModal('modal-task-time');
-            this.renderAll();
+            await this.renderAll();
         }
     }
 
-    handleEditTask(id) {
-        const t = store.getTask(id);
+    async handleEditTask(id) {
+        const t = await store.getTask(id);
         if (!t) return;
         document.getElementById('modal-task-title').innerText = 'Editar Tarefa';
         document.getElementById('task-id').value = t.id;
@@ -336,10 +332,10 @@ class AppController {
         this.openModal('modal-task');
     }
 
-    handleDeleteTask(id) {
+    async handleDeleteTask(id) {
         if (confirm("Deseja realmente apagar esta tarefa?")) {
-            store.deleteTask(id);
-            this.renderAll();
+            await store.deleteTask(id);
+            await this.renderAll();
         }
     }
 
@@ -368,7 +364,7 @@ class AppController {
         }
     }
 
-    dropTask(e) {
+    async dropTask(e) {
         e.preventDefault();
         const dropzone = e.currentTarget;
         dropzone.classList.remove('drag-over');
@@ -377,43 +373,46 @@ class AppController {
         const newStatus = dropzone.dataset.status;
 
         if (taskId && newStatus) {
-            store.updateTaskStatus(taskId, newStatus);
-            this.renderAll();
+            await store.updateTaskStatus(taskId, newStatus);
+            await this.renderAll();
         }
     }
 
     // Chamado após login bem-sucedido
-    initAfterAuth() {
-        this.renderAll();
+    async initAfterAuth() {
+        await this.renderAll();
     }
 
     // ===================================
     // RENDERS
     // ===================================
-    renderAll() {
-        this.updateClientSelects(); // ATUALIZA TODOS OS SELECTS (inclusive os de Filtro)
-        this.renderDashboard();
-        this.renderClients();
-        this.renderRecords();
-        this.renderClientDashboard();
-        this.renderMonthRecords();
-        this.renderTasks();
-        this.renderAgenda();
-        lucide.createIcons(); // Reactiva ícones renderizados dinamicamente
+    async renderAll() {
+        await this.updateClientSelects();
+        await Promise.all([
+            this.renderDashboard(),
+            this.renderClients(),
+            this.renderRecords(),
+            this.renderClientDashboard(),
+            this.renderMonthRecords(),
+            this.renderTasks(),
+            this.renderAgenda()
+        ]);
+        lucide.createIcons();
     }
 
-    renderDashboard() {
+    async renderDashboard() {
         const container = document.getElementById('dashboard-container');
-        
+
         let showActive = true;
         let showFinished = false;
-        
+
         const filterActiveEl = document.getElementById('dash-filter-active');
         const filterFinishedEl = document.getElementById('dash-filter-finished');
         if (filterActiveEl) showActive = filterActiveEl.checked;
         if (filterFinishedEl) showFinished = filterFinishedEl.checked;
 
-        const clients = store.getClients().filter(c => {
+        const allClients = await store.getClients();
+        const clients = allClients.filter(c => {
             const status = c.status || 'active';
             if (status === 'active' && showActive) return true;
             if (status === 'finished' && showFinished) return true;
@@ -422,8 +421,7 @@ class AppController {
 
         const today = new Date();
         const currentYearMonth = today.getFullYear() + "-" + String(today.getMonth() + 1).padStart(2, '0');
-        let stats = clients.map(c => store.getClientStats(c.id, currentYearMonth));
-        // Remove null stats case a client is missing
+        let stats = await Promise.all(clients.map(c => store.getClientStats(c.id, currentYearMonth)));
         stats = stats.filter(s => s !== null);
 
         container.innerHTML = '';
@@ -463,9 +461,9 @@ class AppController {
         });
     }
 
-    renderClients() {
+    async renderClients() {
         const tbody = document.querySelector('#clients-table tbody');
-        const clients = store.getClients();
+        const clients = await store.getClients();
         tbody.innerHTML = '';
 
         if (clients.length === 0) {
@@ -473,9 +471,9 @@ class AppController {
             return;
         }
 
-        clients.forEach(c => {
+        for (const c of clients) {
             const tr = document.createElement('tr');
-            const stat = store.getClientStats(c.id);
+            const stat = await store.getClientStats(c.id);
             const overLimitBadge = stat && stat.isOverLimit ? `<span style="background: var(--danger-color); color: white; padding: 2px 6px; border-radius: 4px; font-size: 0.7rem; margin-left: 8px;">Estourado</span>` : '';
 
             // Formatador de Moeda
@@ -513,11 +511,11 @@ class AppController {
                 </td>
             `;
             tbody.appendChild(tr);
-        });
+        }
     }
 
-    openEditClientModal(id) {
-        const client = store.getClient(id);
+    async openEditClientModal(id) {
+        const client = await store.getClient(id);
         if (!client) return;
 
         document.getElementById('modal-client-title').innerText = 'Editar Cliente';
@@ -536,10 +534,9 @@ class AppController {
         this.openModal('modal-client');
     }
 
-    renderRecords() {
+    async renderRecords() {
         const tbody = document.querySelector('#records-table tbody');
-        // Ordena registros do mais recente para o mais antigo considerando a data do atendimento
-        let records = store.getRecords().sort((a, b) => new Date(b.date) - new Date(a.date));
+        let records = (await store.getRecords()).sort((a, b) => new Date(b.date) - new Date(a.date));
 
         // APERFEIÇOAMENTO: Filtros da Interface
         const filterClient = document.getElementById('filter-client')?.value;
@@ -563,8 +560,15 @@ class AppController {
             return;
         }
 
+        const clientsMap = {};
+        for (const r of records) {
+            if (r.clientId && !clientsMap[r.clientId]) {
+                clientsMap[r.clientId] = await store.getClient(r.clientId);
+            }
+        }
+
         records.forEach(r => {
-            const client = store.getClient(r.clientId);
+            const client = clientsMap[r.clientId];
             const clientName = client ? client.name : '<Deletado>';
             const hoursStr = (r.minutes / 60).toFixed(2) + 'h';
             const timeRange = (r.startTime && r.endTime) ? `<br><small class="text-muted">${r.startTime} às ${r.endTime}</small>` : '';
@@ -593,7 +597,7 @@ class AppController {
         });
     }
 
-    updateClientSelects() {
+    async updateClientSelects() {
         const selects = [
             document.getElementById('record-client'),
             document.getElementById('filter-client'),
@@ -602,7 +606,7 @@ class AppController {
             document.getElementById('agenda-client')
         ];
 
-        const clients = store.getClients();
+        const clients = await store.getClients();
 
         selects.forEach(select => {
             if (!select) return;
@@ -629,18 +633,18 @@ class AppController {
         });
     }
 
-    clearFilters() {
+    async clearFilters() {
         if (document.getElementById('filter-client')) document.getElementById('filter-client').value = '';
         if (document.getElementById('filter-date-start')) document.getElementById('filter-date-start').value = '';
         if (document.getElementById('filter-date-end')) document.getElementById('filter-date-end').value = '';
-        this.renderAll();
+        await this.renderAll();
     }
 
-    exportFilteredToPDF() {
+    async exportFilteredToPDF() {
         const { jsPDF } = window.jspdf;
         const doc = new jsPDF();
 
-        let records = store.getRecords().sort((a, b) => new Date(b.date) - new Date(a.date));
+        let records = (await store.getRecords()).sort((a, b) => new Date(b.date) - new Date(a.date));
 
         const filterClient = document.getElementById('filter-client')?.value;
         const filterStart = document.getElementById('filter-date-start')?.value;
@@ -650,7 +654,7 @@ class AppController {
 
         if (filterClient) {
             records = records.filter(r => r.clientId === filterClient);
-            const client = store.getClient(filterClient);
+            const client = await store.getClient(filterClient);
             if (client) {
                 clientNameHeader = client.name;
             }
@@ -684,8 +688,15 @@ class AppController {
         const tableColumn = ["Data e Hora", "Cliente", "Descrição da Atividade", "Tempo Gasto"];
         const tableRows = [];
 
+        const clientsMap = {};
+        for (const r of records) {
+            if (r.clientId && !clientsMap[r.clientId]) {
+                clientsMap[r.clientId] = await store.getClient(r.clientId);
+            }
+        }
+
         records.forEach(r => {
-            const client = store.getClient(r.clientId);
+            const client = clientsMap[r.clientId];
             const clientName = client ? client.name : '<Deletado>';
             const hoursStr = (r.minutes / 60).toFixed(2) + 'h';
             const timeRange = (r.startTime && r.endTime) ? `\n${r.startTime} às ${r.endTime}` : '';
@@ -723,16 +734,16 @@ class AppController {
         document.querySelectorAll('.nav-item').forEach(item => item.classList.remove('active'));
     }
 
-    renderClientDashboard() {
+    async renderClientDashboard() {
         if (this.currentView !== 'client-dashboard' || !this.selectedClient) return;
 
-        const client = store.getClient(this.selectedClient);
+        const client = await store.getClient(this.selectedClient);
         if (!client) return;
 
         document.getElementById('client-dashboard-title').innerText = client.name;
 
         const container = document.getElementById('client-months-container');
-        const monthlyStats = store.getMonthlyStatsByClient(this.selectedClient);
+        const monthlyStats = await store.getMonthlyStatsByClient(this.selectedClient);
         container.innerHTML = '';
 
         if (monthlyStats.length === 0) {
@@ -774,13 +785,13 @@ class AppController {
         document.querySelectorAll('.nav-item').forEach(item => item.classList.remove('active'));
     }
 
-    renderMonthRecords() {
+    async renderMonthRecords() {
         if (this.currentView !== 'month-records' || !this.selectedClient || !this.selectedMonth) return;
 
-        const client = store.getClient(this.selectedClient);
+        const client = await store.getClient(this.selectedClient);
         if (!client) return;
 
-        const monthlyStats = store.getMonthlyStatsByClient(this.selectedClient);
+        const monthlyStats = await store.getMonthlyStatsByClient(this.selectedClient);
         const monthData = monthlyStats.find(m => m.yearMonth === this.selectedMonth);
 
         document.getElementById('month-records-title').innerText = monthData ? monthData.monthName : this.selectedMonth;
@@ -826,10 +837,10 @@ class AppController {
     // ===================================
     // KANBAN & TASKS RENDER
     // ===================================
-    renderTasks() {
+    async renderTasks() {
         if (this.currentView !== 'tasks') return;
 
-        let tasks = store.getTasks();
+        let tasks = await store.getTasks();
 
         // Filters
         const filterClient = document.getElementById('filter-task-client')?.value;
@@ -854,8 +865,12 @@ class AppController {
 
         const counts = { new: 0, doing: 0, done: 0 };
 
+        const clientIds = [...new Set(tasks.map(t => t.clientId).filter(Boolean))];
+        const clientsMap = {};
+        await Promise.all(clientIds.map(async id => { clientsMap[id] = await store.getClient(id); }));
+
         tasks.forEach(task => {
-            const client = store.getClient(task.clientId);
+            const client = clientsMap[task.clientId];
             const clientName = client ? client.name : '<Desconhecido>';
 
             const status = task.status || 'new';
@@ -915,11 +930,11 @@ class AppController {
         document.getElementById('kanban-count-doing').innerText = counts.doing;
         document.getElementById('kanban-count-done').innerText = counts.done;
 
-        this.renderTasksDashboard(tasks, filterClient);
+        await this.renderTasksDashboard(tasks, filterClient);
         lucide.createIcons();
     }
 
-    renderTasksDashboard(tasks, filteredClientId) {
+    async renderTasksDashboard(tasks, filteredClientId) {
         const container = document.getElementById('tasks-dashboard-container');
         if (!container) return;
 
@@ -936,7 +951,7 @@ class AppController {
             totalSpent += parseInt(t.spentMinutes) || 0;
         });
 
-        const stats = store.getAllStats();
+        const stats = await store.getAllStats();
         const overLimitClients = stats.filter(s => s.isOverLimit);
 
         container.innerHTML = `
@@ -971,36 +986,36 @@ class AppController {
     // ===================================
     // AGENDA
     // ===================================
-    switchAgendaMode(mode) {
+    async switchAgendaMode(mode) {
         this.agendaViewMode = mode;
         document.getElementById('btn-agenda-weekly').classList.toggle('active-mode', mode === 'weekly');
         document.getElementById('btn-agenda-daily').classList.toggle('active-mode', mode === 'daily');
-        this.renderAgenda();
+        await this.renderAgenda();
     }
 
-    prevAgendaDate() {
+    async prevAgendaDate() {
         if (this.agendaViewMode === 'daily') {
             this.agendaCurrentDate.setDate(this.agendaCurrentDate.getDate() - 1);
         } else {
             this.agendaCurrentDate.setDate(this.agendaCurrentDate.getDate() - 7);
         }
-        this.renderAgenda();
+        await this.renderAgenda();
     }
 
-    nextAgendaDate() {
+    async nextAgendaDate() {
         if (this.agendaViewMode === 'daily') {
             this.agendaCurrentDate.setDate(this.agendaCurrentDate.getDate() + 1);
         } else {
             this.agendaCurrentDate.setDate(this.agendaCurrentDate.getDate() + 7);
         }
-        this.renderAgenda();
+        await this.renderAgenda();
     }
 
-    updateAgendaTaskSelect() {
+    async updateAgendaTaskSelect() {
         const select = document.getElementById('agenda-task');
         if (!select) return;
         select.innerHTML = '<option value="">-- Nenhuma tarefa vinculada --</option>';
-        const tasks = store.getTasks().filter(t => t.status !== 'done');
+        const tasks = (await store.getTasks()).filter(t => t.status !== 'done');
         tasks.forEach(t => {
             const opt = document.createElement('option');
             opt.value = t.id;
@@ -1046,7 +1061,7 @@ class AppController {
 
         if (id) {
             eventData.id = id;
-            const updated = store.updateAgendaEvent(eventData);
+            const updated = await store.updateAgendaEvent(eventData);
             if (syncGoogle && updated && updated.calendarEventId) {
                 await calendarAPI.updateGoogleEvent(updated.calendarEventId, eventData);
             }
@@ -1055,7 +1070,7 @@ class AppController {
                 const gCalId = await calendarAPI.createGoogleEvent(eventData);
                 if (gCalId) eventData.calendarEventId = gCalId;
             }
-            store.addAgendaEvent(eventData);
+            await store.addAgendaEvent(eventData);
         }
 
         btn.innerText = originalText;
@@ -1065,8 +1080,8 @@ class AppController {
         this.renderAgenda();
     }
 
-    editAgendaEvent(id) {
-        const ev = store.getAgendaEvent(id);
+    async editAgendaEvent(id) {
+        const ev = await store.getAgendaEvent(id);
         if (!ev) return;
 
         document.getElementById('modal-agenda-title').innerText = 'Editar Agendamento';
@@ -1090,16 +1105,16 @@ class AppController {
             eventRoot.stopPropagation();
         }
         if (confirm("Deseja deletar este agendamento?")) {
-            const ev = store.getAgendaEvent(id);
+            const ev = await store.getAgendaEvent(id);
             if (ev && ev.calendarEventId && calendarAPI.isAuthenticated) {
                 await calendarAPI.deleteGoogleEvent(ev.calendarEventId);
             }
-            store.deleteAgendaEvent(id);
-            this.renderAgenda();
+            await store.deleteAgendaEvent(id);
+            await this.renderAgenda();
         }
     }
 
-    renderAgenda() {
+    async renderAgenda() {
         if (this.currentView !== 'agenda') return;
 
         const container = document.getElementById('agenda-container');
@@ -1119,9 +1134,9 @@ class AppController {
         }
 
         if (this.agendaViewMode === 'daily') {
-            this.renderAgendaDaily(container);
+            await this.renderAgendaDaily(container);
         } else {
-            this.renderAgendaWeekly(container);
+            await this.renderAgendaWeekly(container);
         }
         lucide.createIcons();
     }
@@ -1162,15 +1177,19 @@ class AppController {
         return new Date(date.setDate(diff));
     }
 
-    renderAgendaDaily(container) {
+    async renderAgendaDaily(container) {
         document.getElementById('agenda-current-date-label').innerText = this.formatDateBR(this.agendaCurrentDate);
 
         const isoDate = this.agendaCurrentDate.toISOString().split('T')[0];
-        const events = store.getEventsByDate(isoDate);
+        const events = await store.getEventsByDate(isoDate);
+
+        const clientIds = [...new Set(events.map(e => e.clientId).filter(Boolean))];
+        const clientsMap = {};
+        await Promise.all(clientIds.map(async id => { clientsMap[id] = await store.getClient(id); }));
 
         let eventsHtml = '';
         events.forEach(ev => {
-            eventsHtml += this.createEventBlockHtml(ev, '100%');
+            eventsHtml += this.createEventBlockHtml(ev, '100%', clientsMap);
         });
 
         container.innerHTML = `
@@ -1191,7 +1210,7 @@ class AppController {
         `;
     }
 
-    renderAgendaWeekly(container) {
+    async renderAgendaWeekly(container) {
         const monday = this.getMonday(this.agendaCurrentDate);
         const friday = new Date(monday);
         friday.setDate(friday.getDate() + 4);
@@ -1202,7 +1221,11 @@ class AppController {
         document.getElementById('agenda-current-date-label').innerText =
             `${this.formatDateBR(monday)} - ${this.formatDateBR(friday)}`;
 
-        const events = store.getEventsByWeek(isoStart, isoEnd);
+        const events = await store.getEventsByWeek(isoStart, isoEnd);
+
+        const clientIds = [...new Set(events.map(e => e.clientId).filter(Boolean))];
+        const clientsMap = {};
+        await Promise.all(clientIds.map(async id => { clientsMap[id] = await store.getClient(id); }));
 
         const days = ['Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta'];
         let headersHtml = '';
@@ -1220,7 +1243,7 @@ class AppController {
             const dayEvents = events.filter(e => e.date === isoCurrentDay);
             let dayEventsHtml = '';
             dayEvents.forEach(ev => {
-                dayEventsHtml += this.createEventBlockHtml(ev, 'calc(100% - 8px)');
+                dayEventsHtml += this.createEventBlockHtml(ev, 'calc(100% - 8px)', clientsMap);
             });
 
             columnsHtml += `
@@ -1248,14 +1271,14 @@ class AppController {
         `;
     }
 
-    createEventBlockHtml(ev, width) {
+    createEventBlockHtml(ev, width, clientsMap = {}) {
         const top = this.getTopPositionForTime(ev.startTime);
         const height = this.getHeightForTimeRange(ev.startTime, ev.endTime);
         const typeClass = 'type-' + ev.type;
 
         let clientName = '';
         if (ev.clientId) {
-            const client = store.getClient(ev.clientId);
+            const client = clientsMap[ev.clientId];
             if (client) clientName = `<div style="display:flex; align-items:center; gap:4px;"><i data-lucide="user" style="width:10px; height:10px;"></i> ${client.name}</div>`;
         }
 
@@ -1283,9 +1306,9 @@ class AppController {
         `;
     }
 
-    onCalendarAuthenticated() {
+    async onCalendarAuthenticated() {
         console.log("App ciente que Calendar está autenticado");
-        this.renderAgenda();
+        await this.renderAgenda();
     }
 
     async promptGoogleSync() {
@@ -1321,7 +1344,7 @@ class AppController {
         const googleEvents = await calendarAPI.syncEventsFromGoogle(30);
         if (!googleEvents) return;
 
-        const localEvents = store.getAgendaEvents();
+        const localEvents = await store.getAgendaEvents();
 
         // 1. O que tem no Google que não temos (ou foi atualizado lá)
         for (const gEv of googleEvents) {
@@ -1365,9 +1388,9 @@ class AppController {
                 mappedData.type = match.type; // Preserva o tipo customizado do TSP
                 mappedData.clientId = match.clientId;
                 mappedData.relatedTaskId = match.relatedTaskId;
-                store.updateAgendaEvent(mappedData);
+                await store.updateAgendaEvent(mappedData);
             } else {
-                store.addAgendaEvent(mappedData);
+                await store.addAgendaEvent(mappedData);
             }
         }
 
@@ -1606,8 +1629,8 @@ class AppController {
         this.openPdfConfirmationModal();
     }
 
-    openPdfConfirmationModal() {
-        const clients = store.getClients();
+    async openPdfConfirmationModal() {
+        const clients = await store.getClients();
         let allMatched = true;
         let unMatchedProjects = new Set();
         let statusInput = document.getElementById('pdf-client-name');
@@ -1668,21 +1691,21 @@ class AppController {
         });
     }
 
-    confirmPdfImport() {
+    async confirmPdfImport() {
         let importedCount = 0;
-        this.pendingPdfRecords.forEach((r, idx) => {
+        for (const [idx, r] of this.pendingPdfRecords.entries()) {
             const isChecked = document.getElementById(`pdf-check-${idx}`).checked;
             if (isChecked && r.matchedClientId) {
                 const desc = document.getElementById(`pdf-desc-${idx}`).value;
-                store.addRecord(r.matchedClientId, r.date, r.startTime, r.endTime, r.minutes, desc);
+                await store.addRecord(r.matchedClientId, r.date, r.startTime, r.endTime, r.minutes, desc);
                 importedCount++;
             }
-        });
+        }
 
         alert(`Sucesso! ${importedCount} atendimentos foram importados.`);
         this.closeModal('modal-import-pdf');
         this.pendingPdfRecords = [];
-        this.renderAll();
+        await this.renderAll();
     }
 
     // ===================================

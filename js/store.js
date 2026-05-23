@@ -1,324 +1,276 @@
-/**
- * TSP Store - Gerencia o estado da aplicação via LocalStorage
- */
 class TSPStore {
-    constructor() {
-        this.STORAGE_KEY = 'tsp_data_v1';
-        this.data = {
-            clients: [], // { id, name, hoursTotal, createdAt }
-            records: [], // { id, clientId, date, minutes, description, createdAt }
-            tasks: [],   // Kanban tasks array
-            agendaEvents: [] // { id, title, description, type, clientId, relatedTaskId, date, startTime, endTime, location, createdAt, calendarEventId }
-        };
-        this.load();
+    get db() { return window.supabaseClient; }
+    get userId() { return Auth.getUserId(); }
+
+    // ── Mappers camelCase ↔ snake_case ────────────────────────────
+
+    _client(r) {
+        return { id: r.id, name: r.name, hoursTotal: parseFloat(r.hours_total) || 0,
+            csName: r.cs_name || '', projectNum: r.project_num || '',
+            clientPays: parseFloat(r.client_pays) || 0, notes: r.notes || '',
+            status: r.status || 'active', createdAt: r.created_at };
     }
 
-    // Carrega dados do LocalStorage
-    load() {
-        const stored = localStorage.getItem(this.STORAGE_KEY);
-        if (stored) {
-            try {
-                this.data = JSON.parse(stored);
-
-                // Sanitize existing records (Fix string concatenation bug)
-                if (this.data.records) {
-                    this.data.records.forEach(r => {
-                        if (typeof r.minutes === 'string') {
-                            r.minutes = parseInt(r.minutes, 10) || 0;
-                        }
-                    });
-                }
-                if (!this.data.tasks) {
-                    this.data.tasks = [];
-                }
-                if (!this.data.agendaEvents) {
-                    this.data.agendaEvents = [];
-                }
-            } catch (e) {
-                console.error("Erro ao carregar dados do LocalStorage", e);
-            }
-        }
+    _record(r) {
+        return { id: r.id, clientId: r.client_id, date: r.date,
+            startTime: r.start_time || '', endTime: r.end_time || '',
+            minutes: parseInt(r.minutes) || 0, description: r.description || '',
+            createdAt: r.created_at };
     }
 
-    // Salva dados no LocalStorage
-    save() {
-        localStorage.setItem(this.STORAGE_KEY, JSON.stringify(this.data));
+    _task(r) {
+        return { id: r.id, clientId: r.client_id, title: r.title,
+            description: r.description || '', status: r.status || 'new',
+            priority: r.priority || 'medium', dueDate: r.due_date || '',
+            estimatedMinutes: parseInt(r.estimated_minutes) || 0,
+            spentMinutes: parseInt(r.spent_minutes) || 0,
+            createdAt: r.created_at, updatedAt: r.updated_at };
     }
 
-    // ==========================================
-    // CLIENTES
-    // ==========================================
-    getClients() {
-        return this.data.clients || [];
+    _event(r) {
+        return { id: r.id, clientId: r.client_id, relatedTaskId: r.related_task_id,
+            title: r.title, description: r.description || '', type: r.type || 'meeting',
+            date: r.date, startTime: r.start_time || '', endTime: r.end_time || '',
+            location: r.location || '', calendarEventId: r.calendar_event_id || null,
+            createdAt: r.created_at };
     }
 
-    getClient(id) {
-        return this.data.clients.find(c => c.id === id);
+    // ── CLIENTES ─────────────────────────────────────────────────
+
+    async getClients() {
+        const { data, error } = await this.db.from('clients').select('*')
+            .eq('user_id', this.userId).order('created_at');
+        if (error) throw error;
+        return data.map(r => this._client(r));
     }
 
-    addClient(name, hoursTotal, csName, projectNum, clientPays, notes, status) {
-        const newClient = {
-            id: crypto.randomUUID(),
-            name,
-            hoursTotal: parseFloat(hoursTotal),
-            csName: csName || '',
-            projectNum: projectNum || '',
-            clientPays: parseFloat(clientPays) || 0,
-            notes: notes || '',
-            status: status || 'active',
-            createdAt: new Date().toISOString()
-        };
-        this.data.clients.push(newClient);
-        this.save();
-        return newClient;
+    async getClient(id) {
+        const { data, error } = await this.db.from('clients').select('*').eq('id', id).single();
+        if (error) return null;
+        return this._client(data);
     }
 
-    updateClient(id, name, hoursTotal, csName, projectNum, clientPays, notes, status) {
-        const client = this.getClient(id);
-        if (client) {
-            client.name = name;
-            client.hoursTotal = parseFloat(hoursTotal);
-            client.csName = csName || '';
-            client.projectNum = projectNum || '';
-            client.clientPays = parseFloat(clientPays) || 0;
-            client.notes = notes || '';
-            client.status = status || 'active';
-            this.save();
-        }
-        return client;
+    async addClient(name, hoursTotal, csName, projectNum, clientPays, notes, status) {
+        const { data, error } = await this.db.from('clients').insert({
+            user_id: this.userId, name,
+            hours_total: parseFloat(hoursTotal) || 0, cs_name: csName || '',
+            project_num: projectNum || '', client_pays: parseFloat(clientPays) || 0,
+            notes: notes || '', status: status || 'active'
+        }).select().single();
+        if (error) throw error;
+        return this._client(data);
     }
 
-    deleteClient(id) {
-        this.data.clients = this.data.clients.filter(c => c.id !== id);
-        // Remove também os lançamentos associados
-        this.data.records = this.data.records.filter(r => r.clientId !== id);
-        if (this.data.tasks) {
-            this.data.tasks = this.data.tasks.filter(t => t.clientId !== id);
-        }
-        this.save();
+    async updateClient(id, name, hoursTotal, csName, projectNum, clientPays, notes, status) {
+        const { data, error } = await this.db.from('clients').update({
+            name, hours_total: parseFloat(hoursTotal) || 0, cs_name: csName || '',
+            project_num: projectNum || '', client_pays: parseFloat(clientPays) || 0,
+            notes: notes || '', status: status || 'active'
+        }).eq('id', id).select().single();
+        if (error) throw error;
+        return this._client(data);
     }
 
-    // ==========================================
-    // LANÇAMENTOS (ATENDIMENTOS)
-    // ==========================================
-    getRecords() {
-        return this.data.records || [];
+    async deleteClient(id) {
+        const { error } = await this.db.from('clients').delete().eq('id', id);
+        if (error) throw error;
     }
 
-    getRecordsByClient(clientId) {
-        return this.data.records.filter(r => r.clientId === clientId);
+    // ── ATENDIMENTOS ──────────────────────────────────────────────
+
+    async getRecords() {
+        const { data, error } = await this.db.from('records').select('*')
+            .eq('user_id', this.userId).order('date', { ascending: false });
+        if (error) throw error;
+        return data.map(r => this._record(r));
     }
 
-    addRecord(clientId, date, startTime, endTime, minutes, description) {
-        const newRecord = {
-            id: crypto.randomUUID(),
-            clientId,
-            date,
-            startTime,
-            endTime,
-            minutes: parseInt(minutes, 10),
-            description,
-            createdAt: new Date().toISOString()
-        };
-        this.data.records.push(newRecord);
-        this.save();
-        return newRecord;
+    async getRecord(id) {
+        const { data, error } = await this.db.from('records').select('*').eq('id', id).single();
+        if (error) return null;
+        return this._record(data);
     }
 
-    getRecord(id) {
-        return this.data.records.find(r => r.id === id);
+    async getRecordsByClient(clientId) {
+        const { data, error } = await this.db.from('records').select('*')
+            .eq('user_id', this.userId).eq('client_id', clientId).order('date', { ascending: false });
+        if (error) throw error;
+        return data.map(r => this._record(r));
     }
 
-    updateRecord(id, clientId, date, startTime, endTime, minutes, description) {
-        const index = this.data.records.findIndex(r => r.id === id);
-        if (index !== -1) {
-            this.data.records[index] = {
-                ...this.data.records[index],
-                clientId,
-                date,
-                startTime,
-                endTime,
-                minutes: parseInt(minutes, 10) || 0,
-                description
-            };
-            this.save();
-            return this.data.records[index];
-        }
-        return null;
+    async addRecord(clientId, date, startTime, endTime, minutes, description) {
+        const { data, error } = await this.db.from('records').insert({
+            user_id: this.userId, client_id: clientId, date,
+            start_time: startTime || '', end_time: endTime || '',
+            minutes: parseInt(minutes) || 0, description: description || ''
+        }).select().single();
+        if (error) throw error;
+        return this._record(data);
     }
 
-    deleteRecord(id) {
-        this.data.records = this.data.records.filter(r => r.id !== id);
-        this.save();
+    async updateRecord(id, clientId, date, startTime, endTime, minutes, description) {
+        const { data, error } = await this.db.from('records').update({
+            client_id: clientId, date, start_time: startTime || '',
+            end_time: endTime || '', minutes: parseInt(minutes) || 0,
+            description: description || ''
+        }).eq('id', id).select().single();
+        if (error) throw error;
+        return this._record(data);
     }
 
-    // ==========================================
-    // TAREFAS (KANBAN)
-    // ==========================================
-    getTasks() {
-        return this.data.tasks || [];
+    async deleteRecord(id) {
+        const { error } = await this.db.from('records').delete().eq('id', id);
+        if (error) throw error;
     }
 
-    getTask(id) {
-        return this.data.tasks.find(t => t.id === id);
+    // ── TAREFAS ───────────────────────────────────────────────────
+
+    async getTasks() {
+        const { data, error } = await this.db.from('tasks').select('*')
+            .eq('user_id', this.userId).order('created_at');
+        if (error) throw error;
+        return data.map(r => this._task(r));
     }
 
-    getTasksByClient(clientId) {
-        return this.getTasks().filter(t => t.clientId === clientId);
+    async getTask(id) {
+        const { data, error } = await this.db.from('tasks').select('*').eq('id', id).single();
+        if (error) return null;
+        return this._task(data);
     }
 
-    addTask(taskData) {
-        const newTask = {
-            id: crypto.randomUUID(),
-            clientId: taskData.clientId,
-            title: taskData.title,
-            description: taskData.description || '',
-            status: taskData.status || 'new', // new, doing, done
-            priority: taskData.priority || 'medium', // low, medium, high
-            dueDate: taskData.dueDate || '',
-            estimatedMinutes: parseInt(taskData.estimatedMinutes, 10) || 0,
-            spentMinutes: 0,
-            attachments: taskData.attachments || [],
-            createdAt: new Date().toISOString(),
-            updatedAt: new Date().toISOString()
-        };
-        this.data.tasks.push(newTask);
-        this.save();
-        return newTask;
+    async getTasksByClient(clientId) {
+        const { data, error } = await this.db.from('tasks').select('*')
+            .eq('user_id', this.userId).eq('client_id', clientId);
+        if (error) throw error;
+        return data.map(r => this._task(r));
     }
 
-    updateTask(taskData) {
-        const index = this.data.tasks.findIndex(t => t.id === taskData.id);
-        if (index !== -1) {
-            this.data.tasks[index] = {
-                ...this.data.tasks[index],
-                ...taskData,
-                updatedAt: new Date().toISOString()
-            };
-            this.save();
-            return this.data.tasks[index];
-        }
-        return null;
+    async addTask(taskData) {
+        const { data, error } = await this.db.from('tasks').insert({
+            user_id: this.userId, client_id: taskData.clientId || null,
+            title: taskData.title, description: taskData.description || '',
+            status: taskData.status || 'new', priority: taskData.priority || 'medium',
+            due_date: taskData.dueDate || null,
+            estimated_minutes: parseInt(taskData.estimatedMinutes) || 0,
+            spent_minutes: 0
+        }).select().single();
+        if (error) throw error;
+        return this._task(data);
     }
 
-    deleteTask(id) {
-        this.data.tasks = this.data.tasks.filter(t => t.id !== id);
-        this.save();
+    async updateTask(taskData) {
+        const { data, error } = await this.db.from('tasks').update({
+            client_id: taskData.clientId || null, title: taskData.title,
+            description: taskData.description || '', status: taskData.status,
+            priority: taskData.priority, due_date: taskData.dueDate || null,
+            estimated_minutes: parseInt(taskData.estimatedMinutes) || 0,
+            updated_at: new Date().toISOString()
+        }).eq('id', taskData.id).select().single();
+        if (error) throw error;
+        return this._task(data);
     }
 
-    updateTaskStatus(id, status) {
-        const index = this.data.tasks.findIndex(t => t.id === id);
-        if (index !== -1) {
-            this.data.tasks[index].status = status;
-            this.data.tasks[index].updatedAt = new Date().toISOString();
-            this.save();
-            return this.data.tasks[index];
-        }
-        return null;
+    async updateTaskStatus(id, status) {
+        const { data, error } = await this.db.from('tasks').update({
+            status, updated_at: new Date().toISOString()
+        }).eq('id', id).select().single();
+        if (error) throw error;
+        return this._task(data);
     }
 
-    addTaskTime(id, minutes) {
-        const index = this.data.tasks.findIndex(t => t.id === id);
-        if (index !== -1) {
-            this.data.tasks[index].spentMinutes += (parseInt(minutes, 10) || 0);
-            this.data.tasks[index].updatedAt = new Date().toISOString();
-            this.save();
-            return this.data.tasks[index];
-        }
-        return null;
+    async addTaskTime(id, minutes) {
+        const task = await this.getTask(id);
+        if (!task) return null;
+        const { data, error } = await this.db.from('tasks').update({
+            spent_minutes: task.spentMinutes + (parseInt(minutes) || 0),
+            updated_at: new Date().toISOString()
+        }).eq('id', id).select().single();
+        if (error) throw error;
+        return this._task(data);
     }
 
-    // ==========================================
-    // AGENDA
-    // ==========================================
-    getAgendaEvents() {
-        return this.data.agendaEvents || [];
+    async deleteTask(id) {
+        const { error } = await this.db.from('tasks').delete().eq('id', id);
+        if (error) throw error;
     }
 
-    getAgendaEvent(id) {
-        return this.data.agendaEvents.find(e => e.id === id);
+    // ── AGENDA ────────────────────────────────────────────────────
+
+    async getAgendaEvents() {
+        const { data, error } = await this.db.from('agenda_events').select('*')
+            .eq('user_id', this.userId).order('date');
+        if (error) throw error;
+        return data.map(r => this._event(r));
     }
 
-    addAgendaEvent(eventData) {
-        const newEvent = {
-            id: crypto.randomUUID(),
-            title: eventData.title || '',
-            description: eventData.description || '',
-            type: eventData.type || 'meeting', // meeting, consulting, task, reminder
-            clientId: eventData.clientId || null,
-            relatedTaskId: eventData.relatedTaskId || null,
-            date: eventData.date || '',
-            startTime: eventData.startTime || '',
-            endTime: eventData.endTime || '',
-            location: eventData.location || '',
-            createdAt: new Date().toISOString(),
-            calendarEventId: eventData.calendarEventId || null
-        };
-        this.data.agendaEvents.push(newEvent);
-        this.save();
-        return newEvent;
+    async getAgendaEvent(id) {
+        const { data, error } = await this.db.from('agenda_events').select('*').eq('id', id).single();
+        if (error) return null;
+        return this._event(data);
     }
 
-    updateAgendaEvent(eventData) {
-        const index = this.data.agendaEvents.findIndex(e => e.id === eventData.id);
-        if (index !== -1) {
-            this.data.agendaEvents[index] = {
-                ...this.data.agendaEvents[index],
-                ...eventData
-            };
-            this.save();
-            return this.data.agendaEvents[index];
-        }
-        return null;
+    async addAgendaEvent(eventData) {
+        const { data, error } = await this.db.from('agenda_events').insert({
+            user_id: this.userId, client_id: eventData.clientId || null,
+            related_task_id: eventData.relatedTaskId || null,
+            title: eventData.title || '', description: eventData.description || '',
+            type: eventData.type || 'meeting', date: eventData.date,
+            start_time: eventData.startTime || '', end_time: eventData.endTime || '',
+            location: eventData.location || '', calendar_event_id: eventData.calendarEventId || null
+        }).select().single();
+        if (error) throw error;
+        return this._event(data);
     }
 
-    deleteAgendaEvent(id) {
-        this.data.agendaEvents = this.data.agendaEvents.filter(e => e.id !== id);
-        this.save();
+    async updateAgendaEvent(eventData) {
+        const { data, error } = await this.db.from('agenda_events').update({
+            client_id: eventData.clientId || null, related_task_id: eventData.relatedTaskId || null,
+            title: eventData.title || '', description: eventData.description || '',
+            type: eventData.type || 'meeting', date: eventData.date,
+            start_time: eventData.startTime || '', end_time: eventData.endTime || '',
+            location: eventData.location || '', calendar_event_id: eventData.calendarEventId || null
+        }).eq('id', eventData.id).select().single();
+        if (error) throw error;
+        return this._event(data);
     }
 
-    getEventsByDate(date) {
-        return this.getAgendaEvents().filter(e => e.date === date);
+    async deleteAgendaEvent(id) {
+        const { error } = await this.db.from('agenda_events').delete().eq('id', id);
+        if (error) throw error;
     }
 
-    getEventsByWeek(startDate, endDate) {
-        // Assume startDate and endDate are 'YYYY-MM-DD' strings
-        return this.getAgendaEvents().filter(e => e.date >= startDate && e.date <= endDate);
+    async getEventsByDate(date) {
+        const { data, error } = await this.db.from('agenda_events').select('*')
+            .eq('user_id', this.userId).eq('date', date);
+        if (error) throw error;
+        return data.map(r => this._event(r));
     }
 
-    // ==========================================
-    // ESTATÍSTICAS E CÁLCULOS
-    // ==========================================
+    async getEventsByWeek(startDate, endDate) {
+        const { data, error } = await this.db.from('agenda_events').select('*')
+            .eq('user_id', this.userId).gte('date', startDate).lte('date', endDate)
+            .order('date');
+        if (error) throw error;
+        return data.map(r => this._event(r));
+    }
 
-    // Retorna as horas consolidadas por cliente num dado mês/ano (ou todos, se omitido)
-    // Para simplificar a 1a versão, vamos calcular o total global que está ativo
-    getClientStats(clientId, yearMonth = null) {
-        const client = this.getClient(clientId);
+    // ── ESTATÍSTICAS ──────────────────────────────────────────────
+
+    async getClientStats(clientId, yearMonth = null) {
+        const client = await this.getClient(clientId);
         if (!client) return null;
 
-        let records = this.getRecordsByClient(clientId);
+        let records = await this.getRecordsByClient(clientId);
+        if (yearMonth) records = records.filter(r => r.date.startsWith(yearMonth));
 
-        // Se quiser filtrar por mês específico futuramente:
-        if (yearMonth) {
-            records = records.filter(r => r.date.startsWith(yearMonth));
-        }
-
-        const totalMinutesUsed = records.reduce((acc, obj) => acc + obj.minutes, 0);
+        const openTasks = (await this.getTasksByClient(clientId)).filter(t => t.status !== 'done');
+        const totalMinutesUsed = records.reduce((acc, r) => acc + r.minutes, 0);
         const hoursUsed = totalMinutesUsed / 60;
-
-        // Calcular impacto das tarefas abertas
-        const openTasks = this.getTasksByClient(clientId).filter(t => t.status !== 'done');
-        const tasksEstimatedMinutes = openTasks.reduce((acc, t) => acc + t.estimatedMinutes, 0);
-        const tasksSpentMinutes = openTasks.reduce((acc, t) => acc + t.spentMinutes, 0);
-
-        const tasksEstimatedHours = tasksEstimatedMinutes / 60;
-        const tasksSpentHours = tasksSpentMinutes / 60;
-
+        const tasksEstimatedHours = openTasks.reduce((acc, t) => acc + t.estimatedMinutes, 0) / 60;
+        const tasksSpentHours = openTasks.reduce((acc, t) => acc + t.spentMinutes, 0) / 60;
         const totalUsedWithTasks = hoursUsed + tasksSpentHours;
         const projectedHours = hoursUsed + tasksEstimatedHours;
-
         const percentage = client.hoursTotal > 0 ? (totalUsedWithTasks / client.hoursTotal) * 100 : 0;
-        const isOverLimit = projectedHours > client.hoursTotal;
 
         return {
             client,
@@ -330,63 +282,54 @@ class TSPStore {
             tasksSpentHours: parseFloat(tasksSpentHours.toFixed(2)),
             hoursRemaining: parseFloat((Math.max(0, client.hoursTotal - totalUsedWithTasks)).toFixed(2)),
             percentage: Math.min(100, Math.round(percentage)),
-            isOverLimit
+            isOverLimit: projectedHours > client.hoursTotal
         };
     }
 
-    getAllStats() {
-        return this.getClients().map(c => this.getClientStats(c.id));
+    async getAllStats() {
+        const clients = await this.getClients();
+        return Promise.all(clients.map(c => this.getClientStats(c.id)));
     }
 
-    // Retorna agrupamento dos lançamentos de um cliente por mês/ano (Ex: "2026-03")
-    getMonthlyStatsByClient(clientId) {
-        const client = this.getClient(clientId);
+    async getMonthlyStatsByClient(clientId) {
+        const client = await this.getClient(clientId);
         if (!client) return [];
 
-        const records = this.getRecordsByClient(clientId);
+        const records = await this.getRecordsByClient(clientId);
+        const monthNames = ["Jan","Fev","Mar","Abr","Mai","Jun","Jul","Ago","Set","Out","Nov","Dez"];
         const monthlyData = {};
 
-        const monthNames = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"];
-
         records.forEach(r => {
-            // r.date formato: YYYY-MM-DD
-            const yearMonth = r.date.substring(0, 7); // ex: "2026-03"
-
+            const yearMonth = r.date.substring(0, 7);
             if (!monthlyData[yearMonth]) {
                 const parts = yearMonth.split('-');
-                const monthName = monthNames[parseInt(parts[1], 10) - 1] + ' / ' + parts[0];
                 monthlyData[yearMonth] = {
                     yearMonth,
-                    monthName,
-                    minutes: 0,
-                    records: []
+                    monthName: monthNames[parseInt(parts[1], 10) - 1] + ' / ' + parts[0],
+                    minutes: 0, records: []
                 };
             }
             monthlyData[yearMonth].minutes += r.minutes;
             monthlyData[yearMonth].records.push(r);
         });
 
-        // Converte o objeto para array e ordena do mês mais antigo para o mais recente (Crescente)
         return Object.values(monthlyData).sort((a, b) => a.yearMonth.localeCompare(b.yearMonth));
     }
 
-    // ==========================================
-    // SISTEMA DE BACKUP (JSON)
-    // ==========================================
+    // ── BACKUP ────────────────────────────────────────────────────
 
-    exportData() {
-        const dataStr = JSON.stringify(this.data, null, 2);
-        const blob = new Blob([dataStr], { type: "application/json" });
+    async exportData() {
+        const [clients, records, tasks, agendaEvents] = await Promise.all([
+            this.getClients(), this.getRecords(), this.getTasks(), this.getAgendaEvents()
+        ]);
+        const blob = new Blob([JSON.stringify({ clients, records, tasks, agendaEvents }, null, 2)],
+            { type: 'application/json' });
         const url = URL.createObjectURL(blob);
-
         const a = document.createElement('a');
         a.href = url;
-        const dateStr = new Date().toISOString().split('T')[0];
-        a.download = `tsp_backup_${dateStr}.json`;
-
+        a.download = `tsp_backup_${new Date().toISOString().split('T')[0]}.json`;
         document.body.appendChild(a);
         a.click();
-
         document.body.removeChild(a);
         URL.revokeObjectURL(url);
     }
@@ -394,37 +337,34 @@ class TSPStore {
     async importData(file) {
         return new Promise((resolve, reject) => {
             const reader = new FileReader();
-            reader.onload = (e) => {
+            reader.onload = async (e) => {
                 try {
-                    const importedData = JSON.parse(e.target.result);
+                    const d = JSON.parse(e.target.result);
+                    if (!d.clients || !d.records) throw new Error('Formato inválido.');
 
-                    // Validação simples do formato
-                    if (importedData.clients && Array.isArray(importedData.clients) &&
-                        importedData.records && Array.isArray(importedData.records)) {
-
-                        if (!importedData.tasks || !Array.isArray(importedData.tasks)) {
-                            importedData.tasks = [];
-                        }
-
-                        if (!importedData.agendaEvents || !Array.isArray(importedData.agendaEvents)) {
-                            importedData.agendaEvents = [];
-                        }
-
-                        this.data = importedData;
-                        this.save();
-                        resolve({ success: true, message: "Dados importados com sucesso!" });
-                    } else {
-                        reject(new Error("Formato de arquivo inválido."));
+                    const idMap = {};
+                    for (const c of d.clients) {
+                        const created = await this.addClient(c.name, c.hoursTotal, c.csName,
+                            c.projectNum, c.clientPays, c.notes, c.status);
+                        idMap[c.id] = created.id;
                     }
-                } catch (error) {
-                    reject(new Error("Falha ao ler o arquivo JSON."));
-                }
+                    for (const r of d.records) {
+                        if (idMap[r.clientId]) await this.addRecord(
+                            idMap[r.clientId], r.date, r.startTime, r.endTime, r.minutes, r.description);
+                    }
+                    for (const t of (d.tasks || [])) {
+                        await this.addTask({ ...t, clientId: idMap[t.clientId] || null });
+                    }
+                    for (const ev of (d.agendaEvents || [])) {
+                        await this.addAgendaEvent({ ...ev, clientId: idMap[ev.clientId] || null });
+                    }
+                    resolve({ success: true, message: 'Dados importados com sucesso!' });
+                } catch (err) { reject(err); }
             };
-            reader.onerror = () => reject(new Error("Erro ao carregar o arquivo."));
+            reader.onerror = () => reject(new Error('Erro ao carregar o arquivo.'));
             reader.readAsText(file);
         });
     }
 }
 
-// Expõe a instância globalmente
 window.store = new TSPStore();

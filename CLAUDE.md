@@ -102,8 +102,9 @@ DOMContentLoaded
 - `initAfterAuth()` — ponto de entrada pós-login, chama `renderAll()`
 
 **`TSPStore`** (`js/store.js`)
-- **Status atual**: ainda usa `localStorage` — migração para Supabase é a Fase 3 pendente
-- Operações CRUD para: Clientes, Registros (horas), Tarefas, Eventos de agenda
+- Todas as operações são `async`, usam `this.db` (supabaseClient) e `this.userId` (Auth.getUserId())
+- Mappers `_client()`, `_record()`, `_task()`, `_event()` convertem snake_case → camelCase
+- CRUD para: Clientes, Registros (horas), Tarefas, Eventos de agenda + stats + backup
 
 **`GoogleCalendarAPI`** (`js/calendar.js`)
 - Lê credenciais de `window.TSP_CONFIG.CLIENT_ID` e `window.TSP_CONFIG.API_KEY`
@@ -130,8 +131,8 @@ Todas têm `user_id uuid references auth.users` + RLS ativa (`auth.uid() = user_
 
 - **Fase 1** ✅ — Supabase criado, tabelas e RLS configuradas
 - **Fase 2** ✅ — Autenticação: tela de login/logout integrada ao app
-- **Fase 3** 🔄 — Reescrita do `store.js` para usar Supabase (todas as ops viram async)
-- **Fase 4** 🔄 — Adaptação do `app.js` para async/await e loading states
+- **Fase 3** ✅ — Reescrita do `store.js` para Supabase + adaptação completa do `app.js` para async/await
+- **Fase 4** 🔄 — Loading states e error handling na UI
 - **Fase 5** 🔄 — Ferramenta de migração de dados do localStorage para Supabase
 - **Fase 6** 🔄 — Deploy final e testes com múltiplos usuários
 
@@ -172,7 +173,8 @@ O `docker-entrypoint.sh` injeta essas vars em `js/config.js` via `envsubst` na i
 ### Padrões de código
 - JavaScript vanilla ES6+; sem TypeScript, sem React, sem bundler
 - CSS usa variáveis (`--primary`, `--bg-glass`, etc.) definidas em `:root`
-- Após migração do store (Fase 3), todas as chamadas serão `async/await`
+- Todas as chamadas ao `store` são `async/await` — nunca chamar métodos do store sem `await`
+- Pre-fetch de `clientsMap` antes de `forEach` para evitar chamadas async dentro de loops síncronos
 
 ### Cálculos automáticos
 - Comissão do consultor = 43% do valor pago pelo cliente (`clientPays * 0.43`)
