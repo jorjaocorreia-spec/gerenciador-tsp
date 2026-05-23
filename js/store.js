@@ -45,7 +45,8 @@ class TSPStore {
     }
 
     async getClient(id) {
-        const { data, error } = await this.db.from('clients').select('*').eq('id', id).single();
+        const { data, error } = await this.db.from('clients').select('*')
+            .eq('id', id).eq('user_id', this.userId).single();
         if (error) return null;
         return this._client(data);
     }
@@ -86,7 +87,8 @@ class TSPStore {
     }
 
     async getRecord(id) {
-        const { data, error } = await this.db.from('records').select('*').eq('id', id).single();
+        const { data, error } = await this.db.from('records').select('*')
+            .eq('id', id).eq('user_id', this.userId).single();
         if (error) return null;
         return this._record(data);
     }
@@ -133,7 +135,8 @@ class TSPStore {
     }
 
     async getTask(id) {
-        const { data, error } = await this.db.from('tasks').select('*').eq('id', id).single();
+        const { data, error } = await this.db.from('tasks').select('*')
+            .eq('id', id).eq('user_id', this.userId).single();
         if (error) return null;
         return this._task(data);
     }
@@ -204,7 +207,8 @@ class TSPStore {
     }
 
     async getAgendaEvent(id) {
-        const { data, error } = await this.db.from('agenda_events').select('*').eq('id', id).single();
+        const { data, error } = await this.db.from('agenda_events').select('*')
+            .eq('id', id).eq('user_id', this.userId).single();
         if (error) return null;
         return this._event(data);
     }

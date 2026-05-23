@@ -72,6 +72,8 @@ GerenciadorTSP/
 ├── skills/                 # Instrução de skills de desenvolvimento (gitignored, não vai ao container)
 └── Documentation/
     ├── INSTRUCOES_GOOGLE_CALENDAR.md
+    ├── fase6-rls-verificacao.sql      # SQL para verificar/criar políticas RLS no Supabase
+    ├── fase6-checklist-testes.md      # Checklist completo de testes multi-usuário
     └── GEMINI-Construtor-de-Sites.md  # Referência de design (não faz parte do app)
 ```
 
@@ -137,7 +139,7 @@ Todas têm `user_id uuid references auth.users` + RLS ativa (`auth.uid() = user_
 - **Fase 3** ✅ — Reescrita do `store.js` para Supabase + adaptação completa do `app.js` para async/await
 - **Fase 4** ✅ — Loading states (spinners) e error handling (Toast notifications) na UI
 - **Fase 5** ✅ — Ferramenta de migração localStorage → Supabase (detecção automática + modal + limpeza)
-- **Fase 6** 🔄 — Deploy final e testes com múltiplos usuários
+- **Fase 6** ✅ — Deploy final: correções RLS defense-in-depth, reset de estado no logout, checklist de testes multi-usuário
 
 ---
 

@@ -2027,6 +2027,14 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     document.getElementById('btn-logout').addEventListener('click', async () => {
+        // Limpa estado da instância antes do logout para evitar vazamento entre sessões
+        if (window.app) {
+            window.app.selectedClient = null;
+            window.app.selectedMonth = null;
+            window.app.currentView = 'dashboard';
+            window.app.agendaCurrentDate = new Date();
+            window.app.pendingPdfRecords = [];
+        }
         await Auth.signOut();
     });
 });
