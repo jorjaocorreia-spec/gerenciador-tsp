@@ -2,6 +2,29 @@
  * TSP App - Controlador da Lógica da Interface
  */
 
+const Toast = {
+    show(message, type = 'info', duration = 3500) {
+        let container = document.getElementById('toast-container');
+        if (!container) {
+            container = document.createElement('div');
+            container.id = 'toast-container';
+            document.body.appendChild(container);
+        }
+        const icons = { success: 'check-circle', error: 'x-circle', info: 'info' };
+        const el = document.createElement('div');
+        el.className = `toast toast-${type}`;
+        el.innerHTML = `<i data-lucide="${icons[type] || 'info'}" style="width:16px;height:16px;flex-shrink:0;"></i><span>${message}</span>`;
+        container.appendChild(el);
+        lucide.createIcons({ nodes: [el] });
+        setTimeout(() => {
+            el.style.animation = 'toast-out 0.3s ease forwards';
+            setTimeout(() => el.remove(), 300);
+        }, duration);
+    }
+};
+
+const spinnerHtml = '<div class="spinner-wrap"><div class="spinner"></div></div>';
+
 class AppController {
     constructor() {
         this.currentView = 'dashboard';
@@ -136,17 +159,25 @@ class AppController {
         const clientPays = document.getElementById('client-pays').value;
         const notes = document.getElementById('client-notes').value;
         const status = document.getElementById('client-status').value;
+        const btn = e.target.querySelector('[type="submit"]');
+        btn.disabled = true;
 
-        if (id) {
-            await store.updateClient(id, name, hours, csName, projectNum, clientPays, notes, status);
-        } else {
-            await store.addClient(name, hours, csName, projectNum, clientPays, notes, status);
+        try {
+            if (id) {
+                await store.updateClient(id, name, hours, csName, projectNum, clientPays, notes, status);
+            } else {
+                await store.addClient(name, hours, csName, projectNum, clientPays, notes, status);
+            }
+            e.target.reset();
+            document.getElementById('client-id').value = '';
+            this.closeModal('modal-client');
+            await this.renderAll();
+            Toast.show(id ? 'Cliente atualizado.' : 'Cliente cadastrado.', 'success');
+        } catch (err) {
+            Toast.show('Erro ao salvar cliente: ' + err.message, 'error');
+        } finally {
+            btn.disabled = false;
         }
-
-        e.target.reset();
-        document.getElementById('client-id').value = '';
-        this.closeModal('modal-client');
-        await this.renderAll();
     }
 
     calculateConsultantValue() {
@@ -196,35 +227,54 @@ class AppController {
         const desc = document.getElementById('record-desc').value;
 
         if (!minutes || minutes <= 0) {
-            alert("Preencha horários válidos.");
+            Toast.show('Preencha horários válidos.', 'error');
             return;
         }
 
-        if (recordId) {
-            await store.updateRecord(recordId, clientId, date, startTime, endTime, minutes, desc);
-        } else {
-            await store.addRecord(clientId, date, startTime, endTime, minutes, desc);
-        }
+        const btn = e.target.querySelector('[type="submit"]');
+        btn.disabled = true;
 
-        e.target.reset();
-        document.getElementById('record-id').value = '';
-        document.getElementById('record-calculated').dataset.minutes = 0;
-        document.getElementById('record-date').valueAsDate = new Date();
-        this.closeModal('modal-record');
-        await this.renderAll();
+        try {
+            if (recordId) {
+                await store.updateRecord(recordId, clientId, date, startTime, endTime, minutes, desc);
+            } else {
+                await store.addRecord(clientId, date, startTime, endTime, minutes, desc);
+            }
+            e.target.reset();
+            document.getElementById('record-id').value = '';
+            document.getElementById('record-calculated').dataset.minutes = 0;
+            document.getElementById('record-date').valueAsDate = new Date();
+            this.closeModal('modal-record');
+            await this.renderAll();
+            Toast.show(recordId ? 'Atendimento atualizado.' : 'Atendimento lançado.', 'success');
+        } catch (err) {
+            Toast.show('Erro ao salvar atendimento: ' + err.message, 'error');
+        } finally {
+            btn.disabled = false;
+        }
     }
 
     async handleDeleteClient(id) {
         if (confirm("Tem certeza que deseja excluir este cliente e TODOS os seus atendimentos?")) {
-            await store.deleteClient(id);
-            await this.renderAll();
+            try {
+                await store.deleteClient(id);
+                await this.renderAll();
+                Toast.show('Cliente excluído.', 'success');
+            } catch (err) {
+                Toast.show('Erro ao excluir cliente: ' + err.message, 'error');
+            }
         }
     }
 
     async handleDeleteRecord(id) {
         if (confirm("Deseja realmente apagar este lançamento?")) {
-            await store.deleteRecord(id);
-            await this.renderAll();
+            try {
+                await store.deleteRecord(id);
+                await this.renderAll();
+                Toast.show('Atendimento excluído.', 'success');
+            } catch (err) {
+                Toast.show('Erro ao excluir atendimento: ' + err.message, 'error');
+            }
         }
     }
 
@@ -293,15 +343,24 @@ class AppController {
             attachments
         };
 
-        if (id) {
-            taskData.id = id;
-            await store.updateTask(taskData);
-        } else {
-            await store.addTask(taskData);
-        }
+        const btn = e.target.querySelector('[type="submit"]');
+        btn.disabled = true;
 
-        this.closeModal('modal-task');
-        await this.renderAll();
+        try {
+            if (id) {
+                taskData.id = id;
+                await store.updateTask(taskData);
+            } else {
+                await store.addTask(taskData);
+            }
+            this.closeModal('modal-task');
+            await this.renderAll();
+            Toast.show(id ? 'Tarefa atualizada.' : 'Tarefa criada.', 'success');
+        } catch (err) {
+            Toast.show('Erro ao salvar tarefa: ' + err.message, 'error');
+        } finally {
+            btn.disabled = false;
+        }
     }
 
     async handleTaskTimeSubmit(e) {
@@ -310,9 +369,18 @@ class AppController {
         const minutes = document.getElementById('time-task-minutes').value;
 
         if (id && minutes) {
-            await store.addTaskTime(id, minutes);
-            this.closeModal('modal-task-time');
-            await this.renderAll();
+            const btn = e.target.querySelector('[type="submit"]');
+            btn.disabled = true;
+            try {
+                await store.addTaskTime(id, minutes);
+                this.closeModal('modal-task-time');
+                await this.renderAll();
+                Toast.show('Tempo adicionado.', 'success');
+            } catch (err) {
+                Toast.show('Erro ao registrar tempo: ' + err.message, 'error');
+            } finally {
+                btn.disabled = false;
+            }
         }
     }
 
@@ -334,8 +402,13 @@ class AppController {
 
     async handleDeleteTask(id) {
         if (confirm("Deseja realmente apagar esta tarefa?")) {
-            await store.deleteTask(id);
-            await this.renderAll();
+            try {
+                await store.deleteTask(id);
+                await this.renderAll();
+                Toast.show('Tarefa excluída.', 'success');
+            } catch (err) {
+                Toast.show('Erro ao excluir tarefa: ' + err.message, 'error');
+            }
         }
     }
 
@@ -402,6 +475,7 @@ class AppController {
 
     async renderDashboard() {
         const container = document.getElementById('dashboard-container');
+        container.innerHTML = spinnerHtml;
 
         let showActive = true;
         let showFinished = false;
@@ -463,6 +537,7 @@ class AppController {
 
     async renderClients() {
         const tbody = document.querySelector('#clients-table tbody');
+        tbody.innerHTML = `<tr><td colspan="3">${spinnerHtml}</td></tr>`;
         const clients = await store.getClients();
         tbody.innerHTML = '';
 
@@ -536,6 +611,7 @@ class AppController {
 
     async renderRecords() {
         const tbody = document.querySelector('#records-table tbody');
+        tbody.innerHTML = `<tr><td colspan="5">${spinnerHtml}</td></tr>`;
         let records = (await store.getRecords()).sort((a, b) => new Date(b.date) - new Date(a.date));
 
         // APERFEIÇOAMENTO: Filtros da Interface
@@ -667,7 +743,7 @@ class AppController {
         }
 
         if (records.length === 0) {
-            alert("Nenhum dado para exportar.");
+            Toast.show('Nenhum dado para exportar.', 'info');
             return;
         }
 
@@ -861,13 +937,15 @@ class AppController {
 
         if (!cols.new || !cols.doing || !cols.done) return;
 
-        Object.values(cols).forEach(col => col.innerHTML = '');
+        Object.values(cols).forEach(col => col.innerHTML = spinnerHtml);
 
         const counts = { new: 0, doing: 0, done: 0 };
 
         const clientIds = [...new Set(tasks.map(t => t.clientId).filter(Boolean))];
         const clientsMap = {};
         await Promise.all(clientIds.map(async id => { clientsMap[id] = await store.getClient(id); }));
+
+        Object.values(cols).forEach(col => col.innerHTML = '');
 
         tasks.forEach(task => {
             const client = clientsMap[task.clientId];
@@ -1051,7 +1129,7 @@ class AppController {
             if (!calendarAPI.isAuthenticated) {
                 const success = await calendarAPI.authenticateGoogle();
                 if (!success) {
-                    alert("Falha na autenticação do Google");
+                    Toast.show('Falha na autenticação do Google.', 'error');
                     btn.innerText = originalText;
                     btn.disabled = false;
                     return;
@@ -1059,25 +1137,29 @@ class AppController {
             }
         }
 
-        if (id) {
-            eventData.id = id;
-            const updated = await store.updateAgendaEvent(eventData);
-            if (syncGoogle && updated && updated.calendarEventId) {
-                await calendarAPI.updateGoogleEvent(updated.calendarEventId, eventData);
+        try {
+            if (id) {
+                eventData.id = id;
+                const updated = await store.updateAgendaEvent(eventData);
+                if (syncGoogle && updated && updated.calendarEventId) {
+                    await calendarAPI.updateGoogleEvent(updated.calendarEventId, eventData);
+                }
+            } else {
+                if (syncGoogle) {
+                    const gCalId = await calendarAPI.createGoogleEvent(eventData);
+                    if (gCalId) eventData.calendarEventId = gCalId;
+                }
+                await store.addAgendaEvent(eventData);
             }
-        } else {
-            if (syncGoogle) {
-                const gCalId = await calendarAPI.createGoogleEvent(eventData);
-                if (gCalId) eventData.calendarEventId = gCalId;
-            }
-            await store.addAgendaEvent(eventData);
+            this.closeModal('modal-agenda-event');
+            await this.renderAgenda();
+            Toast.show(id ? 'Agendamento atualizado.' : 'Agendamento criado.', 'success');
+        } catch (err) {
+            Toast.show('Erro ao salvar agendamento: ' + err.message, 'error');
+        } finally {
+            btn.innerText = originalText;
+            btn.disabled = false;
         }
-
-        btn.innerText = originalText;
-        btn.disabled = false;
-
-        this.closeModal('modal-agenda-event');
-        this.renderAgenda();
     }
 
     async editAgendaEvent(id) {
@@ -1105,12 +1187,17 @@ class AppController {
             eventRoot.stopPropagation();
         }
         if (confirm("Deseja deletar este agendamento?")) {
-            const ev = await store.getAgendaEvent(id);
-            if (ev && ev.calendarEventId && calendarAPI.isAuthenticated) {
-                await calendarAPI.deleteGoogleEvent(ev.calendarEventId);
+            try {
+                const ev = await store.getAgendaEvent(id);
+                if (ev && ev.calendarEventId && calendarAPI.isAuthenticated) {
+                    await calendarAPI.deleteGoogleEvent(ev.calendarEventId);
+                }
+                await store.deleteAgendaEvent(id);
+                await this.renderAgenda();
+                Toast.show('Agendamento excluído.', 'success');
+            } catch (err) {
+                Toast.show('Erro ao excluir agendamento: ' + err.message, 'error');
             }
-            await store.deleteAgendaEvent(id);
-            await this.renderAgenda();
         }
     }
 
@@ -1120,7 +1207,7 @@ class AppController {
         const container = document.getElementById('agenda-container');
         if (!container) return;
 
-        container.innerHTML = '';
+        container.innerHTML = spinnerHtml;
 
         // Atualizar estado do botão de sync superior
         const syncBtn = document.getElementById('btn-agenda-sync');
@@ -1318,7 +1405,7 @@ class AppController {
         if (!calendarAPI.isAuthenticated) {
             const success = await calendarAPI.authenticateGoogle();
             if (!success) {
-                alert("Falha na autenticação do Google");
+                Toast.show('Falha na autenticação do Google.', 'error');
                 return;
             }
         }
@@ -1328,10 +1415,10 @@ class AppController {
 
         try {
             await this.executeBiDirectionalSync();
-            alert("Sincronização concluída com sucesso!");
+            Toast.show('Sincronização concluída com sucesso!', 'success');
         } catch (error) {
             console.error("Erro no sync", error);
-            alert("Erro durante a sincronização");
+            Toast.show('Erro durante a sincronização.', 'error');
         } finally {
             btn.innerHTML = '<i data-lucide="refresh-cw"></i> Sincronizar Google';
             btn.disabled = false;
@@ -1436,7 +1523,7 @@ class AppController {
 
             } catch (err) {
                 console.error(err);
-                alert("Erro ao ler o PDF: " + err.message);
+                Toast.show('Erro ao ler o PDF: ' + err.message, 'error');
             }
 
             // Reseta o input file
@@ -1621,7 +1708,7 @@ class AppController {
         });
 
         if (records.length === 0) {
-            alert("Não foram encontrados atendimentos válidos neste PDF.");
+            Toast.show('Nenhum atendimento válido encontrado no PDF.', 'info');
             return;
         }
 
@@ -1702,7 +1789,7 @@ class AppController {
             }
         }
 
-        alert(`Sucesso! ${importedCount} atendimentos foram importados.`);
+        Toast.show(`${importedCount} atendimento(s) importado(s) com sucesso!`, 'success');
         this.closeModal('modal-import-pdf');
         this.pendingPdfRecords = [];
         await this.renderAll();
@@ -1730,10 +1817,10 @@ class AppController {
 
             try {
                 await store.importData(file);
-                alert("Dados importados com sucesso!");
-                this.renderAll();
+                Toast.show('Dados importados com sucesso!', 'success');
+                await this.renderAll();
             } catch (err) {
-                alert("Erro na importação: " + err.message);
+                Toast.show('Erro na importação: ' + err.message, 'error');
             }
 
             // Reseta o input file

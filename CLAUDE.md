@@ -132,7 +132,7 @@ Todas têm `user_id uuid references auth.users` + RLS ativa (`auth.uid() = user_
 - **Fase 1** ✅ — Supabase criado, tabelas e RLS configuradas
 - **Fase 2** ✅ — Autenticação: tela de login/logout integrada ao app
 - **Fase 3** ✅ — Reescrita do `store.js` para Supabase + adaptação completa do `app.js` para async/await
-- **Fase 4** 🔄 — Loading states e error handling na UI
+- **Fase 4** ✅ — Loading states (spinners) e error handling (Toast notifications) na UI
 - **Fase 5** 🔄 — Ferramenta de migração de dados do localStorage para Supabase
 - **Fase 6** 🔄 — Deploy final e testes com múltiplos usuários
 
