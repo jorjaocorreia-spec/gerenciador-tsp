@@ -463,6 +463,7 @@ class AppController {
 
     // Chamado após login bem-sucedido
     async initAfterAuth() {
+        this.checkLocalStorageMigration();
         await this.renderAll();
     }
 
@@ -1836,6 +1837,177 @@ class AppController {
             // Reseta o input file
             e.target.value = '';
         });
+    }
+
+    // ===================================
+    // MIGRAÇÃO localStorage → Supabase
+    // ===================================
+
+    _detectLocalStorageData() {
+        const found = { clients: [], records: [], tasks: [], agendaEvents: [] };
+
+        for (let i = 0; i < localStorage.length; i++) {
+            const key = localStorage.key(i);
+            try {
+                const val = JSON.parse(localStorage.getItem(key));
+                if (!Array.isArray(val) || val.length === 0) continue;
+                const first = val[0];
+
+                if (first.hoursTotal !== undefined || first.hours_total !== undefined) {
+                    found.clients = val;
+                } else if (first.minutes !== undefined && (first.clientId !== undefined || first.client_id !== undefined)) {
+                    found.records = val;
+                } else if (first.title !== undefined && first.status !== undefined &&
+                    ['new', 'doing', 'done'].includes(first.status)) {
+                    found.tasks = val;
+                } else if (first.type !== undefined && first.date !== undefined &&
+                    ['meeting', 'consulting', 'task', 'reminder'].includes(first.type)) {
+                    found.agendaEvents = val;
+                }
+            } catch (e) { /* chave não é JSON válido */ }
+        }
+
+        // Fallback: procura objeto único com todas as entidades (formato de backup)
+        for (let i = 0; i < localStorage.length; i++) {
+            const key = localStorage.key(i);
+            try {
+                const val = JSON.parse(localStorage.getItem(key));
+                if (val && typeof val === 'object' && !Array.isArray(val)) {
+                    if (Array.isArray(val.clients) && val.clients.length > 0) found.clients = val.clients;
+                    if (Array.isArray(val.records) && val.records.length > 0) found.records = val.records;
+                    if (Array.isArray(val.tasks) && val.tasks.length > 0) found.tasks = val.tasks;
+                    if (Array.isArray(val.agendaEvents) && val.agendaEvents.length > 0) found.agendaEvents = val.agendaEvents;
+                }
+            } catch (e) {}
+        }
+
+        return found;
+    }
+
+    checkLocalStorageMigration() {
+        const data = this._detectLocalStorageData();
+        const hasData = data.clients.length > 0 || data.records.length > 0 ||
+                        data.tasks.length > 0 || data.agendaEvents.length > 0;
+        const btn = document.getElementById('btn-migrate-local');
+        if (btn) btn.style.display = hasData ? '' : 'none';
+    }
+
+    openMigrationModal() {
+        const data = this._detectLocalStorageData();
+        const summary = document.getElementById('migration-summary');
+
+        const rows = [
+            { label: 'Clientes', count: data.clients.length, icon: 'users' },
+            { label: 'Atendimentos', count: data.records.length, icon: 'clock' },
+            { label: 'Tarefas', count: data.tasks.length, icon: 'kanban' },
+            { label: 'Eventos de Agenda', count: data.agendaEvents.length, icon: 'calendar' },
+        ];
+
+        summary.innerHTML = rows.map(r => `
+            <div style="display:flex; align-items:center; justify-content:space-between; padding:10px 14px; background:rgba(255,255,255,0.04); border-radius:8px;">
+                <span style="display:flex; align-items:center; gap:8px;">
+                    <i data-lucide="${r.icon}" style="width:16px;height:16px;color:var(--primary-color);"></i>
+                    ${r.label}
+                </span>
+                <span style="font-weight:600; color:${r.count > 0 ? 'var(--success-color)' : 'var(--text-muted)'}">
+                    ${r.count} registro(s)
+                </span>
+            </div>
+        `).join('');
+
+        document.getElementById('migration-progress').style.display = 'none';
+        document.getElementById('btn-confirm-migration').disabled = false;
+        document.getElementById('modal-migration').classList.add('active');
+        lucide.createIcons();
+    }
+
+    async executeMigration() {
+        const data = this._detectLocalStorageData();
+        const total = data.clients.length + data.records.length + data.tasks.length + data.agendaEvents.length;
+
+        if (total === 0) {
+            Toast.show('Nenhum dado local encontrado para migrar.', 'info');
+            this.closeModal('modal-migration');
+            return;
+        }
+
+        const progressBar = document.getElementById('migration-progress-bar');
+        const statusText = document.getElementById('migration-status-text');
+        const progressWrap = document.getElementById('migration-progress');
+        const btn = document.getElementById('btn-confirm-migration');
+
+        progressWrap.style.display = 'block';
+        btn.disabled = true;
+
+        let done = 0;
+        const setProgress = (label) => {
+            done++;
+            progressBar.style.width = `${Math.round((done / total) * 100)}%`;
+            statusText.textContent = label;
+        };
+
+        try {
+            const idMap = {};
+
+            for (const c of data.clients) {
+                const created = await store.addClient(
+                    c.name, c.hoursTotal ?? c.hours_total,
+                    c.csName ?? c.cs_name, c.projectNum ?? c.project_num,
+                    c.clientPays ?? c.client_pays, c.notes, c.status
+                );
+                idMap[c.id] = created.id;
+                setProgress(`Migrando clientes... ${c.name}`);
+            }
+
+            for (const r of data.records) {
+                const mappedClientId = idMap[r.clientId ?? r.client_id];
+                if (mappedClientId) {
+                    await store.addRecord(
+                        mappedClientId, r.date,
+                        r.startTime ?? r.start_time, r.endTime ?? r.end_time,
+                        r.minutes, r.description
+                    );
+                }
+                setProgress(`Migrando atendimentos...`);
+            }
+
+            for (const t of data.tasks) {
+                await store.addTask({
+                    ...t,
+                    clientId: idMap[t.clientId ?? t.client_id] || null
+                });
+                setProgress(`Migrando tarefas... ${t.title}`);
+            }
+
+            for (const ev of data.agendaEvents) {
+                await store.addAgendaEvent({
+                    ...ev,
+                    clientId: idMap[ev.clientId ?? ev.client_id] || null
+                });
+                setProgress(`Migrando agenda...`);
+            }
+
+            progressBar.style.width = '100%';
+            statusText.textContent = 'Migração concluída!';
+
+            Toast.show(`${total} registros migrados com sucesso!`, 'success');
+
+            // Oferece limpeza do localStorage
+            setTimeout(() => {
+                if (confirm('Migração concluída! Deseja apagar os dados locais agora? (Recomendado, pois já estão na nuvem)')) {
+                    localStorage.clear();
+                    document.getElementById('btn-migrate-local').style.display = 'none';
+                    Toast.show('Dados locais removidos.', 'info');
+                }
+                this.closeModal('modal-migration');
+            }, 800);
+
+            await this.renderAll();
+
+        } catch (err) {
+            Toast.show('Erro durante a migração: ' + err.message, 'error');
+            btn.disabled = false;
+        }
     }
 }
 

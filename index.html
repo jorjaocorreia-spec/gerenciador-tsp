@@ -94,10 +94,15 @@
             </button>
             <input type="file" id="file-import" accept=".json" style="display: none;">
 
-            <button class="btn btn-secondary" id="btn-import-pdf" style="width: 100%;">
+            <button class="btn btn-secondary" id="btn-import-pdf" style="width: 100%; margin-bottom: 8px;">
                 <i data-lucide="file-text"></i> Importar Ata (PDF)
             </button>
             <input type="file" id="file-import-pdf" accept=".pdf" style="display: none;">
+
+            <!-- Botão de migração: visível apenas se houver dados no localStorage -->
+            <button class="btn btn-secondary" id="btn-migrate-local" style="width: 100%; display: none; border-color: var(--secondary-color); color: var(--secondary-color);" onclick="app.openMigrationModal()">
+                <i data-lucide="database"></i> Migrar Dados Locais
+            </button>
 
             <div style="margin-top:16px; padding-top:16px; border-top:1px solid var(--surface-border);">
                 <p id="user-email-display" class="text-muted" style="font-size:0.75rem; margin-bottom:8px; word-break:break-all;"></p>
@@ -764,6 +769,37 @@
                 <button type="submit" class="btn btn-primary" style="width: 100%; justify-content: center;">Salvar
                     Agendamento</button>
             </form>
+        </div>
+    </div>
+
+    <!-- MODAL: MIGRAÇÃO localStorage → Supabase -->
+    <div class="modal-overlay" id="modal-migration">
+        <div class="modal glass" style="max-width: 560px;">
+            <div class="modal-header">
+                <h3>Migrar Dados Locais para a Nuvem</h3>
+                <button class="close-modal" onclick="app.closeModal('modal-migration')"><i data-lucide="x"></i></button>
+            </div>
+            <div style="padding: 8px 0;">
+                <p class="text-muted" style="margin-bottom: 20px; font-size: 0.9rem;">
+                    Foram encontrados dados salvos localmente neste navegador. Clique em <strong>Migrar</strong> para copiá-los para sua conta na nuvem.
+                </p>
+                <div id="migration-summary" style="display: flex; flex-direction: column; gap: 10px; margin-bottom: 24px;"></div>
+                <div id="migration-progress" style="display: none; margin-bottom: 16px;">
+                    <div style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 8px;" id="migration-status-text">Migrando...</div>
+                    <div style="background: rgba(255,255,255,0.05); border-radius: 6px; height: 6px; overflow: hidden;">
+                        <div id="migration-progress-bar" style="height: 100%; background: var(--primary-color); width: 0%; transition: width 0.3s ease;"></div>
+                    </div>
+                </div>
+                <div style="display: flex; gap: 12px;">
+                    <button class="btn btn-secondary" style="flex: 1; justify-content: center;" onclick="app.closeModal('modal-migration')">Cancelar</button>
+                    <button class="btn btn-primary" id="btn-confirm-migration" style="flex: 2; justify-content: center;" onclick="app.executeMigration()">
+                        <i data-lucide="database"></i> Migrar para a Nuvem
+                    </button>
+                </div>
+                <p style="margin-top: 16px; font-size: 0.8rem; color: var(--text-muted); text-align: center;">
+                    Após a migração, você poderá limpar os dados locais com segurança.
+                </p>
+            </div>
         </div>
     </div>
 

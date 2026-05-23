@@ -54,19 +54,22 @@ window.TSP_CONFIG = {
 
 ```
 GerenciadorTSP/
-├── index.html              # Estrutura HTML completa (tela de login + app)
+├── index.html              # Estrutura HTML completa (tela de login + app + modais)
 ├── Dockerfile              # nginx:alpine + envsubst para injetar credenciais
+├── nginx.conf              # Config nginx customizada: security headers, rate limit, CSP
 ├── docker-entrypoint.sh    # Gera config.js a partir de config.template.js + env vars
+├── .dockerignore           # Exclui skills/, docs, .bat do container
 ├── Iniciar.bat             # Script dev: inicia servidor Python
 ├── js/
 │   ├── config.template.js  # Template de configuração com placeholders (versionado)
 │   ├── config.js           # Gerado em runtime pelo container (gitignored)
 │   ├── auth.js             # Auth — Supabase client, login/logout, UI de autenticação
-│   ├── app.js              # AppController — lógica de UI, handlers, renderização, PDF
-│   ├── store.js            # TSPStore — CRUD (atualmente localStorage, migração pendente)
+│   ├── app.js              # AppController — lógica de UI, handlers, renderização, PDF, migração
+│   ├── store.js            # TSPStore — CRUD Supabase async + stats + backup
 │   └── calendar.js         # GoogleCalendarAPI — OAuth e sincronização de eventos
 ├── styles/
-│   └── main.css            # Sistema de design: variáveis, layouts, componentes, animações
+│   └── main.css            # Sistema de design + Toast notifications + Loading spinners
+├── skills/                 # Instrução de skills de desenvolvimento (gitignored, não vai ao container)
 └── Documentation/
     ├── INSTRUCOES_GOOGLE_CALENDAR.md
     └── GEMINI-Construtor-de-Sites.md  # Referência de design (não faz parte do app)
@@ -133,7 +136,7 @@ Todas têm `user_id uuid references auth.users` + RLS ativa (`auth.uid() = user_
 - **Fase 2** ✅ — Autenticação: tela de login/logout integrada ao app
 - **Fase 3** ✅ — Reescrita do `store.js` para Supabase + adaptação completa do `app.js` para async/await
 - **Fase 4** ✅ — Loading states (spinners) e error handling (Toast notifications) na UI
-- **Fase 5** 🔄 — Ferramenta de migração de dados do localStorage para Supabase
+- **Fase 5** ✅ — Ferramenta de migração localStorage → Supabase (detecção automática + modal + limpeza)
 - **Fase 6** 🔄 — Deploy final e testes com múltiplos usuários
 
 ---
