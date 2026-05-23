@@ -140,6 +140,7 @@ Todas têm `user_id uuid references auth.users` + RLS ativa (`auth.uid() = user_
 - **Fase 4** ✅ — Loading states (spinners) e error handling (Toast notifications) na UI
 - **Fase 5** ✅ — Ferramenta de migração localStorage → Supabase (detecção automática + modal + limpeza)
 - **Fase 6** ✅ — Deploy final: correções RLS defense-in-depth, reset de estado no logout, checklist de testes multi-usuário
+- **Fase 7** ✅ — Suite de testes Playwright 48/48 passando; correção do Toast (`lucide.createIcons()`) e headers de segurança nginx
 
 ---
 
@@ -181,6 +182,14 @@ O `docker-entrypoint.sh` injeta essas vars em `js/config.js` via `envsubst` na i
 - Todas as chamadas ao `store` são `async/await` — nunca chamar métodos do store sem `await`
 - Pre-fetch de `clientsMap` antes de `forEach` para evitar chamadas async dentro de loops síncronos
 
+### Armadilhas conhecidas
+- **`switchView()` chama `renderAll()` sem `await`** — views sub-nível (client-dashboard, month-records) ficam com spinner briefly após navegação; testes ou código que dependem do conteúdo renderizado devem aguardar o elemento concreto aparecer no DOM
+- **`const Toast` e `const spinnerHtml` em `app.js` são script-scoped** — não estão em `window`; inacessíveis de `page.evaluate()` no Playwright e de outros scripts. Não mover para `window` sem avaliar impacto
+- **`lucide.createIcons({ nodes: [...] })` NÃO é suportado no Lucide 0.469.0 UMD** — usar sempre `lucide.createIcons()` sem opções para re-processar ícones no DOM
+- **`store.userId` dentro de `page.evaluate()` async retorna `null`** — ao testar via Playwright, usar `window.supabaseClient` com `uid = Auth.getUserId()` capturado localmente em vez de chamar `store.addXxx()` ou `store.getXxx()` dentro de evaluate
+- **`renderClients()` faz `await store.getClientStats(c.id)` por cliente** — chamadas sequenciais; com muitos clientes a renderização pode levar 2-3s; esperar o elemento aparecer no DOM antes de interagir
+- **Google Calendar API mantém conexões em background** — `page.waitForLoadState('networkidle')` nunca dispara; sempre adicionar `.catch(() => {})`
+
 ### Cálculos automáticos
 - Comissão do consultor = 43% do valor pago pelo cliente (`clientPays * 0.43`)
 - Duração do atendimento calculada a partir de `startTime` e `endTime`
@@ -198,6 +207,34 @@ O `docker-entrypoint.sh` injeta essas vars em `js/config.js` via `envsubst` na i
 | **Atendimentos** | Log de horas por cliente; filtros por cliente e período; exportação PDF |
 | **Tarefas** | Kanban (Novas / Em Execução / Finalizadas) com drag-and-drop e métricas |
 | **Agenda** | Calendário diário/semanal; 4 tipos de evento; sincronização Google Calendar |
+
+---
+
+## Testes automatizados (Playwright)
+
+Suite de testes end-to-end em `C:\Users\jorge\AppData\Local\Temp\playwright-test-tsp-v2.js`.
+
+**Rodar:**
+```powershell
+cd "d:\GerenciadorTSP\skills\playwright-skill"
+node run.js "C:\Users\jorge\AppData\Local\Temp\playwright-test-tsp-v2.js"
+```
+
+**Resultado esperado:** 48/48 ✅ — dividido em 7 blocos:
+
+| Bloco | Cobertura | Testes |
+|-------|-----------|--------|
+| 1 — Autenticação | Login correto/errado, logout, troca de usuário | 4 |
+| 2 — RLS Isolamento | user_a e user_b não veem dados um do outro (clients, records, events, tasks) | 10 |
+| 3 — CRUD | Criar/editar clientes, atendimentos, tarefas, Kanban, agenda | 20 |
+| 4 — Dashboard | Cards, filtros, drilldown mensal | 4 |
+| 5 — Backup | Exportar JSON, botão migração oculto | 2 |
+| 6 — Segurança | Headers HTTP, config.js, skills/ e nginx.conf bloqueados | 6 |
+| 7 — UX/Loading | Toast, spinner, validação de campos | 4 |
+
+**Usuários de teste:**
+- user_a: `jorjaocorreia@gmail.com` / `Jhc1881//`
+- user_b: `testes@teste.com` / `123testes`
 
 ---
 
