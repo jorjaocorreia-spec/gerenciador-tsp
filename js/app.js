@@ -15,7 +15,7 @@ const Toast = {
         el.className = `toast toast-${type}`;
         el.innerHTML = `<i data-lucide="${icons[type] || 'info'}" style="width:16px;height:16px;flex-shrink:0;"></i><span>${message}</span>`;
         container.appendChild(el);
-        lucide.createIcons({ nodes: [el] });
+        lucide.createIcons();
         setTimeout(() => {
             el.style.animation = 'toast-out 0.3s ease forwards';
             setTimeout(() => el.remove(), 300);
