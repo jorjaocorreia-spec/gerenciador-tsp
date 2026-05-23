@@ -22,9 +22,44 @@
     <!-- APIs do Google Identity e Calendar (Sync) -->
     <script async defer src="https://apis.google.com/js/api.js" onload="gapiLoaded()"></script>
     <script async defer src="https://accounts.google.com/gsi/client" onload="gisLoaded()"></script>
+
+    <!-- Supabase -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 
 <body>
+
+    <!-- TELA DE LOGIN -->
+    <div id="auth-screen" style="display:none; position:fixed; inset:0; z-index:9999; background:var(--bg-primary); display:flex; align-items:center; justify-content:center;">
+        <div class="glass" style="width:100%; max-width:420px; padding:40px; border-radius:16px;">
+            <div style="text-align:center; margin-bottom:32px;">
+                <i data-lucide="activity" style="width:40px; height:40px; color:var(--primary);"></i>
+                <h1 style="margin-top:12px; font-size:1.5rem;">TSP Manager</h1>
+                <p class="text-muted" style="margin-top:4px;">Acesse sua conta para continuar</p>
+            </div>
+
+            <div style="display:flex; gap:8px; margin-bottom:24px;">
+                <button id="auth-tab-login" class="btn btn-primary" style="flex:1;" onclick="Auth.switchTab('login')">Entrar</button>
+                <button id="auth-tab-register" class="btn btn-secondary" style="flex:1;" onclick="Auth.switchTab('register')">Criar Conta</button>
+            </div>
+
+            <div id="auth-message" style="display:none; padding:12px; border-radius:8px; margin-bottom:16px; font-size:0.875rem;"></div>
+
+            <form id="auth-form" onsubmit="Auth.handleSubmit(event)">
+                <div class="form-group">
+                    <label class="form-label">E-mail</label>
+                    <input type="email" id="auth-email" class="form-control" placeholder="seu@email.com" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Senha</label>
+                    <input type="password" id="auth-password" class="form-control" placeholder="••••••••" required minlength="6">
+                </div>
+                <button type="submit" id="auth-submit" class="btn btn-primary" style="width:100%; margin-top:8px;">
+                    Entrar
+                </button>
+            </form>
+        </div>
+    </div>
 
     <!-- SIDEBAR -->
     <nav class="sidebar">
@@ -63,6 +98,13 @@
                 <i data-lucide="file-text"></i> Importar Ata (PDF)
             </button>
             <input type="file" id="file-import-pdf" accept=".pdf" style="display: none;">
+
+            <div style="margin-top:16px; padding-top:16px; border-top:1px solid var(--surface-border);">
+                <p id="user-email-display" class="text-muted" style="font-size:0.75rem; margin-bottom:8px; word-break:break-all;"></p>
+                <button class="btn btn-secondary" id="btn-logout" style="width:100%;">
+                    <i data-lucide="log-out"></i> Sair
+                </button>
+            </div>
         </div>
     </nav>
 
@@ -727,6 +769,7 @@
 
     <!-- SCRIPTS -->
     <script src="js/config.js"></script>
+    <script src="js/auth.js?v=1"></script>
     <script src="js/calendar.js?v=21"></script>
     <script src="js/store.js?v=21"></script>
     <script src="js/app.js?v=21"></script>

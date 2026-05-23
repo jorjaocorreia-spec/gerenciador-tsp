@@ -382,6 +382,11 @@ class AppController {
         }
     }
 
+    // Chamado após login bem-sucedido
+    initAfterAuth() {
+        this.renderAll();
+    }
+
     // ===================================
     // RENDERS
     // ===================================
@@ -1715,6 +1720,21 @@ class AppController {
 }
 
 // Iniciar a aplicação quando DOM estiver pronto
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
+    Auth.init();
+
+    const user = await Auth.getSession();
+
     window.app = new AppController();
+
+    if (!user) {
+        Auth.showAuthScreen();
+    } else {
+        Auth.hideAuthScreen();
+        window.app.initAfterAuth();
+    }
+
+    document.getElementById('btn-logout').addEventListener('click', async () => {
+        await Auth.signOut();
+    });
 });

@@ -2,18 +2,22 @@
 
 ## O que é este projeto
 
-Sistema web de gerenciamento de horas e consultoria para pequenas empresas ou consultores independentes. Permite controlar contratos de clientes, horas consumidas, tarefas (Kanban), agenda de atendimentos e sincronização com Google Calendar.
+Sistema web de gerenciamento de horas e consultoria para empresas. Permite controlar contratos de clientes, horas consumidas, tarefas (Kanban), agenda de atendimentos e sincronização com Google Calendar. Suporta múltiplos usuários — cada um com sua própria carteira de clientes e lançamentos isolados.
 
-Aplicação 100% client-side (sem backend): roda no navegador com dados persistidos em `localStorage`, servida por um servidor HTTP Python local.
+Aplicação client-side (vanilla JS) com autenticação e persistência via **Supabase**, servida por nginx no Docker.
+
+**URL de produção**: https://jorge-gerenciador-tsp.27pl2o.easypanel.host
 
 ---
 
 ## Stack e dependências
 
 - **Linguagens**: HTML5, CSS3, JavaScript ES6+ (vanilla, sem frameworks, sem build step)
-- **Persistência**: `localStorage` (chave `tsp_data_v1`)
-- **Servidor local**: Python 3 HTTP server na porta 8080
+- **Autenticação e banco**: Supabase (Auth + PostgreSQL + RLS)
+- **Servidor local (dev)**: Python 3 HTTP server na porta 8080
+- **Servidor produção**: nginx:alpine via Docker
 - **Bibliotecas (CDN)**:
+  - `@supabase/supabase-js@2` — autenticação e acesso ao banco
   - Lucide Icons — ícones da UI
   - PDF.js — leitura/parsing de PDFs
   - jsPDF + jsPDF-AutoTable — geração de PDFs
@@ -22,7 +26,7 @@ Aplicação 100% client-side (sem backend): roda no navegador com dados persisti
 
 ---
 
-## Como rodar
+## Como rodar localmente
 
 ```batch
 # Windows — duplo clique ou via terminal:
@@ -33,9 +37,16 @@ python -m http.server 8080
 # Abrir: http://localhost:8080/index.html
 ```
 
-**Requisitos**: Python 3.x instalado, navegador moderno, conexão com internet (CDNs e Google APIs).
+Em dev, `js/config.js` precisa existir localmente com as credenciais reais (não é gerado automaticamente fora do Docker). Crie manualmente:
 
-Não há etapa de build, transpilação ou instalação de pacotes.
+```javascript
+window.TSP_CONFIG = {
+  CLIENT_ID: 'seu-google-client-id',
+  API_KEY: 'sua-google-api-key',
+  SUPABASE_URL: 'https://klimkamnydfnzqetqlqm.supabase.co',
+  SUPABASE_ANON_KEY: 'eyJ...'
+};
+```
 
 ---
 
@@ -43,104 +54,130 @@ Não há etapa de build, transpilação ou instalação de pacotes.
 
 ```
 GerenciadorTSP/
-├── index.html          # Estrutura HTML completa (modais, formulários, seções)
-├── Iniciar.bat         # Script para iniciar servidor Python e abrir no browser
+├── index.html              # Estrutura HTML completa (tela de login + app)
+├── Dockerfile              # nginx:alpine + envsubst para injetar credenciais
+├── docker-entrypoint.sh    # Gera config.js a partir de config.template.js + env vars
+├── Iniciar.bat             # Script dev: inicia servidor Python
 ├── js/
-│   ├── app.js          # AppController — lógica de UI, handlers, renderização, PDF
-│   ├── store.js        # TSPStore — CRUD e persistência no localStorage
-│   └── calendar.js     # GoogleCalendarAPI — OAuth e sincronização de eventos
+│   ├── config.template.js  # Template de configuração com placeholders (versionado)
+│   ├── config.js           # Gerado em runtime pelo container (gitignored)
+│   ├── auth.js             # Auth — Supabase client, login/logout, UI de autenticação
+│   ├── app.js              # AppController — lógica de UI, handlers, renderização, PDF
+│   ├── store.js            # TSPStore — CRUD (atualmente localStorage, migração pendente)
+│   └── calendar.js         # GoogleCalendarAPI — OAuth e sincronização de eventos
 ├── styles/
-│   └── main.css        # Sistema de design: variáveis, layouts, componentes, animações
-├── Documentation/
-│   ├── INSTRUCOES_GOOGLE_CALENDAR.md  # Guia de configuração da integração Google
-│   └── GEMINI-Construtor-de-Sites.md  # Referência de design (não faz parte do app)
-└── Sample Data/        # PDFs de exemplo para testar importação de ATAs
+│   └── main.css            # Sistema de design: variáveis, layouts, componentes, animações
+└── Documentation/
+    ├── INSTRUCOES_GOOGLE_CALENDAR.md
+    └── GEMINI-Construtor-de-Sites.md  # Referência de design (não faz parte do app)
 ```
 
 ---
 
 ## Arquitetura
 
-### Classes principais
+### Fluxo de inicialização
+
+```
+DOMContentLoaded
+  → Auth.init()          — inicializa Supabase client
+  → Auth.getSession()    — verifica se há sessão ativa
+  → new AppController()  — configura event listeners
+  → se autenticado:  Auth.hideAuthScreen() + app.initAfterAuth()
+  → se não:          Auth.showAuthScreen()
+```
+
+### Classes / objetos principais
+
+**`Auth`** (`js/auth.js`)
+- Inicializa o Supabase client (`window.supabaseClient`)
+- Gerencia sessão: `getSession()`, `signIn()`, `signUp()`, `signOut()`
+- Controla exibição da tela de login/cadastro
+- `handleSubmit()` — trata o formulário de login e cadastro
 
 **`AppController`** (`js/app.js`)
 - Controla navegação entre views (Dashboard, Clientes, Atendimentos, Tarefas, Agenda)
 - Gerencia modais, formulários e eventos de UI
 - Renderiza todas as views dinamicamente no DOM
-- Drag-and-drop do Kanban
-- Importação e exportação de PDFs
-- Ponto de entrada: instanciado no final do `index.html`
+- `initAfterAuth()` — ponto de entrada pós-login, chama `renderAll()`
 
 **`TSPStore`** (`js/store.js`)
+- **Status atual**: ainda usa `localStorage` — migração para Supabase é a Fase 3 pendente
 - Operações CRUD para: Clientes, Registros (horas), Tarefas, Eventos de agenda
-- Serialização/desserialização para `localStorage`
-- Relacionamentos entre entidades (ex.: registros vinculados a clientes)
 
 **`GoogleCalendarAPI`** (`js/calendar.js`)
-- Gerenciamento de token OAuth 2.0
-- Inicialização do GAPI client
-- Sincronização bidirecional com Google Calendar (pull e push)
-- Credenciais configuradas nas linhas 13-14 do arquivo
+- Lê credenciais de `window.TSP_CONFIG.CLIENT_ID` e `window.TSP_CONFIG.API_KEY`
+- Sincronização bidirecional com Google Calendar
 
 ---
 
-## Modelo de dados
+## Banco de dados (Supabase)
 
-```javascript
-// Cliente
-{ id, name, hoursTotal, csName, projectNum, clientPays, notes, status, createdAt }
+**Projeto**: `klimkamnydfnzqetqlqm.supabase.co`
 
-// Registro de horas (Atendimento)
-{ id, clientId, date, startTime, endTime, minutes, description, createdAt }
+### Tabelas
 
-// Tarefa (Kanban)
-{ id, clientId, title, description, status, priority, dueDate, estimatedMinutes, attachments, createdAt, timeSpent }
-// status: 'new' | 'doing' | 'done'
-// priority: 'low' | 'medium' | 'high'
+Todas têm `user_id uuid references auth.users` + RLS ativa (`auth.uid() = user_id`).
 
-// Evento de agenda
-{ id, title, description, type, clientId, relatedTaskId, date, startTime, endTime, location, createdAt, calendarEventId }
-// type: 'meeting' | 'consulting' | 'task' | 'reminder'
-```
+| Tabela | Campos principais |
+|--------|------------------|
+| `clients` | id, user_id, name, hours_total, cs_name, project_num, client_pays, notes, status |
+| `records` | id, user_id, client_id, date, start_time, end_time, minutes, description |
+| `tasks` | id, user_id, client_id, title, description, status, priority, due_date, estimated_minutes, spent_minutes |
+| `agenda_events` | id, user_id, client_id, related_task_id, title, type, date, start_time, end_time, location, calendar_event_id |
+
+### Fases de migração
+
+- **Fase 1** ✅ — Supabase criado, tabelas e RLS configuradas
+- **Fase 2** ✅ — Autenticação: tela de login/logout integrada ao app
+- **Fase 3** 🔄 — Reescrita do `store.js` para usar Supabase (todas as ops viram async)
+- **Fase 4** 🔄 — Adaptação do `app.js` para async/await e loading states
+- **Fase 5** 🔄 — Ferramenta de migração de dados do localStorage para Supabase
+- **Fase 6** 🔄 — Deploy final e testes com múltiplos usuários
 
 ---
 
-## Configuração do Google Calendar
+## Variáveis de ambiente
 
-As credenciais ficam em `js/calendar.js` (linhas 13-14):
+Configuradas no Easypanel → serviço `gerenciador-tsp` → Ambiente:
 
-```javascript
-const CLIENT_ID = '...apps.googleusercontent.com';
-const API_KEY = 'AIzaSy...';
-```
+| Variável | Descrição |
+|----------|-----------|
+| `GOOGLE_CLIENT_ID` | OAuth Client ID do Google Cloud |
+| `GOOGLE_API_KEY` | API Key do Google Cloud |
+| `SUPABASE_URL` | `https://klimkamnydfnzqetqlqm.supabase.co` |
+| `SUPABASE_ANON_KEY` | Chave pública anon do Supabase |
 
-Para configurar do zero, seguir `Documentation/INSTRUCOES_GOOGLE_CALENDAR.md`.
-A origin `http://localhost:8080` deve estar autorizada no projeto Google Cloud.
+O `docker-entrypoint.sh` injeta essas vars em `js/config.js` via `envsubst` na inicialização do container. O arquivo `js/config.js` está no `.gitignore`.
+
+---
+
+## Deploy
+
+- **VPS**: Hostinger → Easypanel → projeto `jorge`, serviço `gerenciador-tsp`
+- **Build**: Dockerfile (nginx:alpine)
+- **Repo**: https://github.com/jorjaocorreia-spec/gerenciador-tsp (público)
+- **Branch**: `main` → deploy automático via webhook
+- NUNCA tocar em outros serviços da VPS (7dias, evolution-api, termix)
 
 ---
 
 ## Regras de desenvolvimento
 
 ### O que nunca alterar sem cuidado
-- `store.js` — toda mudança no esquema de dados pode corromper dados existentes no `localStorage`; migração manual pode ser necessária
-- Credenciais em `calendar.js` — não commitar credenciais reais; usar variáveis de ambiente se o projeto evoluir para um servidor
-- Chave `tsp_data_v1` no `localStorage` — renomear causa perda de todos os dados do usuário
+- Schema das tabelas Supabase — mudanças requerem migration SQL e atualização do store.js
+- `docker-entrypoint.sh` — qualquer var nova precisa ser adicionada aqui E no Easypanel
+- IDs de elementos HTML — usados como seletores em `app.js`; renomear quebra a UI
 
 ### Padrões de código
 - JavaScript vanilla ES6+; sem TypeScript, sem React, sem bundler
-- Sem comentários redundantes — o código deve ser autoexplicativo via nomes
-- CSS usa variáveis (`--primary`, `--bg-glass`, etc.) definidas em `:root`; sempre usar variáveis em vez de valores hardcoded
-- IDs de elementos HTML são usados como seletores no `app.js`; manter consistência ao renomear
+- CSS usa variáveis (`--primary`, `--bg-glass`, etc.) definidas em `:root`
+- Após migração do store (Fase 3), todas as chamadas serão `async/await`
 
 ### Cálculos automáticos
 - Comissão do consultor = 43% do valor pago pelo cliente (`clientPays * 0.43`)
 - Duração do atendimento calculada a partir de `startTime` e `endTime`
 - Barras de progresso baseadas em `minutes / (hoursTotal * 60)`
-
-### Exportação de dados
-- JSON backup/restore: exporta o objeto completo do `localStorage`
-- PDF de registros: usa jsPDF com AutoTable; filtros de cliente e data são aplicados antes
-- Importação de ATAs (PDF): parsing via PDF.js, extrai registros de presença
 
 ---
 
@@ -148,6 +185,7 @@ A origin `http://localhost:8080` deve estar autorizada no projeto Google Cloud.
 
 | View | Descrição |
 |------|-----------|
+| **Login** | Tela de autenticação (email/senha) via Supabase Auth |
 | **Dashboard** | Visão geral dos clientes com barras de consumo de horas |
 | **Clientes** | CRUD de clientes; campos: nome, horas, CS, nº projeto, valor, notas, status |
 | **Atendimentos** | Log de horas por cliente; filtros por cliente e período; exportação PDF |
@@ -156,25 +194,17 @@ A origin `http://localhost:8080` deve estar autorizada no projeto Google Cloud.
 
 ---
 
-## Limitações conhecidas
-
-- Dados ficam somente no navegador (localStorage); não há backup automático em nuvem
-- Google OAuth exige origin pública para produção (localhost funciona em dev)
-- Sem autenticação de usuário: qualquer pessoa com acesso ao browser vê todos os dados
-- Sem testes automatizados
-- Arquivo `app.js` é extenso (71 KB); qualquer refatoração deve ser incremental
-
----
-
 ## Comandos úteis
 
 ```powershell
-# Iniciar servidor
+# Iniciar servidor dev
 python -m http.server 8080
 
 # Verificar se porta 8080 está em uso
 netstat -ano | findstr :8080
 
-# Parar processo na porta 8080 (substituir PID)
-taskkill /PID <PID> /F
+# Git push (usa git do GitHub Desktop)
+$git = "C:\Users\jorge\AppData\Local\GitHubDesktop\app-3.5.8\resources\app\git\cmd\git.exe"
+Set-Location d:\GerenciadorTSP
+& $git add . && & $git commit -m "mensagem" && & $git push
 ```
