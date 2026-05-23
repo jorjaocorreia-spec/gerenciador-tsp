@@ -1,0 +1,4 @@
+window.TSP_CONFIG = {
+  CLIENT_ID: '${GOOGLE_CLIENT_ID}',
+  API_KEY: '${GOOGLE_API_KEY}'
+};

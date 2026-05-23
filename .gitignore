@@ -1,0 +1,22 @@
+# PDFs de exemplo (arquivos grandes, não versionados)
+Sample Data/
+
+# Config gerado pelo container (credenciais reais — nunca versionar)
+js/config.js
+
+# Arquivos de sistema Windows
+Thumbs.db
+desktop.ini
+*.lnk
+
+# Arquivos de sistema macOS
+.DS_Store
+
+# Editors
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Logs
+*.log

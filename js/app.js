@@ -1,0 +1,1720 @@
+/**
+ * TSP App - Controlador da Lógica da Interface
+ */
+
+class AppController {
+    constructor() {
+        this.currentView = 'dashboard';
+        this.selectedClient = null;
+        this.selectedMonth = null;
+        this.pendingPdfRecords = []; // Armazena temporariamente os registros do PDF lido
+        this.agendaCurrentDate = new Date();
+        this.agendaViewMode = 'weekly'; // daily or weekly
+        this.init();
+    }
+
+    init() {
+        // Inicializar ícones
+        lucide.createIcons();
+
+        // Bind Navegação
+        document.querySelectorAll('.nav-item').forEach(item => {
+            item.addEventListener('click', (e) => {
+                const view = e.currentTarget.getAttribute('data-view');
+                this.switchView(view);
+            });
+        });
+
+        // Configurar Formulários
+        document.getElementById('form-client').addEventListener('submit', this.handleClientSubmit.bind(this));
+        document.getElementById('form-record').addEventListener('submit', this.handleRecordSubmit.bind(this));
+        document.getElementById('form-task').addEventListener('submit', this.handleTaskSubmit.bind(this));
+        document.getElementById('form-task-time').addEventListener('submit', this.handleTaskTimeSubmit.bind(this));
+        document.getElementById('form-agenda-event').addEventListener('submit', this.handleAgendaSubmit.bind(this));
+
+        // Calculo de tempo automático
+        document.getElementById('record-start').addEventListener('input', this.calculateTimeDiff.bind(this));
+        document.getElementById('record-end').addEventListener('input', this.calculateTimeDiff.bind(this));
+
+        // Calculo valor do consultor automático
+        document.getElementById('client-pays').addEventListener('input', this.calculateConsultantValue.bind(this));
+
+        // Sets default date in record form to today
+        document.getElementById('record-date').valueAsDate = new Date();
+
+        // Configurar Backup
+        this.setupBackup();
+
+        // Configurar Importação de PDF
+        this.setupPdfImport();
+
+        // Renderizar Views
+        this.renderAll();
+    }
+
+    // ===================================
+    // NAVEGAÇÃO / ROTEAMENTO
+    // ===================================
+    switchView(viewName) {
+        this.currentView = viewName;
+
+        // Update nav UI
+        document.querySelectorAll('.nav-item').forEach(item => {
+            item.classList.remove('active');
+            if (item.getAttribute('data-view') === viewName) {
+                item.classList.add('active');
+            }
+        });
+
+        // Update sections
+        document.querySelectorAll('.view-section').forEach(section => {
+            section.classList.remove('active');
+            if (section.id === `view-${viewName}`) {
+                section.classList.add('active');
+            }
+        });
+
+        this.renderAll();
+    }
+
+    // ===================================
+    // MODAIS
+    // ===================================
+    openModal(modalId) {
+        document.getElementById(modalId).classList.add('active');
+        if (modalId === 'modal-record' || modalId === 'modal-task' || modalId === 'modal-agenda-event') {
+            this.updateClientSelects();
+        }
+        if (modalId === 'modal-task') {
+            if (!document.getElementById('task-id').value) {
+                document.getElementById('task-status').value = 'new';
+                document.getElementById('task-priority').value = 'medium';
+            }
+        }
+        if (modalId === 'modal-agenda-event') {
+            this.updateAgendaTaskSelect();
+            if (!document.getElementById('agenda-id').value) {
+                document.getElementById('agenda-date').valueAsDate = new Date();
+            }
+        }
+    }
+
+    closeModal(modalId) {
+        document.getElementById(modalId).classList.remove('active');
+
+        if (modalId === 'modal-client') {
+            document.getElementById('form-client').reset();
+            document.getElementById('client-id').value = '';
+            document.getElementById('modal-client-title').innerText = 'Novo Cliente';
+        }
+        if (modalId === 'modal-task') {
+            document.getElementById('form-task').reset();
+            document.getElementById('task-id').value = '';
+            document.getElementById('modal-task-title').innerText = 'Nova Tarefa';
+        }
+        if (modalId === 'modal-task-time') {
+            document.getElementById('form-task-time').reset();
+            document.getElementById('time-task-id').value = '';
+        }
+        if (modalId === 'modal-agenda-event') {
+            document.getElementById('form-agenda-event').reset();
+            document.getElementById('agenda-id').value = '';
+            document.getElementById('modal-agenda-title').innerText = 'Novo Agendamento';
+        }
+    }
+
+    // ===================================
+    // FORM SUBMITS
+    // ===================================
+    handleClientSubmit(e) {
+        e.preventDefault();
+        const id = document.getElementById('client-id').value;
+        const name = document.getElementById('client-name').value;
+        const hours = document.getElementById('client-hours').value;
+        const projectNum = document.getElementById('client-project').value;
+        const csName = document.getElementById('client-cs').value;
+        const clientPays = document.getElementById('client-pays').value;
+        const notes = document.getElementById('client-notes').value;
+        const status = document.getElementById('client-status').value;
+
+        if (id) {
+            // Edição
+            store.updateClient(id, name, hours, csName, projectNum, clientPays, notes, status);
+        } else {
+            // Criação
+            store.addClient(name, hours, csName, projectNum, clientPays, notes, status);
+        }
+
+        e.target.reset();
+        document.getElementById('client-id').value = '';
+        this.closeModal('modal-client');
+        this.renderAll();
+    }
+
+    calculateConsultantValue() {
+        const inputPays = document.getElementById('client-pays').value;
+        const inputReceives = document.getElementById('consultant-receives');
+        if (inputPays && !isNaN(inputPays)) {
+            const receivesValue = parseFloat(inputPays) * 0.43;
+            inputReceives.value = `R$ ${receivesValue.toFixed(2).replace('.', ',')}`;
+        } else {
+            inputReceives.value = '';
+        }
+    }
+
+    calculateTimeDiff() {
+        const start = document.getElementById('record-start').value;
+        const end = document.getElementById('record-end').value;
+        const calcInput = document.getElementById('record-calculated');
+
+        if (start && end) {
+            const [startH, startM] = start.split(':').map(Number);
+            const [endH, endM] = end.split(':').map(Number);
+
+            let diffMins = (endH * 60 + endM) - (startH * 60 + startM);
+            if (diffMins < 0) {
+                diffMins += 24 * 60; // Passou da meia noite
+            }
+
+            const hours = Math.floor(diffMins / 60);
+            const mins = diffMins % 60;
+
+            calcInput.value = `${hours}h ${mins}m (${diffMins} min)`;
+            calcInput.dataset.minutes = diffMins;
+        } else {
+            calcInput.value = '';
+            calcInput.dataset.minutes = 0;
+        }
+    }
+
+    handleRecordSubmit(e) {
+        e.preventDefault();
+        const recordId = document.getElementById('record-id').value;
+        const clientId = document.getElementById('record-client').value;
+        const date = document.getElementById('record-date').value;
+        const startTime = document.getElementById('record-start').value;
+        const endTime = document.getElementById('record-end').value;
+        const minutes = document.getElementById('record-calculated').dataset.minutes;
+        const desc = document.getElementById('record-desc').value;
+
+        if (!minutes || minutes <= 0) {
+            alert("Preencha horários válidos.");
+            return;
+        }
+
+        if (recordId) {
+            store.updateRecord(recordId, clientId, date, startTime, endTime, minutes, desc);
+        } else {
+            store.addRecord(clientId, date, startTime, endTime, minutes, desc);
+        }
+
+        e.target.reset();
+        document.getElementById('record-id').value = '';
+        document.getElementById('record-calculated').dataset.minutes = 0;
+        document.getElementById('record-date').valueAsDate = new Date();
+        this.closeModal('modal-record');
+        this.renderAll();
+    }
+
+    handleDeleteClient(id) {
+        if (confirm("Tem certeza que deseja excluir este cliente e TODOS os seus atendimentos?")) {
+            store.deleteClient(id);
+            this.renderAll();
+        }
+    }
+
+    handleDeleteRecord(id) {
+        if (confirm("Deseja realmente apagar este lançamento?")) {
+            store.deleteRecord(id);
+            this.renderAll();
+        }
+    }
+
+    handleEditRecord(id) {
+        const r = store.getRecord(id);
+        if (!r) return;
+        document.getElementById('record-id').value = r.id;
+        document.getElementById('record-client').value = r.clientId;
+        document.getElementById('record-date').value = r.date;
+        document.getElementById('record-start').value = r.startTime;
+        document.getElementById('record-end').value = r.endTime;
+        document.getElementById('record-desc').value = r.description;
+
+        document.getElementById('record-calculated').value = r.minutes + ' min';
+        document.getElementById('record-calculated').dataset.minutes = r.minutes;
+
+        this.openModal('modal-record');
+    }
+
+    handleViewRecord(id) {
+        const r = store.getRecord(id);
+        if (!r) return;
+        const client = store.getClient(r.clientId);
+
+        document.getElementById('view-record-client').value = client ? client.name : '<Deletado>';
+        document.getElementById('view-record-date').value = r.date.split('-').reverse().join('/');
+        document.getElementById('view-record-time').value = r.minutes + ' minutos';
+
+        const timeRange = (r.startTime && r.endTime) ? `${r.startTime} às ${r.endTime}` : 'N/A';
+        document.getElementById('view-record-range').value = timeRange;
+        document.getElementById('view-record-desc').value = r.description;
+
+        this.openModal('modal-view-record');
+    }
+
+    // ===================================
+    // TAREFAS (Ações e Submits)
+    // ===================================
+    handleTaskSubmit(e) {
+        e.preventDefault();
+        const id = document.getElementById('task-id').value;
+        const clientId = document.getElementById('task-client').value;
+        const title = document.getElementById('task-title').value;
+        const desc = document.getElementById('task-desc').value;
+        const priority = document.getElementById('task-priority').value;
+        const dueDate = document.getElementById('task-due-date').value;
+        const estimated = document.getElementById('task-estimated').value;
+        const status = document.getElementById('task-status').value;
+        const attachmentsInput = document.getElementById('task-attachments');
+        let attachments = [];
+
+        if (attachmentsInput.files && attachmentsInput.files.length > 0) {
+            for (let i = 0; i < attachmentsInput.files.length; i++) {
+                attachments.push(attachmentsInput.files[i].name);
+            }
+        }
+
+        const taskData = {
+            clientId,
+            title,
+            description: desc,
+            status,
+            priority,
+            dueDate,
+            estimatedMinutes: estimated,
+            attachments
+        };
+
+        if (id) {
+            taskData.id = id;
+            store.updateTask(taskData);
+        } else {
+            store.addTask(taskData);
+        }
+
+        this.closeModal('modal-task');
+        this.renderAll();
+    }
+
+    handleTaskTimeSubmit(e) {
+        e.preventDefault();
+        const id = document.getElementById('time-task-id').value;
+        const minutes = document.getElementById('time-task-minutes').value;
+        const desc = document.getElementById('time-task-desc').value;
+
+        if (id && minutes) {
+            // Pode expandir para salvar tb em atendimentos no futuro se desejar
+            store.addTaskTime(id, minutes);
+            this.closeModal('modal-task-time');
+            this.renderAll();
+        }
+    }
+
+    handleEditTask(id) {
+        const t = store.getTask(id);
+        if (!t) return;
+        document.getElementById('modal-task-title').innerText = 'Editar Tarefa';
+        document.getElementById('task-id').value = t.id;
+        document.getElementById('task-client').value = t.clientId;
+        document.getElementById('task-title').value = t.title;
+        document.getElementById('task-desc').value = t.description;
+        document.getElementById('task-priority').value = t.priority;
+        document.getElementById('task-due-date').value = t.dueDate;
+        document.getElementById('task-estimated').value = t.estimatedMinutes || '';
+        document.getElementById('task-status').value = t.status;
+
+        this.openModal('modal-task');
+    }
+
+    handleDeleteTask(id) {
+        if (confirm("Deseja realmente apagar esta tarefa?")) {
+            store.deleteTask(id);
+            this.renderAll();
+        }
+    }
+
+    handleOpenTaskTime(id) {
+        document.getElementById('time-task-id').value = id;
+        this.openModal('modal-task-time');
+    }
+
+    // Drag and Drop Tarefas
+    dragStart(e) {
+        e.dataTransfer.setData('text/plain', e.currentTarget.dataset.id);
+        setTimeout(() => e.target.classList.add('dragging'), 0);
+    }
+
+    dragEnd(e) {
+        e.target.classList.remove('dragging');
+        document.querySelectorAll('.kanban-dropzone').forEach(zone => {
+            zone.classList.remove('drag-over');
+        });
+    }
+
+    allowDrop(e) {
+        e.preventDefault();
+        if (e.currentTarget.classList.contains('kanban-dropzone')) {
+            e.currentTarget.classList.add('drag-over');
+        }
+    }
+
+    dropTask(e) {
+        e.preventDefault();
+        const dropzone = e.currentTarget;
+        dropzone.classList.remove('drag-over');
+
+        const taskId = e.dataTransfer.getData('text/plain');
+        const newStatus = dropzone.dataset.status;
+
+        if (taskId && newStatus) {
+            store.updateTaskStatus(taskId, newStatus);
+            this.renderAll();
+        }
+    }
+
+    // ===================================
+    // RENDERS
+    // ===================================
+    renderAll() {
+        this.updateClientSelects(); // ATUALIZA TODOS OS SELECTS (inclusive os de Filtro)
+        this.renderDashboard();
+        this.renderClients();
+        this.renderRecords();
+        this.renderClientDashboard();
+        this.renderMonthRecords();
+        this.renderTasks();
+        this.renderAgenda();
+        lucide.createIcons(); // Reactiva ícones renderizados dinamicamente
+    }
+
+    renderDashboard() {
+        const container = document.getElementById('dashboard-container');
+        
+        let showActive = true;
+        let showFinished = false;
+        
+        const filterActiveEl = document.getElementById('dash-filter-active');
+        const filterFinishedEl = document.getElementById('dash-filter-finished');
+        if (filterActiveEl) showActive = filterActiveEl.checked;
+        if (filterFinishedEl) showFinished = filterFinishedEl.checked;
+
+        const clients = store.getClients().filter(c => {
+            const status = c.status || 'active';
+            if (status === 'active' && showActive) return true;
+            if (status === 'finished' && showFinished) return true;
+            return false;
+        });
+
+        const today = new Date();
+        const currentYearMonth = today.getFullYear() + "-" + String(today.getMonth() + 1).padStart(2, '0');
+        let stats = clients.map(c => store.getClientStats(c.id, currentYearMonth));
+        // Remove null stats case a client is missing
+        stats = stats.filter(s => s !== null);
+
+        container.innerHTML = '';
+
+        if (stats.length === 0) {
+            container.innerHTML = `
+                <div style="grid-column: 1 / -1; text-align: center; padding: 40px;" class="glass">
+                    <p class="text-muted">Nenhum cliente cadastrado ainda.</p>
+                </div>
+            `;
+            return;
+        }
+
+        stats.forEach(stat => {
+            const isCritical = stat.isOverLimit ? 'over-limit' : '';
+            const statusColor = stat.isOverLimit ? 'var(--danger-color)' : 'var(--primary-color)';
+
+            const card = document.createElement('div');
+            card.className = 'stat-card glass';
+            card.style.cursor = 'pointer';
+            card.onclick = () => app.openClientDashboard(stat.client.id);
+
+            card.innerHTML = `
+                <div class="stat-header">
+                    <span class="client-name">${stat.client.name}</span>
+                    <span style="font-weight: 600; color: ${statusColor}">${stat.hoursUsed}h / ${stat.hoursTotal}h</span>
+                </div>
+                <div class="progress-container">
+                    <div class="progress-bar ${isCritical}" style="width: ${stat.percentage}%;"></div>
+                </div>
+                <div style="display: flex; justify-content: space-between; font-size: 0.85rem; margin-top: 8px;">
+                    <span class="text-muted">${stat.percentage}% utilizado</span>
+                    <span class="text-muted">${stat.hoursRemaining}h restantes</span>
+                </div>
+            `;
+            container.appendChild(card);
+        });
+    }
+
+    renderClients() {
+        const tbody = document.querySelector('#clients-table tbody');
+        const clients = store.getClients();
+        tbody.innerHTML = '';
+
+        if (clients.length === 0) {
+            tbody.innerHTML = `<tr><td colspan="4" class="text-muted" style="text-align: center;">Nenhum cliente encontrado.</td></tr>`;
+            return;
+        }
+
+        clients.forEach(c => {
+            const tr = document.createElement('tr');
+            const stat = store.getClientStats(c.id);
+            const overLimitBadge = stat && stat.isOverLimit ? `<span style="background: var(--danger-color); color: white; padding: 2px 6px; border-radius: 4px; font-size: 0.7rem; margin-left: 8px;">Estourado</span>` : '';
+
+            // Formatador de Moeda
+            const formatMoney = (val) => {
+                return (val && !isNaN(val)) ? `R$ ${parseFloat(val).toFixed(2).replace('.', ',')}` : 'R$ 0,00';
+            };
+
+            const clientPaysStr = formatMoney(c.clientPays);
+            const consultantReceives = (c.clientPays && !isNaN(c.clientPays)) ? formatMoney(c.clientPays * 0.43) : 'R$ 0,00';
+            const detailsHtml = `
+                <div style="font-size: 0.85rem; margin-top: 4px; color: var(--text-muted)">
+                    <span><strong>CS:</strong> ${c.csName || '-'}</span> | 
+                    <span><strong>Proj:</strong> ${c.projectNum || '-'}</span> <br>
+                    <span><strong>Paga:</strong> ${clientPaysStr}</span> | 
+                    <span><strong>Recebe:</strong> ${consultantReceives}</span>
+                    <div style="margin-top:2px; font-style:italic; font-size: 0.8rem">Obs: ${c.notes || '-'}</div>
+                </div>
+            `;
+
+            tr.innerHTML = `
+                <td>
+                    <strong>${c.name}</strong> ${overLimitBadge}
+                    ${detailsHtml}
+                </td>
+                <td style="vertical-align: top; padding-top: 20px;">${c.hoursTotal}h</td>
+                <td style="vertical-align: top; padding-top: 16px;">
+                    <div style="display: flex; gap: 8px;">
+                        <button class="btn btn-secondary" onclick="app.openEditClientModal('${c.id}')" style="padding: 6px 12px; font-size: 0.8rem;">
+                            <i data-lucide="edit-2" style="width: 16px; height: 16px;"></i> Editar
+                        </button>
+                        <button class="btn btn-danger" onclick="app.handleDeleteClient('${c.id}')" style="padding: 6px 12px; font-size: 0.8rem;">
+                            <i data-lucide="trash-2" style="width: 16px; height: 16px;"></i> Apagar
+                        </button>
+                    </div>
+                </td>
+            `;
+            tbody.appendChild(tr);
+        });
+    }
+
+    openEditClientModal(id) {
+        const client = store.getClient(id);
+        if (!client) return;
+
+        document.getElementById('modal-client-title').innerText = 'Editar Cliente';
+        document.getElementById('client-id').value = client.id;
+        document.getElementById('client-name').value = client.name;
+        document.getElementById('client-hours').value = client.hoursTotal;
+        document.getElementById('client-project').value = client.projectNum || '';
+        document.getElementById('client-cs').value = client.csName || '';
+        document.getElementById('client-pays').value = client.clientPays || '';
+        document.getElementById('client-notes').value = client.notes || '';
+        document.getElementById('client-status').value = client.status || 'active';
+
+        // Recalcular recebimento no modal ao abrir para edição
+        this.calculateConsultantValue();
+
+        this.openModal('modal-client');
+    }
+
+    renderRecords() {
+        const tbody = document.querySelector('#records-table tbody');
+        // Ordena registros do mais recente para o mais antigo considerando a data do atendimento
+        let records = store.getRecords().sort((a, b) => new Date(b.date) - new Date(a.date));
+
+        // APERFEIÇOAMENTO: Filtros da Interface
+        const filterClient = document.getElementById('filter-client')?.value;
+        const filterStart = document.getElementById('filter-date-start')?.value;
+        const filterEnd = document.getElementById('filter-date-end')?.value;
+
+        if (filterClient) {
+            records = records.filter(r => r.clientId === filterClient);
+        }
+        if (filterStart) {
+            records = records.filter(r => new Date(r.date) >= new Date(filterStart));
+        }
+        if (filterEnd) {
+            records = records.filter(r => new Date(r.date) <= new Date(filterEnd));
+        }
+
+        tbody.innerHTML = '';
+
+        if (records.length === 0) {
+            tbody.innerHTML = `<tr><td colspan="5" class="text-muted" style="text-align: center;">Nenhum atendimento lançado.</td></tr>`;
+            return;
+        }
+
+        records.forEach(r => {
+            const client = store.getClient(r.clientId);
+            const clientName = client ? client.name : '<Deletado>';
+            const hoursStr = (r.minutes / 60).toFixed(2) + 'h';
+            const timeRange = (r.startTime && r.endTime) ? `<br><small class="text-muted">${r.startTime} às ${r.endTime}</small>` : '';
+
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+                <td>${r.date.split('-').reverse().join('/')}${timeRange}</td>
+                <td><strong>${clientName}</strong></td>
+                <td>${r.description}</td>
+                <td>${r.minutes} min <span class="text-muted">(${hoursStr})</span></td>
+                <td>
+                    <div style="display: flex; gap: 8px;">
+                        <button class="btn btn-secondary" onclick="app.handleViewRecord('${r.id}')" style="padding: 6px 10px; font-size: 0.8rem;" title="Visualizar">
+                            <i data-lucide="eye" style="width: 16px; height: 16px;"></i>
+                        </button>
+                        <button class="btn btn-primary" onclick="app.handleEditRecord('${r.id}')" style="padding: 6px 10px; font-size: 0.8rem;" title="Editar">
+                            <i data-lucide="pencil" style="width: 16px; height: 16px;"></i>
+                        </button>
+                        <button class="btn btn-danger" onclick="app.handleDeleteRecord('${r.id}')" style="padding: 6px 10px; font-size: 0.8rem;" title="Apagar">
+                            <i data-lucide="trash-2" style="width: 16px; height: 16px;"></i>
+                        </button>
+                    </div>
+                </td>
+            `;
+            tbody.appendChild(tr);
+        });
+    }
+
+    updateClientSelects() {
+        const selects = [
+            document.getElementById('record-client'),
+            document.getElementById('filter-client'),
+            document.getElementById('task-client'),
+            document.getElementById('filter-task-client'),
+            document.getElementById('agenda-client')
+        ];
+
+        const clients = store.getClients();
+
+        selects.forEach(select => {
+            if (!select) return;
+
+            // SALVA O VALOR ATUAL ANTES DE LIMPAR O CONTEÚDO
+            const currentValue = select.value;
+
+            const isFilter = select.id === 'filter-client';
+            select.innerHTML = isFilter
+                ? '<option value="">Todos os Clientes</option>'
+                : '<option value="" disabled selected>-- Escolha um cliente --</option>';
+
+            clients.forEach(c => {
+                const option = document.createElement('option');
+                option.value = c.id;
+                option.textContent = c.name;
+                select.appendChild(option);
+            });
+
+            // RESTAURA O VALOR SALVO
+            if (currentValue) {
+                select.value = currentValue;
+            }
+        });
+    }
+
+    clearFilters() {
+        if (document.getElementById('filter-client')) document.getElementById('filter-client').value = '';
+        if (document.getElementById('filter-date-start')) document.getElementById('filter-date-start').value = '';
+        if (document.getElementById('filter-date-end')) document.getElementById('filter-date-end').value = '';
+        this.renderAll();
+    }
+
+    exportFilteredToPDF() {
+        const { jsPDF } = window.jspdf;
+        const doc = new jsPDF();
+
+        let records = store.getRecords().sort((a, b) => new Date(b.date) - new Date(a.date));
+
+        const filterClient = document.getElementById('filter-client')?.value;
+        const filterStart = document.getElementById('filter-date-start')?.value;
+        const filterEnd = document.getElementById('filter-date-end')?.value;
+
+        let clientNameHeader = "Todos os Clientes";
+
+        if (filterClient) {
+            records = records.filter(r => r.clientId === filterClient);
+            const client = store.getClient(filterClient);
+            if (client) {
+                clientNameHeader = client.name;
+            }
+        }
+        if (filterStart) {
+            records = records.filter(r => new Date(r.date) >= new Date(filterStart));
+        }
+        if (filterEnd) {
+            records = records.filter(r => new Date(r.date) <= new Date(filterEnd));
+        }
+
+        if (records.length === 0) {
+            alert("Nenhum dado para exportar.");
+            return;
+        }
+
+        doc.setFontSize(16);
+        doc.text("Relatório de Atendimentos", 14, 20);
+
+        doc.setFontSize(10);
+        let subtitle = `Cliente(s): ${clientNameHeader}`;
+        let period = "Período: ";
+        if (filterStart || filterEnd) {
+            period += `${filterStart ? filterStart.split('-').reverse().join('/') : 'Início'} até ${filterEnd ? filterEnd.split('-').reverse().join('/') : 'Atual'}`;
+        } else {
+            period += "Todo o período";
+        }
+        doc.text(subtitle, 14, 28);
+        doc.text(period, 14, 34);
+
+        const tableColumn = ["Data e Hora", "Cliente", "Descrição da Atividade", "Tempo Gasto"];
+        const tableRows = [];
+
+        records.forEach(r => {
+            const client = store.getClient(r.clientId);
+            const clientName = client ? client.name : '<Deletado>';
+            const hoursStr = (r.minutes / 60).toFixed(2) + 'h';
+            const timeRange = (r.startTime && r.endTime) ? `\n${r.startTime} às ${r.endTime}` : '';
+
+            const dateText = `${r.date.split('-').reverse().join('/')}${timeRange}`;
+            const timeText = `${r.minutes} min\n(${hoursStr})`;
+
+            tableRows.push([
+                dateText,
+                clientName,
+                r.description,
+                timeText
+            ]);
+        });
+
+        doc.autoTable({
+            startY: 40,
+            head: [tableColumn],
+            body: tableRows,
+            styles: { fontSize: 8 },
+            headStyles: { fillColor: [79, 70, 229] },
+        });
+
+        const safeClientName = clientNameHeader.replace(/[^a-z0-9]/gi, '_').toLowerCase();
+        doc.save(`atendimentos_${safeClientName}_${new Date().getTime()}.pdf`);
+    }
+
+    // ===================================
+    // CLIENT DASHBOARD (MONTHS)
+    // ===================================
+    openClientDashboard(clientId) {
+        this.selectedClient = clientId;
+        this.switchView('client-dashboard');
+        // Remove class active de todos os nav-items porque é uma sub-view
+        document.querySelectorAll('.nav-item').forEach(item => item.classList.remove('active'));
+    }
+
+    renderClientDashboard() {
+        if (this.currentView !== 'client-dashboard' || !this.selectedClient) return;
+
+        const client = store.getClient(this.selectedClient);
+        if (!client) return;
+
+        document.getElementById('client-dashboard-title').innerText = client.name;
+
+        const container = document.getElementById('client-months-container');
+        const monthlyStats = store.getMonthlyStatsByClient(this.selectedClient);
+        container.innerHTML = '';
+
+        if (monthlyStats.length === 0) {
+            container.innerHTML = `
+                <div style="grid-column: 1 / -1; text-align: center; padding: 40px;" class="glass">
+                    <p class="text-muted">Nenhum atendimento lançado para este cliente.</p>
+                </div>
+            `;
+            return;
+        }
+
+        monthlyStats.forEach(stat => {
+            const hoursUsed = (stat.minutes / 60).toFixed(2);
+
+            const card = document.createElement('div');
+            card.className = 'stat-card glass';
+            card.style.cursor = 'pointer';
+            card.onclick = () => app.openMonthRecords(stat.yearMonth);
+
+            card.innerHTML = `
+                <div class="stat-header">
+                    <span class="client-name">${stat.monthName}</span>
+                    <span style="font-weight: 600; color: var(--primary-color)">${hoursUsed}h utilizadas</span>
+                </div>
+                <div style="margin-top: 12px; font-size: 0.9rem;">
+                    <span class="text-muted">${stat.records.length} atendimento(s) neste mês</span>
+                </div>
+            `;
+            container.appendChild(card);
+        });
+    }
+
+    // ===================================
+    // MONTH RECORDS
+    // ===================================
+    openMonthRecords(yearMonth) {
+        this.selectedMonth = yearMonth;
+        this.switchView('month-records');
+        document.querySelectorAll('.nav-item').forEach(item => item.classList.remove('active'));
+    }
+
+    renderMonthRecords() {
+        if (this.currentView !== 'month-records' || !this.selectedClient || !this.selectedMonth) return;
+
+        const client = store.getClient(this.selectedClient);
+        if (!client) return;
+
+        const monthlyStats = store.getMonthlyStatsByClient(this.selectedClient);
+        const monthData = monthlyStats.find(m => m.yearMonth === this.selectedMonth);
+
+        document.getElementById('month-records-title').innerText = monthData ? monthData.monthName : this.selectedMonth;
+        document.getElementById('month-records-subtitle').innerText = `Atendimentos de ${client.name}`;
+
+        const tbody = document.querySelector('#month-records-table tbody');
+        tbody.innerHTML = '';
+
+        if (!monthData || monthData.records.length === 0) {
+            tbody.innerHTML = `<tr><td colspan="4" class="text-muted" style="text-align: center;">Nenhum atendimento encontrado.</td></tr>`;
+            return;
+        }
+
+        const records = monthData.records.sort((a, b) => new Date(b.date) - new Date(a.date));
+
+        records.forEach(r => {
+            const hoursStr = (r.minutes / 60).toFixed(2) + 'h';
+            const timeRange = (r.startTime && r.endTime) ? `<br><small class="text-muted">${r.startTime} às ${r.endTime}</small>` : '';
+
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+                <td>${r.date.split('-').reverse().join('/')}${timeRange}</td>
+                <td>${r.description}</td>
+                <td>${r.minutes} min <span class="text-muted">(${hoursStr})</span></td>
+                <td>
+                    <div style="display: flex; gap: 8px;">
+                        <button class="btn btn-secondary" onclick="app.handleViewRecord('${r.id}')" style="padding: 6px 10px; font-size: 0.8rem;" title="Visualizar">
+                            <i data-lucide="eye" style="width: 16px; height: 16px;"></i>
+                        </button>
+                        <button class="btn btn-primary" onclick="app.handleEditRecord('${r.id}')" style="padding: 6px 10px; font-size: 0.8rem;" title="Editar">
+                            <i data-lucide="pencil" style="width: 16px; height: 16px;"></i>
+                        </button>
+                        <button class="btn btn-danger" onclick="app.handleDeleteRecord('${r.id}')" style="padding: 6px 10px; font-size: 0.8rem;" title="Apagar">
+                            <i data-lucide="trash-2" style="width: 16px; height: 16px;"></i>
+                        </button>
+                    </div>
+                </td>
+            `;
+            tbody.appendChild(tr);
+        });
+    }
+
+    // ===================================
+    // KANBAN & TASKS RENDER
+    // ===================================
+    renderTasks() {
+        if (this.currentView !== 'tasks') return;
+
+        let tasks = store.getTasks();
+
+        // Filters
+        const filterClient = document.getElementById('filter-task-client')?.value;
+        const filterPriority = document.getElementById('filter-task-priority')?.value;
+
+        if (filterClient) {
+            tasks = tasks.filter(t => t.clientId === filterClient);
+        }
+        if (filterPriority) {
+            tasks = tasks.filter(t => t.priority === filterPriority);
+        }
+
+        const cols = {
+            new: document.getElementById('kb-col-new'),
+            doing: document.getElementById('kb-col-doing'),
+            done: document.getElementById('kb-col-done')
+        };
+
+        if (!cols.new || !cols.doing || !cols.done) return;
+
+        Object.values(cols).forEach(col => col.innerHTML = '');
+
+        const counts = { new: 0, doing: 0, done: 0 };
+
+        tasks.forEach(task => {
+            const client = store.getClient(task.clientId);
+            const clientName = client ? client.name : '<Desconhecido>';
+
+            const status = task.status || 'new';
+            if (counts[status] !== undefined) counts[status]++;
+
+            const card = document.createElement('div');
+            card.className = 'task-card';
+            card.draggable = true;
+            card.dataset.id = task.id;
+
+            card.addEventListener('dragstart', this.dragStart.bind(this));
+            card.addEventListener('dragend', this.dragEnd.bind(this));
+
+            let priorityClass = 'priority-low';
+            if (task.priority === 'high') priorityClass = 'priority-high';
+            if (task.priority === 'medium') priorityClass = 'priority-medium';
+
+            let delayHtml = '';
+            if (task.dueDate && task.status !== 'done') {
+                const today = new Date().toISOString().split('T')[0];
+                if (task.dueDate < today) {
+                    delayHtml = `<span class="task-alert"><i data-lucide="alert-circle" style="width: 12px; height: 12px;"></i> Atrasada (${task.dueDate.split('-').reverse().join('/')})</span>`;
+                } else {
+                    delayHtml = `<span>Prazo: ${task.dueDate.split('-').reverse().join('/')}</span>`;
+                }
+            }
+
+            const estMinutes = parseInt(task.estimatedMinutes) || 0;
+            const spentMinutes = parseInt(task.spentMinutes) || 0;
+            const timeInfo = (estMinutes > 0 || spentMinutes > 0) ? `<span><i data-lucide="clock" style="width: 12px; height: 12px;"></i> ${spentMinutes}m / ${estMinutes}m</span>` : '';
+
+            let attachmentsHtml = '';
+            if (task.attachments && task.attachments.length > 0) {
+                attachmentsHtml = `<span><i data-lucide="paperclip" style="width: 12px; height: 12px;"></i> ${task.attachments.length} anexo(s)</span>`;
+            }
+
+            card.innerHTML = `
+                <div class="task-priority-bar ${priorityClass}"></div>
+                <div class="task-title">${task.title}</div>
+                <div class="task-client-name">${clientName}</div>
+                <div class="task-meta">
+                    ${delayHtml ? `<div>${delayHtml}</div>` : ''}
+                    ${timeInfo ? `<div>${timeInfo}</div>` : ''}
+                    ${attachmentsHtml ? `<div>${attachmentsHtml}</div>` : ''}
+                </div>
+                <div class="task-actions" style="margin-top: 8px;">
+                    <button type="button" onclick="app.handleEditTask('${task.id}')" title="Editar"><i data-lucide="pencil" style="width: 14px; height: 14px;"></i></button>
+                    ${task.status !== 'done' ? `<button type="button" onclick="app.handleOpenTaskTime('${task.id}')" title="Adicionar Tempo"><i data-lucide="play" style="width: 14px; height: 14px;"></i></button>` : ''}
+                    <button type="button" onclick="app.handleDeleteTask('${task.id}')" title="Excluir"><i data-lucide="trash-2" style="width: 14px; height: 14px;"></i></button>
+                </div>
+            `;
+
+            if (cols[status]) cols[status].appendChild(card);
+        });
+
+        document.getElementById('kanban-count-new').innerText = counts.new;
+        document.getElementById('kanban-count-doing').innerText = counts.doing;
+        document.getElementById('kanban-count-done').innerText = counts.done;
+
+        this.renderTasksDashboard(tasks, filterClient);
+        lucide.createIcons();
+    }
+
+    renderTasksDashboard(tasks, filteredClientId) {
+        const container = document.getElementById('tasks-dashboard-container');
+        if (!container) return;
+
+        const openTasks = tasks.filter(t => t.status !== 'done');
+        let delayed = 0;
+        let totalEst = 0;
+        let totalSpent = 0;
+
+        const today = new Date().toISOString().split('T')[0];
+
+        openTasks.forEach(t => {
+            if (t.dueDate && t.dueDate < today) delayed++;
+            totalEst += parseInt(t.estimatedMinutes) || 0;
+            totalSpent += parseInt(t.spentMinutes) || 0;
+        });
+
+        const stats = store.getAllStats();
+        const overLimitClients = stats.filter(s => s.isOverLimit);
+
+        container.innerHTML = `
+            <div class="stat-card glass" style="padding: 16px;">
+                <div class="stat-header">
+                    <span class="client-name">Abertas</span>
+                    <span style="font-size: 1.5rem; color: var(--primary-color)">${openTasks.length}</span>
+                </div>
+            </div>
+            <div class="stat-card glass" style="padding: 16px;">
+                <div class="stat-header">
+                    <span class="client-name">Atrasadas</span>
+                    <span style="font-size: 1.5rem; color: ${delayed > 0 ? 'var(--danger-color)' : 'var(--success-color)'}">${delayed}</span>
+                </div>
+            </div>
+            <div class="stat-card glass" style="padding: 16px;">
+                <div class="stat-header">
+                    <span class="client-name">Tempo (Gasto / Estimado)</span>
+                    <span style="font-size: 1.2rem; color: var(--text-main)">${(totalSpent / 60).toFixed(1)}h / ${(totalEst / 60).toFixed(1)}h</span>
+                </div>
+            </div>
+            ${!filteredClientId ? `
+            <div class="stat-card glass" style="padding: 16px;">
+                <div class="stat-header">
+                    <span class="client-name" style="color: var(--danger-color)">Contratos Sobrecarregados</span>
+                    <span style="font-size: 1.2rem;">${overLimitClients.length}</span>
+                </div>
+            </div>` : ''}
+        `;
+    }
+
+    // ===================================
+    // AGENDA
+    // ===================================
+    switchAgendaMode(mode) {
+        this.agendaViewMode = mode;
+        document.getElementById('btn-agenda-weekly').classList.toggle('active-mode', mode === 'weekly');
+        document.getElementById('btn-agenda-daily').classList.toggle('active-mode', mode === 'daily');
+        this.renderAgenda();
+    }
+
+    prevAgendaDate() {
+        if (this.agendaViewMode === 'daily') {
+            this.agendaCurrentDate.setDate(this.agendaCurrentDate.getDate() - 1);
+        } else {
+            this.agendaCurrentDate.setDate(this.agendaCurrentDate.getDate() - 7);
+        }
+        this.renderAgenda();
+    }
+
+    nextAgendaDate() {
+        if (this.agendaViewMode === 'daily') {
+            this.agendaCurrentDate.setDate(this.agendaCurrentDate.getDate() + 1);
+        } else {
+            this.agendaCurrentDate.setDate(this.agendaCurrentDate.getDate() + 7);
+        }
+        this.renderAgenda();
+    }
+
+    updateAgendaTaskSelect() {
+        const select = document.getElementById('agenda-task');
+        if (!select) return;
+        select.innerHTML = '<option value="">-- Nenhuma tarefa vinculada --</option>';
+        const tasks = store.getTasks().filter(t => t.status !== 'done');
+        tasks.forEach(t => {
+            const opt = document.createElement('option');
+            opt.value = t.id;
+            opt.textContent = t.title;
+            select.appendChild(opt);
+        });
+    }
+
+    async handleAgendaSubmit(e) {
+        e.preventDefault();
+        const id = document.getElementById('agenda-id').value;
+        const btn = e.submitter || document.querySelector('#form-agenda-event button[type="submit"]');
+        const originalText = btn.innerText;
+
+        const eventData = {
+            title: document.getElementById('agenda-title').value,
+            description: document.getElementById('agenda-desc').value,
+            type: document.getElementById('agenda-type').value,
+            clientId: document.getElementById('agenda-client').value || null,
+            relatedTaskId: document.getElementById('agenda-task').value || null,
+            date: document.getElementById('agenda-date').value,
+            startTime: document.getElementById('agenda-start').value,
+            endTime: document.getElementById('agenda-end').value,
+            location: document.getElementById('agenda-location').value
+        };
+
+        const syncGoogle = document.getElementById('agenda-sync-google').checked;
+
+        btn.innerText = "Salvando...";
+        btn.disabled = true;
+
+        if (syncGoogle) {
+            if (!calendarAPI.isAuthenticated) {
+                const success = await calendarAPI.authenticateGoogle();
+                if (!success) {
+                    alert("Falha na autenticação do Google");
+                    btn.innerText = originalText;
+                    btn.disabled = false;
+                    return;
+                }
+            }
+        }
+
+        if (id) {
+            eventData.id = id;
+            const updated = store.updateAgendaEvent(eventData);
+            if (syncGoogle && updated && updated.calendarEventId) {
+                await calendarAPI.updateGoogleEvent(updated.calendarEventId, eventData);
+            }
+        } else {
+            if (syncGoogle) {
+                const gCalId = await calendarAPI.createGoogleEvent(eventData);
+                if (gCalId) eventData.calendarEventId = gCalId;
+            }
+            store.addAgendaEvent(eventData);
+        }
+
+        btn.innerText = originalText;
+        btn.disabled = false;
+
+        this.closeModal('modal-agenda-event');
+        this.renderAgenda();
+    }
+
+    editAgendaEvent(id) {
+        const ev = store.getAgendaEvent(id);
+        if (!ev) return;
+
+        document.getElementById('modal-agenda-title').innerText = 'Editar Agendamento';
+        document.getElementById('agenda-id').value = ev.id;
+        document.getElementById('agenda-title').value = ev.title;
+        document.getElementById('agenda-desc').value = ev.description;
+        document.getElementById('agenda-type').value = ev.type;
+        document.getElementById('agenda-client').value = ev.clientId || '';
+        this.updateAgendaTaskSelect();
+        document.getElementById('agenda-task').value = ev.relatedTaskId || '';
+        document.getElementById('agenda-date').value = ev.date;
+        document.getElementById('agenda-start').value = ev.startTime;
+        document.getElementById('agenda-end').value = ev.endTime;
+        document.getElementById('agenda-location').value = ev.location;
+
+        this.openModal('modal-agenda-event');
+    }
+
+    async deleteAgendaEvent(id, eventRoot) {
+        if (eventRoot) {
+            eventRoot.stopPropagation();
+        }
+        if (confirm("Deseja deletar este agendamento?")) {
+            const ev = store.getAgendaEvent(id);
+            if (ev && ev.calendarEventId && calendarAPI.isAuthenticated) {
+                await calendarAPI.deleteGoogleEvent(ev.calendarEventId);
+            }
+            store.deleteAgendaEvent(id);
+            this.renderAgenda();
+        }
+    }
+
+    renderAgenda() {
+        if (this.currentView !== 'agenda') return;
+
+        const container = document.getElementById('agenda-container');
+        if (!container) return;
+
+        container.innerHTML = '';
+
+        // Atualizar estado do botão de sync superior
+        const syncBtn = document.getElementById('btn-agenda-sync');
+        if (syncBtn) {
+            if (calendarAPI && calendarAPI.isAuthenticated) {
+                syncBtn.classList.remove('btn-secondary');
+                syncBtn.classList.add('btn-primary');
+                syncBtn.innerHTML = '<i data-lucide="refresh-cw"></i> Sincronizando...';
+                syncBtn.innerHTML = '<i data-lucide="refresh-cw"></i> Sincronizar Google';
+            }
+        }
+
+        if (this.agendaViewMode === 'daily') {
+            this.renderAgendaDaily(container);
+        } else {
+            this.renderAgendaWeekly(container);
+        }
+        lucide.createIcons();
+    }
+
+    getTopPositionForTime(timeStr) {
+        // Assume agenda starts at 08:00
+        const [h, m] = timeStr.split(':').map(Number);
+        const startHour = 8;
+        const totalMinutes = ((h - startHour) * 60) + m;
+        // 1 hour = 60px height
+        return Math.max(0, totalMinutes);
+    }
+
+    getHeightForTimeRange(startStr, endStr) {
+        const [sH, sM] = startStr.split(':').map(Number);
+        const [eH, eM] = endStr.split(':').map(Number);
+        let diffMins = (eH * 60 + eM) - (sH * 60 + sM);
+        if (diffMins < 0) diffMins += 24 * 60;
+        return Math.max(30, diffMins); // min 30px height = 30min
+    }
+
+    generateTimeSlots() {
+        let html = '';
+        for (let i = 8; i <= 20; i++) {
+            html += `<div class="agenda-time-slot">${String(i).padStart(2, '0')}:00</div>`;
+        }
+        return html;
+    }
+
+    formatDateBR(dateObj) {
+        return dateObj.toLocaleDateString('pt-BR');
+    }
+
+    getMonday(d) {
+        const date = new Date(d);
+        const day = date.getDay();
+        const diff = date.getDate() - day + (day === 0 ? -6 : 1);
+        return new Date(date.setDate(diff));
+    }
+
+    renderAgendaDaily(container) {
+        document.getElementById('agenda-current-date-label').innerText = this.formatDateBR(this.agendaCurrentDate);
+
+        const isoDate = this.agendaCurrentDate.toISOString().split('T')[0];
+        const events = store.getEventsByDate(isoDate);
+
+        let eventsHtml = '';
+        events.forEach(ev => {
+            eventsHtml += this.createEventBlockHtml(ev, '100%');
+        });
+
+        container.innerHTML = `
+            <div class="agenda-grid">
+                <div class="agenda-time-column">
+                    ${this.generateTimeSlots()}
+                </div>
+                <div class="agenda-content-column">
+                    <div class="agenda-days-row" style="grid-template-columns: 1fr;">
+                        <div class="agenda-day-header active">${this.formatDateBR(this.agendaCurrentDate)}</div>
+                    </div>
+                    <div class="events-container">
+                        <div class="agenda-grid-lines"></div>
+                        ${eventsHtml}
+                    </div>
+                </div>
+            </div>
+        `;
+    }
+
+    renderAgendaWeekly(container) {
+        const monday = this.getMonday(this.agendaCurrentDate);
+        const friday = new Date(monday);
+        friday.setDate(friday.getDate() + 4);
+
+        const isoStart = monday.toISOString().split('T')[0];
+        const isoEnd = friday.toISOString().split('T')[0];
+
+        document.getElementById('agenda-current-date-label').innerText =
+            `${this.formatDateBR(monday)} - ${this.formatDateBR(friday)}`;
+
+        const events = store.getEventsByWeek(isoStart, isoEnd);
+
+        const days = ['Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta'];
+        let headersHtml = '';
+        let columnsHtml = '';
+
+        for (let i = 0; i < 5; i++) {
+            const currentDay = new Date(monday);
+            currentDay.setDate(monday.getDate() + i);
+            const isoCurrentDay = currentDay.toISOString().split('T')[0];
+            const isToday = isoCurrentDay === new Date().toISOString().split('T')[0];
+
+            headersHtml += `<div class="agenda-day-header ${isToday ? 'active' : ''}">${days[i]}<br><small>${currentDay.getDate()}/${currentDay.getMonth() + 1}</small></div>`;
+
+            // Filter events for this day
+            const dayEvents = events.filter(e => e.date === isoCurrentDay);
+            let dayEventsHtml = '';
+            dayEvents.forEach(ev => {
+                dayEventsHtml += this.createEventBlockHtml(ev, 'calc(100% - 8px)');
+            });
+
+            columnsHtml += `
+                <div style="position: relative; height: 100%;">
+                    ${dayEventsHtml}
+                </div>
+            `;
+        }
+
+        container.innerHTML = `
+            <div class="agenda-grid">
+                <div class="agenda-time-column">
+                    ${this.generateTimeSlots()}
+                </div>
+                <div class="agenda-content-column">
+                    <div class="agenda-days-row">
+                        ${headersHtml}
+                    </div>
+                    <div class="events-container" style="display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px;">
+                        <div class="agenda-grid-lines"></div>
+                        ${columnsHtml}
+                    </div>
+                </div>
+            </div>
+        `;
+    }
+
+    createEventBlockHtml(ev, width) {
+        const top = this.getTopPositionForTime(ev.startTime);
+        const height = this.getHeightForTimeRange(ev.startTime, ev.endTime);
+        const typeClass = 'type-' + ev.type;
+
+        let clientName = '';
+        if (ev.clientId) {
+            const client = store.getClient(ev.clientId);
+            if (client) clientName = `<div style="display:flex; align-items:center; gap:4px;"><i data-lucide="user" style="width:10px; height:10px;"></i> ${client.name}</div>`;
+        }
+
+        return `
+            <div class="event-block ${typeClass}" 
+                 style="top: ${top}px; height: ${height}px; width: ${width};" 
+                 onclick="app.editAgendaEvent('${ev.id}')">
+                
+                <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+                    <div class="event-title">${ev.title}</div>
+                    <button class="btn btn-danger" style="padding: 2px 4px; font-size: 0.6rem; border-radius: 4px; background: rgba(0,0,0,0.3); border:none; color:white;"
+                            onclick="app.deleteAgendaEvent('${ev.id}', event)">
+                        <i data-lucide="x" style="width: 12px; height: 12px;"></i>
+                    </button>
+                </div>
+                <div class="event-meta">
+                    <div style="display:flex; align-items:center; gap:4px;">
+                       <i data-lucide="clock" style="width:10px; height:10px;"></i> 
+                       ${ev.startTime} - ${ev.endTime}
+                       ${ev.calendarEventId ? '<i data-lucide="calendar" style="width:10px; height:10px; margin-left:4px; color:#60a5fa;" title="Sincronizado via Google"></i>' : ''}
+                    </div>
+                    ${clientName}
+                </div>
+            </div>
+        `;
+    }
+
+    onCalendarAuthenticated() {
+        console.log("App ciente que Calendar está autenticado");
+        this.renderAgenda();
+    }
+
+    async promptGoogleSync() {
+        const btn = document.getElementById('btn-agenda-sync');
+        if (!btn) return;
+
+        if (!calendarAPI.isAuthenticated) {
+            const success = await calendarAPI.authenticateGoogle();
+            if (!success) {
+                alert("Falha na autenticação do Google");
+                return;
+            }
+        }
+
+        btn.innerHTML = '<i data-lucide="loader" class="spin"></i> Buscando...';
+        btn.disabled = true;
+
+        try {
+            await this.executeBiDirectionalSync();
+            alert("Sincronização concluída com sucesso!");
+        } catch (error) {
+            console.error("Erro no sync", error);
+            alert("Erro durante a sincronização");
+        } finally {
+            btn.innerHTML = '<i data-lucide="refresh-cw"></i> Sincronizar Google';
+            btn.disabled = false;
+            this.renderAgenda();
+        }
+    }
+
+    async executeBiDirectionalSync() {
+        // Fetch do google (ultimos 30 dias até proximos 30)
+        const googleEvents = await calendarAPI.syncEventsFromGoogle(30);
+        if (!googleEvents) return;
+
+        const localEvents = store.getAgendaEvents();
+
+        // 1. O que tem no Google que não temos (ou foi atualizado lá)
+        for (const gEv of googleEvents) {
+            if (gEv.status === 'cancelled') continue;
+
+            // Procura localmente pelo ID do google
+            let match = localEvents.find(le => le.calendarEventId === gEv.id);
+
+            let evDate = '';
+            let evStart = '08:00';
+            let evEnd = '09:00';
+
+            // Google lida com dateTime e date (allDay)
+            if (gEv.start.dateTime) {
+                const startObj = new Date(gEv.start.dateTime);
+                const endObj = new Date(gEv.end.dateTime);
+
+                // Formata local YYYY-MM-DD
+                evDate = startObj.getFullYear() + "-" + String(startObj.getMonth() + 1).padStart(2, '0') + "-" + String(startObj.getDate()).padStart(2, '0');
+                evStart = String(startObj.getHours()).padStart(2, '0') + ":" + String(startObj.getMinutes()).padStart(2, '0');
+                evEnd = String(endObj.getHours()).padStart(2, '0') + ":" + String(endObj.getMinutes()).padStart(2, '0');
+            } else if (gEv.start.date) {
+                evDate = gEv.start.date; // YYYY-MM-DD already
+            }
+
+            if (!evDate) continue; // Pula se n conseguir extrair data
+
+            const mappedData = {
+                title: gEv.summary || 'Sem Título',
+                description: gEv.description || '',
+                type: 'meeting',
+                location: gEv.location || '',
+                date: evDate,
+                startTime: evStart,
+                endTime: evEnd,
+                calendarEventId: gEv.id
+            };
+
+            if (match) {
+                mappedData.id = match.id;
+                mappedData.type = match.type; // Preserva o tipo customizado do TSP
+                mappedData.clientId = match.clientId;
+                mappedData.relatedTaskId = match.relatedTaskId;
+                store.updateAgendaEvent(mappedData);
+            } else {
+                store.addAgendaEvent(mappedData);
+            }
+        }
+
+        // 2. Idealmente tb empurra o que criamos offline com a flag de sync mas
+        // para essa versão dependemos do modal "Sincronizar [x]" fazer o PUSH unitario.
+        // Se deletaram no google, poderiamos deletar aqui também cruzando IDs
+        // Simplificado: Assumimos GAPI sync unilateral PULL e local edits dão PUSH
+    }
+
+    // ===================================
+    // IMPORTAÇÃO DE PDF (ATA)
+    // ===================================
+    setupPdfImport() {
+        const btnImportPdf = document.getElementById('btn-import-pdf');
+        const fileImportPdf = document.getElementById('file-import-pdf');
+
+        if (!btnImportPdf || !fileImportPdf) return;
+
+        btnImportPdf.addEventListener('click', () => {
+            fileImportPdf.click();
+        });
+
+        fileImportPdf.addEventListener('change', async (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            try {
+                // Carregar worker do pdfjs
+                pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+
+                const arrayBuffer = await file.arrayBuffer();
+                const pdf = await pdfjsLib.getDocument(arrayBuffer).promise;
+
+                let fullText = '';
+                for (let i = 1; i <= pdf.numPages; i++) {
+                    const page = await pdf.getPage(i);
+                    const textContent = await page.getTextContent();
+                    const pageText = textContent.items.map(item => item.str).join(' ');
+                    fullText += pageText + '\n';
+                }
+
+                this.parsePdfText(fullText);
+
+            } catch (err) {
+                console.error(err);
+                alert("Erro ao ler o PDF: " + err.message);
+            }
+
+            // Reseta o input file
+            e.target.value = '';
+        });
+    }
+
+    // Remove textos de cabeçalhos da ATA que podem aparecer em páginas seguintes
+    cleanupPageHeaders(text) {
+        return text
+            // Remove cabeçalhos de tabela de horas
+            .replace(/Hora\s+Inicial\s+Hora\s+Final\s+Horas\s+Aplicadas\s*(no\s+Dia)?\s*Analista/gi, '')
+            .replace(/Hora\s+Inicial\s+Hora\s+Final\s+Horas\s+Aplicadas/gi, '')
+            // Remove cabeçalhos de colunas da tabela principal da ata
+            .replace(/DATA\s+E\s+HORA\s+CLIENTE/gi, '')
+            .replace(/Descri..o\s+do\s+Atendimento/gi, '')
+            .replace(/Horas\s+Aplicadas\s+no\s+Dia\s+\d{2}\/\d{2}\/\d{4}/gi, '')
+            // Remove referências a Projeto/número que aparecem no cabeçalho repetido
+            .replace(/Projeto[:.\s]*\d{4,6}/gi, '')
+            .replace(/\d{4,6}\s*Projeto/gi, '')
+            // Remove total de horas
+            .replace(/Total\s+Horas[:\s]*\d{2}:\d{2}/gi, '')
+            // Remove responsável
+            .replace(/Respons.vel[:\s]*/gi, '')
+            // Normaliza múltiplos espaços/newlines
+            .replace(/\s{2,}/g, ' ')
+            .trim();
+    }
+
+    parsePdfText(text) {
+        // Encontra todos os projetos no documento e salva o index em que apareceram
+        // Ajustado para capturar apenas números com 4 a 6 dígitos (evitando pegar dias de data como "03")
+        const projectRegex = /Projeto[:.\s]*(\d{4,6})/ig;
+        let projectMatches = [];
+        let pMatch;
+        while ((pMatch = projectRegex.exec(text)) !== null) {
+            projectMatches.push({ index: pMatch.index, projectNum: pMatch[1].trim() });
+        }
+
+        // Caso a pessoa digite "(Projeto 22901)"
+        const projParenthesisRgx = /\(\s*Projeto\s+(\d{4,6})\s*\)/ig;
+        while ((pMatch = projParenthesisRgx.exec(text)) !== null) {
+            projectMatches.push({ index: pMatch.index, projectNum: pMatch[1].trim() });
+        }
+
+        // NOVO: Em atas multi-páginas o PDF.js inverte a ordem: "22851 Projeto.: "
+        const projBeforeRgx = /(\d{4,6})\s*Projeto/ig;
+        while ((pMatch = projBeforeRgx.exec(text)) !== null) {
+            projectMatches.push({ index: pMatch.index, projectNum: pMatch[1].trim() });
+        }
+
+        projectMatches.sort((a, b) => a.index - b.index);
+
+        // EXTRAIR DESCRIÇÕES GLOBAIS "Descrição do Atendimento"
+        // Usa Regex para ignorar problemas de encoding acentuação vindos do PDF.js
+        const descMatches = [];
+        const descRegex = /Descri..o do Atendimento/ig;
+        const horasRegex = /Horas Aplicadas no Dia/ig;
+
+        let dMatch;
+        while ((dMatch = descRegex.exec(text)) !== null) {
+            const startIdx = dMatch.index + dMatch[0].length;
+
+            // Procura a próxima ocorrência de "Horas Aplicadas no Dia" a partir daqui
+            horasRegex.lastIndex = startIdx;
+            const hMatch = horasRegex.exec(text);
+
+            let rawDesc;
+            if (hMatch) {
+                rawDesc = text.substring(startIdx, hMatch.index).trim();
+            } else {
+                rawDesc = text.substring(startIdx, startIdx + 500).trim();
+            }
+
+            // Limpa cabeçalhos que possam ter caído dentro desta descrição
+            rawDesc = this.cleanupPageHeaders(rawDesc);
+
+            if (rawDesc) {
+                descMatches.push({ index: dMatch.index, text: rawDesc });
+            }
+        }
+
+        let records = [];
+
+        // Encontrar todas as datas de "Horas Aplicadas no Dia XX/XX/XXXX"
+        const dateRegex = /Horas Aplicadas no Dia (\d{2}\/\d{2}\/\d{4})/g;
+        let match;
+        let dateBlocks = [];
+
+        while ((match = dateRegex.exec(text)) !== null) {
+            dateBlocks.push({ index: match.index, date: match[1] });
+        }
+
+        dateBlocks.forEach((block, i) => {
+            const nextIndex = i + 1 < dateBlocks.length ? dateBlocks[i + 1].index : text.length;
+            const blockText = text.substring(block.index, nextIndex);
+
+            // Descobrir o projeto mais recente antes deste bloco de data
+            let currentProjectNum = '';
+            for (let j = projectMatches.length - 1; j >= 0; j--) {
+                if (projectMatches[j].index < block.index) {
+                    currentProjectNum = projectMatches[j].projectNum;
+                    break;
+                }
+            }
+
+            // Fallback se ele encontrou o projeto logo após a primeira data
+            if (!currentProjectNum && projectMatches.length > 0) {
+                currentProjectNum = projectMatches[0].projectNum;
+            }
+
+            // Descobrir a descrição global mais recente antes deste bloco de data
+            let currentGlobalDesc = '';
+            for (let j = descMatches.length - 1; j >= 0; j--) {
+                if (descMatches[j].index < block.index) {
+                    currentGlobalDesc = descMatches[j].text;
+                    break;
+                }
+            }
+
+            // Fallback para descrição
+            if (!currentGlobalDesc && descMatches.length > 0) {
+                currentGlobalDesc = descMatches[0].text;
+            }
+
+            // Limpeza adicional da descrição global para remover cabeçalhos colados
+            if (currentGlobalDesc) {
+                currentGlobalDesc = currentGlobalDesc
+                    .replace(/.*?Horas executadas:\s*/i, '') // Remove cabeçalho anterior
+                    .replace(/Hora Inicial.*?Analista\s*/i, '') // Remove tabela de horas
+                    .trim();
+            }
+
+            // Regex para extrair horários e a descrição específica da linha
+            // Formato da tabela: HoraInicial HoraFinal HorasAplicadas [Analista/texto]
+            // Grupos: [1]=HoraInicial, [2]=HoraFinal, [3]=HorasAplicadas, [4]=restante
+            const timeRegex = /(\d{2}:\d{2})\s+(\d{2}:\d{2})\s+(\d{2}:\d{2})\s*(.*?)(?=(?:\d{2}:\d{2}\s+\d{2}:\d{2})|Total\s+Horas|Responsável|$)/gs;
+
+            let timeMatch;
+            while ((timeMatch = timeRegex.exec(blockText)) !== null) {
+                const startTime = timeMatch[1];
+                const endTime = timeMatch[2];
+                // timeMatch[3] = horas aplicadas (não usamos, calculamos a partir de start/end)
+
+                // Calcular diferença REAL de minutos entre hora inicial e hora final
+                const [sH, sM] = startTime.split(':').map(Number);
+                const [eH, eM] = endTime.split(':').map(Number);
+                let diffMins = (eH * 60 + eM) - (sH * 60 + sM);
+                if (diffMins < 0) diffMins += 24 * 60;
+
+                // Deve haver pelo menos 1 minuto de diferença para ser um registro válido
+                if (diffMins <= 0) continue;
+
+                // FIX 1: Usar apenas a descrição global — não concatenar "Tarefa da Linha"
+                // A linha específica pode ter analista ou texto irrelevante do PDF
+                let finalDesc = currentGlobalDesc;
+
+                // Somente usa o texto da linha como fallback se não houver descrição global
+                if (!finalDesc) {
+                    let lineDesc = (timeMatch[4] || '').trim();
+                    // Limpa cabeçalhos da página que possam ter caído no texto da linha
+                    lineDesc = this.cleanupPageHeaders(lineDesc);
+                    finalDesc = lineDesc;
+                }
+
+                if (!finalDesc || finalDesc === '') finalDesc = "Importado via Ata PDF";
+                if (finalDesc.length > 800) finalDesc = finalDesc.substring(0, 800);
+
+                const [d, m, y] = block.date.split('/');
+                const isoDate = `${y}-${m}-${d}`;
+
+                records.push({
+                    clientProjectPdf: currentProjectNum,
+                    dateStrBrazil: block.date,
+                    date: isoDate,
+                    startTime,
+                    endTime,
+                    minutes: diffMins,
+                    description: finalDesc
+                });
+            }
+        });
+
+        if (records.length === 0) {
+            alert("Não foram encontrados atendimentos válidos neste PDF.");
+            return;
+        }
+
+        this.pendingPdfRecords = records;
+        this.openPdfConfirmationModal();
+    }
+
+    openPdfConfirmationModal() {
+        const clients = store.getClients();
+        let allMatched = true;
+        let unMatchedProjects = new Set();
+        let statusInput = document.getElementById('pdf-client-name');
+
+        // Mapear cada record para o seu ClientID correspondente
+        this.pendingPdfRecords.forEach(r => {
+            let matchedClient = null;
+            if (r.clientProjectPdf) {
+                // Ensure the search number only contains digits
+                const searchNum = r.clientProjectPdf.replace(/\D/g, '');
+                matchedClient = clients.find(c => {
+                    if (!c.projectNum) return false;
+                    // Split the client's project field by any non-digit character (comma, space, dash, slash, etc.)
+                    const cProjects = c.projectNum.split(/\D+/).filter(Boolean);
+                    return cProjects.includes(searchNum);
+                });
+            }
+
+            if (matchedClient) {
+                r.matchedClientId = matchedClient.id;
+                r.matchedClientName = matchedClient.name;
+            } else {
+                allMatched = false;
+                if (r.clientProjectPdf) unMatchedProjects.add(r.clientProjectPdf);
+            }
+        });
+
+        if (!allMatched) {
+            const missing = Array.from(unMatchedProjects).join(', ') || 'Sem identificação';
+            alert(`ATENÇÃO: Não foi possível identificar todos os Clientes da Ata automaticamente.\n\nProjetos não encontrados na sua base: ${missing}\n\nPor favor, cadastre ou edite estes clientes e adicione o número do projeto para continuar a importação.`);
+            this.pendingPdfRecords = [];
+            return;
+        }
+
+        const uniqueClientIds = new Set(this.pendingPdfRecords.map(r => r.matchedClientId));
+        if (uniqueClientIds.size === 1) {
+            statusInput.value = `${this.pendingPdfRecords[0].matchedClientName} (Padrão Único)`;
+        } else {
+            statusInput.value = `Múltiplos Clientes Identificados (${uniqueClientIds.size})`;
+        }
+
+        document.getElementById('modal-import-pdf').classList.add('active');
+
+        const tbody = document.querySelector('#pdf-records-table tbody');
+        tbody.innerHTML = '';
+
+        this.pendingPdfRecords.forEach((r, idx) => {
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+                <td style="font-size: 0.9rem;">${r.dateStrBrazil}</td>
+                <td style="font-size: 0.9rem; font-weight: 500; color: var(--primary-color);">${r.matchedClientName}</td>
+                <td style="font-size: 0.9rem;">${r.startTime} - ${r.endTime}</td>
+                <td style="font-size: 0.9rem;">${r.minutes}</td>
+                <td><textarea class="form-control" id="pdf-desc-${idx}" style="font-size: 0.85rem; padding: 4px; width: 100%; min-width: 250px; resize: vertical;" rows="3">${r.description}</textarea></td>
+                <td style="text-align: center;"><input type="checkbox" id="pdf-check-${idx}" checked style="width: 18px; height: 18px; cursor: pointer;"></td>
+            `;
+            tbody.appendChild(tr);
+        });
+    }
+
+    confirmPdfImport() {
+        let importedCount = 0;
+        this.pendingPdfRecords.forEach((r, idx) => {
+            const isChecked = document.getElementById(`pdf-check-${idx}`).checked;
+            if (isChecked && r.matchedClientId) {
+                const desc = document.getElementById(`pdf-desc-${idx}`).value;
+                store.addRecord(r.matchedClientId, r.date, r.startTime, r.endTime, r.minutes, desc);
+                importedCount++;
+            }
+        });
+
+        alert(`Sucesso! ${importedCount} atendimentos foram importados.`);
+        this.closeModal('modal-import-pdf');
+        this.pendingPdfRecords = [];
+        this.renderAll();
+    }
+
+    // ===================================
+    // BACKUP
+    // ===================================
+    setupBackup() {
+        const btnExport = document.getElementById('btn-export');
+        const btnImport = document.getElementById('btn-import');
+        const fileImport = document.getElementById('file-import');
+
+        btnExport.addEventListener('click', () => {
+            store.exportData();
+        });
+
+        btnImport.addEventListener('click', () => {
+            fileImport.click(); // Abre o seletor de arquivo do SO
+        });
+
+        fileImport.addEventListener('change', async (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            try {
+                await store.importData(file);
+                alert("Dados importados com sucesso!");
+                this.renderAll();
+            } catch (err) {
+                alert("Erro na importação: " + err.message);
+            }
+
+            // Reseta o input file
+            e.target.value = '';
+        });
+    }
+}
+
+// Iniciar a aplicação quando DOM estiver pronto
+document.addEventListener('DOMContentLoaded', () => {
+    window.app = new AppController();
+});
