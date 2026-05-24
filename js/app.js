@@ -1640,7 +1640,12 @@ class AppController {
             const rawDesc = endIdx !== -1
                 ? textAfterLabel.substring(0, endIdx)
                 : textAfterLabel.substring(0, 600);
-            description = rawDesc.replace(/\s{2,}/g, ' ').trim();
+            description = rawDesc
+                // Remove "Horas contratadas/executadas" que o PDF.js injeta na descrição por inversão de colunas
+                .replace(/[\d:]+\s+Horas\s+contratadas[.:]*\s*[\d:]*\s*Horas\s+executadas[.:]*\s*[\d:]*/gi, '')
+                .replace(/Horas\s+(?:contratadas|executadas)[.:]*\s*[\d:]*/gi, '')
+                .replace(/\s{2,}/g, ' ')
+                .trim();
         }
 
         if (!description) description = 'Importado via Ata PDF';
