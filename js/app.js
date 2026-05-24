@@ -1629,26 +1629,34 @@ class AppController {
         let projectNum = '';
         let clientNamePdf = '';
 
-        // Formato A: "Projeto.: 22851   17 - CASCAVEL MAQUINAS AGRICOLAS LTDA 001 CVEL"
-        // O nome é tudo que vem após o número do projeto até o fim da linha ou até Horas/Data
-        const projA = text.match(/Projeto[.:]+\s*(\d{4,6})\s+(.+?)(?=\n|\s+Horas\s+(?:contratadas|executadas)|\s+Data\s*[.:]+|$)/i);
-        if (projA) {
-            projectNum = projA[1].trim();
-            clientNamePdf = projA[2].replace(/\s{2,}/g, ' ').trim();
+        // 1a. Captura o número do projeto, ancorado em "Projeto.:"
+        let projMatch = text.match(/Projeto[.:]+\s*(\d{4,6})/i);
+        let afterIdx = -1;
+        if (projMatch) {
+            projectNum = projMatch[1].trim();
+            afterIdx = projMatch.index + projMatch[0].length;
         } else {
-            // Formato B (PDF.js inverte): "22851 Projeto.:   17 - CASCAVEL..."
-            const projB = text.match(/(?:^|[\s])(\d{4,6})\s+Projeto[.:]+\s*(.+?)(?=\n|\s+Horas\s+(?:contratadas|executadas)|\s+Data\s*[.:]+|$)/i);
-            if (projB) {
-                projectNum = projB[1].trim();
-                clientNamePdf = projB[2].replace(/\s{2,}/g, ' ').trim();
-            } else {
-                // Fallback: só o número (âncora em "Projeto.:" para não pegar anos de datas)
-                const projNum = text.match(/Projeto[.:]+\s*(\d{4,6})/i);
-                if (projNum) projectNum = projNum[1].trim();
+            // PDF.js pode inverter: "22851 Projeto.:"
+            projMatch = text.match(/(?:^|\s)(\d{4,6})\s+Projeto[.:]+/i);
+            if (projMatch) {
+                projectNum = projMatch[1].trim();
+                afterIdx = projMatch.index + projMatch[0].length;
             }
         }
 
         if (!projectNum) return { records, warnings };
+
+        // 1b. Busca o nome do cliente na área após o número do projeto.
+        // PDF.js pode reordenar elementos (insere datas ou outros conteúdos entre o número e o nome).
+        // Padrão obrigatório: "NN - LETRAS..." (ID secundário + traço + nome do cliente).
+        // Isso evita capturar datas como "01/04/2026" que ficam entre o número e o nome.
+        if (afterIdx >= 0) {
+            const searchArea = text.substring(afterIdx, afterIdx + 500);
+            const nameMatch = searchArea.match(/(\d{1,3}\s*[-–]\s*[A-Za-zÀ-ÿ][^\n]*?)(?=\n|\s+Horas\s+(?:contratadas|executadas)|\s+Data\s*[.:]+|$)/);
+            if (nameMatch) {
+                clientNamePdf = nameMatch[1].replace(/\s{2,}/g, ' ').trim();
+            }
+        }
 
         // Limita tamanho do nome
         if (clientNamePdf.length > 120) clientNamePdf = clientNamePdf.substring(0, 120).trim();
