@@ -7,7 +7,9 @@ class TSPStore {
     _client(r) {
         return { id: r.id, name: r.name, hoursTotal: parseFloat(r.hours_total) || 0,
             csName: r.cs_name || '', projectNum: r.project_num || '',
-            clientPays: parseFloat(r.client_pays) || 0, notes: r.notes || '',
+            clientPays: parseFloat(r.client_pays) || 0,
+            consultantBonus: parseFloat(r.consultant_bonus) || 0,
+            notes: r.notes || '',
             status: r.status || 'active', createdAt: r.created_at };
     }
 
@@ -51,21 +53,23 @@ class TSPStore {
         return this._client(data);
     }
 
-    async addClient(name, hoursTotal, csName, projectNum, clientPays, notes, status) {
+    async addClient(name, hoursTotal, csName, projectNum, clientPays, consultantBonus, notes, status) {
         const { data, error } = await this.db.from('clients').insert({
             user_id: this.userId, name,
             hours_total: parseFloat(hoursTotal) || 0, cs_name: csName || '',
             project_num: projectNum || '', client_pays: parseFloat(clientPays) || 0,
+            consultant_bonus: parseFloat(consultantBonus) || 0,
             notes: notes || '', status: status || 'active'
         }).select().single();
         if (error) throw error;
         return this._client(data);
     }
 
-    async updateClient(id, name, hoursTotal, csName, projectNum, clientPays, notes, status) {
+    async updateClient(id, name, hoursTotal, csName, projectNum, clientPays, consultantBonus, notes, status) {
         const { data, error } = await this.db.from('clients').update({
             name, hours_total: parseFloat(hoursTotal) || 0, cs_name: csName || '',
             project_num: projectNum || '', client_pays: parseFloat(clientPays) || 0,
+            consultant_bonus: parseFloat(consultantBonus) || 0,
             notes: notes || '', status: status || 'active'
         }).eq('id', id).select().single();
         if (error) throw error;

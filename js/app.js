@@ -165,6 +165,7 @@ class AppController {
         const projectNum = document.getElementById('client-project').value;
         const csName = document.getElementById('client-cs').value;
         const clientPays = document.getElementById('client-pays').value;
+        const consultantBonus = document.getElementById('consultant-bonus').value;
         const notes = document.getElementById('client-notes').value;
         const status = document.getElementById('client-status').value;
         const btn = e.target.querySelector('[type="submit"]');
@@ -172,9 +173,9 @@ class AppController {
 
         try {
             if (id) {
-                await store.updateClient(id, name, hours, csName, projectNum, clientPays, notes, status);
+                await store.updateClient(id, name, hours, csName, projectNum, clientPays, consultantBonus, notes, status);
             } else {
-                await store.addClient(name, hours, csName, projectNum, clientPays, notes, status);
+                await store.addClient(name, hours, csName, projectNum, clientPays, consultantBonus, notes, status);
             }
             e.target.reset();
             document.getElementById('client-id').value = '';
@@ -190,12 +191,18 @@ class AppController {
 
     calculateConsultantValue() {
         const inputPays = document.getElementById('client-pays').value;
+        const inputBonus = document.getElementById('consultant-bonus').value;
         const inputReceives = document.getElementById('consultant-receives');
+        const inputTotal = document.getElementById('consultant-total');
+        const fmt = v => `R$ ${v.toFixed(2).replace('.', ',')}`;
         if (inputPays && !isNaN(inputPays)) {
-            const receivesValue = parseFloat(inputPays) * 0.43;
-            inputReceives.value = `R$ ${receivesValue.toFixed(2).replace('.', ',')}`;
+            const base = parseFloat(inputPays) * 0.43;
+            const bonus = (inputBonus && !isNaN(inputBonus)) ? parseFloat(inputBonus) : 0;
+            inputReceives.value = fmt(base);
+            inputTotal.value = fmt(base + bonus);
         } else {
             inputReceives.value = '';
+            inputTotal.value = '';
         }
     }
 
@@ -600,13 +607,16 @@ class AppController {
             };
 
             const clientPaysStr = formatMoney(c.clientPays);
-            const consultantReceives = (c.clientPays && !isNaN(c.clientPays)) ? formatMoney(c.clientPays * 0.43) : 'R$ 0,00';
+            const base43 = (c.clientPays && !isNaN(c.clientPays)) ? c.clientPays * 0.43 : 0;
+            const bonus = c.consultantBonus || 0;
+            const totalConsultant = base43 + bonus;
+            const consultantReceives = formatMoney(totalConsultant);
             const detailsHtml = `
                 <div style="font-size: 0.85rem; margin-top: 4px; color: var(--text-muted)">
                     <span><strong>CS:</strong> ${escapeHtml(c.csName) || '-'}</span> |
                     <span><strong>Proj:</strong> ${escapeHtml(c.projectNum) || '-'}</span> <br>
                     <span><strong>Paga:</strong> ${clientPaysStr}</span> |
-                    <span><strong>Recebe:</strong> ${consultantReceives}</span>
+                    <span><strong>Recebe:</strong> ${consultantReceives}</span>${bonus > 0 ? ` <span style="color: #4ade80; font-size:0.8rem">(+R$ ${bonus.toFixed(2).replace('.',',')} adicional)</span>` : ''}
                     <div style="margin-top:2px; font-style:italic; font-size: 0.8rem">Obs: ${escapeHtml(c.notes) || '-'}</div>
                 </div>
             `;
@@ -643,6 +653,7 @@ class AppController {
         document.getElementById('client-project').value = client.projectNum || '';
         document.getElementById('client-cs').value = client.csName || '';
         document.getElementById('client-pays').value = client.clientPays || '';
+        document.getElementById('consultant-bonus').value = client.consultantBonus || '';
         document.getElementById('client-notes').value = client.notes || '';
         document.getElementById('client-status').value = client.status || 'active';
 
