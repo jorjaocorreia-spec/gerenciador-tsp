@@ -1625,29 +1625,39 @@ class AppController {
         // === 1. NÚMERO DO PROJETO + NOME DO CLIENTE ===
         // SAP format: "Projeto.: 22851   17 - CASCAVEL MAQUINAS AGRICOLAS LTDA 001 CVEL"
         // PDF.js pode inverter: "22851 Projeto.:   17 - CASCAVEL..."
-        // Captura: (número) depois do traço = nome
+        // Abordagem linha-a-linha: encontra a linha com "Projeto.:" e extrai número + tudo que segue
         let projectNum = '';
         let clientNamePdf = '';
 
-        // Formato A: "Projeto.:" seguido do número
-        const projA = text.match(/Projeto[.:]+\s*(\d{4,6})\s+(?:\d{1,3}\s+)?[-–]\s*(.+?)(?=\s+Horas\s+(?:contratadas|executadas)|\s+Data\s*[.:]+|$)/i);
-        if (projA) {
-            projectNum = projA[1].trim();
-            clientNamePdf = projA[2].replace(/\s{2,}/g, ' ').trim();
-        } else {
-            // Formato B: número antes de "Projeto.:"
-            const projB = text.match(/(?:^|[\s])(\d{4,6})\s+Projeto[.:]+\s*(?:\d{1,3}\s+)?[-–]\s*(.+?)(?=\s+Horas\s+(?:contratadas|executadas)|\s+Data\s*[.:]+|$)/i);
-            if (projB) {
-                projectNum = projB[1].trim();
-                clientNamePdf = projB[2].replace(/\s{2,}/g, ' ').trim();
+        const projLine = text.split('\n').find(line => /Projeto[.:]+/i.test(line));
+        if (projLine) {
+            // Formato A: "Projeto.:" seguido do número e nome
+            const mA = projLine.match(/Projeto[.:]+\s*(\d{4,6})\s+(.+)/i);
+            if (mA) {
+                projectNum = mA[1].trim();
+                clientNamePdf = mA[2];
             } else {
-                // Fallback: só o número, sem nome
-                const projNum = text.match(/Projeto[.:]+\s*(\d{4,6})/i) || text.match(/(?:^|[\s])(\d{4,6})\s+Projeto/i);
-                if (projNum) projectNum = projNum[1].trim();
+                // Formato B: número antes de "Projeto.:" e nome depois
+                const mB = projLine.match(/(\d{4,6})\s+Projeto[.:]+\s*(.+)/i);
+                if (mB) {
+                    projectNum = mB[1].trim();
+                    clientNamePdf = mB[2];
+                } else {
+                    // Fallback: só o número
+                    const mNum = projLine.match(/(\d{4,6})/);
+                    if (mNum) projectNum = mNum[1].trim();
+                }
             }
         }
 
         if (!projectNum) return { records, warnings };
+
+        // Limpa artefatos que PDF.js pode injetar na mesma linha (colunas achatadas)
+        clientNamePdf = clientNamePdf
+            .replace(/\s*Horas\s+(?:contratadas|executadas)[.:]*.*$/i, '')
+            .replace(/\s*Data\s*[.:]+.*$/i, '')
+            .replace(/\s{2,}/g, ' ')
+            .trim();
 
         // Limita tamanho do nome
         if (clientNamePdf.length > 120) clientNamePdf = clientNamePdf.substring(0, 120).trim();
