@@ -42,7 +42,7 @@ class AppController {
         this.selectedMonth = null;
         this.pendingPdfRecords = []; // Armazena temporariamente os registros do PDF lido
         this.agendaCurrentDate = new Date();
-        this.agendaViewMode = 'monthly'; // daily, weekly or monthly
+        this.agendaViewMode = 'schedule'; // daily, weekly, monthly or schedule
         this.init();
     }
 
@@ -1142,6 +1142,7 @@ class AppController {
     // ===================================
     async switchAgendaMode(mode) {
         this.agendaViewMode = mode;
+        document.getElementById('btn-agenda-schedule').classList.toggle('active-mode', mode === 'schedule');
         document.getElementById('btn-agenda-monthly').classList.toggle('active-mode', mode === 'monthly');
         document.getElementById('btn-agenda-weekly').classList.toggle('active-mode', mode === 'weekly');
         document.getElementById('btn-agenda-daily').classList.toggle('active-mode', mode === 'daily');
@@ -1153,6 +1154,8 @@ class AppController {
             this.agendaCurrentDate.setDate(this.agendaCurrentDate.getDate() - 1);
         } else if (this.agendaViewMode === 'monthly') {
             this.agendaCurrentDate.setMonth(this.agendaCurrentDate.getMonth() - 1);
+        } else if (this.agendaViewMode === 'schedule') {
+            this.agendaCurrentDate.setDate(this.agendaCurrentDate.getDate() - 30);
         } else {
             this.agendaCurrentDate.setDate(this.agendaCurrentDate.getDate() - 7);
         }
@@ -1164,6 +1167,8 @@ class AppController {
             this.agendaCurrentDate.setDate(this.agendaCurrentDate.getDate() + 1);
         } else if (this.agendaViewMode === 'monthly') {
             this.agendaCurrentDate.setMonth(this.agendaCurrentDate.getMonth() + 1);
+        } else if (this.agendaViewMode === 'schedule') {
+            this.agendaCurrentDate.setDate(this.agendaCurrentDate.getDate() + 30);
         } else {
             this.agendaCurrentDate.setDate(this.agendaCurrentDate.getDate() + 7);
         }
@@ -1305,6 +1310,8 @@ class AppController {
             await this.renderAgendaDaily(container);
         } else if (this.agendaViewMode === 'monthly') {
             await this.renderAgendaMonthly(container);
+        } else if (this.agendaViewMode === 'schedule') {
+            await this.renderAgendaSchedule(container);
         } else {
             await this.renderAgendaWeekly(container);
         }
@@ -1506,6 +1513,97 @@ class AppController {
                 <div class="agenda-month-grid">${cellsHtml}</div>
             </div>
         `;
+    }
+
+    async renderAgendaSchedule(container) {
+        const monthNames = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
+        const dayNames = ['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'];
+
+        const startDate = new Date(this.agendaCurrentDate);
+        startDate.setHours(0, 0, 0, 0);
+        const endDate = new Date(startDate);
+        endDate.setDate(endDate.getDate() + 89);
+
+        const isoStart = startDate.toISOString().split('T')[0];
+        const isoEnd = endDate.toISOString().split('T')[0];
+
+        const startLabel = `${monthNames[startDate.getMonth()]}. ${startDate.getFullYear()}`;
+        const endLabel = `${monthNames[endDate.getMonth()]}. ${endDate.getFullYear()}`;
+        document.getElementById('agenda-current-date-label').innerText =
+            (startDate.getMonth() === endDate.getMonth() && startDate.getFullYear() === endDate.getFullYear())
+                ? startLabel
+                : `${startLabel} – ${endLabel}`;
+
+        const events = await store.getEventsByWeek(isoStart, isoEnd);
+        events.sort((a, b) => a.date !== b.date ? a.date.localeCompare(b.date) : a.startTime.localeCompare(b.startTime));
+
+        const clientIds = [...new Set(events.map(e => e.clientId).filter(Boolean))];
+        const clientsMap = {};
+        await Promise.all(clientIds.map(async id => { clientsMap[id] = await store.getClient(id); }));
+
+        const todayIso = new Date().toISOString().split('T')[0];
+
+        const eventsByDate = {};
+        events.forEach(ev => {
+            if (!eventsByDate[ev.date]) eventsByDate[ev.date] = [];
+            eventsByDate[ev.date].push(ev);
+        });
+
+        // Show days that have events + today if within range
+        const datesToShow = new Set(Object.keys(eventsByDate));
+        if (todayIso >= isoStart && todayIso <= isoEnd) datesToShow.add(todayIso);
+        const sortedDates = [...datesToShow].sort();
+
+        if (sortedDates.length === 0) {
+            container.innerHTML = `<div style="text-align:center; padding: 60px; color: var(--text-muted); font-size: 0.95rem;">Nenhum agendamento encontrado neste período.</div>`;
+            return;
+        }
+
+        let html = '<div class="agenda-schedule-view">';
+        let lastMonth = null;
+
+        sortedDates.forEach(dateStr => {
+            const dateObj = new Date(dateStr + 'T00:00:00');
+            const monthKey = `${dateObj.getFullYear()}-${dateObj.getMonth()}`;
+            const isToday = dateStr === todayIso;
+            const dayEvents = eventsByDate[dateStr] || [];
+
+            // Month separator
+            if (monthKey !== lastMonth) {
+                lastMonth = monthKey;
+                html += `<div class="schedule-month-separator">${monthNames[dateObj.getMonth()]}. ${dateObj.getFullYear()}</div>`;
+            }
+
+            html += `<div class="schedule-day-row">
+                <div class="schedule-date-label">
+                    <div class="schedule-day-num ${isToday ? 'today' : ''}">${dateObj.getDate()}</div>
+                    <div class="schedule-day-info">${monthNames[dateObj.getMonth()].toUpperCase()}., ${dayNames[dateObj.getDay()]}.</div>
+                </div>
+                <div class="schedule-events">`;
+
+            if (dayEvents.length === 0) {
+                html += `<div class="schedule-no-events">Sem agendamentos</div>`;
+            } else {
+                dayEvents.forEach(ev => {
+                    const clientName = ev.clientId && clientsMap[ev.clientId]
+                        ? `<span class="schedule-event-client">${escapeHtml(clientsMap[ev.clientId].name)}</span>`
+                        : '';
+                    html += `<div class="schedule-event" onclick="app.editAgendaEvent('${ev.id}')">
+                        <div class="schedule-event-dot type-${ev.type}"></div>
+                        <div class="schedule-event-time">${ev.startTime} – ${ev.endTime}</div>
+                        <div class="schedule-event-info">
+                            <span class="schedule-event-title">${escapeHtml(ev.title)}</span>
+                            ${clientName}
+                        </div>
+                    </div>`;
+                });
+            }
+
+            html += `</div></div>`;
+        });
+
+        html += '</div>';
+        container.innerHTML = html;
     }
 
     createEventBlockHtml(ev, width, clientsMap = {}) {

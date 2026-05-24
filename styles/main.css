@@ -708,6 +708,138 @@ h4 {
   background-size: 100% 60px;
 }
 /* =========================================
+   Agenda — Schedule View (Programação)
+   ========================================= */
+.agenda-schedule-view {
+  display: flex;
+  flex-direction: column;
+}
+
+.schedule-month-separator {
+  padding: 12px 0 6px;
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--text-muted);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  border-bottom: 1px solid var(--surface-border);
+  margin-bottom: 2px;
+}
+
+.schedule-day-row {
+  display: grid;
+  grid-template-columns: 100px 1fr;
+  gap: 16px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+  padding: 6px 0;
+  min-height: 52px;
+  align-items: flex-start;
+}
+
+.schedule-date-label {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding-top: 6px;
+  gap: 2px;
+}
+
+.schedule-day-num {
+  font-size: 1.5rem;
+  font-weight: 400;
+  line-height: 1;
+  color: var(--text-main);
+  width: 44px;
+  height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+}
+
+.schedule-day-num.today {
+  background: var(--primary-color);
+  color: white;
+  font-weight: 600;
+}
+
+.schedule-day-info {
+  font-size: 0.68rem;
+  color: var(--text-muted);
+  text-align: center;
+  font-weight: 500;
+  letter-spacing: 0.03em;
+}
+
+.schedule-events {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px 0;
+}
+
+.schedule-event {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 7px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.schedule-event:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.schedule-event-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.schedule-event-dot.type-meeting    { background: #3b82f6; }
+.schedule-event-dot.type-consulting { background: #8b5cf6; }
+.schedule-event-dot.type-task       { background: #10b981; }
+.schedule-event-dot.type-reminder   { background: #f59e0b; }
+
+.schedule-event-time {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  min-width: 115px;
+  flex-shrink: 0;
+}
+
+.schedule-event-info {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+
+.schedule-event-title {
+  font-size: 0.9rem;
+  color: var(--text-main);
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.schedule-event-client {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+.schedule-no-events {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  padding: 8px 10px;
+  font-style: italic;
+}
+
+/* =========================================
    Agenda — Monthly View
    ========================================= */
 .agenda-monthly-calendar {
