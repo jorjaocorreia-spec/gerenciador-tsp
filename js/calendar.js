@@ -27,18 +27,14 @@ const GoogleCalendarAPI = {
 
     async _applyConfig() {
         if (!this._clientId || !this._apiKey) return;
-        // Reinicializa gapi client com a nova API key
         try {
-            await gapi.client.init({
-                apiKey: this._apiKey,
-                discoveryDocs: [DISCOVERY_DOC],
-            });
+            gapi.client.setApiKey(this._apiKey);
+            await gapi.client.load(DISCOVERY_DOC);
             this.gapiInited = true;
         } catch (err) {
-            console.error('Erro ao (re)inicializar GAPI client:', err);
+            console.error('Erro ao configurar GAPI client:', JSON.stringify(err));
             return;
         }
-        // Reinicializa token client com o novo client_id
         try {
             this.tokenClient = google.accounts.oauth2.initTokenClient({
                 client_id: this._clientId,
@@ -47,7 +43,7 @@ const GoogleCalendarAPI = {
             });
             this.gisInited = true;
         } catch (err) {
-            console.error('Erro ao (re)inicializar GIS client:', err);
+            console.error('Erro ao configurar GIS client:', err);
             return;
         }
         this._checkEnableStatus();
@@ -55,24 +51,14 @@ const GoogleCalendarAPI = {
 
     async initGapiClient() {
         if (!gapi) return;
-        return new Promise((resolve, reject) => {
+        return new Promise((resolve) => {
             gapi.load('client', async () => {
-                try {
-                    const apiKey = this._apiKey;
-                    if (!apiKey) {
-                        // Credenciais ainda não chegaram; marca como pronto para quando configure() for chamado
-                        this.gapiInited = true;
-                        resolve();
-                        return;
-                    }
-                    await gapi.client.init({ apiKey, discoveryDocs: [DISCOVERY_DOC] });
-                    this.gapiInited = true;
-                    this._checkEnableStatus();
-                    resolve();
-                } catch (error) {
-                    console.error('Erro ao inicializar GAPI client', error);
-                    reject(error);
+                // Marca como carregado; _applyConfig() fará a configuração real quando credentials chegarem
+                this.gapiInited = true;
+                if (this._clientId && this._apiKey) {
+                    await this._applyConfig();
                 }
+                resolve();
             });
         });
     },
