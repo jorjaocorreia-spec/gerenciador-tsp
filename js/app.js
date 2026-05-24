@@ -1566,6 +1566,7 @@ class AppController {
     }
 
     parsePdfText(text) {
+        this._lastPdfText = text;
         // Encontra todos os projetos no documento e salva o index em que apareceram
         // Ajustado para capturar apenas números com 4 a 6 dígitos (evitando pegar dias de data como "03")
         const projectRegex = /Projeto[:.\s]*(\d{4,6})/ig;
@@ -1758,10 +1759,22 @@ class AppController {
         });
 
         if (!allMatched) {
-            const missing = Array.from(unMatchedProjects).join(', ') || 'Sem identificação';
-            alert(`ATENÇÃO: Não foi possível identificar todos os Clientes da Ata automaticamente.\n\nProjetos não encontrados na sua base: ${missing}\n\nPor favor, cadastre ou edite estes clientes e adicione o número do projeto para continuar a importação.`);
-            this.pendingPdfRecords = [];
-            return;
+            for (const projectNum of unMatchedProjects) {
+                const clientName = this._extractClientNameForProject(projectNum) || `Projeto ${projectNum}`;
+                const newClient = await store.addClient(
+                    clientName, 0, '', projectNum, 0,
+                    'Cliente criado automaticamente via importação de Ata PDF. Cadastro incompleto — por favor, complete os dados.',
+                    'active'
+                );
+                this.pendingPdfRecords.forEach(r => {
+                    if (r.clientProjectPdf === projectNum && !r.matchedClientId) {
+                        r.matchedClientId = newClient.id;
+                        r.matchedClientName = newClient.name;
+                        r.autoCreated = true;
+                    }
+                });
+            }
+            Toast.show(`${unMatchedProjects.size} cliente(s) criado(s) automaticamente. Verifique e complete os dados após a importação.`, 'info', 5000);
         }
 
         const uniqueClientIds = new Set(this.pendingPdfRecords.map(r => r.matchedClientId));
@@ -1780,7 +1793,7 @@ class AppController {
             const tr = document.createElement('tr');
             tr.innerHTML = `
                 <td style="font-size: 0.9rem;">${r.dateStrBrazil}</td>
-                <td style="font-size: 0.9rem; font-weight: 500; color: var(--primary-color);">${r.matchedClientName}</td>
+                <td style="font-size: 0.9rem; font-weight: 500; color: var(--primary-color);">${r.matchedClientName}${r.autoCreated ? ' <span style="font-size:0.75rem;background:var(--primary-color);color:#fff;border-radius:4px;padding:1px 5px;">Novo</span>' : ''}</td>
                 <td style="font-size: 0.9rem;">${r.startTime} - ${r.endTime}</td>
                 <td style="font-size: 0.9rem;">${r.minutes}</td>
                 <td><textarea class="form-control" id="pdf-desc-${idx}" style="font-size: 0.85rem; padding: 4px; width: 100%; min-width: 250px; resize: vertical;" rows="3">${r.description}</textarea></td>
@@ -1805,6 +1818,27 @@ class AppController {
         this.closeModal('modal-import-pdf');
         this.pendingPdfRecords = [];
         await this.renderAll();
+    }
+
+    _extractClientNameForProject(projectNum) {
+        const text = this._lastPdfText || '';
+        if (!text) return '';
+
+        const projIdx = text.search(new RegExp(`\\b${projectNum}\\b`));
+        if (projIdx === -1) return '';
+
+        // Contexto ao redor do número do projeto
+        const context = text.substring(Math.max(0, projIdx - 600), projIdx + 200);
+
+        // Tenta: "CLIENTE: Nome" ou "Cliente: Nome"
+        const clienteMatch = context.match(/CLIENTE[:\s]+([^\n\r]{3,80}?)(?=\s*[\n\r]|\s*Projeto|\s*\d{4,6}|$)/i);
+        if (clienteMatch) return clienteMatch[1].trim();
+
+        // Tenta: "Nome/Razão Social: Nome" ou "Razão Social: Nome"
+        const nomeMatch = context.match(/(?:Nome|Raz.o\s+Social)[:\s]+([^\n\r]{3,80}?)(?=\s*[\n\r]|$)/i);
+        if (nomeMatch) return nomeMatch[1].trim();
+
+        return '';
     }
 
     // ===================================
