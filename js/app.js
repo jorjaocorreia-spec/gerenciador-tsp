@@ -75,9 +75,6 @@ class AppController {
         // Sets default date in record form to today
         document.getElementById('record-date').valueAsDate = new Date();
 
-        // Configurar Backup
-        this.setupBackup();
-
         // Configurar Importação de PDF
         this.setupPdfImport();
 
@@ -1804,39 +1801,6 @@ class AppController {
         this.closeModal('modal-import-pdf');
         this.pendingPdfRecords = [];
         await this.renderAll();
-    }
-
-    // ===================================
-    // BACKUP
-    // ===================================
-    setupBackup() {
-        const btnExport = document.getElementById('btn-export');
-        const btnImport = document.getElementById('btn-import');
-        const fileImport = document.getElementById('file-import');
-
-        btnExport.addEventListener('click', () => {
-            store.exportData();
-        });
-
-        btnImport.addEventListener('click', () => {
-            fileImport.click(); // Abre o seletor de arquivo do SO
-        });
-
-        fileImport.addEventListener('change', async (e) => {
-            const file = e.target.files[0];
-            if (!file) return;
-
-            try {
-                await store.importData(file);
-                Toast.show('Dados importados com sucesso!', 'success');
-                await this.renderAll();
-            } catch (err) {
-                Toast.show('Erro na importação: ' + err.message, 'error');
-            }
-
-            // Reseta o input file
-            e.target.value = '';
-        });
     }
 
     // ===================================

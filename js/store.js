@@ -320,55 +320,6 @@ class TSPStore {
         return Object.values(monthlyData).sort((a, b) => a.yearMonth.localeCompare(b.yearMonth));
     }
 
-    // ── BACKUP ────────────────────────────────────────────────────
-
-    async exportData() {
-        const [clients, records, tasks, agendaEvents] = await Promise.all([
-            this.getClients(), this.getRecords(), this.getTasks(), this.getAgendaEvents()
-        ]);
-        const blob = new Blob([JSON.stringify({ clients, records, tasks, agendaEvents }, null, 2)],
-            { type: 'application/json' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `tsp_backup_${new Date().toISOString().split('T')[0]}.json`;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        URL.revokeObjectURL(url);
-    }
-
-    async importData(file) {
-        return new Promise((resolve, reject) => {
-            const reader = new FileReader();
-            reader.onload = async (e) => {
-                try {
-                    const d = JSON.parse(e.target.result);
-                    if (!d.clients || !d.records) throw new Error('Formato inválido.');
-
-                    const idMap = {};
-                    for (const c of d.clients) {
-                        const created = await this.addClient(c.name, c.hoursTotal, c.csName,
-                            c.projectNum, c.clientPays, c.notes, c.status);
-                        idMap[c.id] = created.id;
-                    }
-                    for (const r of d.records) {
-                        if (idMap[r.clientId]) await this.addRecord(
-                            idMap[r.clientId], r.date, r.startTime, r.endTime, r.minutes, r.description);
-                    }
-                    for (const t of (d.tasks || [])) {
-                        await this.addTask({ ...t, clientId: idMap[t.clientId] || null });
-                    }
-                    for (const ev of (d.agendaEvents || [])) {
-                        await this.addAgendaEvent({ ...ev, clientId: idMap[ev.clientId] || null });
-                    }
-                    resolve({ success: true, message: 'Dados importados com sucesso!' });
-                } catch (err) { reject(err); }
-            };
-            reader.onerror = () => reject(new Error('Erro ao carregar o arquivo.'));
-            reader.readAsText(file);
-        });
-    }
 }
 
 window.store = new TSPStore();
