@@ -501,6 +501,7 @@ class AppController {
     // Chamado após login bem-sucedido
     async initAfterAuth() {
         this.checkLocalStorageMigration();
+        this.applyMoneyVisibility();
         const settings = await store.getUserSettings();
         if (settings && settings.googleClientId && settings.googleApiKey) {
             await calendarAPI.configure(settings.googleClientId, settings.googleApiKey);
@@ -587,6 +588,18 @@ class AppController {
 
     toggleMoneyVisibility() {
         const hidden = document.body.classList.toggle('money-hidden');
+        sessionStorage.setItem('moneyHidden', hidden ? '1' : '0');
+        const icon = document.getElementById('icon-toggle-money');
+        if (icon) {
+            icon.setAttribute('data-lucide', hidden ? 'eye-off' : 'eye');
+            lucide.createIcons();
+        }
+    }
+
+    applyMoneyVisibility() {
+        const stored = sessionStorage.getItem('moneyHidden');
+        const hidden = stored === null ? true : stored === '1';
+        document.body.classList.toggle('money-hidden', hidden);
         const icon = document.getElementById('icon-toggle-money');
         if (icon) {
             icon.setAttribute('data-lucide', hidden ? 'eye-off' : 'eye');
