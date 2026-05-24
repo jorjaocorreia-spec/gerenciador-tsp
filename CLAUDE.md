@@ -104,7 +104,9 @@ DOMContentLoaded
 - Controla navegação entre views (Dashboard, Clientes, Atendimentos, Tarefas, Agenda)
 - Gerencia modais, formulários e eventos de UI
 - Renderiza todas as views dinamicamente no DOM
-- `initAfterAuth()` — ponto de entrada pós-login, chama `renderAll()`
+- `initAfterAuth()` — ponto de entrada pós-login; chama `applySidebarState()`, `applyMoneyVisibility()` e `renderAll()`
+- `toggleSidebar()` / `applySidebarState()` — controla sidebar recolhível; estado via `sessionStorage.sidebarCollapsed`
+- `toggleMoneyVisibility()` / `applyMoneyVisibility()` — oculta valores monetários; estado via `sessionStorage.moneyHidden`
 
 **`TSPStore`** (`js/store.js`)
 - Todas as operações são `async`, usam `this.db` (supabaseClient) e `this.userId` (Auth.getUserId())
@@ -165,7 +167,7 @@ O `docker-entrypoint.sh` injeta essas vars em `js/config.js` via `envsubst` na i
 - **VPS**: Hostinger → Easypanel → projeto `jorge`, serviço `gerenciador-tsp`
 - **Build**: Dockerfile (nginx:alpine)
 - **Repo**: https://github.com/jorjaocorreia-spec/gerenciador-tsp (público)
-- **Branch**: `main` → deploy automático via webhook
+- **Branch**: `main` → ~~deploy automático via webhook~~ **deploy manual** (webhook quebrado)
 - NUNCA tocar em outros serviços da VPS (7dias, evolution-api, termix)
 
 ---
@@ -176,6 +178,7 @@ O `docker-entrypoint.sh` injeta essas vars em `js/config.js` via `envsubst` na i
 - Schema das tabelas Supabase — mudanças requerem migration SQL e atualização do store.js
 - `docker-entrypoint.sh` — qualquer var nova precisa ser adicionada aqui E no Easypanel
 - IDs de elementos HTML — usados como seletores em `app.js`; renomear quebra a UI
+- Estrutura do sidebar — `.sidebar-header`, `.sidebar-bottom`, `.sidebar-user`, `.sidebar-section-label` e `.nav-label` são usados pelo CSS do estado colapsado; reorganizar sem atualizar o CSS quebra o comportamento de colapso
 
 ### Padrões de código
 - JavaScript vanilla ES6+; sem TypeScript, sem React, sem bundler
@@ -194,6 +197,8 @@ O `docker-entrypoint.sh` injeta essas vars em `js/config.js` via `envsubst` na i
 - **Horas na Ata SAP são centesimais, não sexagesimais** — `00:75` = 0,75 h = 45 min reais (não 1h15). A coluna "Horas Aplicadas" usa formato centesimal. Hora Inicial e Hora Final são horários de relógio normais (HH:MM). Para converter centesimal → minutos: `(HH * 100 + CC) / 100 * 60`.
 - **Cada página da Ata PDF = um bloco independente** — nunca concatenar textos de páginas diferentes antes de parsear. O parser (`parsePdfPages`) processa cada página em isolamento via `_parseSinglePage`.
 - **Deploy automático (webhook Easypanel) está quebrado** — após cada `git push`, avisar o usuário para fazer deploy manual no Easypanel antes de testar em produção.
+- **Sidebar: todo texto usa `<span class="nav-label">`** — nav-items, botões da `sidebar-bottom` e email do usuário têm o texto em `<span class="nav-label">`. Esse span é o que CSS esconde no estado `.sidebar.collapsed`. Novos itens de menu ou botões adicionados ao sidebar sem esse span não respondem ao colapso. Cada nav-item também precisa do atributo `title="Nome"` para exibir tooltip quando colapsado.
+- **Sidebar: dois estados via `sessionStorage`** — `sidebarCollapsed` ('1' = colapsado) e `moneyHidden` ('1' = oculto). Ambos são aplicados em `initAfterAuth()`. O padrão é: se a chave não existir no sessionStorage, o default é expandido/visível. A sidebar vai de 260px (expandida) para 70px (colapsada) com `transition: width 0.25s ease` no CSS.
 
 ### Cálculos automáticos
 - Comissão do consultor = 43% do valor pago pelo cliente (`clientPays * 0.43`)
@@ -212,6 +217,12 @@ O `docker-entrypoint.sh` injeta essas vars em `js/config.js` via `envsubst` na i
 | **Atendimentos** | Log de horas por cliente; filtros por cliente e período; exportação PDF |
 | **Tarefas** | Kanban (Novas / Em Execução / Finalizadas) com drag-and-drop e métricas |
 | **Agenda** | Calendário diário/semanal; 4 tipos de evento; sincronização Google Calendar |
+
+### Sidebar
+- **Recolhível**: botão chevron no cabeçalho (`#btn-sidebar-toggle`) alterna entre expandido (260px) e colapsado (70px)
+- **Estado colapsado**: apenas ícones centralizados; texto oculto via `.sidebar.collapsed .nav-label { display: none }`
+- **Persistência**: `sessionStorage.sidebarCollapsed`; default = expandido; aplicado em `applySidebarState()` dentro de `initAfterAuth()`
+- **Ícone do toggle**: `chevron-left` quando expandido, `chevron-right` quando colapsado (atualizado via `lucide.createIcons()`)
 
 ---
 
