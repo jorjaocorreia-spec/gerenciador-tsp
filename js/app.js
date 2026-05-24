@@ -1629,35 +1629,37 @@ class AppController {
         let projectNum = '';
         let clientNamePdf = '';
 
-        const projLine = text.split('\n').find(line => /Projeto[.:]+/i.test(line));
-        if (projLine) {
-            // Formato A: "Projeto.:" seguido do número e nome
-            const mA = projLine.match(/Projeto[.:]+\s*(\d{4,6})\s+(.+)/i);
-            if (mA) {
-                projectNum = mA[1].trim();
-                clientNamePdf = mA[2];
-            } else {
-                // Formato B: número antes de "Projeto.:" e nome depois
-                const mB = projLine.match(/(\d{4,6})\s+Projeto[.:]+\s*(.+)/i);
-                if (mB) {
-                    projectNum = mB[1].trim();
-                    clientNamePdf = mB[2];
-                } else {
-                    // Fallback: só o número
-                    const mNum = projLine.match(/(\d{4,6})/);
-                    if (mNum) projectNum = mNum[1].trim();
+        const lines = text.split('\n');
+        const projLineIdx = lines.findIndex(line => /Projeto[.:]+/i.test(line));
+        if (projLineIdx !== -1) {
+            const projLine = lines[projLineIdx];
+            // Extrai o número do projeto
+            const mNum = projLine.match(/(\d{4,6})/);
+            if (mNum) projectNum = mNum[1].trim();
+            // Tenta extrair o nome da mesma linha
+            // Formato A: "Projeto.: 22851   NOME"
+            const mA = projLine.match(/Projeto[.:]+\s*\d{4,6}\s+(.+)/i);
+            // Formato B: "22851 Projeto.:   NOME"
+            const mB = projLine.match(/\d{4,6}\s+Projeto[.:]+\s*(.+)/i);
+            clientNamePdf = ((mA || mB)?.[1] || '')
+                .replace(/\s*Horas\s+(?:contratadas|executadas)[.:]*.*$/i, '')
+                .replace(/\s*Data\s*[.:]+.*$/i, '')
+                .replace(/\b\d{2}\/\d{2}\/\d{4}\b.*/g, '')  // remove datas (artefato PDF.js)
+                .replace(/\s{2,}/g, ' ')
+                .trim();
+            // Se o nome ficou vazio, busca nas linhas seguintes (nome pode estar em linha separada)
+            if (clientNamePdf.length < 3) {
+                for (let i = projLineIdx + 1; i < Math.min(projLineIdx + 5, lines.length); i++) {
+                    const next = lines[i].trim();
+                    if (!next || /^\d{2}\/\d{2}\/\d{4}$/.test(next)) continue;
+                    if (/^Horas\s+(?:contratadas|executadas|Aplicadas)/i.test(next)) break;
+                    if (/^Data\s*[.:]+/i.test(next)) continue;
+                    if (/[a-zA-Z]/.test(next)) { clientNamePdf = next; break; }
                 }
             }
         }
 
         if (!projectNum) return { records, warnings };
-
-        // Limpa artefatos que PDF.js pode injetar na mesma linha (colunas achatadas)
-        clientNamePdf = clientNamePdf
-            .replace(/\s*Horas\s+(?:contratadas|executadas)[.:]*.*$/i, '')
-            .replace(/\s*Data\s*[.:]+.*$/i, '')
-            .replace(/\s{2,}/g, ' ')
-            .trim();
 
         // Limita tamanho do nome
         if (clientNamePdf.length > 120) clientNamePdf = clientNamePdf.substring(0, 120).trim();
@@ -1819,6 +1821,7 @@ class AppController {
                     )?.clientNamePdf || `Projeto ${projectNum}`;
                     targetClient = await store.addClient(
                         clientName, 0, '', projectNum, 0,
+                        0,
                         'Cliente criado automaticamente via importação de Ata PDF. Cadastro incompleto — por favor, complete os dados.',
                         'active'
                     );
