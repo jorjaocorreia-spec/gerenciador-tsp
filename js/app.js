@@ -505,9 +505,7 @@ class AppController {
             return false;
         });
 
-        const today = new Date();
-        const currentYearMonth = today.getFullYear() + "-" + String(today.getMonth() + 1).padStart(2, '0');
-        let stats = await Promise.all(clients.map(c => store.getClientStats(c.id, currentYearMonth)));
+        let stats = await Promise.all(clients.map(c => store.getClientStats(c.id)));
         stats = stats.filter(s => s !== null);
 
         container.innerHTML = '';

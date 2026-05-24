@@ -141,6 +141,7 @@ Todas têm `user_id uuid references auth.users` + RLS ativa (`auth.uid() = user_
 - **Fase 5** ✅ — Ferramenta de migração localStorage → Supabase (detecção automática + modal + limpeza)
 - **Fase 6** ✅ — Deploy final: correções RLS defense-in-depth, reset de estado no logout, checklist de testes multi-usuário
 - **Fase 7** ✅ — Suite de testes Playwright 48/48 passando; correção do Toast (`lucide.createIcons()`) e headers de segurança nginx
+- **Fase 8** ✅ — Importação de Ata PDF (SAP): parser page-by-page, extração de nome do cliente, criação automática de cliente, validação de horas centesimais
 
 ---
 
@@ -189,6 +190,10 @@ O `docker-entrypoint.sh` injeta essas vars em `js/config.js` via `envsubst` na i
 - **`store.userId` dentro de `page.evaluate()` async retorna `null`** — ao testar via Playwright, usar `window.supabaseClient` com `uid = Auth.getUserId()` capturado localmente em vez de chamar `store.addXxx()` ou `store.getXxx()` dentro de evaluate
 - **`renderClients()` faz `await store.getClientStats(c.id)` por cliente** — chamadas sequenciais; com muitos clientes a renderização pode levar 2-3s; esperar o elemento aparecer no DOM antes de interagir
 - **Google Calendar API mantém conexões em background** — `page.waitForLoadState('networkidle')` nunca dispara; sempre adicionar `.catch(() => {})`
+- **PDF.js achata colunas visuais em texto plano** — layout de colunas do SAP faz PDF.js extrair `"22851 Projeto.:"` (número antes do rótulo) em vez de `"Projeto.: 22851"`. O parser suporta ambos os formatos.
+- **Horas na Ata SAP são centesimais, não sexagesimais** — `00:75` = 0,75 h = 45 min reais (não 1h15). A coluna "Horas Aplicadas" usa formato centesimal. Hora Inicial e Hora Final são horários de relógio normais (HH:MM). Para converter centesimal → minutos: `(HH * 100 + CC) / 100 * 60`.
+- **Cada página da Ata PDF = um bloco independente** — nunca concatenar textos de páginas diferentes antes de parsear. O parser (`parsePdfPages`) processa cada página em isolamento via `_parseSinglePage`.
+- **Deploy automático (webhook Easypanel) está quebrado** — após cada `git push`, avisar o usuário para fazer deploy manual no Easypanel antes de testar em produção.
 
 ### Cálculos automáticos
 - Comissão do consultor = 43% do valor pago pelo cliente (`clientPays * 0.43`)
@@ -207,6 +212,49 @@ O `docker-entrypoint.sh` injeta essas vars em `js/config.js` via `envsubst` na i
 | **Atendimentos** | Log de horas por cliente; filtros por cliente e período; exportação PDF |
 | **Tarefas** | Kanban (Novas / Em Execução / Finalizadas) com drag-and-drop e métricas |
 | **Agenda** | Calendário diário/semanal; 4 tipos de evento; sincronização Google Calendar |
+
+---
+
+## Importação de Ata PDF (SAP)
+
+Funcionalidade na view **Atendimentos**: botão "Importar Ata (PDF)" lê um PDF gerado pelo SAP e cria registros de atendimento automaticamente.
+
+### Fluxo
+1. Usuário seleciona o PDF → `setupPdfImport()` lê página por página com PDF.js
+2. `parsePdfPages(pageTexts[])` processa cada página independentemente via `_parseSinglePage()`
+3. Modal de confirmação (`openPdfConfirmationModal()`) mostra registros identificados; clientes sem cadastro são criados automaticamente com nota "Cadastro incompleto"
+4. Usuário confirma → `confirmPdfImport()` salva via `store.addRecord()`
+
+### Estrutura da Ata SAP (por página)
+```
+Projeto.: 22851   17 - CASCAVEL MAQUINAS AGRICOLAS LTDA 001 CVEL
+Data......: 09/04/2026
+Horas contratadas.: 1000:00   Horas executadas.: 500:00
+Descrição do Atendimento
+[texto da descrição global]
+Horas Aplicadas no Dia 09/04/2026
+Hora Inicial  Hora Final  Horas Aplicadas no Dia  Analista
+08:00         09:00       01:00                   JORGE HENRIQUE
+09:30         10:15       00:75                   JORGE HENRIQUE
+Total Horas Dia.: 01:75
+Responsável: ...
+```
+
+- **Código do projeto**: `22851` (4–6 dígitos após `"Projeto.:"`)
+- **ID secundário**: `17` — ignorado pelo parser
+- **Nome do cliente**: tudo após `" - "` até `"Horas contratadas"`
+- **PDF.js** pode inverter a ordem: `"22851 Projeto.: 17 - NOME"` — ambos os formatos são suportados
+- **Horas Aplicadas**: formato centesimal (`01:75` = 1,75 h = 105 min). Hora Inicial/Final são HH:MM normais.
+- **Validação**: `_parseSinglePage` compara soma das linhas com `Total Horas Dia` (divergências → `console.warn`)
+
+### Métodos relevantes em `js/app.js`
+| Método | Descrição |
+|--------|-----------|
+| `setupPdfImport()` | Configura listener do input de arquivo; coleta `pageTexts[]` |
+| `parsePdfPages(pageTexts)` | Itera páginas, agrega records e warnings |
+| `_parseSinglePage(text, pageNum)` | Extrai projeto, data, descrição, linhas da tabela e valida total |
+| `openPdfConfirmationModal()` | Mapeia projetos → clientes; cria cliente auto se não encontrado |
+| `confirmPdfImport()` | Salva records confirmados pelo usuário com progress feedback |
 
 ---
 
