@@ -12,7 +12,7 @@ const GoogleCalendarAPI = {
 
     // Chamado após carregar as credenciais do Supabase.
     // Lida com dois cenários: scripts CDN já carregados, ou ainda pendentes.
-    configure(clientId, apiKey) {
+    async configure(clientId, apiKey) {
         this._clientId = clientId || '';
         this._apiKey = apiKey || '';
 
@@ -20,7 +20,7 @@ const GoogleCalendarAPI = {
 
         if (this.gapiInited && this.gisInited) {
             // Scripts já carregaram antes das credenciais chegarem — reinicializa
-            this._applyConfig();
+            await this._applyConfig();
         }
         // Se os scripts ainda não carregaram, gapiLoaded/gisLoaded farão a init quando chamados
     },

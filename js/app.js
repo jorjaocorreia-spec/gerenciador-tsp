@@ -463,7 +463,7 @@ class AppController {
         this.checkLocalStorageMigration();
         const settings = await store.getUserSettings();
         if (settings && settings.googleClientId && settings.googleApiKey) {
-            calendarAPI.configure(settings.googleClientId, settings.googleApiKey);
+            await calendarAPI.configure(settings.googleClientId, settings.googleApiKey);
         }
         await this.renderAll();
     }
@@ -2026,7 +2026,7 @@ class AppController {
 
         try {
             await store.saveUserSettings({ googleClientId: clientId, googleApiKey: apiKey });
-            calendarAPI.configure(clientId, apiKey);
+            await calendarAPI.configure(clientId, apiKey);
             Toast.show('Configurações salvas com sucesso!', 'success');
             this.closeModal('modal-calendar-settings');
             await this.renderAgenda();
