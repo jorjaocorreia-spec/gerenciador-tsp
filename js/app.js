@@ -461,6 +461,10 @@ class AppController {
     // Chamado após login bem-sucedido
     async initAfterAuth() {
         this.checkLocalStorageMigration();
+        const settings = await store.getUserSettings();
+        if (settings && settings.googleClientId && settings.googleApiKey) {
+            calendarAPI.configure(settings.googleClientId, settings.googleApiKey);
+        }
         await this.renderAll();
     }
 
@@ -1971,6 +1975,61 @@ class AppController {
         } catch (err) {
             Toast.show('Erro durante a migração: ' + err.message, 'error');
             btn.disabled = false;
+        }
+    }
+
+    // ===================================
+    // CONFIGURAÇÕES DO GOOGLE CALENDAR
+    // ===================================
+    async openCalendarSettings() {
+        const settings = await store.getUserSettings();
+
+        const clientIdInput = document.getElementById('settings-client-id');
+        const apiKeyInput = document.getElementById('settings-api-key');
+        const statusEl = document.getElementById('calendar-settings-status');
+
+        if (settings) {
+            clientIdInput.value = settings.googleClientId || '';
+            apiKeyInput.value = settings.googleApiKey || '';
+        }
+
+        const configured = settings && settings.googleClientId && settings.googleApiKey;
+        statusEl.innerHTML = configured
+            ? `<div style="display:flex;align-items:center;gap:8px;padding:10px 14px;background:rgba(34,197,94,0.1);border:1px solid rgba(34,197,94,0.3);border-radius:8px;font-size:0.875rem;">
+                 <i data-lucide="check-circle" style="width:16px;height:16px;color:#22c55e;flex-shrink:0;"></i>
+                 <span style="color:#22c55e;">Integração configurada</span>
+               </div>`
+            : `<div style="display:flex;align-items:center;gap:8px;padding:10px 14px;background:rgba(234,179,8,0.1);border:1px solid rgba(234,179,8,0.3);border-radius:8px;font-size:0.875rem;">
+                 <i data-lucide="alert-triangle" style="width:16px;height:16px;color:#eab308;flex-shrink:0;"></i>
+                 <span style="color:#eab308;">Integração não configurada</span>
+               </div>`;
+
+        this.openModal('modal-calendar-settings');
+        lucide.createIcons();
+    }
+
+    async handleCalendarSettingsSave(e) {
+        e.preventDefault();
+        const clientId = document.getElementById('settings-client-id').value.trim();
+        const apiKey = document.getElementById('settings-api-key').value.trim();
+        const btn = e.submitter || e.target.querySelector('button[type="submit"]');
+
+        btn.disabled = true;
+        btn.innerHTML = '<i data-lucide="loader" class="spin"></i> Salvando...';
+        lucide.createIcons();
+
+        try {
+            await store.saveUserSettings({ googleClientId: clientId, googleApiKey: apiKey });
+            calendarAPI.configure(clientId, apiKey);
+            Toast.show('Configurações salvas com sucesso!', 'success');
+            this.closeModal('modal-calendar-settings');
+            await this.renderAgenda();
+        } catch (err) {
+            Toast.show('Erro ao salvar: ' + err.message, 'error');
+        } finally {
+            btn.disabled = false;
+            btn.innerHTML = '<i data-lucide="save"></i> Salvar Configurações';
+            lucide.createIcons();
         }
     }
 }

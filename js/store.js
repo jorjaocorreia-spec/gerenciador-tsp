@@ -320,6 +320,32 @@ class TSPStore {
         return Object.values(monthlyData).sort((a, b) => a.yearMonth.localeCompare(b.yearMonth));
     }
 
+    // ── USER SETTINGS ─────────────────────────────────────────────
+
+    async getUserSettings() {
+        const uid = this.userId;
+        if (!uid) return null;
+        const { data, error } = await this.db
+            .from('user_settings')
+            .select('*')
+            .eq('user_id', uid)
+            .maybeSingle();
+        if (error) { console.error('getUserSettings:', error); return null; }
+        if (!data) return { googleClientId: '', googleApiKey: '' };
+        return { googleClientId: data.google_client_id || '', googleApiKey: data.google_api_key || '' };
+    }
+
+    async saveUserSettings({ googleClientId, googleApiKey }) {
+        const uid = this.userId;
+        if (!uid) throw new Error('Usuário não autenticado.');
+        const { error } = await this.db
+            .from('user_settings')
+            .upsert(
+                { user_id: uid, google_client_id: googleClientId, google_api_key: googleApiKey, updated_at: new Date().toISOString() },
+                { onConflict: 'user_id' }
+            );
+        if (error) throw error;
+    }
 }
 
 window.store = new TSPStore();

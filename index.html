@@ -307,9 +307,12 @@
                     <h1>Agenda</h1>
                     <p class="text-muted">Agendamento de reuniões, consultorias e tarefas.</p>
                 </div>
-                <div style="display: flex; gap: 12px;">
+                <div style="display: flex; gap: 12px; align-items: center;">
                     <button class="btn btn-secondary" id="btn-agenda-sync" onclick="app.promptGoogleSync()">
                         <i data-lucide="refresh-cw"></i> Sincronizar Google
+                    </button>
+                    <button class="btn btn-secondary" id="btn-calendar-settings" onclick="app.openCalendarSettings()" title="Configurar integração Google Calendar">
+                        <i data-lucide="settings"></i>
                     </button>
                     <button class="btn btn-secondary active-mode" id="btn-agenda-weekly"
                         onclick="app.switchAgendaMode('weekly')">Semanal</button>
@@ -762,6 +765,41 @@
                 <button type="submit" class="btn btn-primary" style="width: 100%; justify-content: center;">Salvar
                     Agendamento</button>
             </form>
+        </div>
+    </div>
+
+    <!-- MODAL: CONFIGURAÇÕES DO GOOGLE CALENDAR -->
+    <div class="modal-overlay" id="modal-calendar-settings">
+        <div class="modal glass" style="max-width: 520px;">
+            <div class="modal-header">
+                <h3>Configurar Google Calendar</h3>
+                <button class="close-modal" onclick="app.closeModal('modal-calendar-settings')">
+                    <i data-lucide="x"></i>
+                </button>
+            </div>
+            <div style="padding: 0 24px 8px;">
+                <p class="text-muted" style="font-size: 0.875rem; margin-bottom: 20px;">
+                    Para integrar com o Google Calendar, você precisa criar um projeto no
+                    <a href="https://console.cloud.google.com/" target="_blank" rel="noopener" style="color: var(--primary-color);">Google Cloud Console</a>,
+                    ativar a Google Calendar API e criar as credenciais abaixo.
+                </p>
+                <div id="calendar-settings-status" style="margin-bottom: 20px;"></div>
+                <form id="form-calendar-settings" onsubmit="app.handleCalendarSettingsSave(event)">
+                    <div class="form-group">
+                        <label class="form-label">Client ID (OAuth 2.0)</label>
+                        <input type="text" id="settings-client-id" class="form-control"
+                            placeholder="xxxxxx.apps.googleusercontent.com" autocomplete="off">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">API Key</label>
+                        <input type="text" id="settings-api-key" class="form-control"
+                            placeholder="AIzaSy..." autocomplete="off">
+                    </div>
+                    <button type="submit" class="btn btn-primary" style="width: 100%; justify-content: center;">
+                        <i data-lucide="save"></i> Salvar Configurações
+                    </button>
+                </form>
+            </div>
         </div>
     </div>
 
