@@ -68,6 +68,7 @@ class AppController {
         // Calculo de tempo automático
         document.getElementById('record-start').addEventListener('input', this.calculateTimeDiff.bind(this));
         document.getElementById('record-end').addEventListener('input', this.calculateTimeDiff.bind(this));
+        document.getElementById('record-centesimal').addEventListener('change', this.onCentesimalToggle.bind(this));
 
         // Calculo valor do consultor automático
         document.getElementById('client-pays').addEventListener('input', this.calculateConsultantValue.bind(this));
@@ -198,19 +199,51 @@ class AppController {
         }
     }
 
+    onCentesimalToggle() {
+        const isCentesimal = document.getElementById('record-centesimal').checked;
+        const startInput = document.getElementById('record-start');
+        const endInput = document.getElementById('record-end');
+        if (isCentesimal) {
+            startInput.type = 'text';
+            startInput.placeholder = 'HH:CC (ex: 13:50)';
+            endInput.type = 'text';
+            endInput.placeholder = 'HH:CC (ex: 14:25)';
+        } else {
+            startInput.type = 'time';
+            startInput.placeholder = '';
+            endInput.type = 'time';
+            endInput.placeholder = '';
+        }
+        this.calculateTimeDiff();
+    }
+
     calculateTimeDiff() {
         const start = document.getElementById('record-start').value;
         const end = document.getElementById('record-end').value;
         const calcInput = document.getElementById('record-calculated');
+        const isCentesimal = document.getElementById('record-centesimal').checked;
 
         if (start && end) {
             const [startH, startM] = start.split(':').map(Number);
             const [endH, endM] = end.split(':').map(Number);
 
-            let diffMins = (endH * 60 + endM) - (startH * 60 + startM);
-            if (diffMins < 0) {
-                diffMins += 24 * 60; // Passou da meia noite
+            if (isNaN(startH) || isNaN(startM) || isNaN(endH) || isNaN(endM)) {
+                calcInput.value = 'Formato inválido';
+                calcInput.dataset.minutes = 0;
+                return;
             }
+
+            let diffMins;
+            if (isCentesimal) {
+                // Centesimal: HH:CC onde CC é centésimos de hora (0–99)
+                const startTotal = Math.round((startH * 100 + startM) / 100 * 60);
+                const endTotal = Math.round((endH * 100 + endM) / 100 * 60);
+                diffMins = endTotal - startTotal;
+            } else {
+                diffMins = (endH * 60 + endM) - (startH * 60 + startM);
+            }
+
+            if (diffMins < 0) diffMins += 24 * 60;
 
             const hours = Math.floor(diffMins / 60);
             const mins = diffMins % 60;
