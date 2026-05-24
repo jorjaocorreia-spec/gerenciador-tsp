@@ -1629,33 +1629,22 @@ class AppController {
         let projectNum = '';
         let clientNamePdf = '';
 
-        const lines = text.split('\n');
-        const projLineIdx = lines.findIndex(line => /Projeto[.:]+/i.test(line));
-        if (projLineIdx !== -1) {
-            const projLine = lines[projLineIdx];
-            // Extrai o número do projeto
-            const mNum = projLine.match(/(\d{4,6})/);
-            if (mNum) projectNum = mNum[1].trim();
-            // Tenta extrair o nome da mesma linha
-            // Formato A: "Projeto.: 22851   NOME"
-            const mA = projLine.match(/Projeto[.:]+\s*\d{4,6}\s+(.+)/i);
-            // Formato B: "22851 Projeto.:   NOME"
-            const mB = projLine.match(/\d{4,6}\s+Projeto[.:]+\s*(.+)/i);
-            clientNamePdf = ((mA || mB)?.[1] || '')
-                .replace(/\s*Horas\s+(?:contratadas|executadas)[.:]*.*$/i, '')
-                .replace(/\s*Data\s*[.:]+.*$/i, '')
-                .replace(/\b\d{2}\/\d{2}\/\d{4}\b.*/g, '')  // remove datas (artefato PDF.js)
-                .replace(/\s{2,}/g, ' ')
-                .trim();
-            // Se o nome ficou vazio, busca nas linhas seguintes (nome pode estar em linha separada)
-            if (clientNamePdf.length < 3) {
-                for (let i = projLineIdx + 1; i < Math.min(projLineIdx + 5, lines.length); i++) {
-                    const next = lines[i].trim();
-                    if (!next || /^\d{2}\/\d{2}\/\d{4}$/.test(next)) continue;
-                    if (/^Horas\s+(?:contratadas|executadas|Aplicadas)/i.test(next)) break;
-                    if (/^Data\s*[.:]+/i.test(next)) continue;
-                    if (/[a-zA-Z]/.test(next)) { clientNamePdf = next; break; }
-                }
+        // Formato A: "Projeto.: 22851   17 - CASCAVEL MAQUINAS AGRICOLAS LTDA 001 CVEL"
+        // O nome é tudo que vem após o número do projeto até o fim da linha ou até Horas/Data
+        const projA = text.match(/Projeto[.:]+\s*(\d{4,6})\s+(.+?)(?=\n|\s+Horas\s+(?:contratadas|executadas)|\s+Data\s*[.:]+|$)/i);
+        if (projA) {
+            projectNum = projA[1].trim();
+            clientNamePdf = projA[2].replace(/\s{2,}/g, ' ').trim();
+        } else {
+            // Formato B (PDF.js inverte): "22851 Projeto.:   17 - CASCAVEL..."
+            const projB = text.match(/(?:^|[\s])(\d{4,6})\s+Projeto[.:]+\s*(.+?)(?=\n|\s+Horas\s+(?:contratadas|executadas)|\s+Data\s*[.:]+|$)/i);
+            if (projB) {
+                projectNum = projB[1].trim();
+                clientNamePdf = projB[2].replace(/\s{2,}/g, ' ').trim();
+            } else {
+                // Fallback: só o número (âncora em "Projeto.:" para não pegar anos de datas)
+                const projNum = text.match(/Projeto[.:]+\s*(\d{4,6})/i);
+                if (projNum) projectNum = projNum[1].trim();
             }
         }
 
