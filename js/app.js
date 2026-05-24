@@ -1538,7 +1538,15 @@ class AppController {
                 }
 
                 setBtn(`<span style="display:inline-flex;align-items:center;gap:8px;">${spinner}Identificando projetos...</span>`);
-                this.parsePdfText(fullText);
+                const records = this.parsePdfText(fullText);
+
+                if (records && records.length > 0) {
+                    setBtn(`<span style="display:inline-flex;align-items:center;gap:8px;">${spinner}Identificando clientes...</span>`);
+                    this.pendingPdfRecords = records;
+                    await this.openPdfConfirmationModal();
+                } else if (records) {
+                    Toast.show('Nenhum atendimento válido encontrado no PDF.', 'info');
+                }
 
             } catch (err) {
                 console.error(err);
@@ -1578,13 +1586,15 @@ class AppController {
         this._lastPdfText = text;
 
         // Extrai mapa projectNum → clientName a partir do formato "Projeto.: 22851   17 - Nome Empresa"
+        // Requer o formato SAP "NN - NOME" imediatamente após o número, terminado por "Horas contratadas/executadas"
+        // Não usa fallback $ para evitar capturar nomes de analistas ou descrições de tarefas
         this._projectClientNames = new Map();
-        const projectNameRegex = /Projeto[:.\s]*(\d{4,6})\s+(.+?)(?=\s*(?:Horas\s+contratadas|Horas\s+executadas|Data\s*\.|Respons|\n|\r|$))/ig;
+        const projectNameRegex = /Projeto[:.\s]*(\d{4,6})\s+(\d{1,3}\s*[-–]\s*.+?)(?=\s*(?:Horas\s+contratadas|Horas\s+executadas))/ig;
         let pnMatch;
         while ((pnMatch = projectNameRegex.exec(text)) !== null) {
             const num = pnMatch[1].trim();
             const name = pnMatch[2].trim();
-            if (name && !this._projectClientNames.has(num)) {
+            if (name && name.length >= 5 && !this._projectClientNames.has(num)) {
                 this._projectClientNames.set(num, name);
             }
         }
@@ -1601,12 +1611,6 @@ class AppController {
         // Caso a pessoa digite "(Projeto 22901)"
         const projParenthesisRgx = /\(\s*Projeto\s+(\d{4,6})\s*\)/ig;
         while ((pMatch = projParenthesisRgx.exec(text)) !== null) {
-            projectMatches.push({ index: pMatch.index, projectNum: pMatch[1].trim() });
-        }
-
-        // NOVO: Em atas multi-páginas o PDF.js inverte a ordem: "22851 Projeto.: "
-        const projBeforeRgx = /(\d{4,6})\s*Projeto/ig;
-        while ((pMatch = projBeforeRgx.exec(text)) !== null) {
             projectMatches.push({ index: pMatch.index, projectNum: pMatch[1].trim() });
         }
 
@@ -1742,13 +1746,7 @@ class AppController {
             }
         });
 
-        if (records.length === 0) {
-            Toast.show('Nenhum atendimento válido encontrado no PDF.', 'info');
-            return;
-        }
-
-        this.pendingPdfRecords = records;
-        this.openPdfConfirmationModal();
+        return records;
     }
 
     async openPdfConfirmationModal() {
