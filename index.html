@@ -63,44 +63,49 @@
     </div>
 
     <!-- SIDEBAR -->
-    <nav class="sidebar">
-        <div class="brand">
-            <i data-lucide="activity"></i>
-            <span>TSP Manager</span>
+    <nav class="sidebar" id="sidebar">
+        <div class="sidebar-header">
+            <div class="brand">
+                <i data-lucide="activity"></i>
+                <span class="nav-label">TSP Manager</span>
+            </div>
+            <button class="btn-sidebar-toggle" id="btn-sidebar-toggle" onclick="app.toggleSidebar()" title="Recolher menu">
+                <i data-lucide="chevron-left" id="icon-sidebar-toggle" style="width:18px;height:18px;"></i>
+            </button>
         </div>
         <ul class="nav-links">
-            <li class="nav-item active" data-view="dashboard">
-                <i data-lucide="layout-dashboard"></i> Dashboard
+            <li class="nav-item active" data-view="dashboard" title="Dashboard">
+                <i data-lucide="layout-dashboard"></i><span class="nav-label">Dashboard</span>
             </li>
-            <li class="nav-item" data-view="clients">
-                <i data-lucide="users"></i> Clientes
+            <li class="nav-item" data-view="clients" title="Clientes">
+                <i data-lucide="users"></i><span class="nav-label">Clientes</span>
             </li>
-            <li class="nav-item" data-view="records">
-                <i data-lucide="clock"></i> Atendimentos
+            <li class="nav-item" data-view="records" title="Atendimentos">
+                <i data-lucide="clock"></i><span class="nav-label">Atendimentos</span>
             </li>
-            <li class="nav-item" data-view="tasks">
-                <i data-lucide="kanban"></i> Tarefas
+            <li class="nav-item" data-view="tasks" title="Tarefas">
+                <i data-lucide="kanban"></i><span class="nav-label">Tarefas</span>
             </li>
-            <li class="nav-item" data-view="agenda">
-                <i data-lucide="calendar"></i> Agenda
+            <li class="nav-item" data-view="agenda" title="Agenda">
+                <i data-lucide="calendar"></i><span class="nav-label">Agenda</span>
             </li>
         </ul>
-        <div style="margin-top: auto; padding-top: 20px; border-top: 1px solid var(--surface-border)">
-            <p class="text-muted" style="font-size: 0.8rem; margin-bottom: 12px; font-weight: 500;">SISTEMA</p>
-            <button class="btn btn-secondary" id="btn-import-pdf" style="width: 100%; margin-bottom: 8px;">
-                <i data-lucide="file-text"></i> Importar Ata (PDF)
+        <div class="sidebar-bottom">
+            <p class="text-muted sidebar-section-label">SISTEMA</p>
+            <button class="btn btn-secondary" id="btn-import-pdf" style="width: 100%; margin-bottom: 8px;" title="Importar Ata (PDF)">
+                <i data-lucide="file-text"></i><span class="nav-label"> Importar Ata (PDF)</span>
             </button>
             <input type="file" id="file-import-pdf" accept=".pdf" style="display: none;">
 
             <!-- Botão de migração: visível apenas se houver dados no localStorage -->
-            <button class="btn btn-secondary" id="btn-migrate-local" style="width: 100%; display: none; border-color: var(--secondary-color); color: var(--secondary-color);" onclick="app.openMigrationModal()">
-                <i data-lucide="database"></i> Migrar Dados Locais
+            <button class="btn btn-secondary" id="btn-migrate-local" style="width: 100%; display: none; border-color: var(--secondary-color); color: var(--secondary-color);" onclick="app.openMigrationModal()" title="Migrar Dados Locais">
+                <i data-lucide="database"></i><span class="nav-label"> Migrar Dados Locais</span>
             </button>
 
-            <div style="margin-top:16px; padding-top:16px; border-top:1px solid var(--surface-border);">
-                <p id="user-email-display" class="text-muted" style="font-size:0.75rem; margin-bottom:8px; word-break:break-all;"></p>
-                <button class="btn btn-secondary" id="btn-logout" style="width:100%;">
-                    <i data-lucide="log-out"></i> Sair
+            <div class="sidebar-user">
+                <p id="user-email-display" class="text-muted nav-label" style="font-size:0.75rem; margin-bottom:8px; word-break:break-all;"></p>
+                <button class="btn btn-secondary" id="btn-logout" style="width:100%;" title="Sair">
+                    <i data-lucide="log-out"></i><span class="nav-label"> Sair</span>
                 </button>
             </div>
         </div>

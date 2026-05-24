@@ -501,6 +501,7 @@ class AppController {
     // Chamado após login bem-sucedido
     async initAfterAuth() {
         this.checkLocalStorageMigration();
+        this.applySidebarState();
         this.applyMoneyVisibility();
         const settings = await store.getUserSettings();
         if (settings && settings.googleClientId && settings.googleApiKey) {
@@ -584,6 +585,31 @@ class AppController {
             `;
             container.appendChild(card);
         });
+    }
+
+    toggleSidebar() {
+        const collapsed = document.getElementById('sidebar').classList.toggle('collapsed');
+        sessionStorage.setItem('sidebarCollapsed', collapsed ? '1' : '0');
+        const icon = document.getElementById('icon-sidebar-toggle');
+        if (icon) {
+            icon.setAttribute('data-lucide', collapsed ? 'chevron-right' : 'chevron-left');
+            lucide.createIcons();
+        }
+        const toggle = document.getElementById('btn-sidebar-toggle');
+        if (toggle) toggle.title = collapsed ? 'Expandir menu' : 'Recolher menu';
+    }
+
+    applySidebarState() {
+        const stored = sessionStorage.getItem('sidebarCollapsed');
+        const collapsed = stored === '1';
+        document.getElementById('sidebar').classList.toggle('collapsed', collapsed);
+        const icon = document.getElementById('icon-sidebar-toggle');
+        if (icon) {
+            icon.setAttribute('data-lucide', collapsed ? 'chevron-right' : 'chevron-left');
+            lucide.createIcons();
+        }
+        const toggle = document.getElementById('btn-sidebar-toggle');
+        if (toggle) toggle.title = collapsed ? 'Expandir menu' : 'Recolher menu';
     }
 
     toggleMoneyVisibility() {

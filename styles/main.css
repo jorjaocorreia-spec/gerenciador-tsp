@@ -83,17 +83,70 @@ h4 {
   flex-direction: column;
   border-right: 1px solid var(--surface-border);
   background: rgba(15, 23, 42, 0.8);
+  transition: width 0.25s ease, padding 0.25s ease;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.sidebar-header {
+  display: flex;
+  align-items: center;
+  margin-bottom: 40px;
+  gap: 8px;
 }
 
 .brand {
   font-size: 1.5rem;
   font-weight: 700;
-  margin-bottom: 40px;
   display: flex;
   align-items: center;
   gap: 12px;
   color: var(--primary-color);
   text-shadow: 0 0 15px rgba(139, 92, 246, 0.5);
+  flex: 1;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+.btn-sidebar-toggle {
+  flex-shrink: 0;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--surface-border);
+  cursor: pointer;
+  color: var(--text-muted);
+  padding: 5px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: color 0.2s, background 0.2s, border-color 0.2s;
+}
+
+.btn-sidebar-toggle:hover {
+  color: var(--primary-color);
+  background: rgba(139, 92, 246, 0.1);
+  border-color: rgba(139, 92, 246, 0.4);
+}
+
+.sidebar-bottom {
+  margin-top: auto;
+  padding-top: 20px;
+  border-top: 1px solid var(--surface-border);
+}
+
+.sidebar-section-label {
+  font-size: 0.8rem;
+  margin-bottom: 12px;
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+.sidebar-user {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid var(--surface-border);
 }
 
 .nav-links {
@@ -114,6 +167,7 @@ h4 {
   align-items: center;
   gap: 12px;
   font-weight: 500;
+  white-space: nowrap;
 }
 
 .nav-item:hover {
@@ -125,6 +179,61 @@ h4 {
   background: linear-gradient(90deg, rgba(139, 92, 246, 0.15) 0%, transparent 100%);
   color: var(--primary-color);
   border-left: 3px solid var(--primary-color);
+}
+
+/* ---- Sidebar colapsada ---- */
+.sidebar.collapsed {
+  width: 70px;
+  padding: 24px 12px;
+}
+
+.sidebar.collapsed .nav-label {
+  display: none;
+}
+
+.sidebar.collapsed .sidebar-section-label {
+  display: none;
+}
+
+.sidebar.collapsed .sidebar-header {
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 28px;
+}
+
+.sidebar.collapsed .brand {
+  justify-content: center;
+  flex: none;
+}
+
+.sidebar.collapsed .btn-sidebar-toggle {
+  margin-left: 0;
+}
+
+.sidebar.collapsed .nav-item {
+  justify-content: center;
+  padding: 12px;
+  gap: 0;
+}
+
+.sidebar.collapsed .nav-item.active {
+  padding-left: 9px;
+}
+
+.sidebar.collapsed .sidebar-bottom .btn {
+  justify-content: center;
+  padding: 10px;
+}
+
+.sidebar.collapsed .sidebar-user {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.sidebar.collapsed .sidebar-user .btn {
+  width: 100%;
 }
 
 /* =========================================
