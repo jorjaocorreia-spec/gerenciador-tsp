@@ -1982,30 +1982,36 @@ class AppController {
     // CONFIGURAÇÕES DO GOOGLE CALENDAR
     // ===================================
     async openCalendarSettings() {
-        const settings = await store.getUserSettings();
-
-        const clientIdInput = document.getElementById('settings-client-id');
-        const apiKeyInput = document.getElementById('settings-api-key');
-        const statusEl = document.getElementById('calendar-settings-status');
-
-        if (settings) {
-            clientIdInput.value = settings.googleClientId || '';
-            apiKeyInput.value = settings.googleApiKey || '';
-        }
-
-        const configured = settings && settings.googleClientId && settings.googleApiKey;
-        statusEl.innerHTML = configured
-            ? `<div style="display:flex;align-items:center;gap:8px;padding:10px 14px;background:rgba(34,197,94,0.1);border:1px solid rgba(34,197,94,0.3);border-radius:8px;font-size:0.875rem;">
-                 <i data-lucide="check-circle" style="width:16px;height:16px;color:#22c55e;flex-shrink:0;"></i>
-                 <span style="color:#22c55e;">Integração configurada</span>
-               </div>`
-            : `<div style="display:flex;align-items:center;gap:8px;padding:10px 14px;background:rgba(234,179,8,0.1);border:1px solid rgba(234,179,8,0.3);border-radius:8px;font-size:0.875rem;">
-                 <i data-lucide="alert-triangle" style="width:16px;height:16px;color:#eab308;flex-shrink:0;"></i>
-                 <span style="color:#eab308;">Integração não configurada</span>
-               </div>`;
-
         this.openModal('modal-calendar-settings');
-        lucide.createIcons();
+
+        const statusEl = document.getElementById('calendar-settings-status');
+        statusEl.innerHTML = '<div class="spinner-wrap" style="padding:8px 0;"><div class="spinner"></div></div>';
+
+        try {
+            const settings = await store.getUserSettings();
+            const clientIdInput = document.getElementById('settings-client-id');
+            const apiKeyInput = document.getElementById('settings-api-key');
+
+            if (settings) {
+                clientIdInput.value = settings.googleClientId || '';
+                apiKeyInput.value = settings.googleApiKey || '';
+            }
+
+            const configured = settings && settings.googleClientId && settings.googleApiKey;
+            statusEl.innerHTML = configured
+                ? `<div style="display:flex;align-items:center;gap:8px;padding:10px 14px;background:rgba(34,197,94,0.1);border:1px solid rgba(34,197,94,0.3);border-radius:8px;font-size:0.875rem;">
+                     <i data-lucide="check-circle" style="width:16px;height:16px;color:#22c55e;flex-shrink:0;"></i>
+                     <span style="color:#22c55e;">Integração configurada</span>
+                   </div>`
+                : `<div style="display:flex;align-items:center;gap:8px;padding:10px 14px;background:rgba(234,179,8,0.1);border:1px solid rgba(234,179,8,0.3);border-radius:8px;font-size:0.875rem;">
+                     <i data-lucide="alert-triangle" style="width:16px;height:16px;color:#eab308;flex-shrink:0;"></i>
+                     <span style="color:#eab308;">Integração não configurada</span>
+                   </div>`;
+            lucide.createIcons();
+        } catch (err) {
+            statusEl.innerHTML = '';
+            Toast.show('Erro ao carregar configurações: ' + err.message, 'error');
+        }
     }
 
     async handleCalendarSettingsSave(e) {
