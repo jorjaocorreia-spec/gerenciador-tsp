@@ -319,7 +319,9 @@
                     <button class="btn btn-secondary" id="btn-calendar-settings" onclick="app.openCalendarSettings()" title="Configurar integração Google Calendar">
                         <i data-lucide="settings"></i>
                     </button>
-                    <button class="btn btn-secondary active-mode" id="btn-agenda-weekly"
+                    <button class="btn btn-secondary active-mode" id="btn-agenda-monthly"
+                        onclick="app.switchAgendaMode('monthly')">Mensal</button>
+                    <button class="btn btn-secondary" id="btn-agenda-weekly"
                         onclick="app.switchAgendaMode('weekly')">Semanal</button>
                     <button class="btn btn-secondary" id="btn-agenda-daily"
                         onclick="app.switchAgendaMode('daily')">Diário</button>

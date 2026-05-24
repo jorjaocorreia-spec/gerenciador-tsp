@@ -292,6 +292,12 @@ h4 {
   background: rgba(255, 255, 255, 0.1);
 }
 
+.btn-secondary.active-mode {
+  background: rgba(139, 92, 246, 0.2);
+  border-color: var(--primary-color);
+  color: var(--primary-color);
+}
+
 .header-actions {
   display: flex;
   justify-content: space-between;
@@ -701,6 +707,89 @@ h4 {
   background-image: linear-gradient(to bottom, transparent 59px, rgba(255, 255, 255, 0.05) 60px);
   background-size: 100% 60px;
 }
+/* =========================================
+   Agenda — Monthly View
+   ========================================= */
+.agenda-monthly-calendar {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.agenda-month-header-row {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 2px;
+  margin-bottom: 4px;
+}
+
+.agenda-month-col-header {
+  text-align: center;
+  padding: 10px 4px;
+  font-weight: 600;
+  color: var(--text-muted);
+  font-size: 0.8rem;
+  letter-spacing: 0.05em;
+}
+
+.agenda-month-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 2px;
+}
+
+.agenda-month-cell {
+  min-height: 110px;
+  padding: 6px;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid var(--surface-border);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.agenda-month-cell.other-month {
+  opacity: 0.35;
+}
+
+.agenda-month-cell.today {
+  background: rgba(139, 92, 246, 0.08);
+  border-color: var(--primary-color);
+}
+
+.agenda-month-day-num {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  margin-bottom: 4px;
+}
+
+.agenda-month-cell.today .agenda-month-day-num {
+  color: var(--primary-color);
+}
+
+.agenda-month-events {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.agenda-month-event {
+  font-size: 0.68rem;
+  padding: 2px 5px;
+  border-radius: 3px;
+  color: white;
+  cursor: pointer;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  opacity: 0.9;
+  transition: opacity 0.15s;
+}
+
+.agenda-month-event:hover {
+  opacity: 1;
+}
+
 /* =========================================
    Loading Spinner
    ========================================= */

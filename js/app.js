@@ -42,7 +42,7 @@ class AppController {
         this.selectedMonth = null;
         this.pendingPdfRecords = []; // Armazena temporariamente os registros do PDF lido
         this.agendaCurrentDate = new Date();
-        this.agendaViewMode = 'weekly'; // daily or weekly
+        this.agendaViewMode = 'monthly'; // daily, weekly or monthly
         this.init();
     }
 
@@ -1142,6 +1142,7 @@ class AppController {
     // ===================================
     async switchAgendaMode(mode) {
         this.agendaViewMode = mode;
+        document.getElementById('btn-agenda-monthly').classList.toggle('active-mode', mode === 'monthly');
         document.getElementById('btn-agenda-weekly').classList.toggle('active-mode', mode === 'weekly');
         document.getElementById('btn-agenda-daily').classList.toggle('active-mode', mode === 'daily');
         await this.renderAgenda();
@@ -1150,6 +1151,8 @@ class AppController {
     async prevAgendaDate() {
         if (this.agendaViewMode === 'daily') {
             this.agendaCurrentDate.setDate(this.agendaCurrentDate.getDate() - 1);
+        } else if (this.agendaViewMode === 'monthly') {
+            this.agendaCurrentDate.setMonth(this.agendaCurrentDate.getMonth() - 1);
         } else {
             this.agendaCurrentDate.setDate(this.agendaCurrentDate.getDate() - 7);
         }
@@ -1159,6 +1162,8 @@ class AppController {
     async nextAgendaDate() {
         if (this.agendaViewMode === 'daily') {
             this.agendaCurrentDate.setDate(this.agendaCurrentDate.getDate() + 1);
+        } else if (this.agendaViewMode === 'monthly') {
+            this.agendaCurrentDate.setMonth(this.agendaCurrentDate.getMonth() + 1);
         } else {
             this.agendaCurrentDate.setDate(this.agendaCurrentDate.getDate() + 7);
         }
@@ -1298,6 +1303,8 @@ class AppController {
 
         if (this.agendaViewMode === 'daily') {
             await this.renderAgendaDaily(container);
+        } else if (this.agendaViewMode === 'monthly') {
+            await this.renderAgendaMonthly(container);
         } else {
             await this.renderAgendaWeekly(container);
         }
@@ -1375,14 +1382,14 @@ class AppController {
 
     async renderAgendaWeekly(container) {
         const monday = this.getMonday(this.agendaCurrentDate);
-        const friday = new Date(monday);
-        friday.setDate(friday.getDate() + 4);
+        const sunday = new Date(monday);
+        sunday.setDate(sunday.getDate() + 6);
 
         const isoStart = monday.toISOString().split('T')[0];
-        const isoEnd = friday.toISOString().split('T')[0];
+        const isoEnd = sunday.toISOString().split('T')[0];
 
         document.getElementById('agenda-current-date-label').innerText =
-            `${this.formatDateBR(monday)} - ${this.formatDateBR(friday)}`;
+            `${this.formatDateBR(monday)} - ${this.formatDateBR(sunday)}`;
 
         const events = await store.getEventsByWeek(isoStart, isoEnd);
 
@@ -1390,11 +1397,11 @@ class AppController {
         const clientsMap = {};
         await Promise.all(clientIds.map(async id => { clientsMap[id] = await store.getClient(id); }));
 
-        const days = ['Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta'];
+        const days = ['Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado', 'Domingo'];
         let headersHtml = '';
         let columnsHtml = '';
 
-        for (let i = 0; i < 5; i++) {
+        for (let i = 0; i < 7; i++) {
             const currentDay = new Date(monday);
             currentDay.setDate(monday.getDate() + i);
             const isoCurrentDay = currentDay.toISOString().split('T')[0];
@@ -1402,7 +1409,6 @@ class AppController {
 
             headersHtml += `<div class="agenda-day-header ${isToday ? 'active' : ''}">${days[i]}<br><small>${currentDay.getDate()}/${currentDay.getMonth() + 1}</small></div>`;
 
-            // Filter events for this day
             const dayEvents = events.filter(e => e.date === isoCurrentDay);
             let dayEventsHtml = '';
             dayEvents.forEach(ev => {
@@ -1422,14 +1428,82 @@ class AppController {
                     ${this.generateTimeSlots()}
                 </div>
                 <div class="agenda-content-column">
-                    <div class="agenda-days-row">
+                    <div class="agenda-days-row" style="grid-template-columns: repeat(7, 1fr);">
                         ${headersHtml}
                     </div>
-                    <div class="events-container" style="display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px;">
+                    <div class="events-container" style="display: grid; grid-template-columns: repeat(7, 1fr); gap: 8px;">
                         <div class="agenda-grid-lines"></div>
                         ${columnsHtml}
                     </div>
                 </div>
+            </div>
+        `;
+    }
+
+    async renderAgendaMonthly(container) {
+        const year = this.agendaCurrentDate.getFullYear();
+        const month = this.agendaCurrentDate.getMonth();
+        const monthNames = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho',
+                            'Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+        document.getElementById('agenda-current-date-label').innerText = `${monthNames[month]} ${year}`;
+
+        const firstDay = new Date(year, month, 1);
+        const lastDay = new Date(year, month + 1, 0);
+
+        // Start grid on the Monday on or before the 1st
+        const startGrid = new Date(firstDay);
+        const dowFirst = startGrid.getDay();
+        startGrid.setDate(startGrid.getDate() - (dowFirst === 0 ? 6 : dowFirst - 1));
+
+        // End grid on the Sunday on or after the last day
+        const endGrid = new Date(lastDay);
+        const dowLast = endGrid.getDay();
+        if (dowLast !== 0) endGrid.setDate(endGrid.getDate() + (7 - dowLast));
+
+        const isoStart = startGrid.toISOString().split('T')[0];
+        const isoEnd = endGrid.toISOString().split('T')[0];
+
+        const events = await store.getEventsByWeek(isoStart, isoEnd);
+
+        const clientIds = [...new Set(events.map(e => e.clientId).filter(Boolean))];
+        const clientsMap = {};
+        await Promise.all(clientIds.map(async id => { clientsMap[id] = await store.getClient(id); }));
+
+        const todayIso = new Date().toISOString().split('T')[0];
+        const dayNames = ['Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb', 'Dom'];
+
+        const headerHtml = dayNames.map(d => `<div class="agenda-month-col-header">${d}</div>`).join('');
+
+        let cellsHtml = '';
+        const cursor = new Date(startGrid);
+        while (cursor <= endGrid) {
+            const iso = cursor.toISOString().split('T')[0];
+            const isCurrentMonth = cursor.getMonth() === month;
+            const isToday = iso === todayIso;
+            const dayEvents = events.filter(e => e.date === iso);
+
+            let eventsHtml = '';
+            dayEvents.forEach(ev => {
+                eventsHtml += `<div class="agenda-month-event type-${ev.type}"
+                     onclick="app.editAgendaEvent('${ev.id}')"
+                     title="${escapeHtml(ev.title)} (${ev.startTime} - ${ev.endTime})">
+                    ${escapeHtml(ev.title)}
+                </div>`;
+            });
+
+            cellsHtml += `
+                <div class="agenda-month-cell ${!isCurrentMonth ? 'other-month' : ''} ${isToday ? 'today' : ''}">
+                    <div class="agenda-month-day-num">${cursor.getDate()}</div>
+                    <div class="agenda-month-events">${eventsHtml}</div>
+                </div>`;
+
+            cursor.setDate(cursor.getDate() + 1);
+        }
+
+        container.innerHTML = `
+            <div class="agenda-monthly-calendar">
+                <div class="agenda-month-header-row">${headerHtml}</div>
+                <div class="agenda-month-grid">${cellsHtml}</div>
             </div>
         `;
     }
