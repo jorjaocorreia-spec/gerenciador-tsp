@@ -1804,19 +1804,47 @@ class AppController {
     }
 
     async confirmPdfImport() {
+        const confirmBtn = document.getElementById('btn-confirm-pdf-import');
+        const cancelBtn = document.getElementById('btn-cancel-pdf-import');
+        const closeBtn = document.querySelector('#modal-import-pdf .close-modal');
+
+        const toImport = this.pendingPdfRecords.filter((r, idx) => {
+            const cb = document.getElementById(`pdf-check-${idx}`);
+            return cb && cb.checked && r.matchedClientId;
+        });
+        const total = toImport.length;
+
+        // Bloqueia controles para evitar cliques duplos
+        confirmBtn.disabled = true;
+        cancelBtn.disabled = true;
+        if (closeBtn) closeBtn.disabled = true;
+
         let importedCount = 0;
+        const setProgress = (n) => {
+            confirmBtn.innerHTML = `<span style="display:inline-flex;align-items:center;gap:8px;"><div class="spinner" style="width:14px;height:14px;border-width:2px;flex-shrink:0;"></div>Importando ${n} de ${total}...</span>`;
+        };
+        setProgress(0);
+
         for (const [idx, r] of this.pendingPdfRecords.entries()) {
             const isChecked = document.getElementById(`pdf-check-${idx}`).checked;
             if (isChecked && r.matchedClientId) {
                 const desc = document.getElementById(`pdf-desc-${idx}`).value;
                 await store.addRecord(r.matchedClientId, r.date, r.startTime, r.endTime, r.minutes, desc);
                 importedCount++;
+                setProgress(importedCount);
             }
         }
 
         Toast.show(`${importedCount} atendimento(s) importado(s) com sucesso!`, 'success');
         this.closeModal('modal-import-pdf');
         this.pendingPdfRecords = [];
+
+        // Restaura botão para uso futuro
+        confirmBtn.disabled = false;
+        cancelBtn.disabled = false;
+        if (closeBtn) closeBtn.disabled = false;
+        confirmBtn.textContent = 'Confirmar e Salvar';
+
         await this.renderAll();
     }
 
