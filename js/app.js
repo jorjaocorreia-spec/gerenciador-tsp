@@ -1528,17 +1528,16 @@ class AppController {
                 const arrayBuffer = await file.arrayBuffer();
                 const pdf = await pdfjsLib.getDocument(arrayBuffer).promise;
 
-                let fullText = '';
+                const pageTexts = [];
                 for (let i = 1; i <= pdf.numPages; i++) {
                     setBtn(`<span style="display:inline-flex;align-items:center;gap:8px;">${spinner}Lendo página ${i} de ${pdf.numPages}...</span>`);
                     const page = await pdf.getPage(i);
                     const textContent = await page.getTextContent();
-                    const pageText = textContent.items.map(item => item.str).join(' ');
-                    fullText += pageText + '\n';
+                    pageTexts.push(textContent.items.map(item => item.str).join(' '));
                 }
 
                 setBtn(`<span style="display:inline-flex;align-items:center;gap:8px;">${spinner}Identificando projetos...</span>`);
-                const records = this.parsePdfText(fullText);
+                const records = this.parsePdfPages(pageTexts);
 
                 if (records && records.length > 0) {
                     setBtn(`<span style="display:inline-flex;align-items:center;gap:8px;">${spinner}Identificando clientes...</span>`);
@@ -1560,223 +1559,156 @@ class AppController {
         });
     }
 
-    // Remove textos de cabeçalhos da ATA que podem aparecer em páginas seguintes
-    cleanupPageHeaders(text) {
-        return text
-            // Remove cabeçalhos de tabela de horas
-            .replace(/Hora\s+Inicial\s+Hora\s+Final\s+Horas\s+Aplicadas\s*(no\s+Dia)?\s*Analista/gi, '')
-            .replace(/Hora\s+Inicial\s+Hora\s+Final\s+Horas\s+Aplicadas/gi, '')
-            // Remove cabeçalhos de colunas da tabela principal da ata
-            .replace(/DATA\s+E\s+HORA\s+CLIENTE/gi, '')
-            .replace(/Descri..o\s+do\s+Atendimento/gi, '')
-            .replace(/Horas\s+Aplicadas\s+no\s+Dia\s+\d{2}\/\d{2}\/\d{4}/gi, '')
-            // Remove referências a Projeto/número que aparecem no cabeçalho repetido
-            .replace(/Projeto[:.\s]*\d{4,6}/gi, '')
-            .replace(/\d{4,6}\s*Projeto/gi, '')
-            // Remove total de horas
-            .replace(/Total\s+Horas[:\s]*\d{2}:\d{2}/gi, '')
-            // Remove responsável
-            .replace(/Respons.vel[:\s]*/gi, '')
-            // Normaliza múltiplos espaços/newlines
-            .replace(/\s{2,}/g, ' ')
-            .trim();
+    parsePdfPages(pageTexts) {
+        const allRecords = [];
+        const warnings = [];
+
+        for (let i = 0; i < pageTexts.length; i++) {
+            const result = this._parseSinglePage(pageTexts[i], i + 1);
+            allRecords.push(...result.records);
+            warnings.push(...result.warnings);
+        }
+
+        if (warnings.length > 0) {
+            console.warn('[PDF Import] Avisos:', warnings.join(' | '));
+        }
+
+        return allRecords;
     }
 
-    parsePdfText(text) {
-        this._lastPdfText = text;
+    _parseSinglePage(text, pageNum) {
+        const records = [];
+        const warnings = [];
 
-        // Extrai mapa projectNum → clientName
-        // Suporta dois formatos da ATA:
-        //   Formato A: "Projeto.: 22851   17 - Nome Empresa Horas contratadas"
-        //   Formato B: "22851 Projeto.:   17 - Nome Empresa Horas contratadas"
-        // Requer formato SAP "NN - NOME" para evitar capturar analistas ou descrições
-        this._projectClientNames = new Map();
-        const nameTerminator = `(?=\\s*(?:Horas\\s+contratadas|Horas\\s+executadas))`;
-        const sapNamePattern = `(\\d{1,3}\\s*[-–]\\s*.+?)`;
-        const nameRegexes = [
-            new RegExp(`Projeto[:.\\.\\s]*(\\d{4,6})\\s+${sapNamePattern}${nameTerminator}`, 'ig'),
-            new RegExp(`(?:^|[\\s\\n])(\\d{4,6})\\s+Projeto[:.\\.\\s]*${sapNamePattern}${nameTerminator}`, 'ig'),
-        ];
-        let pnMatch;
-        for (const rx of nameRegexes) {
-            while ((pnMatch = rx.exec(text)) !== null) {
-                const num = pnMatch[1].trim();
-                const name = pnMatch[2].trim();
-                if (name && name.length >= 5 && !this._projectClientNames.has(num)) {
-                    this._projectClientNames.set(num, name);
-                }
-            }
-        }
+        // === 1. NÚMERO DO PROJETO + NOME DO CLIENTE ===
+        // SAP format: "Projeto.: 22851   17 - CASCAVEL MAQUINAS AGRICOLAS LTDA 001 CVEL"
+        // PDF.js pode inverter: "22851 Projeto.:   17 - CASCAVEL..."
+        // Captura: (número) depois do traço = nome
+        let projectNum = '';
+        let clientNamePdf = '';
 
-        // Encontra todos os projetos no documento e salva o index em que apareceram
-        // Ajustado para capturar apenas números com 4 a 6 dígitos (evitando pegar dias de data como "03")
-        const projectRegex = /Projeto[:.\s]*(\d{4,6})/ig;
-        let projectMatches = [];
-        let pMatch;
-        while ((pMatch = projectRegex.exec(text)) !== null) {
-            projectMatches.push({ index: pMatch.index, projectNum: pMatch[1].trim() });
-        }
-
-        // Caso a pessoa digite "(Projeto 22901)"
-        const projParenthesisRgx = /\(\s*Projeto\s+(\d{4,6})\s*\)/ig;
-        while ((pMatch = projParenthesisRgx.exec(text)) !== null) {
-            projectMatches.push({ index: pMatch.index, projectNum: pMatch[1].trim() });
-        }
-
-        // PDFs com layout de colunas: PDF.js extrai "22851 Projeto.:" (número antes do rótulo)
-        // Requer que o número apareça no início de um "token" — precedido por espaço ou início do texto
-        const projBeforeRgx = /(?:^|[\s\n])(\d{4,6})\s+Projeto[.:]/ig;
-        while ((pMatch = projBeforeRgx.exec(text)) !== null) {
-            projectMatches.push({ index: pMatch.index, projectNum: pMatch[1].trim() });
-        }
-
-        projectMatches.sort((a, b) => a.index - b.index);
-
-        // Deduplica: remove entradas com mesmo projectNum e índice muito próximo (< 50 chars)
-        const seen = new Map();
-        const deduped = [];
-        for (const pm of projectMatches) {
-            const key = pm.projectNum;
-            const prev = seen.get(key);
-            if (!prev || Math.abs(prev.index - pm.index) > 50) {
-                deduped.push(pm);
-                seen.set(key, pm);
-            }
-        }
-        projectMatches.length = 0;
-        projectMatches.push(...deduped);
-
-        // EXTRAIR DESCRIÇÕES GLOBAIS "Descrição do Atendimento"
-        // Usa Regex para ignorar problemas de encoding acentuação vindos do PDF.js
-        const descMatches = [];
-        const descRegex = /Descri..o do Atendimento/ig;
-        const horasRegex = /Horas Aplicadas no Dia/ig;
-
-        let dMatch;
-        while ((dMatch = descRegex.exec(text)) !== null) {
-            const startIdx = dMatch.index + dMatch[0].length;
-
-            // Procura a próxima ocorrência de "Horas Aplicadas no Dia" a partir daqui
-            horasRegex.lastIndex = startIdx;
-            const hMatch = horasRegex.exec(text);
-
-            let rawDesc;
-            if (hMatch) {
-                rawDesc = text.substring(startIdx, hMatch.index).trim();
+        // Formato A: "Projeto.:" seguido do número
+        const projA = text.match(/Projeto[.:]+\s*(\d{4,6})\s+(?:\d{1,3}\s+)?[-–]\s*(.+?)(?=\s+Horas\s+(?:contratadas|executadas)|\s+Data\s*[.:]+|$)/i);
+        if (projA) {
+            projectNum = projA[1].trim();
+            clientNamePdf = projA[2].replace(/\s{2,}/g, ' ').trim();
+        } else {
+            // Formato B: número antes de "Projeto.:"
+            const projB = text.match(/(?:^|[\s])(\d{4,6})\s+Projeto[.:]+\s*(?:\d{1,3}\s+)?[-–]\s*(.+?)(?=\s+Horas\s+(?:contratadas|executadas)|\s+Data\s*[.:]+|$)/i);
+            if (projB) {
+                projectNum = projB[1].trim();
+                clientNamePdf = projB[2].replace(/\s{2,}/g, ' ').trim();
             } else {
-                rawDesc = text.substring(startIdx, startIdx + 500).trim();
-            }
-
-            // Limpa cabeçalhos que possam ter caído dentro desta descrição
-            rawDesc = this.cleanupPageHeaders(rawDesc);
-
-            if (rawDesc) {
-                descMatches.push({ index: dMatch.index, text: rawDesc });
+                // Fallback: só o número, sem nome
+                const projNum = text.match(/Projeto[.:]+\s*(\d{4,6})/i) || text.match(/(?:^|[\s])(\d{4,6})\s+Projeto/i);
+                if (projNum) projectNum = projNum[1].trim();
             }
         }
 
-        let records = [];
+        if (!projectNum) return { records, warnings };
 
-        // Encontrar todas as datas de "Horas Aplicadas no Dia XX/XX/XXXX"
-        const dateRegex = /Horas Aplicadas no Dia (\d{2}\/\d{2}\/\d{4})/g;
-        let match;
-        let dateBlocks = [];
+        // Limita tamanho do nome
+        if (clientNamePdf.length > 120) clientNamePdf = clientNamePdf.substring(0, 120).trim();
 
-        while ((match = dateRegex.exec(text)) !== null) {
-            dateBlocks.push({ index: match.index, date: match[1] });
+        // === 2. DATA ===
+        // Formato primário: "Data......: 09/04/2026"
+        // Formato secundário: "Horas Aplicadas no Dia 09/04/2026"
+        let dateStr = '';
+        const dateA = text.match(/Data[.:]+\s*(\d{2}\/\d{2}\/\d{4})/i);
+        if (dateA) {
+            dateStr = dateA[1];
+        } else {
+            const dateB = text.match(/Horas\s+Aplicadas\s+no\s+Dia\s+(\d{2}\/\d{2}\/\d{4})/i);
+            if (dateB) dateStr = dateB[1];
         }
 
-        dateBlocks.forEach((block, i) => {
-            const nextIndex = i + 1 < dateBlocks.length ? dateBlocks[i + 1].index : text.length;
-            const blockText = text.substring(block.index, nextIndex);
+        if (!dateStr) {
+            warnings.push(`Pág.${pageNum} (Proj.${projectNum}): data não encontrada — página ignorada`);
+            return { records, warnings };
+        }
 
-            // Descobrir o projeto mais recente antes deste bloco de data
-            let currentProjectNum = '';
-            for (let j = projectMatches.length - 1; j >= 0; j--) {
-                if (projectMatches[j].index < block.index) {
-                    currentProjectNum = projectMatches[j].projectNum;
-                    break;
-                }
+        const [d, m, y] = dateStr.split('/');
+        const isoDate = `${y}-${m}-${d}`;
+
+        // === 3. DESCRIÇÃO GLOBAL DO ATENDIMENTO ===
+        // Entre "Descrição do Atendimento" e "Horas Aplicadas no Dia DD/MM/YYYY"
+        let description = '';
+        const descLabelMatch = text.match(/Descri..o\s+do\s+Atendimento/i);
+        if (descLabelMatch) {
+            const afterLabel = descLabelMatch.index + descLabelMatch[0].length;
+            const textAfterLabel = text.substring(afterLabel);
+            // Termina em "Horas Aplicadas no Dia DD/MM/YYYY" ou "Hora Inicial"
+            const endIdx = textAfterLabel.search(/Horas\s+Aplicadas\s+no\s+Dia\s+\d{2}\/\d{2}\/\d{4}|Hora\s+Inicial\s+Hora\s+Final/i);
+            const rawDesc = endIdx !== -1
+                ? textAfterLabel.substring(0, endIdx)
+                : textAfterLabel.substring(0, 600);
+            description = rawDesc.replace(/\s{2,}/g, ' ').trim();
+        }
+
+        if (!description) description = 'Importado via Ata PDF';
+        if (description.length > 800) description = description.substring(0, 800).trim();
+
+        // === 4. LINHAS DA TABELA DE HORAS ===
+        // Localiza o trecho entre o cabeçalho da tabela e "Total Horas Dia.:"
+        const tableHeaderIdx = text.search(/Hora\s+Inicial\s+Hora\s+Final/i);
+        const totalHorasIdx = text.search(/Total\s+Horas\s+Dia/i);
+
+        let tableText = text;
+        if (tableHeaderIdx !== -1) {
+            // Pula o cabeçalho da tabela em si (primeira linha após o match)
+            const afterHeader = text.indexOf(' ', tableHeaderIdx + 20);
+            tableText = text.substring(afterHeader !== -1 ? afterHeader : tableHeaderIdx);
+        }
+        if (totalHorasIdx !== -1) {
+            const tableEnd = totalHorasIdx - (tableHeaderIdx !== -1 ? tableHeaderIdx : 0);
+            if (tableEnd > 0) tableText = tableText.substring(0, tableEnd);
+        }
+
+        // Encontra triplas de horário: Hora Inicial  Hora Final  Horas Aplicadas (centesimal)
+        const timeRegex = /(\d{2}:\d{2})\s+(\d{2}:\d{2})\s+(\d{2}:\d{2})/g;
+        let timeMatch;
+
+        while ((timeMatch = timeRegex.exec(tableText)) !== null) {
+            const startTime = timeMatch[1];
+            const endTime = timeMatch[2];
+
+            const [sH, sM] = startTime.split(':').map(Number);
+            const [eH, eM] = endTime.split(':').map(Number);
+
+            // Valida que são horários de relógio reais (não centesimais)
+            if (sM > 59 || eM > 59) continue;
+
+            let diffMins = (eH * 60 + eM) - (sH * 60 + sM);
+            if (diffMins < 0) diffMins += 24 * 60;
+            if (diffMins <= 0) continue;
+
+            records.push({
+                clientProjectPdf: projectNum,
+                clientNamePdf,
+                dateStrBrazil: dateStr,
+                date: isoDate,
+                startTime,
+                endTime,
+                minutes: diffMins,
+                description,
+            });
+        }
+
+        // === 5. VALIDAÇÃO: soma vs Total Horas Dia ===
+        const totalMatch = text.match(/Total\s+Horas\s+Dia[.:]+\s*(\d{2}):(\d{2})/i);
+        if (totalMatch && records.length > 0) {
+            const tH = parseInt(totalMatch[1], 10);
+            const tC = parseInt(totalMatch[2], 10);
+            // Centesimal → minutos reais: (HH * 100 + CC) / 100 * 60
+            const totalMinutes = Math.round((tH * 100 + tC) / 100 * 60);
+            const sumMinutes = records.reduce((s, r) => s + r.minutes, 0);
+            if (Math.abs(sumMinutes - totalMinutes) > 2) {
+                warnings.push(`Pág.${pageNum} (${dateStr}, Proj.${projectNum}): soma=${sumMinutes}min, Total Horas Dia=${totalMinutes}min`);
+                console.warn(`[PDF Import] Divergência de horas — Pág.${pageNum}: ${dateStr} Proj.${projectNum} soma=${sumMinutes}min total=${totalMinutes}min`);
             }
+        }
 
-            // Fallback se ele encontrou o projeto logo após a primeira data
-            if (!currentProjectNum && projectMatches.length > 0) {
-                currentProjectNum = projectMatches[0].projectNum;
-            }
-
-            // Descobrir a descrição global mais recente antes deste bloco de data
-            let currentGlobalDesc = '';
-            for (let j = descMatches.length - 1; j >= 0; j--) {
-                if (descMatches[j].index < block.index) {
-                    currentGlobalDesc = descMatches[j].text;
-                    break;
-                }
-            }
-
-            // Fallback para descrição
-            if (!currentGlobalDesc && descMatches.length > 0) {
-                currentGlobalDesc = descMatches[0].text;
-            }
-
-            // Limpeza adicional da descrição global para remover cabeçalhos colados
-            if (currentGlobalDesc) {
-                currentGlobalDesc = currentGlobalDesc
-                    .replace(/.*?Horas executadas:\s*/i, '') // Remove cabeçalho anterior
-                    .replace(/Hora Inicial.*?Analista\s*/i, '') // Remove tabela de horas
-                    .trim();
-            }
-
-            // Regex para extrair horários e a descrição específica da linha
-            // Formato da tabela: HoraInicial HoraFinal HorasAplicadas [Analista/texto]
-            // Grupos: [1]=HoraInicial, [2]=HoraFinal, [3]=HorasAplicadas, [4]=restante
-            const timeRegex = /(\d{2}:\d{2})\s+(\d{2}:\d{2})\s+(\d{2}:\d{2})\s*(.*?)(?=(?:\d{2}:\d{2}\s+\d{2}:\d{2})|Total\s+Horas|Responsável|$)/gs;
-
-            let timeMatch;
-            while ((timeMatch = timeRegex.exec(blockText)) !== null) {
-                const startTime = timeMatch[1];
-                const endTime = timeMatch[2];
-                // timeMatch[3] = horas aplicadas (não usamos, calculamos a partir de start/end)
-
-                // Calcular diferença REAL de minutos entre hora inicial e hora final
-                const [sH, sM] = startTime.split(':').map(Number);
-                const [eH, eM] = endTime.split(':').map(Number);
-                let diffMins = (eH * 60 + eM) - (sH * 60 + sM);
-                if (diffMins < 0) diffMins += 24 * 60;
-
-                // Deve haver pelo menos 1 minuto de diferença para ser um registro válido
-                if (diffMins <= 0) continue;
-
-                // FIX 1: Usar apenas a descrição global — não concatenar "Tarefa da Linha"
-                // A linha específica pode ter analista ou texto irrelevante do PDF
-                let finalDesc = currentGlobalDesc;
-
-                // Somente usa o texto da linha como fallback se não houver descrição global
-                if (!finalDesc) {
-                    let lineDesc = (timeMatch[4] || '').trim();
-                    // Limpa cabeçalhos da página que possam ter caído no texto da linha
-                    lineDesc = this.cleanupPageHeaders(lineDesc);
-                    finalDesc = lineDesc;
-                }
-
-                if (!finalDesc || finalDesc === '') finalDesc = "Importado via Ata PDF";
-                if (finalDesc.length > 800) finalDesc = finalDesc.substring(0, 800);
-
-                const [d, m, y] = block.date.split('/');
-                const isoDate = `${y}-${m}-${d}`;
-
-                records.push({
-                    clientProjectPdf: currentProjectNum,
-                    dateStrBrazil: block.date,
-                    date: isoDate,
-                    startTime,
-                    endTime,
-                    minutes: diffMins,
-                    description: finalDesc
-                });
-            }
-        });
-
-        return records;
+        return { records, warnings };
     }
 
     async openPdfConfirmationModal() {
@@ -1823,7 +1755,9 @@ class AppController {
 
                 let targetClient = existing;
                 if (!targetClient) {
-                    const clientName = this._extractClientNameForProject(projectNum) || `Projeto ${projectNum}`;
+                    const clientName = this.pendingPdfRecords.find(r =>
+                        r.clientProjectPdf.replace(/\D/g, '') === searchNum && r.clientNamePdf
+                    )?.clientNamePdf || `Projeto ${projectNum}`;
                     targetClient = await store.addClient(
                         clientName, 0, '', projectNum, 0,
                         'Cliente criado automaticamente via importação de Ata PDF. Cadastro incompleto — por favor, complete os dados.',
@@ -1865,7 +1799,7 @@ class AppController {
                 <td style="font-size: 0.9rem;">${r.dateStrBrazil}</td>
                 <td style="font-size: 0.9rem; font-weight: 500; color: var(--primary-color);">${r.matchedClientName}${r.autoCreated ? ' <span style="font-size:0.75rem;background:var(--primary-color);color:#fff;border-radius:4px;padding:1px 5px;">Novo</span>' : ''}</td>
                 <td style="font-size: 0.9rem;">${r.startTime} - ${r.endTime}</td>
-                <td style="font-size: 0.9rem;">${r.minutes}</td>
+                <td style="font-size: 0.9rem;">${Math.floor(r.minutes / 60)}h${String(r.minutes % 60).padStart(2,'0')}min</td>
                 <td><textarea class="form-control" id="pdf-desc-${idx}" style="font-size: 0.85rem; padding: 4px; width: 100%; min-width: 250px; resize: vertical;" rows="3">${r.description}</textarea></td>
                 <td style="text-align: center;"><input type="checkbox" id="pdf-check-${idx}" checked style="width: 18px; height: 18px; cursor: pointer;"></td>
             `;
@@ -1916,32 +1850,6 @@ class AppController {
         confirmBtn.textContent = 'Confirmar e Salvar';
 
         await this.renderAll();
-    }
-
-    _extractClientNameForProject(projectNum) {
-        const searchNum = projectNum.replace(/\D/g, '');
-
-        // Prioridade 1: mapa extraído durante o parse (formato "Projeto.: XXXXX Nome Cliente")
-        if (this._projectClientNames && this._projectClientNames.has(searchNum)) {
-            return this._projectClientNames.get(searchNum);
-        }
-
-        // Prioridade 2: busca contextual no texto bruto
-        const text = this._lastPdfText || '';
-        if (!text) return '';
-
-        const projIdx = text.search(new RegExp(`\\b${searchNum}\\b`));
-        if (projIdx === -1) return '';
-
-        const context = text.substring(Math.max(0, projIdx - 600), projIdx + 300);
-
-        const clienteMatch = context.match(/CLIENTE[:\s]+([^\n\r]{3,80}?)(?=\s*[\n\r]|\s*Projeto|\s*\d{4,6}|$)/i);
-        if (clienteMatch) return clienteMatch[1].trim();
-
-        const nomeMatch = context.match(/(?:Nome|Raz.o\s+Social)[:\s]+([^\n\r]{3,80}?)(?=\s*[\n\r]|$)/i);
-        if (nomeMatch) return nomeMatch[1].trim();
-
-        return '';
     }
 
     // ===================================
