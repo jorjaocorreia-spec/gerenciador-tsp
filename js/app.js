@@ -1707,15 +1707,17 @@ class AppController {
         while ((timeMatch = timeRegex.exec(tableText)) !== null) {
             const startTime = timeMatch[1];
             const endTime = timeMatch[2];
+            const horasAplicadas = timeMatch[3]; // centesimal (ex: 00:75 = 45 min)
 
             const [sH, sM] = startTime.split(':').map(Number);
             const [eH, eM] = endTime.split(':').map(Number);
 
-            // Valida que são horários de relógio reais (não centesimais)
+            // Descarta linhas onde Hora Inicial/Final claramente não são horários (CC > 59 indica parse errado)
             if (sM > 59 || eM > 59) continue;
 
-            let diffMins = (eH * 60 + eM) - (sH * 60 + sM);
-            if (diffMins < 0) diffMins += 24 * 60;
+            // Usa a coluna "Horas Aplicadas" (centesimal) — fonte oficial de duração no SAP
+            const [aH, aC] = horasAplicadas.split(':').map(Number);
+            const diffMins = Math.round((aH * 100 + aC) / 100 * 60);
             if (diffMins <= 0) continue;
 
             records.push({
