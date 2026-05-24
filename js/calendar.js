@@ -27,26 +27,40 @@ const GoogleCalendarAPI = {
 
     async _applyConfig() {
         if (!this._clientId || !this._apiKey) return;
-        try {
-            gapi.client.setApiKey(this._apiKey);
-            await gapi.client.load(DISCOVERY_DOC);
-            this.gapiInited = true;
-        } catch (err) {
-            console.error('Erro ao configurar GAPI client:', JSON.stringify(err));
-            return;
-        }
+
+        // Configura API key (síncrono)
+        gapi.client.setApiKey(this._apiKey);
+
+        // Cria token client (síncrono)
         try {
             this.tokenClient = google.accounts.oauth2.initTokenClient({
                 client_id: this._clientId,
                 scope: SCOPES,
                 callback: '',
             });
-            this.gisInited = true;
         } catch (err) {
             console.error('Erro ao configurar GIS client:', err);
             return;
         }
-        this._checkEnableStatus();
+
+        // Habilita integração imediatamente
+        this.isEnabled = true;
+        console.log('Google Calendar habilitado. Carregando discovery doc...');
+
+        // Carrega discovery doc em background (necessário para gapi.client.calendar)
+        try {
+            await gapi.client.load(DISCOVERY_DOC);
+            console.log('Google Calendar API pronta.');
+        } catch (err) {
+            console.error('Erro ao carregar Calendar discovery doc:', JSON.stringify(err));
+            // isEnabled permanece true — o erro aparecerá na primeira chamada de sync
+        }
+
+        const token = gapi.client.getToken();
+        if (token) {
+            this.isAuthenticated = true;
+            if (window.app) app.onCalendarAuthenticated();
+        }
     },
 
     async initGapiClient() {
@@ -81,14 +95,8 @@ const GoogleCalendarAPI = {
     },
 
     _checkEnableStatus() {
-        if (!this.gapiInited || !this.gisInited) return;
-        if (!this._clientId || !this._apiKey) return;
-        this.isEnabled = true;
-        console.log('Google Calendar inicializado e pronto.');
-        const token = gapi.client.getToken();
-        if (token) {
-            this.isAuthenticated = true;
-            if (window.app) app.onCalendarAuthenticated();
+        if (this.gapiInited && this.gisInited && this._clientId && this._apiKey) {
+            this._applyConfig();
         }
     },
 
