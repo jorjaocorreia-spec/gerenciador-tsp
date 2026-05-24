@@ -585,6 +585,15 @@ class AppController {
         });
     }
 
+    toggleMoneyVisibility() {
+        const hidden = document.body.classList.toggle('money-hidden');
+        const icon = document.getElementById('icon-toggle-money');
+        if (icon) {
+            icon.setAttribute('data-lucide', hidden ? 'eye-off' : 'eye');
+            lucide.createIcons();
+        }
+    }
+
     async renderClients() {
         const tbody = document.querySelector('#clients-table tbody');
         tbody.innerHTML = `<tr><td colspan="3">${spinnerHtml}</td></tr>`;
@@ -615,8 +624,8 @@ class AppController {
                 <div style="font-size: 0.85rem; margin-top: 4px; color: var(--text-muted)">
                     <span><strong>CS:</strong> ${escapeHtml(c.csName) || '-'}</span> |
                     <span><strong>Proj:</strong> ${escapeHtml(c.projectNum) || '-'}</span> <br>
-                    <span><strong>Paga:</strong> ${clientPaysStr}</span> |
-                    <span><strong>Recebe:</strong> ${consultantReceives}</span>${bonus > 0 ? ` <span style="color: #4ade80; font-size:0.8rem">(+R$ ${bonus.toFixed(2).replace('.',',')} adicional)</span>` : ''}
+                    <span><strong>Paga:</strong> <span class="money-value">${clientPaysStr}</span></span> |
+                    <span><strong>Recebe:</strong> <span class="money-value">${consultantReceives}</span></span>${bonus > 0 ? ` <span class="money-value" style="color: #4ade80; font-size:0.8rem">(+R$ ${bonus.toFixed(2).replace('.',',')} adicional)</span>` : ''}
                     <div style="margin-top:2px; font-style:italic; font-size: 0.8rem">Obs: ${escapeHtml(c.notes) || '-'}</div>
                 </div>
             `;

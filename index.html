@@ -143,9 +143,14 @@
                     <h1>Clientes</h1>
                     <p class="text-muted">Gestão de contratos e horas.</p>
                 </div>
-                <button class="btn btn-primary" onclick="app.openModal('modal-client')">
-                    <i data-lucide="plus"></i> Novo Cliente
-                </button>
+                <div style="display: flex; gap: 10px; align-items: center;">
+                    <button class="btn btn-secondary" id="btn-toggle-money" onclick="app.toggleMoneyVisibility()" title="Mostrar/ocultar valores monetários" style="padding: 8px 12px;">
+                        <i data-lucide="eye" id="icon-toggle-money" style="width: 18px; height: 18px;"></i>
+                    </button>
+                    <button class="btn btn-primary" onclick="app.openModal('modal-client')">
+                        <i data-lucide="plus"></i> Novo Cliente
+                    </button>
+                </div>
             </div>
 
             <div class="glass" style="padding: 24px;">

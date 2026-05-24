@@ -724,6 +724,19 @@ h4 {
 }
 
 /* =========================================
+   Money Blur Toggle
+   ========================================= */
+body.money-hidden .money-value {
+  filter: blur(6px);
+  user-select: none;
+  transition: filter 0.2s ease;
+}
+
+.money-value {
+  transition: filter 0.2s ease;
+}
+
+/* =========================================
    Toast Notifications
    ========================================= */
 #toast-container {
