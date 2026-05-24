@@ -1585,17 +1585,26 @@ class AppController {
     parsePdfText(text) {
         this._lastPdfText = text;
 
-        // Extrai mapa projectNum → clientName a partir do formato "Projeto.: 22851   17 - Nome Empresa"
-        // Requer o formato SAP "NN - NOME" imediatamente após o número, terminado por "Horas contratadas/executadas"
-        // Não usa fallback $ para evitar capturar nomes de analistas ou descrições de tarefas
+        // Extrai mapa projectNum → clientName
+        // Suporta dois formatos da ATA:
+        //   Formato A: "Projeto.: 22851   17 - Nome Empresa Horas contratadas"
+        //   Formato B: "22851 Projeto.:   17 - Nome Empresa Horas contratadas"
+        // Requer formato SAP "NN - NOME" para evitar capturar analistas ou descrições
         this._projectClientNames = new Map();
-        const projectNameRegex = /Projeto[:.\s]*(\d{4,6})\s+(\d{1,3}\s*[-–]\s*.+?)(?=\s*(?:Horas\s+contratadas|Horas\s+executadas))/ig;
+        const nameTerminator = `(?=\\s*(?:Horas\\s+contratadas|Horas\\s+executadas))`;
+        const sapNamePattern = `(\\d{1,3}\\s*[-–]\\s*.+?)`;
+        const nameRegexes = [
+            new RegExp(`Projeto[:.\\.\\s]*(\\d{4,6})\\s+${sapNamePattern}${nameTerminator}`, 'ig'),
+            new RegExp(`(?:^|[\\s\\n])(\\d{4,6})\\s+Projeto[:.\\.\\s]*${sapNamePattern}${nameTerminator}`, 'ig'),
+        ];
         let pnMatch;
-        while ((pnMatch = projectNameRegex.exec(text)) !== null) {
-            const num = pnMatch[1].trim();
-            const name = pnMatch[2].trim();
-            if (name && name.length >= 5 && !this._projectClientNames.has(num)) {
-                this._projectClientNames.set(num, name);
+        for (const rx of nameRegexes) {
+            while ((pnMatch = rx.exec(text)) !== null) {
+                const num = pnMatch[1].trim();
+                const name = pnMatch[2].trim();
+                if (name && name.length >= 5 && !this._projectClientNames.has(num)) {
+                    this._projectClientNames.set(num, name);
+                }
             }
         }
 
@@ -1614,7 +1623,28 @@ class AppController {
             projectMatches.push({ index: pMatch.index, projectNum: pMatch[1].trim() });
         }
 
+        // PDFs com layout de colunas: PDF.js extrai "22851 Projeto.:" (número antes do rótulo)
+        // Requer que o número apareça no início de um "token" — precedido por espaço ou início do texto
+        const projBeforeRgx = /(?:^|[\s\n])(\d{4,6})\s+Projeto[.:]/ig;
+        while ((pMatch = projBeforeRgx.exec(text)) !== null) {
+            projectMatches.push({ index: pMatch.index, projectNum: pMatch[1].trim() });
+        }
+
         projectMatches.sort((a, b) => a.index - b.index);
+
+        // Deduplica: remove entradas com mesmo projectNum e índice muito próximo (< 50 chars)
+        const seen = new Map();
+        const deduped = [];
+        for (const pm of projectMatches) {
+            const key = pm.projectNum;
+            const prev = seen.get(key);
+            if (!prev || Math.abs(prev.index - pm.index) > 50) {
+                deduped.push(pm);
+                seen.set(key, pm);
+            }
+        }
+        projectMatches.length = 0;
+        projectMatches.push(...deduped);
 
         // EXTRAIR DESCRIÇÕES GLOBAIS "Descrição do Atendimento"
         // Usa Regex para ignorar problemas de encoding acentuação vindos do PDF.js
