@@ -1516,30 +1516,39 @@ class AppController {
             const file = e.target.files[0];
             if (!file) return;
 
+            const originalHtml = btnImportPdf.innerHTML;
+            const setBtn = (html) => { btnImportPdf.innerHTML = html; };
+            const spinner = `<div class="spinner" style="width:14px;height:14px;border-width:2px;flex-shrink:0;"></div>`;
+            btnImportPdf.disabled = true;
+
             try {
-                // Carregar worker do pdfjs
                 pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
 
+                setBtn(`<span style="display:inline-flex;align-items:center;gap:8px;">${spinner}Carregando PDF...</span>`);
                 const arrayBuffer = await file.arrayBuffer();
                 const pdf = await pdfjsLib.getDocument(arrayBuffer).promise;
 
                 let fullText = '';
                 for (let i = 1; i <= pdf.numPages; i++) {
+                    setBtn(`<span style="display:inline-flex;align-items:center;gap:8px;">${spinner}Lendo página ${i} de ${pdf.numPages}...</span>`);
                     const page = await pdf.getPage(i);
                     const textContent = await page.getTextContent();
                     const pageText = textContent.items.map(item => item.str).join(' ');
                     fullText += pageText + '\n';
                 }
 
+                setBtn(`<span style="display:inline-flex;align-items:center;gap:8px;">${spinner}Identificando projetos...</span>`);
                 this.parsePdfText(fullText);
 
             } catch (err) {
                 console.error(err);
                 Toast.show('Erro ao ler o PDF: ' + err.message, 'error');
+            } finally {
+                btnImportPdf.disabled = false;
+                btnImportPdf.innerHTML = originalHtml;
+                lucide.createIcons();
+                e.target.value = '';
             }
-
-            // Reseta o input file
-            e.target.value = '';
         });
     }
 
@@ -1567,6 +1576,19 @@ class AppController {
 
     parsePdfText(text) {
         this._lastPdfText = text;
+
+        // Extrai mapa projectNum → clientName a partir do formato "Projeto.: 22851   17 - Nome Empresa"
+        this._projectClientNames = new Map();
+        const projectNameRegex = /Projeto[:.\s]*(\d{4,6})\s+(.+?)(?=\s*(?:Horas\s+contratadas|Horas\s+executadas|Data\s*\.|Respons|\n|\r|$))/ig;
+        let pnMatch;
+        while ((pnMatch = projectNameRegex.exec(text)) !== null) {
+            const num = pnMatch[1].trim();
+            const name = pnMatch[2].trim();
+            if (name && !this._projectClientNames.has(num)) {
+                this._projectClientNames.set(num, name);
+            }
+        }
+
         // Encontra todos os projetos no documento e salva o index em que apareceram
         // Ajustado para capturar apenas números com 4 a 6 dígitos (evitando pegar dias de data como "03")
         const projectRegex = /Projeto[:.\s]*(\d{4,6})/ig;
@@ -1869,20 +1891,25 @@ class AppController {
     }
 
     _extractClientNameForProject(projectNum) {
+        const searchNum = projectNum.replace(/\D/g, '');
+
+        // Prioridade 1: mapa extraído durante o parse (formato "Projeto.: XXXXX Nome Cliente")
+        if (this._projectClientNames && this._projectClientNames.has(searchNum)) {
+            return this._projectClientNames.get(searchNum);
+        }
+
+        // Prioridade 2: busca contextual no texto bruto
         const text = this._lastPdfText || '';
         if (!text) return '';
 
-        const projIdx = text.search(new RegExp(`\\b${projectNum}\\b`));
+        const projIdx = text.search(new RegExp(`\\b${searchNum}\\b`));
         if (projIdx === -1) return '';
 
-        // Contexto ao redor do número do projeto
-        const context = text.substring(Math.max(0, projIdx - 600), projIdx + 200);
+        const context = text.substring(Math.max(0, projIdx - 600), projIdx + 300);
 
-        // Tenta: "CLIENTE: Nome" ou "Cliente: Nome"
         const clienteMatch = context.match(/CLIENTE[:\s]+([^\n\r]{3,80}?)(?=\s*[\n\r]|\s*Projeto|\s*\d{4,6}|$)/i);
         if (clienteMatch) return clienteMatch[1].trim();
 
-        // Tenta: "Nome/Razão Social: Nome" ou "Razão Social: Nome"
         const nomeMatch = context.match(/(?:Nome|Raz.o\s+Social)[:\s]+([^\n\r]{3,80}?)(?=\s*[\n\r]|$)/i);
         if (nomeMatch) return nomeMatch[1].trim();
 
