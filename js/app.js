@@ -1759,22 +1759,42 @@ class AppController {
         });
 
         if (!allMatched) {
+            const sessionCreated = new Map(); // projectNum → client (evita criar o mesmo 2x na mesma rodada)
+            let createdCount = 0;
+
             for (const projectNum of unMatchedProjects) {
-                const clientName = this._extractClientNameForProject(projectNum) || `Projeto ${projectNum}`;
-                const newClient = await store.addClient(
-                    clientName, 0, '', projectNum, 0,
-                    'Cliente criado automaticamente via importação de Ata PDF. Cadastro incompleto — por favor, complete os dados.',
-                    'active'
-                );
+                const searchNum = projectNum.replace(/\D/g, '');
+
+                // Verifica se já existe no banco (importação anterior) ou foi criado nesta rodada
+                const existing = clients.find(c => {
+                    if (!c.projectNum) return false;
+                    return c.projectNum.split(/\D+/).filter(Boolean).includes(searchNum);
+                }) || sessionCreated.get(searchNum);
+
+                let targetClient = existing;
+                if (!targetClient) {
+                    const clientName = this._extractClientNameForProject(projectNum) || `Projeto ${projectNum}`;
+                    targetClient = await store.addClient(
+                        clientName, 0, '', projectNum, 0,
+                        'Cliente criado automaticamente via importação de Ata PDF. Cadastro incompleto — por favor, complete os dados.',
+                        'active'
+                    );
+                    sessionCreated.set(searchNum, targetClient);
+                    createdCount++;
+                }
+
                 this.pendingPdfRecords.forEach(r => {
-                    if (r.clientProjectPdf === projectNum && !r.matchedClientId) {
-                        r.matchedClientId = newClient.id;
-                        r.matchedClientName = newClient.name;
-                        r.autoCreated = true;
+                    if (r.clientProjectPdf.replace(/\D/g, '') === searchNum && !r.matchedClientId) {
+                        r.matchedClientId = targetClient.id;
+                        r.matchedClientName = targetClient.name;
+                        r.autoCreated = !existing;
                     }
                 });
             }
-            Toast.show(`${unMatchedProjects.size} cliente(s) criado(s) automaticamente. Verifique e complete os dados após a importação.`, 'info', 5000);
+
+            if (createdCount > 0) {
+                Toast.show(`${createdCount} cliente(s) criado(s) automaticamente. Verifique e complete os dados após a importação.`, 'info', 5000);
+            }
         }
 
         const uniqueClientIds = new Set(this.pendingPdfRecords.map(r => r.matchedClientId));
