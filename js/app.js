@@ -1631,31 +1631,23 @@ class AppController {
 
         // 1a. Captura o número do projeto, ancorado em "Projeto.:"
         let projMatch = text.match(/Projeto[.:]+\s*(\d{4,6})/i);
-        let afterIdx = -1;
-        if (projMatch) {
-            projectNum = projMatch[1].trim();
-            afterIdx = projMatch.index + projMatch[0].length;
-        } else {
+        if (!projMatch) {
             // PDF.js pode inverter: "22851 Projeto.:"
             projMatch = text.match(/(?:^|\s)(\d{4,6})\s+Projeto[.:]+/i);
-            if (projMatch) {
-                projectNum = projMatch[1].trim();
-                afterIdx = projMatch.index + projMatch[0].length;
-            }
         }
+        if (projMatch) projectNum = projMatch[1].trim();
 
         if (!projectNum) return { records, warnings };
 
-        // 1b. Busca o nome do cliente na área após o número do projeto.
-        // PDF.js pode reordenar elementos (insere datas ou outros conteúdos entre o número e o nome).
-        // Padrão obrigatório: "NN - LETRAS..." (ID secundário + traço + nome do cliente).
-        // Isso evita capturar datas como "01/04/2026" que ficam entre o número e o nome.
-        if (afterIdx >= 0) {
-            const searchArea = text.substring(afterIdx, afterIdx + 500);
-            const nameMatch = searchArea.match(/(\d{1,3}\s*[-–]\s*[A-Za-zÀ-ÿ][^\n]*?)(?=\n|\s+Horas\s+(?:contratadas|executadas)|\s+Data\s*[.:]+|$)/);
-            if (nameMatch) {
-                clientNamePdf = nameMatch[1].replace(/\s{2,}/g, ' ').trim();
-            }
+        // 1b. Busca o nome do cliente no texto inteiro da página.
+        // PDF.js junta todos os items da página com espaço (sem \n) e pode reordenar visualmente,
+        // então o nome pode não estar adjacente ao número do projeto.
+        // Padrão: "NN - NOME EM CAIXA ALTA" — empresas SAP são sempre maiúsculas (CASCAVEL MAQUINAS AGRICOLAS LTDA).
+        // O filtro de caixa alta evita falsos positivos como "WG001 - Exportação..." da descrição (tem minúsculas).
+        const nameRegex = /(\d{1,3}\s*[-–]\s*[A-ZÀ-Ü][A-ZÀ-Ü0-9\s.,&/'()-]{2,}?)(?=\s+Data\s*[.:]+|\s+Horas\s+(?:contratadas|executadas)|\s+Descri[çc][ãa]o|\s+Tarefa\s+Executada|$)/;
+        const nameMatch = text.match(nameRegex);
+        if (nameMatch) {
+            clientNamePdf = nameMatch[1].replace(/\s{2,}/g, ' ').trim();
         }
 
         // Limita tamanho do nome
