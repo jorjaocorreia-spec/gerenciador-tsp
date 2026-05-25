@@ -2175,7 +2175,7 @@ class AppController {
         // então o nome pode não estar adjacente ao número do projeto.
         // Padrão: "NN - NOME EM CAIXA ALTA" — empresas SAP são sempre maiúsculas (CASCAVEL MAQUINAS AGRICOLAS LTDA).
         // O filtro de caixa alta evita falsos positivos como "WG001 - Exportação..." da descrição (tem minúsculas).
-        const nameRegex = /(\d{1,3}\s*[-–]\s*[A-ZÀ-Ü][A-ZÀ-Ü0-9\s.,&/'()-]{2,}?)(?=\s+Data\s*[.:]+|\s+Horas\s+(?:contratadas|executadas)|\s+Descri[çc][ãa]o|\s+Tarefa\s+Executada|$)/;
+        const nameRegex = /(\d{1,5}\s*[-–]\s*[A-ZÀ-Ü][A-ZÀ-Ü0-9\s.,&/'()-]{2,}?)(?=\s+Data\s*[.:]+|\s+Horas\s+(?:contratadas|executadas)|\s+Descri[çc][ãa]o|\s+Tarefa\s+Executada|$)/;
         const nameMatch = text.match(nameRegex);
         if (nameMatch) {
             clientNamePdf = nameMatch[1].replace(/\s{2,}/g, ' ').trim();
@@ -2240,53 +2240,62 @@ class AppController {
         }
 
         let tableText = text;
+        let anchorStart = -1;
         if (tableAnchorIdx !== -1) {
             // Avança ~35 chars para pular a linha âncora ("Horas Aplicadas no Dia DD/MM/YYYY")
             const afterAnchor = text.indexOf(' ', tableAnchorIdx + 30);
-            tableText = text.substring(afterAnchor !== -1 ? afterAnchor : tableAnchorIdx);
+            anchorStart = afterAnchor !== -1 ? afterAnchor : tableAnchorIdx;
+            tableText = text.substring(anchorStart);
         }
-        if (totalHorasIdx !== -1 && tableAnchorIdx !== -1) {
-            const tableEnd = totalHorasIdx - tableAnchorIdx;
+        if (totalHorasIdx !== -1 && anchorStart !== -1) {
+            // tableEnd calculado a partir de anchorStart (não tableAnchorIdx) para não incluir
+            // a linha "Total Horas Dia.: XX:XX" no tableText usado pelo fallback
+            const tableEnd = totalHorasIdx - anchorStart;
             if (tableEnd > 0) tableText = tableText.substring(0, tableEnd);
         }
 
-        // Encontra triplas de horário: Hora Inicial  Hora Final  Horas Aplicadas (centesimal)
-        const timeRegex = /(\d{2}:\d{2})\s+(\d{2}:\d{2})\s+(\d{2}:\d{2})/g;
-        let timeMatch;
-
-        while ((timeMatch = timeRegex.exec(tableText)) !== null) {
-            const startTime = timeMatch[1];
-            const endTime = timeMatch[2];
-            const horasAplicadas = timeMatch[3]; // centesimal (ex: 00:75 = 45 min)
-
+        const pad2 = n => String(n).padStart(2, '0');
+        const processTimeTriplet = (startTime, endTime, horasAplicadas) => {
             const [sH, sM] = startTime.split(':').map(Number);
             const [eH, eM] = endTime.split(':').map(Number);
-
             // SAP às vezes usa notação centesimal também em Hora Inicial/Final (ex: 16:75 = 16h45m)
-            // Converter CC → MM quando minutos > 59; caso contrário manter como está
-            const pad2 = n => String(n).padStart(2, '0');
             const normStart = sM > 59
                 ? `${pad2(sH)}:${pad2(Math.round(sM * 60 / 100))}`
                 : startTime;
             const normEnd = eM > 59
                 ? `${pad2(eH)}:${pad2(Math.round(eM * 60 / 100))}`
                 : endTime;
-
-            // Usa a coluna "Horas Aplicadas" (centesimal) — fonte oficial de duração no SAP
             const [aH, aC] = horasAplicadas.split(':').map(Number);
             const diffMins = Math.round((aH * 100 + aC) / 100 * 60);
-            if (diffMins <= 0) continue;
+            if (diffMins <= 0) return;
+            records.push({ clientProjectPdf: projectNum, clientNamePdf, dateStrBrazil: dateStr, date: isoDate, startTime: normStart, endTime: normEnd, minutes: diffMins, description });
+        };
 
-            records.push({
-                clientProjectPdf: projectNum,
-                clientNamePdf,
-                dateStrBrazil: dateStr,
-                date: isoDate,
-                startTime: normStart,
-                endTime: normEnd,
-                minutes: diffMins,
-                description,
-            });
+        // Estratégia primária: encontra triplas adjacentes HH:MM HH:MM HH:MM (linha por linha)
+        const timeRegex = /(\d{2}:\d{2})\s+(\d{2}:\d{2})\s+(\d{2}:\d{2})/g;
+        let timeMatch;
+        while ((timeMatch = timeRegex.exec(tableText)) !== null) {
+            processTimeTriplet(timeMatch[1], timeMatch[2], timeMatch[3]);
+        }
+
+        // Estratégia fallback: PDF.js extraiu o PDF coluna por coluna (ex: Tecinco/TCar).
+        // Nesse caso os horários não são adjacentes: "14:00 Hora Final 18:00 Total Horas 04:00".
+        // Extrai todos os HH:MM do tableText e agrupa em triplas (start, end, total).
+        if (records.length === 0) {
+            console.log(`[PDF Import] Pág.${pageNum}: regex primário falhou, tentando fallback coluna-por-coluna. tableText:`, tableText);
+            // Filtra apenas tokens HH:MM onde HH é um número com 2 dígitos e não faz parte de um número maior
+            const allTimes = [...tableText.matchAll(/(?<!\d)(\d{2}:\d{2})(?!\d)/g)].map(m => m[1]);
+            if (allTimes.length >= 3 && allTimes.length % 3 === 0) {
+                for (let i = 0; i < allTimes.length; i += 3) {
+                    processTimeTriplet(allTimes[i], allTimes[i + 1], allTimes[i + 2]);
+                }
+            } else if (allTimes.length >= 3) {
+                // Pode haver tempos extras (ex: "Total Horas Dia 04:00" incluído); tenta agrupar os primeiros 3N
+                const usable = allTimes.slice(0, Math.floor(allTimes.length / 3) * 3);
+                for (let i = 0; i < usable.length; i += 3) {
+                    processTimeTriplet(usable[i], usable[i + 1], usable[i + 2]);
+                }
+            }
         }
 
         // === 5. VALIDAÇÃO: soma vs Total Horas Dia ===
