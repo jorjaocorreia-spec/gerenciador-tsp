@@ -521,7 +521,7 @@ class AppController {
         if (hint) hint.style.display = this.taskAttachments.length ? 'none' : '';
         container.innerHTML = this.taskAttachments.map((att, i) => `
             <div class="attach-thumb">
-                <img src="${att.data}" alt="${escHtml(att.name)}" onclick="window.open(this.src,'_blank')" title="${escHtml(att.name)}">
+                <img src="${att.data}" alt="${escapeHtml(att.name)}" onclick="window.open(this.src,'_blank')" title="${escapeHtml(att.name)}">
                 <button type="button" class="attach-remove" onclick="app.removeTaskAttachment(${i})" title="Remover">×</button>
             </div>
         `).join('');
