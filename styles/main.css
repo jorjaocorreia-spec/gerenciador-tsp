@@ -1192,8 +1192,9 @@ body.money-hidden .money-value {
     grid-template-columns: 150px 80px 1fr 60px 148px;
     padding: 10px 16px;
     gap: 12px;
-    align-items: center;
+    align-items: start;
 }
+.apt-table-header { align-items: center; }
 .apt-table-header {
     font-weight: 600;
     font-size: 0.78rem;
@@ -1207,7 +1208,7 @@ body.money-hidden .money-value {
 .apt-row:hover { background: rgba(255,255,255,.04); }
 .apt-horario { font-variant-numeric: tabular-nums; color: var(--primary-color, #7c3aed); font-weight: 500; }
 .apt-proj { font-weight: 600; }
-.apt-desc { opacity: .9; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.apt-desc { opacity: .9; white-space: pre-wrap; word-break: break-word; }
 .apt-dur { opacity: .65; font-size: .85rem; font-variant-numeric: tabular-nums; }
 .apt-actions { display: flex; gap: 4px; }
 .apt-table-footer {
