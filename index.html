@@ -335,7 +335,7 @@
                         onclick="app.switchAgendaMode('weekly')">Semanal</button>
                     <button class="btn btn-secondary" id="btn-agenda-daily"
                         onclick="app.switchAgendaMode('daily')">Diário</button>
-                    <button class="btn btn-primary" onclick="app.openModal('modal-agenda-event')">
+                    <button class="btn btn-primary" onclick="app.openNewAgendaEvent(new Date().toISOString().split('T')[0])">
                         <i data-lucide="plus"></i> Novo Agendamento
                     </button>
                 </div>
@@ -832,8 +832,15 @@
                         Calendar</label>
                 </div>
 
-                <button type="submit" class="btn btn-primary" style="width: 100%; justify-content: center;">Salvar
-                    Agendamento</button>
+                <div style="display: flex; gap: 12px; margin-top: 8px;">
+                    <button type="button" id="btn-delete-agenda-event" class="btn btn-danger"
+                            style="flex: 1; justify-content: center; display: none;"
+                            onclick="app.deleteAgendaEventFromModal()">
+                        <i data-lucide="trash-2"></i> Excluir
+                    </button>
+                    <button type="submit" class="btn btn-primary" style="flex: 2; justify-content: center;">Salvar
+                        Agendamento</button>
+                </div>
             </form>
         </div>
     </div>

@@ -1193,8 +1193,10 @@ class AppController {
     openNewAgendaEvent(dateStr) {
         this.closeModal('modal-agenda-event');
         this.openModal('modal-agenda-event');
+        document.getElementById('agenda-id').value = '';
         document.getElementById('agenda-date').value = dateStr;
         document.getElementById('agenda-date-end').value = dateStr;
+        document.getElementById('btn-delete-agenda-event').style.display = 'none';
     }
 
     async switchAgendaMode(mode) {
@@ -1334,6 +1336,7 @@ class AppController {
         document.getElementById('agenda-location').value = ev.location;
         document.getElementById('agenda-calendar-event-id').value = ev.calendarEventId || '';
         document.getElementById('agenda-sync-google').checked = calendarAPI.isEnabled;
+        document.getElementById('btn-delete-agenda-event').style.display = 'flex';
 
         this.openModal('modal-agenda-event');
     }
@@ -1349,6 +1352,25 @@ class AppController {
                     await calendarAPI.deleteGoogleEvent(ev.calendarEventId);
                 }
                 await store.deleteAgendaEvent(id);
+                await this.renderAgenda();
+                Toast.show('Agendamento excluído.', 'success');
+            } catch (err) {
+                Toast.show('Erro ao excluir agendamento: ' + err.message, 'error');
+            }
+        }
+    }
+
+    async deleteAgendaEventFromModal() {
+        const id = document.getElementById('agenda-id').value;
+        if (!id) return;
+        if (confirm("Deseja deletar este agendamento?")) {
+            try {
+                const ev = await store.getAgendaEvent(id);
+                if (ev && ev.calendarEventId && calendarAPI.isAuthenticated) {
+                    await calendarAPI.deleteGoogleEvent(ev.calendarEventId);
+                }
+                await store.deleteAgendaEvent(id);
+                this.closeModal('modal-agenda-event');
                 await this.renderAgenda();
                 Toast.show('Agendamento excluído.', 'success');
             } catch (err) {
