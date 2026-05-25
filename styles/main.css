@@ -1150,7 +1150,7 @@ body.money-hidden .money-value {
 .apt-proj { font-weight: 600; }
 .apt-desc { opacity: .9; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .apt-dur { opacity: .65; font-size: .85rem; font-variant-numeric: tabular-nums; }
-.apt-actions { display: flex; gap: 4px; justify-content: flex-end; }
+.apt-actions { display: flex; gap: 4px; }
 .apt-table-footer {
     padding: 10px 16px;
     text-align: right;
