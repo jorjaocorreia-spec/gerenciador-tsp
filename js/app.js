@@ -569,14 +569,14 @@ class AppController {
     // Drag and Drop Tarefas
     dragStart(e) {
         e.dataTransfer.setData('text/plain', e.currentTarget.dataset.id);
+        this._draggingFromStatus = e.currentTarget.closest('.kanban-dropzone')?.dataset.status;
         setTimeout(() => e.target.classList.add('dragging'), 0);
     }
 
     dragEnd(e) {
         e.target.classList.remove('dragging');
-        document.querySelectorAll('.kanban-dropzone').forEach(zone => {
-            zone.classList.remove('drag-over');
-        });
+        document.querySelectorAll('.kanban-dropzone').forEach(zone => zone.classList.remove('drag-over'));
+        document.querySelectorAll('.task-card').forEach(c => c.classList.remove('drag-over-above', 'drag-over-below'));
     }
 
     allowDrop(e) {
@@ -595,9 +595,60 @@ class AppController {
         const newStatus = dropzone.dataset.status;
 
         if (taskId && newStatus) {
-            await store.updateTaskStatus(taskId, newStatus);
+            const oldStatus = this._draggingFromStatus;
+            if (oldStatus !== newStatus) {
+                await store.updateTaskStatus(taskId, newStatus);
+            }
+            // Mover para o final da coluna destino na ordem salva
+            const order = this._getTaskOrder();
+            for (const col of ['new', 'doing', 'done']) {
+                order[col] = (order[col] || []).filter(id => id !== taskId);
+            }
+            order[newStatus] = [...(order[newStatus] || []), taskId];
+            this._saveTaskOrder(order);
             await this.renderAll();
         }
+    }
+
+    _getTaskOrder() {
+        const userId = Auth.getUserId();
+        if (!userId) return { new: [], doing: [], done: [] };
+        try {
+            return JSON.parse(localStorage.getItem(`tsp_task_order_${userId}`)) || { new: [], doing: [], done: [] };
+        } catch { return { new: [], doing: [], done: [] }; }
+    }
+
+    _saveTaskOrder(order) {
+        const userId = Auth.getUserId();
+        if (userId) localStorage.setItem(`tsp_task_order_${userId}`, JSON.stringify(order));
+    }
+
+    _getSortedTasks(tasks, status) {
+        const order = this._getTaskOrder()[status] || [];
+        return [...tasks].sort((a, b) => {
+            const ai = order.indexOf(a.id);
+            const bi = order.indexOf(b.id);
+            if (ai === -1 && bi === -1) return 0;
+            if (ai === -1) return 1;
+            if (bi === -1) return -1;
+            return ai - bi;
+        });
+    }
+
+    _updateTaskOrderAfterDrop(draggedId, targetId, insertBefore, newStatus) {
+        const order = this._getTaskOrder();
+        for (const col of ['new', 'doing', 'done']) {
+            order[col] = (order[col] || []).filter(id => id !== draggedId);
+        }
+        const colOrder = order[newStatus] || [];
+        const targetIdx = colOrder.indexOf(targetId);
+        if (targetIdx === -1) {
+            insertBefore ? colOrder.unshift(draggedId) : colOrder.push(draggedId);
+        } else {
+            colOrder.splice(insertBefore ? targetIdx : targetIdx + 1, 0, draggedId);
+        }
+        order[newStatus] = colOrder;
+        this._saveTaskOrder(order);
     }
 
     // Chamado após login bem-sucedido
@@ -1152,7 +1203,16 @@ class AppController {
 
         Object.values(cols).forEach(col => col.innerHTML = '');
 
-        tasks.forEach(task => {
+        // Agrupar por status e ordenar pela ordem salva
+        const grouped = { new: [], doing: [], done: [] };
+        tasks.forEach(t => { const s = t.status || 'new'; if (grouped[s]) grouped[s].push(t); });
+        const sortedTasks = [
+            ...this._getSortedTasks(grouped.new, 'new'),
+            ...this._getSortedTasks(grouped.doing, 'doing'),
+            ...this._getSortedTasks(grouped.done, 'done'),
+        ];
+
+        sortedTasks.forEach(task => {
             const client = clientsMap[task.clientId];
             const clientName = client ? escapeHtml(client.name) : '&lt;Desconhecido&gt;';
 
@@ -1166,6 +1226,40 @@ class AppController {
 
             card.addEventListener('dragstart', this.dragStart.bind(this));
             card.addEventListener('dragend', this.dragEnd.bind(this));
+
+            // Clicar no card abre edição (exceto quando clica em botões)
+            card.addEventListener('click', (e) => {
+                if (!e.target.closest('button')) this.handleEditTask(task.id);
+            });
+
+            // Drag sobre o card para reordenar dentro da coluna
+            card.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                const mid = card.getBoundingClientRect().top + card.getBoundingClientRect().height / 2;
+                document.querySelectorAll('.task-card').forEach(c => c.classList.remove('drag-over-above', 'drag-over-below'));
+                card.classList.add(e.clientY < mid ? 'drag-over-above' : 'drag-over-below');
+            });
+
+            card.addEventListener('dragleave', () => {
+                card.classList.remove('drag-over-above', 'drag-over-below');
+            });
+
+            card.addEventListener('drop', async (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                card.classList.remove('drag-over-above', 'drag-over-below');
+                const draggedId = e.dataTransfer.getData('text/plain');
+                if (!draggedId || draggedId === task.id) return;
+                const newStatus = card.closest('.kanban-dropzone').dataset.status;
+                const oldStatus = this._draggingFromStatus;
+                if (oldStatus && oldStatus !== newStatus) {
+                    await store.updateTaskStatus(draggedId, newStatus);
+                }
+                const mid = card.getBoundingClientRect().top + card.getBoundingClientRect().height / 2;
+                this._updateTaskOrderAfterDrop(draggedId, task.id, e.clientY < mid, newStatus);
+                await this.renderAll();
+            });
 
             let priorityClass = 'priority-low';
             if (task.priority === 'high') priorityClass = 'priority-high';

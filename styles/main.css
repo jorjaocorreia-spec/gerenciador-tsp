@@ -596,6 +596,16 @@ h4 {
   opacity: 0.5;
 }
 
+.task-card.drag-over-above {
+  border-top: 2px solid var(--primary-color);
+  margin-top: -1px;
+}
+
+.task-card.drag-over-below {
+  border-bottom: 2px solid var(--primary-color);
+  margin-bottom: -1px;
+}
+
 .task-priority-bar {
   position: absolute;
   top: 0;
