@@ -837,9 +837,16 @@
                 </div>
 
                 <div class="form-group">
-                    <label>Localização / Link (Opcional)</label>
+                    <label>Localização (Opcional)</label>
                     <input type="text" id="agenda-location" class="form-control"
-                        placeholder="Ex: Link do Meet, Sala 2...">
+                        placeholder="Ex: Sala de reuniões, endereço...">
+                </div>
+
+                <div class="form-group">
+                    <label>Participantes (Opcional)</label>
+                    <input type="text" id="agenda-attendees" class="form-control"
+                        placeholder="email1@ex.com, email2@ex.com">
+                    <small style="color: var(--text-muted); margin-top: 4px; display: block;">Convites enviados automaticamente pelo Google Calendar</small>
                 </div>
 
                 <div class="form-group" style="display: flex; align-items: center; gap: 8px;">
@@ -847,6 +854,25 @@
                     <label style="margin: 0; cursor: pointer;" for="agenda-sync-google">Sincronizar com Google
                         Calendar</label>
                 </div>
+
+                <div id="agenda-generate-meet-row" class="form-group" style="display: flex; align-items: center; gap: 8px; margin-top: 4px; padding-left: 26px;">
+                    <input type="checkbox" id="agenda-generate-meet" style="width: 16px; height: 16px; cursor: pointer;">
+                    <label style="margin: 0; cursor: pointer; font-size: 0.9rem;" for="agenda-generate-meet">
+                        <i data-lucide="video" style="width: 14px; height: 14px; vertical-align: middle; margin-right: 4px;"></i>Gerar link do Google Meet
+                    </label>
+                </div>
+
+                <div id="agenda-meet-link-block" class="form-group" style="display: none; align-items: center; gap: 8px; background: var(--bg-glass); border-radius: 8px; padding: 10px 14px;">
+                    <i data-lucide="video" style="width: 16px; height: 16px; color: var(--primary); flex-shrink: 0;"></i>
+                    <a id="agenda-meet-link-display" href="#" target="_blank" rel="noopener"
+                       style="color: var(--primary); font-size: 0.85rem; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;"></a>
+                    <button type="button" onclick="navigator.clipboard.writeText(document.getElementById('agenda-meet-link').value).then(()=>Toast.show('Link copiado!','success'))"
+                            class="btn btn-sm" title="Copiar link">
+                        <i data-lucide="copy" style="width: 14px; height: 14px;"></i>
+                    </button>
+                </div>
+
+                <input type="hidden" id="agenda-meet-link">
 
                 <div style="display: flex; gap: 12px; margin-top: 8px;">
                     <button type="button" id="btn-delete-agenda-event" class="btn btn-danger"

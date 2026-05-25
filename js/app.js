@@ -86,6 +86,14 @@ class AppController {
         document.getElementById('form-task-time').addEventListener('submit', this.handleTaskTimeSubmit.bind(this));
         document.getElementById('form-agenda-event').addEventListener('submit', this.handleAgendaSubmit.bind(this));
 
+        // Mostrar/ocultar opção de Meet conforme sync Google
+        document.getElementById('agenda-sync-google').addEventListener('change', (e) => {
+            const row = document.getElementById('agenda-generate-meet-row');
+            const hasMeet = document.getElementById('agenda-meet-link').value;
+            row.style.display = (e.target.checked && !hasMeet) ? '' : 'none';
+            if (!e.target.checked) document.getElementById('agenda-generate-meet').checked = false;
+        });
+
         // Calculo de tempo automático
         document.getElementById('record-start').addEventListener('input', this.calculateTimeDiff.bind(this));
         document.getElementById('record-end').addEventListener('input', this.calculateTimeDiff.bind(this));
@@ -223,6 +231,10 @@ class AppController {
             document.getElementById('form-agenda-event').reset();
             document.getElementById('agenda-id').value = '';
             document.getElementById('agenda-calendar-event-id').value = '';
+            document.getElementById('agenda-meet-link').value = '';
+            document.getElementById('agenda-meet-link-block').style.display = 'none';
+            document.getElementById('agenda-generate-meet-row').style.display = 'none';
+            document.getElementById('agenda-generate-meet').checked = false;
             document.getElementById('modal-agenda-title').innerText = 'Novo Agendamento';
             document.getElementById('agenda-sync-google').checked = calendarAPI.isEnabled;
         }
@@ -1374,6 +1386,14 @@ class AppController {
         document.getElementById('agenda-date-end').value = dateStr;
         document.getElementById('btn-delete-agenda-event').style.display = 'none';
         this.toggleAllDayAgenda(false);
+        // Reseta campos de Meet/participantes
+        document.getElementById('agenda-meet-link').value = '';
+        document.getElementById('agenda-attendees').value = '';
+        document.getElementById('agenda-meet-link-block').style.display = 'none';
+        document.getElementById('agenda-generate-meet').checked = false;
+        // Mostra opção de Meet apenas se sync Google estiver ativo
+        const syncChecked = document.getElementById('agenda-sync-google').checked;
+        document.getElementById('agenda-generate-meet-row').style.display = syncChecked ? '' : 'none';
     }
 
     toggleAllDayAgenda(isAllDay) {
@@ -1448,6 +1468,10 @@ class AppController {
         const startDate = document.getElementById('agenda-date').value;
         const endDate = document.getElementById('agenda-date-end').value || startDate;
         const allDay = document.getElementById('agenda-all-day').checked;
+        const syncGoogle = document.getElementById('agenda-sync-google').checked;
+        const generateMeet = syncGoogle && document.getElementById('agenda-generate-meet').checked;
+        const existingMeetLink = document.getElementById('agenda-meet-link').value || '';
+
         const eventData = {
             title: document.getElementById('agenda-title').value,
             description: document.getElementById('agenda-desc').value,
@@ -1458,10 +1482,11 @@ class AppController {
             dateEnd: endDate < startDate ? startDate : endDate,
             startTime: allDay ? '' : document.getElementById('agenda-start').value,
             endTime: allDay ? '' : document.getElementById('agenda-end').value,
-            location: document.getElementById('agenda-location').value
+            location: document.getElementById('agenda-location').value,
+            attendees: document.getElementById('agenda-attendees').value.trim(),
+            generateMeet,
+            meetLink: existingMeetLink
         };
-
-        const syncGoogle = document.getElementById('agenda-sync-google').checked;
 
         btn.innerText = "Salvando...";
         btn.disabled = true;
@@ -1485,23 +1510,32 @@ class AppController {
                 eventData.calendarEventId = existingCalId;
                 if (syncGoogle) {
                     if (existingCalId) {
-                        await calendarAPI.updateGoogleEvent(existingCalId, eventData);
+                        const upd = await calendarAPI.updateGoogleEvent(existingCalId, eventData);
+                        if (upd && upd.meetLink) eventData.meetLink = upd.meetLink;
                     } else {
-                        const gCalId = await calendarAPI.createGoogleEvent(eventData);
-                        if (gCalId) eventData.calendarEventId = gCalId;
+                        const result = await calendarAPI.createGoogleEvent(eventData);
+                        if (result) {
+                            eventData.calendarEventId = result.id;
+                            if (result.meetLink) eventData.meetLink = result.meetLink;
+                        }
                     }
                 }
                 await store.updateAgendaEvent(eventData);
             } else {
                 if (syncGoogle) {
-                    const gCalId = await calendarAPI.createGoogleEvent(eventData);
-                    if (gCalId) eventData.calendarEventId = gCalId;
+                    const result = await calendarAPI.createGoogleEvent(eventData);
+                    if (result) {
+                        eventData.calendarEventId = result.id;
+                        if (result.meetLink) eventData.meetLink = result.meetLink;
+                    }
                 }
                 await store.addAgendaEvent(eventData);
             }
             this.closeModal('modal-agenda-event');
             await this.renderAgenda();
-            Toast.show(id ? 'Agendamento atualizado.' : 'Agendamento criado.', 'success');
+            const meetMsg = eventData.meetLink ? ` Link Meet copiado.` : '';
+            if (eventData.meetLink) navigator.clipboard.writeText(eventData.meetLink).catch(() => {});
+            Toast.show((id ? 'Agendamento atualizado.' : 'Agendamento criado.') + meetMsg, 'success');
         } catch (err) {
             Toast.show('Erro ao salvar agendamento: ' + err.message, 'error');
         } finally {
@@ -1534,6 +1568,22 @@ class AppController {
         document.getElementById('agenda-calendar-event-id').value = ev.calendarEventId || '';
         document.getElementById('agenda-sync-google').checked = calendarAPI.isEnabled;
         document.getElementById('btn-delete-agenda-event').style.display = 'flex';
+
+        // Meet e participantes
+        document.getElementById('agenda-meet-link').value = ev.meetLink || '';
+        document.getElementById('agenda-attendees').value = ev.attendees || '';
+        const meetBlock = document.getElementById('agenda-meet-link-block');
+        if (ev.meetLink) {
+            meetBlock.style.display = 'flex';
+            document.getElementById('agenda-meet-link-display').href = ev.meetLink;
+            document.getElementById('agenda-meet-link-display').textContent = ev.meetLink;
+        } else {
+            meetBlock.style.display = 'none';
+        }
+        // Se já tem Meet link, oculta a checkbox de gerar (já existe)
+        const genMeetRow = document.getElementById('agenda-generate-meet-row');
+        genMeetRow.style.display = ev.meetLink ? 'none' : '';
+        document.getElementById('agenda-generate-meet').checked = false;
 
         this.openModal('modal-agenda-event');
     }
@@ -1896,12 +1946,15 @@ class AppController {
                     const clientName = ev.clientId && clientsMap[ev.clientId]
                         ? `<span class="schedule-event-client">${escapeHtml(clientsMap[ev.clientId].name)}</span>`
                         : '';
+                    const meetBadge = ev.meetLink
+                        ? `<a href="${escapeHtml(ev.meetLink)}" target="_blank" rel="noopener" onclick="event.stopPropagation()" title="Entrar no Google Meet" style="color:#34d399; display:inline-flex; align-items:center; gap:3px; font-size:0.75rem; margin-left:6px;"><i data-lucide="video" style="width:12px; height:12px;"></i> Meet</a>`
+                        : '';
                     html += `<div class="schedule-event" onclick="app.editAgendaEvent('${ev.id}')">
                         <div class="schedule-event-dot type-${ev.type}"></div>
                         <div class="schedule-event-time">${ev.startTime ? `${ev.startTime} – ${ev.endTime}` : '<span style="font-style:italic; opacity:0.8;">Dia inteiro</span>'}</div>
                         <div class="schedule-event-info">
                             <span class="schedule-event-title">${escapeHtml(ev.title)}</span>
-                            ${clientName}
+                            ${clientName}${meetBadge}
                         </div>
                     </div>`;
                 });
@@ -1951,9 +2004,10 @@ class AppController {
                 </div>
                 <div class="event-meta">
                     <div style="display:flex; align-items:center; gap:4px;">
-                       <i data-lucide="clock" style="width:10px; height:10px;"></i> 
+                       <i data-lucide="clock" style="width:10px; height:10px;"></i>
                        ${ev.startTime} - ${ev.endTime}
                        ${ev.calendarEventId ? '<i data-lucide="calendar" style="width:10px; height:10px; margin-left:4px; color:#60a5fa;" title="Sincronizado via Google"></i>' : ''}
+                       ${ev.meetLink ? `<a href="${escapeHtml(ev.meetLink)}" target="_blank" rel="noopener" onclick="event.stopPropagation()" title="Entrar no Google Meet" style="color:#34d399; display:flex; align-items:center;"><i data-lucide="video" style="width:11px; height:11px;"></i></a>` : ''}
                     </div>
                     ${clientName}
                 </div>
@@ -2046,7 +2100,9 @@ class AppController {
                 dateEnd: evDateEnd || evDate,
                 startTime: evStart,
                 endTime: evEnd,
-                calendarEventId: gEv.id
+                calendarEventId: gEv.id,
+                meetLink: gEv.hangoutLink || '',
+                attendees: (gEv.attendees || []).map(a => a.email).join(', ')
             };
 
             if (match) {
@@ -2054,6 +2110,7 @@ class AppController {
                 mappedData.type = match.type; // Preserva o tipo customizado do TSP
                 mappedData.clientId = match.clientId;
                 mappedData.relatedTaskId = match.relatedTaskId;
+                if (!mappedData.meetLink) mappedData.meetLink = match.meetLink || '';
                 await store.updateAgendaEvent(mappedData);
             } else {
                 await store.addAgendaEvent(mappedData);
@@ -2064,9 +2121,10 @@ class AppController {
         const googleIds = new Set(googleEvents.map(g => g.id));
         for (const le of localEvents) {
             if (le.calendarEventId && googleIds.has(le.calendarEventId)) continue; // já existe no Google
-            const gCalId = await calendarAPI.createGoogleEvent(le);
-            if (gCalId) {
-                le.calendarEventId = gCalId;
+            const result = await calendarAPI.createGoogleEvent(le);
+            if (result) {
+                le.calendarEventId = result.id;
+                if (result.meetLink) le.meetLink = result.meetLink;
                 await store.updateAgendaEvent(le);
             }
         }

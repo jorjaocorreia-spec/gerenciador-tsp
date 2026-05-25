@@ -157,7 +157,7 @@ const GoogleCalendarAPI = {
             d.setDate(d.getDate() + 1);
             googleEndDate = d.toISOString().split('T')[0];
         }
-        return {
+        const resource = {
             summary: localEventData.title || 'Evento TSP',
             description: (localEventData.description || '') + `\n\n[Gerado por TSP Manager - ID:${localEventData.id || ''}]`,
             location: localEventData.location || '',
@@ -168,16 +168,39 @@ const GoogleCalendarAPI = {
                 ? { date: googleEndDate }
                 : { dateTime: this.toGoogleDateTime(dateEnd, localEventData.endTime), timeZone: 'America/Sao_Paulo' }
         };
+
+        // Participantes
+        if (localEventData.attendees) {
+            const emails = localEventData.attendees.split(',').map(e => e.trim()).filter(Boolean);
+            if (emails.length > 0) {
+                resource.attendees = emails.map(email => ({ email }));
+            }
+        }
+
+        // Google Meet — só cria na primeira vez (sem meetLink já salvo)
+        if (localEventData.generateMeet && !localEventData.meetLink) {
+            resource.conferenceData = {
+                createRequest: {
+                    requestId: crypto.randomUUID(),
+                    conferenceSolutionKey: { type: 'hangoutsMeet' }
+                }
+            };
+        }
+
+        return resource;
     },
 
     async createGoogleEvent(eventData) {
         if (!this.isAuthenticated) return null;
         try {
-            const request = await gapi.client.calendar.events.insert({
-                calendarId: 'primary',
-                resource: this.mapLocalToGoogleEvent(eventData)
-            });
-            return request.result.id;
+            const params = { calendarId: 'primary', resource: this.mapLocalToGoogleEvent(eventData) };
+            if (eventData.generateMeet) params.conferenceDataVersion = 1;
+            if (eventData.attendees) params.sendUpdates = 'all';
+            const request = await gapi.client.calendar.events.insert(params);
+            return {
+                id: request.result.id,
+                meetLink: request.result.hangoutLink || ''
+            };
         } catch (err) {
             console.error('Erro ao criar evento no Google', err);
             return null;
@@ -187,12 +210,18 @@ const GoogleCalendarAPI = {
     async updateGoogleEvent(eventId, eventData) {
         if (!this.isAuthenticated) return false;
         try {
-            await gapi.client.calendar.events.update({
+            const params = {
                 calendarId: 'primary',
                 eventId: eventId,
                 resource: this.mapLocalToGoogleEvent(eventData)
-            });
-            return true;
+            };
+            if (eventData.generateMeet) params.conferenceDataVersion = 1;
+            if (eventData.attendees) params.sendUpdates = 'all';
+            const request = await gapi.client.calendar.events.update(params);
+            return {
+                ok: true,
+                meetLink: request.result.hangoutLink || eventData.meetLink || ''
+            };
         } catch (err) {
             console.error('Erro ao atualizar evento no Google', err);
             return false;

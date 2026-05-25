@@ -36,6 +36,7 @@ class TSPStore {
             date: r.date, dateEnd: r.date_end || r.date,
             startTime: r.start_time || '', endTime: r.end_time || '',
             location: r.location || '', calendarEventId: r.calendar_event_id || null,
+            meetLink: r.meet_link || '', attendees: r.attendees || '',
             createdAt: r.created_at };
     }
 
@@ -236,7 +237,8 @@ class TSPStore {
             type: eventData.type || 'meeting', date: eventData.date,
             date_end: eventData.dateEnd || eventData.date,
             start_time: eventData.startTime || '', end_time: eventData.endTime || '',
-            location: eventData.location || '', calendar_event_id: eventData.calendarEventId || null
+            location: eventData.location || '', calendar_event_id: eventData.calendarEventId || null,
+            meet_link: eventData.meetLink || '', attendees: eventData.attendees || ''
         }).select().single();
         if (error) throw error;
         return this._event(data);
@@ -249,7 +251,8 @@ class TSPStore {
             type: eventData.type || 'meeting', date: eventData.date,
             date_end: eventData.dateEnd || eventData.date,
             start_time: eventData.startTime || '', end_time: eventData.endTime || '',
-            location: eventData.location || '', calendar_event_id: eventData.calendarEventId || null
+            location: eventData.location || '', calendar_event_id: eventData.calendarEventId || null,
+            meet_link: eventData.meetLink || '', attendees: eventData.attendees || ''
         }).eq('id', eventData.id).select().single();
         if (error) throw error;
         return this._event(data);
