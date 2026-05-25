@@ -1177,6 +1177,83 @@ body.money-hidden .money-value {
   to   { opacity: 0; transform: translateX(40px); }
 }
 
+/* ── Anexos de Tarefa ─────────────────────────────────────── */
+.attach-zone {
+  border: 1.5px dashed var(--border);
+  border-radius: 8px;
+  padding: 12px 14px;
+  min-height: 64px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  transition: border-color 0.2s;
+  outline: none;
+  cursor: default;
+}
+.attach-zone:focus-within,
+.attach-zone.drag-over {
+  border-color: var(--primary);
+}
+.attach-zone-hint {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--text-muted);
+  font-size: 13px;
+}
+.attach-zone-hint i { width: 16px; height: 16px; flex-shrink: 0; }
+kbd {
+  display: inline-block;
+  padding: 1px 5px;
+  font-size: 11px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: rgba(255,255,255,0.05);
+  font-family: inherit;
+}
+.attach-previews {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.attach-thumb {
+  position: relative;
+  width: 80px;
+  height: 80px;
+  border-radius: 6px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  flex-shrink: 0;
+}
+.attach-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  cursor: zoom-in;
+}
+.attach-remove {
+  position: absolute;
+  top: 3px;
+  right: 3px;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: rgba(0,0,0,0.72);
+  color: #fff;
+  border: none;
+  cursor: pointer;
+  font-size: 15px;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transition: opacity 0.15s;
+  padding: 0;
+}
+.attach-thumb:hover .attach-remove { opacity: 1; }
+
 /* ── Apontamentos ─────────────────────────────────────────── */
 .view-header { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; margin-bottom: 24px; }
 .view-header-left { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }

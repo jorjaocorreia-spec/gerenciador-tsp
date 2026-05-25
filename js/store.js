@@ -26,6 +26,7 @@ class TSPStore {
             priority: r.priority || 'medium', dueDate: r.due_date || '',
             estimatedMinutes: parseInt(r.estimated_minutes) || 0,
             spentMinutes: parseInt(r.spent_minutes) || 0,
+            attachments: Array.isArray(r.attachments) ? r.attachments : [],
             createdAt: r.created_at, updatedAt: r.updated_at };
     }
 
@@ -167,7 +168,8 @@ class TSPStore {
             status: taskData.status || 'new', priority: taskData.priority || 'medium',
             due_date: taskData.dueDate || null,
             estimated_minutes: parseInt(taskData.estimatedMinutes) || 0,
-            spent_minutes: 0
+            spent_minutes: 0,
+            attachments: taskData.attachments || []
         }).select().single();
         if (error) throw error;
         return this._task(data);
@@ -179,7 +181,8 @@ class TSPStore {
             description: taskData.description || '', status: taskData.status,
             priority: taskData.priority, due_date: taskData.dueDate || null,
             estimated_minutes: parseInt(taskData.estimatedMinutes) || 0,
-            updated_at: new Date().toISOString()
+            updated_at: new Date().toISOString(),
+            attachments: taskData.attachments || []
         }).eq('id', taskData.id).select().single();
         if (error) throw error;
         return this._task(data);

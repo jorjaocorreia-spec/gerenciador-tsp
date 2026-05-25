@@ -712,8 +712,15 @@
                 </div>
 
                 <div class="form-group">
-                    <label>Anexos (Apenas indicação visual)</label>
-                    <input type="file" id="task-attachments" class="form-control" multiple>
+                    <label>Anexos</label>
+                    <div id="task-attach-zone" class="attach-zone" tabindex="0">
+                        <div class="attach-zone-hint" id="task-attach-hint">
+                            <i data-lucide="clipboard-paste"></i>
+                            <span>Cole uma imagem aqui <kbd>Ctrl+V</kbd> ou <label for="task-attachments" style="cursor:pointer;color:var(--primary);text-decoration:underline">escolha arquivos</label></span>
+                        </div>
+                        <input type="file" id="task-attachments" accept="image/*" multiple style="display:none">
+                        <div id="task-attach-previews" class="attach-previews"></div>
+                    </div>
                 </div>
 
                 <button type="submit" class="btn btn-primary" style="width: 100%; justify-content: center;">Salvar

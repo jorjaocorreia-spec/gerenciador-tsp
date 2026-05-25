@@ -35,6 +35,25 @@ function escapeHtml(str) {
         .replace(/'/g, '&#039;');
 }
 
+function compressImageFile(file, maxWidth = 1400) {
+    return new Promise((resolve) => {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            const img = new Image();
+            img.onload = () => {
+                const scale = Math.min(1, maxWidth / img.width);
+                const canvas = document.createElement('canvas');
+                canvas.width = Math.round(img.width * scale);
+                canvas.height = Math.round(img.height * scale);
+                canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
+                resolve(canvas.toDataURL('image/jpeg', 0.75));
+            };
+            img.src = e.target.result;
+        };
+        reader.readAsDataURL(file);
+    });
+}
+
 class AppController {
     constructor() {
         this.currentView = 'dashboard';
@@ -44,6 +63,7 @@ class AppController {
         this.agendaCurrentDate = new Date();
         this.agendaViewMode = 'schedule'; // daily, weekly, monthly or schedule
         this.aptCurrentDate = new Date().toISOString().split('T')[0]; // 'YYYY-MM-DD'
+        this.taskAttachments = []; // [{name, data}] — imagens em base64 do modal de tarefa
         this.init();
     }
 
@@ -96,6 +116,35 @@ class AppController {
             ?.addEventListener('submit', (e) => this.handleApontamentoSubmit(e));
         ['apt-start', 'apt-end'].forEach(id => {
             document.getElementById(id)?.addEventListener('change', () => this.updateAptDuration());
+        });
+
+        // Paste de imagens no modal de tarefa
+        document.addEventListener('paste', (e) => {
+            if (!document.getElementById('modal-task')?.classList.contains('active')) return;
+            const items = e.clipboardData?.items;
+            if (!items) return;
+            for (const item of items) {
+                if (item.type.startsWith('image/')) {
+                    e.preventDefault();
+                    const file = item.getAsFile();
+                    const name = `print_${new Date().toISOString().replace(/[:.]/g, '-')}.jpg`;
+                    compressImageFile(file).then(data => {
+                        this.taskAttachments.push({ name, data });
+                        this._renderTaskAttachmentPreviews();
+                    });
+                    break;
+                }
+            }
+        });
+
+        // Seleção de arquivos de imagem via input
+        document.getElementById('task-attachments')?.addEventListener('change', async (e) => {
+            for (const file of e.target.files) {
+                const data = await compressImageFile(file);
+                this.taskAttachments.push({ name: file.name, data });
+            }
+            e.target.value = '';
+            this._renderTaskAttachmentPreviews();
         });
 
         // Renderizar Views
@@ -163,6 +212,8 @@ class AppController {
             document.getElementById('form-task').reset();
             document.getElementById('task-id').value = '';
             document.getElementById('modal-task-title').innerText = 'Nova Tarefa';
+            this.taskAttachments = [];
+            this._renderTaskAttachmentPreviews();
         }
         if (modalId === 'modal-task-time') {
             document.getElementById('form-task-time').reset();
@@ -393,15 +444,6 @@ class AppController {
         const dueDate = document.getElementById('task-due-date').value;
         const estimated = document.getElementById('task-estimated').value;
         const status = document.getElementById('task-status').value;
-        const attachmentsInput = document.getElementById('task-attachments');
-        let attachments = [];
-
-        if (attachmentsInput.files && attachmentsInput.files.length > 0) {
-            for (let i = 0; i < attachmentsInput.files.length; i++) {
-                attachments.push(attachmentsInput.files[i].name);
-            }
-        }
-
         const taskData = {
             clientId,
             title,
@@ -410,7 +452,7 @@ class AppController {
             priority,
             dueDate,
             estimatedMinutes: estimated,
-            attachments
+            attachments: this.taskAttachments
         };
 
         const btn = e.target.querySelector('[type="submit"]');
@@ -466,8 +508,28 @@ class AppController {
         document.getElementById('task-due-date').value = t.dueDate;
         document.getElementById('task-estimated').value = t.estimatedMinutes || '';
         document.getElementById('task-status').value = t.status;
+        this.taskAttachments = t.attachments ? [...t.attachments] : [];
+        this._renderTaskAttachmentPreviews();
 
         this.openModal('modal-task');
+    }
+
+    _renderTaskAttachmentPreviews() {
+        const container = document.getElementById('task-attach-previews');
+        const hint = document.getElementById('task-attach-hint');
+        if (!container) return;
+        if (hint) hint.style.display = this.taskAttachments.length ? 'none' : '';
+        container.innerHTML = this.taskAttachments.map((att, i) => `
+            <div class="attach-thumb">
+                <img src="${att.data}" alt="${escHtml(att.name)}" onclick="window.open(this.src,'_blank')" title="${escHtml(att.name)}">
+                <button type="button" class="attach-remove" onclick="app.removeTaskAttachment(${i})" title="Remover">×</button>
+            </div>
+        `).join('');
+    }
+
+    removeTaskAttachment(index) {
+        this.taskAttachments.splice(index, 1);
+        this._renderTaskAttachmentPreviews();
     }
 
     async handleDeleteTask(id) {
@@ -1108,7 +1170,10 @@ class AppController {
 
             let attachmentsHtml = '';
             if (task.attachments && task.attachments.length > 0) {
-                attachmentsHtml = `<span><i data-lucide="paperclip" style="width: 12px; height: 12px;"></i> ${task.attachments.length} anexo(s)</span>`;
+                const thumb = task.attachments[0]?.data
+                    ? `<img src="${task.attachments[0].data}" style="width:14px;height:14px;object-fit:cover;border-radius:2px;vertical-align:middle;margin-right:3px;">`
+                    : '';
+                attachmentsHtml = `<span>${thumb}<i data-lucide="paperclip" style="width:12px;height:12px;"></i> ${task.attachments.length} anexo(s)</span>`;
             }
 
             card.innerHTML = `
