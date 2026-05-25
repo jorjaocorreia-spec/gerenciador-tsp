@@ -521,10 +521,27 @@ class AppController {
         if (hint) hint.style.display = this.taskAttachments.length ? 'none' : '';
         container.innerHTML = this.taskAttachments.map((att, i) => `
             <div class="attach-thumb">
-                <img src="${att.data}" alt="${escapeHtml(att.name)}" onclick="window.open(this.src,'_blank')" title="${escapeHtml(att.name)}">
+                <img src="${att.data}" alt="${escapeHtml(att.name)}" onclick="app._openAttachmentLightbox(${i})" title="${escapeHtml(att.name)}">
                 <button type="button" class="attach-remove" onclick="app.removeTaskAttachment(${i})" title="Remover">×</button>
             </div>
         `).join('');
+    }
+
+    _openAttachmentLightbox(index) {
+        const att = this.taskAttachments[index];
+        if (!att) return;
+        const overlay = document.createElement('div');
+        overlay.style.cssText = 'position:fixed;inset:0;z-index:99999;background:rgba(0,0,0,0.88);display:flex;align-items:center;justify-content:center;cursor:zoom-out;';
+        const img = document.createElement('img');
+        img.src = att.data;
+        img.style.cssText = 'max-width:90vw;max-height:90vh;border-radius:8px;object-fit:contain;box-shadow:0 8px 40px rgba(0,0,0,0.6);cursor:default;';
+        img.addEventListener('click', (e) => e.stopPropagation());
+        overlay.appendChild(img);
+        overlay.addEventListener('click', () => overlay.remove());
+        document.addEventListener('keydown', function esc(e) {
+            if (e.key === 'Escape') { overlay.remove(); document.removeEventListener('keydown', esc); }
+        });
+        document.body.appendChild(overlay);
     }
 
     removeTaskAttachment(index) {
