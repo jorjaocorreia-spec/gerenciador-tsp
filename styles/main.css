@@ -1117,3 +1117,71 @@ body.money-hidden .money-value {
   from { opacity: 1; transform: translateX(0); }
   to   { opacity: 0; transform: translateX(40px); }
 }
+
+/* ── Apontamentos ─────────────────────────────────────────── */
+.view-header { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; margin-bottom: 24px; }
+.view-header-left { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
+.view-header-actions { display: flex; gap: 8px; align-items: center; }
+
+.apontamentos-date-nav { display: flex; align-items: center; gap: 8px; }
+.apt-date-label { font-weight: 600; min-width: 160px; text-align: center; font-size: 0.95rem; }
+
+.apt-table { border-radius: var(--radius); overflow: hidden; }
+.apt-table-header,
+.apt-row {
+    display: grid;
+    grid-template-columns: 150px 80px 1fr 60px 76px;
+    padding: 10px 16px;
+    gap: 12px;
+    align-items: center;
+}
+.apt-table-header {
+    font-weight: 600;
+    font-size: 0.78rem;
+    text-transform: uppercase;
+    letter-spacing: .05em;
+    opacity: .55;
+    border-bottom: 1px solid rgba(255,255,255,.08);
+}
+.apt-row { border-bottom: 1px solid rgba(255,255,255,.06); transition: background .15s; }
+.apt-row:last-of-type { border-bottom: none; }
+.apt-row:hover { background: rgba(255,255,255,.04); }
+.apt-horario { font-variant-numeric: tabular-nums; color: var(--primary-color, #7c3aed); font-weight: 500; }
+.apt-proj { font-weight: 600; }
+.apt-desc { opacity: .9; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.apt-dur { opacity: .65; font-size: .85rem; font-variant-numeric: tabular-nums; }
+.apt-actions { display: flex; gap: 4px; justify-content: flex-end; }
+.apt-table-footer {
+    padding: 10px 16px;
+    text-align: right;
+    border-top: 1px solid rgba(255,255,255,.12);
+    font-size: 0.9rem;
+    opacity: .8;
+}
+.apt-duration-display {
+    display: inline-block;
+    padding: 6px 12px;
+    background: rgba(255,255,255,.06);
+    border-radius: 6px;
+    font-variant-numeric: tabular-nums;
+    min-width: 64px;
+    text-align: center;
+    font-weight: 600;
+    border: 1px solid rgba(255,255,255,.1);
+}
+.btn-sm { padding: 5px 12px; font-size: .82rem; }
+.btn-icon-sm {
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 5px;
+    border-radius: 6px;
+    opacity: .55;
+    transition: opacity .15s, color .15s;
+    color: inherit;
+    display: inline-flex;
+    align-items: center;
+}
+.btn-icon-sm:hover { opacity: 1; }
+.btn-icon-sm svg { width: 15px; height: 15px; }
+.btn-danger-sm:hover { color: #f87171; }

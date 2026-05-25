@@ -37,6 +37,13 @@ class TSPStore {
             createdAt: r.created_at };
     }
 
+    _apontamento(r) {
+        return { id: r.id, date: r.date,
+            startTime: r.start_time || '', endTime: r.end_time || '',
+            projectNum: r.project_num || '', description: r.description || '',
+            createdAt: r.created_at };
+    }
+
     // ── CLIENTES ─────────────────────────────────────────────────
 
     async getClients() {
@@ -348,6 +355,43 @@ class TSPStore {
                 { user_id: uid, google_client_id: googleClientId, google_api_key: googleApiKey, updated_at: new Date().toISOString() },
                 { onConflict: 'user_id' }
             );
+        if (error) throw error;
+    }
+
+    // ── APONTAMENTOS ─────────────────────────────────────────────
+
+    async getApontamentos(date) {
+        const { data, error } = await this.db.from('apontamentos')
+            .select('*')
+            .eq('user_id', this.userId)
+            .eq('date', date)
+            .order('start_time');
+        if (error) throw error;
+        return (data || []).map(r => this._apontamento(r));
+    }
+
+    async addApontamento(date, startTime, endTime, projectNum, description) {
+        const { data, error } = await this.db.from('apontamentos').insert({
+            user_id: this.userId, date,
+            start_time: startTime, end_time: endTime,
+            project_num: projectNum, description: description || ''
+        }).select().single();
+        if (error) throw error;
+        return this._apontamento(data);
+    }
+
+    async updateApontamento(id, date, startTime, endTime, projectNum, description) {
+        const { data, error } = await this.db.from('apontamentos').update({
+            date, start_time: startTime, end_time: endTime,
+            project_num: projectNum, description: description || ''
+        }).eq('id', id).eq('user_id', this.userId).select().single();
+        if (error) throw error;
+        return this._apontamento(data);
+    }
+
+    async deleteApontamento(id) {
+        const { error } = await this.db.from('apontamentos').delete()
+            .eq('id', id).eq('user_id', this.userId);
         if (error) throw error;
     }
 }

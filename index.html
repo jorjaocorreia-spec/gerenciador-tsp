@@ -89,6 +89,9 @@
             <li class="nav-item" data-view="agenda" title="Agenda">
                 <i data-lucide="calendar"></i><span class="nav-label">Agenda</span>
             </li>
+            <li class="nav-item" data-view="apontamentos" title="Apontamentos">
+                <i data-lucide="clipboard-list"></i><span class="nav-label">Apontamentos</span>
+            </li>
         </ul>
         <div class="sidebar-bottom">
             <p class="text-muted sidebar-section-label">SISTEMA</p>
@@ -400,6 +403,32 @@
                     </tbody>
                 </table>
             </div>
+        </section>
+
+        <!-- VIEW: APONTAMENTOS -->
+        <section class="view-section" id="view-apontamentos">
+            <div class="view-header">
+                <div class="view-header-left">
+                    <h1>Apontamentos</h1>
+                    <div class="apontamentos-date-nav">
+                        <button id="btn-apt-prev" class="btn-icon" title="Dia anterior">
+                            <i data-lucide="chevron-left"></i>
+                        </button>
+                        <span id="apt-date-label" class="apt-date-label"></span>
+                        <button id="btn-apt-next" class="btn-icon" title="Próximo dia">
+                            <i data-lucide="chevron-right"></i>
+                        </button>
+                        <button id="btn-apt-today" class="btn btn-secondary btn-sm">Hoje</button>
+                    </div>
+                </div>
+                <div class="view-header-actions">
+                    <button id="btn-new-apontamento" class="btn btn-primary">
+                        <i data-lucide="plus"></i>
+                        <span class="nav-label">Novo Apontamento</span>
+                    </button>
+                </div>
+            </div>
+            <div id="apontamentos-container"></div>
         </section>
 
     </main>
@@ -930,6 +959,50 @@
                     Após a migração, você poderá limpar os dados locais com segurança.
                 </p>
             </div>
+        </div>
+    </div>
+
+    <!-- MODAL: APONTAMENTO -->
+    <div class="modal-overlay" id="modal-apontamento">
+        <div class="modal glass" style="max-width: 560px;">
+            <div class="modal-header">
+                <h3 id="modal-apontamento-title">Novo Apontamento</h3>
+                <button class="close-modal" onclick="app.closeModal('modal-apontamento')"><i data-lucide="x"></i></button>
+            </div>
+            <form id="form-apontamento">
+                <input type="hidden" id="apt-id">
+                <div class="form-group">
+                    <label>Data</label>
+                    <input type="date" id="apt-date" class="form-control" required>
+                </div>
+                <div style="display: flex; gap: 16px; align-items: flex-end;">
+                    <div class="form-group" style="flex: 1;">
+                        <label>Hora Início</label>
+                        <input type="time" id="apt-start" class="form-control" required>
+                    </div>
+                    <div class="form-group" style="flex: 1;">
+                        <label>Hora Fim</label>
+                        <input type="time" id="apt-end" class="form-control" required>
+                    </div>
+                    <div class="form-group" style="flex: 0 0 auto;">
+                        <label>Duração</label>
+                        <span id="apt-duration" class="apt-duration-display">--</span>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Nº Projeto</label>
+                    <input type="text" id="apt-project" class="form-control" list="apt-project-list" placeholder="Ex: 2285" required autocomplete="off">
+                    <datalist id="apt-project-list"></datalist>
+                </div>
+                <div class="form-group">
+                    <label>Descrição</label>
+                    <textarea id="apt-description" class="form-control" rows="3" placeholder="O que foi feito..."></textarea>
+                </div>
+                <div style="display: flex; gap: 12px; margin-top: 8px;">
+                    <button type="button" class="btn btn-secondary" style="flex: 1; justify-content: center;" onclick="app.closeModal('modal-apontamento')">Cancelar</button>
+                    <button type="submit" class="btn btn-primary" style="flex: 2; justify-content: center;">Salvar</button>
+                </div>
+            </form>
         </div>
     </div>
 

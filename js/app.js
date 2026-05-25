@@ -43,6 +43,7 @@ class AppController {
         this.pendingPdfRecords = []; // Armazena temporariamente os registros do PDF lido
         this.agendaCurrentDate = new Date();
         this.agendaViewMode = 'schedule'; // daily, weekly, monthly or schedule
+        this.aptCurrentDate = new Date().toISOString().split('T')[0]; // 'YYYY-MM-DD'
         this.init();
     }
 
@@ -78,6 +79,24 @@ class AppController {
 
         // Configurar Importação de PDF
         this.setupPdfImport();
+
+        // Apontamentos
+        document.getElementById('btn-new-apontamento')
+            ?.addEventListener('click', () => this.openNewApontamento());
+        document.getElementById('btn-apt-prev')
+            ?.addEventListener('click', () => this.aptNavigateDay(-1));
+        document.getElementById('btn-apt-next')
+            ?.addEventListener('click', () => this.aptNavigateDay(1));
+        document.getElementById('btn-apt-today')
+            ?.addEventListener('click', () => {
+                this.aptCurrentDate = new Date().toISOString().split('T')[0];
+                this.renderApontamentos();
+            });
+        document.getElementById('form-apontamento')
+            ?.addEventListener('submit', (e) => this.handleApontamentoSubmit(e));
+        ['apt-start', 'apt-end'].forEach(id => {
+            document.getElementById(id)?.addEventListener('change', () => this.updateAptDuration());
+        });
 
         // Renderizar Views
         this.renderAll();
@@ -522,7 +541,8 @@ class AppController {
             this.renderClientDashboard(),
             this.renderMonthRecords(),
             this.renderTasks(),
-            this.renderAgenda()
+            this.renderAgenda(),
+            this.renderApontamentos()
         ]);
         lucide.createIcons();
     }
@@ -2327,6 +2347,193 @@ class AppController {
         } catch (err) {
             statusEl.innerHTML = '';
             Toast.show('Erro ao carregar configurações: ' + err.message, 'error');
+        }
+    }
+
+    // ===================================
+    // APONTAMENTOS
+    // ===================================
+
+    calcDuration(startTime, endTime) {
+        if (!startTime || !endTime) return { minutes: 0, label: '--' };
+        const [sh, sm] = startTime.split(':').map(Number);
+        const [eh, em] = endTime.split(':').map(Number);
+        let minutes = (eh * 60 + em) - (sh * 60 + sm);
+        if (minutes < 0) minutes = 0;
+        const h = Math.floor(minutes / 60);
+        const m = minutes % 60;
+        const label = h > 0 ? `${h}h${m > 0 ? String(m).padStart(2, '0') : ''}` : `${m}min`;
+        return { minutes, label };
+    }
+
+    updateAptDuration() {
+        const start = document.getElementById('apt-start')?.value;
+        const end = document.getElementById('apt-end')?.value;
+        const el = document.getElementById('apt-duration');
+        if (el) el.textContent = this.calcDuration(start, end).label;
+    }
+
+    aptNavigateDay(delta) {
+        const d = new Date(this.aptCurrentDate + 'T12:00:00');
+        d.setDate(d.getDate() + delta);
+        this.aptCurrentDate = d.toISOString().split('T')[0];
+        this.renderApontamentos();
+    }
+
+    async renderApontamentos() {
+        if (this.currentView !== 'apontamentos') return;
+        const container = document.getElementById('apontamentos-container');
+        if (!container) return;
+        container.innerHTML = spinnerHtml;
+
+        const label = document.getElementById('apt-date-label');
+        if (label) {
+            const [y, m, d] = this.aptCurrentDate.split('-');
+            const today = new Date().toISOString().split('T')[0];
+            label.textContent = this.aptCurrentDate === today
+                ? `Hoje — ${d}/${m}/${y}`
+                : `${d}/${m}/${y}`;
+        }
+
+        try {
+            const items = await store.getApontamentos(this.aptCurrentDate);
+            container.innerHTML = '';
+
+            if (items.length === 0) {
+                container.innerHTML = `
+                    <div class="glass empty-state" style="text-align:center;padding:40px;display:flex;flex-direction:column;align-items:center;gap:16px;">
+                        <i data-lucide="clipboard-list" style="width:32px;height:32px;opacity:.4"></i>
+                        <p class="text-muted">Nenhum apontamento para este dia.</p>
+                        <button class="btn btn-primary" onclick="app.openNewApontamento()">
+                            <i data-lucide="plus"></i> Novo Apontamento
+                        </button>
+                    </div>`;
+                lucide.createIcons();
+                return;
+            }
+
+            let totalMinutes = 0;
+            const table = document.createElement('div');
+            table.className = 'apt-table glass';
+            table.innerHTML = `
+                <div class="apt-table-header">
+                    <span>Horário</span><span>Proj.</span><span>Descrição</span><span>Dur.</span><span></span>
+                </div>`;
+
+            items.forEach(item => {
+                const dur = this.calcDuration(item.startTime, item.endTime);
+                totalMinutes += dur.minutes;
+                const row = document.createElement('div');
+                row.className = 'apt-row';
+                row.innerHTML = `
+                    <span class="apt-horario">${escapeHtml(item.startTime)} – ${escapeHtml(item.endTime)}</span>
+                    <span class="apt-proj">${escapeHtml(item.projectNum)}</span>
+                    <span class="apt-desc">${escapeHtml(item.description)}</span>
+                    <span class="apt-dur">${dur.label}</span>
+                    <span class="apt-actions">
+                        <button class="btn-icon-sm" title="Editar" onclick="app.openEditApontamento('${item.id}')">
+                            <i data-lucide="pencil"></i>
+                        </button>
+                        <button class="btn-icon-sm btn-danger-sm" title="Excluir" onclick="app.deleteApontamento('${item.id}')">
+                            <i data-lucide="trash-2"></i>
+                        </button>
+                    </span>`;
+                table.appendChild(row);
+            });
+
+            const h = Math.floor(totalMinutes / 60);
+            const m = totalMinutes % 60;
+            const footer = document.createElement('div');
+            footer.className = 'apt-table-footer';
+            footer.innerHTML = `<span>Total do dia: <strong>${h}h${m > 0 ? String(m).padStart(2, '0') + 'min' : ''}</strong></span>`;
+            table.appendChild(footer);
+
+            container.appendChild(table);
+            lucide.createIcons();
+        } catch (err) {
+            container.innerHTML = `<div class="glass" style="padding:24px;"><p class="text-muted">Erro ao carregar: ${err.message}</p></div>`;
+        }
+    }
+
+    async populateAptProjectList() {
+        const clients = await store.getClients();
+        const list = document.getElementById('apt-project-list');
+        if (!list) return;
+        list.innerHTML = clients
+            .filter(c => c.projectNum)
+            .map(c => `<option value="${escapeHtml(c.projectNum)}" label="${escapeHtml(c.name)}">`)
+            .join('');
+    }
+
+    async openNewApontamento() {
+        document.getElementById('apt-id').value = '';
+        document.getElementById('modal-apontamento-title').textContent = 'Novo Apontamento';
+        document.getElementById('apt-date').value = this.aptCurrentDate;
+        document.getElementById('apt-start').value = '';
+        document.getElementById('apt-end').value = '';
+        document.getElementById('apt-project').value = '';
+        document.getElementById('apt-description').value = '';
+        document.getElementById('apt-duration').textContent = '--';
+        await this.populateAptProjectList();
+        this.openModal('modal-apontamento');
+    }
+
+    async openEditApontamento(id) {
+        const items = await store.getApontamentos(this.aptCurrentDate);
+        const item = items.find(i => i.id === id);
+        if (!item) return;
+        document.getElementById('apt-id').value = item.id;
+        document.getElementById('modal-apontamento-title').textContent = 'Editar Apontamento';
+        document.getElementById('apt-date').value = item.date;
+        document.getElementById('apt-start').value = item.startTime;
+        document.getElementById('apt-end').value = item.endTime;
+        document.getElementById('apt-project').value = item.projectNum;
+        document.getElementById('apt-description').value = item.description;
+        document.getElementById('apt-duration').textContent = this.calcDuration(item.startTime, item.endTime).label;
+        await this.populateAptProjectList();
+        this.openModal('modal-apontamento');
+    }
+
+    async handleApontamentoSubmit(e) {
+        e.preventDefault();
+        const id = document.getElementById('apt-id').value;
+        const date = document.getElementById('apt-date').value;
+        const startTime = document.getElementById('apt-start').value;
+        const endTime = document.getElementById('apt-end').value;
+        const projectNum = document.getElementById('apt-project').value.trim();
+        const description = document.getElementById('apt-description').value.trim();
+
+        if (!date || !startTime || !endTime || !projectNum) {
+            Toast.show('Preencha todos os campos obrigatórios.', 'error');
+            return;
+        }
+
+        const btn = e.target.querySelector('[type="submit"]');
+        btn.disabled = true;
+        try {
+            if (id) {
+                await store.updateApontamento(id, date, startTime, endTime, projectNum, description);
+            } else {
+                await store.addApontamento(date, startTime, endTime, projectNum, description);
+            }
+            this.closeModal('modal-apontamento');
+            await this.renderApontamentos();
+            Toast.show(id ? 'Apontamento atualizado.' : 'Apontamento salvo.', 'success');
+        } catch (err) {
+            Toast.show('Erro ao salvar: ' + err.message, 'error');
+        } finally {
+            btn.disabled = false;
+        }
+    }
+
+    async deleteApontamento(id) {
+        if (!confirm('Excluir este apontamento?')) return;
+        try {
+            await store.deleteApontamento(id);
+            await this.renderApontamentos();
+            Toast.show('Apontamento excluído.', 'success');
+        } catch (err) {
+            Toast.show('Erro ao excluir: ' + err.message, 'error');
         }
     }
 
