@@ -132,7 +132,7 @@ Todas têm `user_id uuid references auth.users` + RLS ativa (`auth.uid() = user_
 | `clients` | id, user_id, name, hours_total, cs_name, project_num, client_pays, notes, status |
 | `records` | id, user_id, client_id, date, start_time, end_time, minutes, description |
 | `tasks` | id, user_id, client_id, title, description, status, priority, due_date, estimated_minutes, spent_minutes |
-| `agenda_events` | id, user_id, client_id, related_task_id, title, type, date, **date_end**, start_time, end_time, location, calendar_event_id |
+| `agenda_events` | id, user_id, client_id, related_task_id, title, type, date, **date_end**, start_time, end_time, location, calendar_event_id, **meet_link**, **attendees** |
 | `apontamentos` | id, user_id, date, start_time, end_time, project_num, description |
 
 ### Fases de migração
@@ -150,6 +150,7 @@ Todas têm `user_id uuid references auth.users` + RLS ativa (`auth.uid() = user_
 - **Fase 11** ✅ — Agenda: botão "Excluir" no modal de edição de agendamento (visível apenas ao editar); `deleteAgendaEventFromModal()` lida com remoção no Supabase + Google Calendar + fechamento do modal
 - **Fase 12** ✅ — Agenda: checkbox "Dia inteiro" no modal; quando marcado, oculta campos de horário e salva `startTime: ''`; eventos dia-inteiro exibidos como banners coloridos acima da grade horária nas views diária e semanal; view schedule exibe "Dia inteiro"; tooltip mensal atualizado; Google Calendar recebe formato `date` (sem hora) para eventos dia-inteiro
 - **Fase 13** ✅ — Tarefas: anexos reais com paste de prints (Ctrl+V) e seleção de arquivos; imagens salvas como base64 JPEG em coluna `attachments JSONB` na tabela `tasks`; thumbnails no modal com remoção individual; miniatura no card Kanban; compressão automática via Canvas (max 1400px, JPEG 75%)
+- **Fase 14** ✅ — Agenda: Google Meet + convites por e-mail; checkbox "Gerar link do Google Meet" no modal (visível apenas quando sync Google ativo); campo Participantes (e-mails separados por vírgula); `createGoogleEvent()` usa `conferenceDataVersion=1` + `sendUpdates='all'` — Google gera a sala e envia convites automaticamente; `meetLink` salvo localmente; sync bidirecional captura `hangoutLink` e `attendees` do Google; ícone de vídeo clicável nos event blocks e na view schedule; botão Copiar no bloco read-only do link Meet
 
 ---
 
@@ -211,6 +212,10 @@ O `docker-entrypoint.sh` injeta essas vars em `js/config.js` via `envsubst` na i
 - **Agenda: eventos multi-dia usam `date_end`** — `_event()` retorna `dateEnd: r.date_end || r.date`. Queries usam overlap detection via `.or('date_end.gte.X,and(date_end.is.null,...)')`. Nos renders mensal e semanal, filtrar com `e.date <= iso && (e.dateEnd || e.date) >= iso`; nunca filtrar só por `e.date === iso`.
 - **Agenda: `openNewAgendaEvent(dateStr)` é o ponto de entrada para novo agendamento** — chama `closeModal` + `openModal` em sequência (síncrono), sobrescreve as datas e oculta o botão excluir. Cells/colunas do grid e o botão "+ Novo Agendamento" chamam este método. Eventos dentro do grid têm `event.stopPropagation()` para não acionar o click da célula pai.
 - **Agenda: botão excluir no modal** — `#btn-delete-agenda-event` fica oculto (`display:none`) por padrão; `editAgendaEvent()` o exibe (`display:flex`); `openNewAgendaEvent()` o oculta novamente. `deleteAgendaEventFromModal()` lê o ID de `#agenda-id`, remove do Supabase (e do Google Calendar se `calendarEventId` existir), fecha o modal e re-renderiza a agenda.
+- **Agenda: Google Meet — `conferenceDataVersion=1` é obrigatório** — sem esse parâmetro na chamada `gapi.client.calendar.events.insert/update`, o Google ignora o campo `conferenceData` e não gera a sala Meet. O parâmetro é passado junto com `resource`, não dentro dele.
+- **Agenda: `createGoogleEvent()` retorna `{ id, meetLink }`** — retorno mudou da Fase 14 em diante (antes retornava só `id`). Todo código que consome o retorno deve desestruturar: `const result = await calendarAPI.createGoogleEvent(ev); if (result) { ev.calendarEventId = result.id; ev.meetLink = result.meetLink; }`. O mesmo vale para `updateGoogleEvent()` que retorna `{ ok, meetLink }`.
+- **Agenda: `agenda-generate-meet-row` visível somente quando sync Google ativo** — a linha do checkbox "Gerar Meet" começa oculta; o listener em `agenda-sync-google` a exibe quando marcado. `editAgendaEvent()` a oculta se o evento já tem `meetLink` (evita gerar segundo link). `openNewAgendaEvent()` controla a visibilidade com base no estado atual do checkbox de sync.
+- **Agenda: Meet não é regenerado no update** — `mapLocalToGoogleEvent()` só inclui `conferenceData` quando `generateMeet === true && !meetLink`. Se o evento já tem um Meet link, o update preserva o link original e não cria uma nova sala.
 - **Agenda: "Dia inteiro" — identificação e renderização** — eventos dia-inteiro são identificados por `startTime === ''` (string vazia no banco). `toggleAllDayAgenda(bool)` controla visibilidade de `#agenda-time-fields` e o atributo `required` dos inputs de hora. `editAgendaEvent()` detecta allDay e chama `toggleAllDayAgenda(true)`. Nas views diária/semanal, allDay events são filtrados ANTES de `createEventBlockHtml` (que crasharia com `startTime=''`) e renderizados em `createAllDayBannerHtml`. Google Calendar: `mapLocalToGoogleEvent` envia `{ date }` (sem hora) para allDay; na sync reversa, `gEv.end.date` é exclusivo — subtrai 1 dia para `dateEnd`.
 
 ### Cálculos automáticos
