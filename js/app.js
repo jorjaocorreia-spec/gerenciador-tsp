@@ -171,7 +171,9 @@ class AppController {
         if (modalId === 'modal-agenda-event') {
             document.getElementById('form-agenda-event').reset();
             document.getElementById('agenda-id').value = '';
+            document.getElementById('agenda-calendar-event-id').value = '';
             document.getElementById('modal-agenda-title').innerText = 'Novo Agendamento';
+            document.getElementById('agenda-sync-google').checked = calendarAPI.isEnabled;
         }
     }
 
@@ -1331,7 +1333,7 @@ class AppController {
         document.getElementById('agenda-end').value = ev.endTime;
         document.getElementById('agenda-location').value = ev.location;
         document.getElementById('agenda-calendar-event-id').value = ev.calendarEventId || '';
-        document.getElementById('agenda-sync-google').checked = !!ev.calendarEventId;
+        document.getElementById('agenda-sync-google').checked = calendarAPI.isEnabled;
 
         this.openModal('modal-agenda-event');
     }
@@ -1800,10 +1802,16 @@ class AppController {
             }
         }
 
-        // 2. Idealmente tb empurra o que criamos offline com a flag de sync mas
-        // para essa versão dependemos do modal "Sincronizar [x]" fazer o PUSH unitario.
-        // Se deletaram no google, poderiamos deletar aqui também cruzando IDs
-        // Simplificado: Assumimos GAPI sync unilateral PULL e local edits dão PUSH
+        // 2. Empurra eventos locais que ainda não têm calendarEventId
+        const googleIds = new Set(googleEvents.map(g => g.id));
+        for (const le of localEvents) {
+            if (le.calendarEventId && googleIds.has(le.calendarEventId)) continue; // já existe no Google
+            const gCalId = await calendarAPI.createGoogleEvent(le);
+            if (gCalId) {
+                le.calendarEventId = gCalId;
+                await store.updateAgendaEvent(le);
+            }
+        }
     }
 
     // ===================================
