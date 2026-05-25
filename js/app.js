@@ -2086,8 +2086,15 @@ class AppController {
             const [sH, sM] = startTime.split(':').map(Number);
             const [eH, eM] = endTime.split(':').map(Number);
 
-            // Descarta linhas onde Hora Inicial/Final claramente não são horários (CC > 59 indica parse errado)
-            if (sM > 59 || eM > 59) continue;
+            // SAP às vezes usa notação centesimal também em Hora Inicial/Final (ex: 16:75 = 16h45m)
+            // Converter CC → MM quando minutos > 59; caso contrário manter como está
+            const pad2 = n => String(n).padStart(2, '0');
+            const normStart = sM > 59
+                ? `${pad2(sH)}:${pad2(Math.round(sM * 60 / 100))}`
+                : startTime;
+            const normEnd = eM > 59
+                ? `${pad2(eH)}:${pad2(Math.round(eM * 60 / 100))}`
+                : endTime;
 
             // Usa a coluna "Horas Aplicadas" (centesimal) — fonte oficial de duração no SAP
             const [aH, aC] = horasAplicadas.split(':').map(Number);
@@ -2099,8 +2106,8 @@ class AppController {
                 clientNamePdf,
                 dateStrBrazil: dateStr,
                 date: isoDate,
-                startTime,
-                endTime,
+                startTime: normStart,
+                endTime: normEnd,
                 minutes: diffMins,
                 description,
             });
