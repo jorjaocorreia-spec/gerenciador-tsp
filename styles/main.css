@@ -1130,7 +1130,7 @@ body.money-hidden .money-value {
 .apt-table-header,
 .apt-row {
     display: grid;
-    grid-template-columns: 150px 80px 1fr 60px 112px;
+    grid-template-columns: 150px 80px 1fr 60px 148px;
     padding: 10px 16px;
     gap: 12px;
     align-items: center;
