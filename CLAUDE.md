@@ -147,6 +147,8 @@ Todas têm `user_id uuid references auth.users` + RLS ativa (`auth.uid() = user_
 - **Fase 8** ✅ — Importação de Ata PDF (SAP): parser page-by-page, extração de nome do cliente, criação automática de cliente, validação de horas centesimais
 - **Fase 9** ✅ — View Apontamentos: log diário independente de clientes (horário, nº projeto, descrição) para conferência antes de lançar no ERP; tabela `apontamentos` com RLS
 - **Fase 10** ✅ — Agenda: clicar no dia abre novo agendamento direto; campo Data Final (`date_end`) para eventos multi-dia; queries com overlap detection; sync Google Calendar usa dateEnd
+- **Fase 11** ✅ — Agenda: botão "Excluir" no modal de edição de agendamento (visível apenas ao editar); `deleteAgendaEventFromModal()` lida com remoção no Supabase + Google Calendar + fechamento do modal
+- **Fase 12** ✅ — Agenda: checkbox "Dia inteiro" no modal; quando marcado, oculta campos de horário e salva `startTime: ''`; eventos dia-inteiro exibidos como banners coloridos acima da grade horária nas views diária e semanal; view schedule exibe "Dia inteiro"; tooltip mensal atualizado; Google Calendar recebe formato `date` (sem hora) para eventos dia-inteiro
 
 ---
 
@@ -203,7 +205,9 @@ O `docker-entrypoint.sh` injeta essas vars em `js/config.js` via `envsubst` na i
 - **Sidebar: todo texto usa `<span class="nav-label">`** — nav-items, botões da `sidebar-bottom` e email do usuário têm o texto em `<span class="nav-label">`. Esse span é o que CSS esconde no estado `.sidebar.collapsed`. Novos itens de menu ou botões adicionados ao sidebar sem esse span não respondem ao colapso. Cada nav-item também precisa do atributo `title="Nome"` para exibir tooltip quando colapsado.
 - **Sidebar: dois estados via `sessionStorage`** — `sidebarCollapsed` ('1' = colapsado) e `moneyHidden` ('1' = oculto). Ambos são aplicados em `initAfterAuth()`. O padrão é: se a chave não existir no sessionStorage, o default é expandido/visível. A sidebar vai de 260px (expandida) para 70px (colapsada) com `transition: width 0.25s ease` no CSS.
 - **Agenda: eventos multi-dia usam `date_end`** — `_event()` retorna `dateEnd: r.date_end || r.date`. Queries usam overlap detection via `.or('date_end.gte.X,and(date_end.is.null,...)')`. Nos renders mensal e semanal, filtrar com `e.date <= iso && (e.dateEnd || e.date) >= iso`; nunca filtrar só por `e.date === iso`.
-- **Agenda: `openNewAgendaEvent(dateStr)` é o ponto de entrada para novo agendamento** — chama `closeModal` + `openModal` em sequência (síncrono) e depois sobrescreve as datas. Cells/colunas do grid chamam este método; o botão "+ Novo Agendamento" ainda usa `openModal` diretamente (abre com hoje). Eventos dentro do grid têm `event.stopPropagation()` para não acionar o click da célula pai.
+- **Agenda: `openNewAgendaEvent(dateStr)` é o ponto de entrada para novo agendamento** — chama `closeModal` + `openModal` em sequência (síncrono), sobrescreve as datas e oculta o botão excluir. Cells/colunas do grid e o botão "+ Novo Agendamento" chamam este método. Eventos dentro do grid têm `event.stopPropagation()` para não acionar o click da célula pai.
+- **Agenda: botão excluir no modal** — `#btn-delete-agenda-event` fica oculto (`display:none`) por padrão; `editAgendaEvent()` o exibe (`display:flex`); `openNewAgendaEvent()` o oculta novamente. `deleteAgendaEventFromModal()` lê o ID de `#agenda-id`, remove do Supabase (e do Google Calendar se `calendarEventId` existir), fecha o modal e re-renderiza a agenda.
+- **Agenda: "Dia inteiro" — identificação e renderização** — eventos dia-inteiro são identificados por `startTime === ''` (string vazia no banco). `toggleAllDayAgenda(bool)` controla visibilidade de `#agenda-time-fields` e o atributo `required` dos inputs de hora. `editAgendaEvent()` detecta allDay e chama `toggleAllDayAgenda(true)`. Nas views diária/semanal, allDay events são filtrados ANTES de `createEventBlockHtml` (que crasharia com `startTime=''`) e renderizados em `createAllDayBannerHtml`. Google Calendar: `mapLocalToGoogleEvent` envia `{ date }` (sem hora) para allDay; na sync reversa, `gEv.end.date` é exclusivo — subtrai 1 dia para `dateEnd`.
 
 ### Cálculos automáticos
 - Comissão do consultor = 43% do valor pago pelo cliente (`clientPays * 0.43`)
@@ -221,7 +225,7 @@ O `docker-entrypoint.sh` injeta essas vars em `js/config.js` via `envsubst` na i
 | **Clientes** | CRUD de clientes; campos: nome, horas, CS, nº projeto, valor, notas, status |
 | **Atendimentos** | Log de horas por cliente; filtros por cliente e período; exportação PDF |
 | **Tarefas** | Kanban (Novas / Em Execução / Finalizadas) com drag-and-drop e métricas |
-| **Agenda** | Calendário diário/semanal/mensal; 4 tipos de evento; eventos multi-dia (Data Inicial + Data Final); clicar no dia abre novo agendamento; sincronização Google Calendar |
+| **Agenda** | Calendário diário/semanal/mensal; 4 tipos de evento; eventos multi-dia (Data Inicial + Data Final); clicar no dia abre novo agendamento; excluir pelo modal de edição; sincronização Google Calendar |
 | **Apontamentos** | Log diário: horário início/fim, nº projeto (texto livre + autocomplete de clientes), descrição; navegação por dia; total do dia calculado |
 
 ### Sidebar

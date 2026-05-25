@@ -1197,6 +1197,22 @@ class AppController {
         document.getElementById('agenda-date').value = dateStr;
         document.getElementById('agenda-date-end').value = dateStr;
         document.getElementById('btn-delete-agenda-event').style.display = 'none';
+        this.toggleAllDayAgenda(false);
+    }
+
+    toggleAllDayAgenda(isAllDay) {
+        const cb = document.getElementById('agenda-all-day');
+        const fields = document.getElementById('agenda-time-fields');
+        const startInput = document.getElementById('agenda-start');
+        const endInput = document.getElementById('agenda-end');
+        if (cb) cb.checked = isAllDay;
+        if (fields) fields.style.display = isAllDay ? 'none' : 'flex';
+        if (startInput) startInput.required = !isAllDay;
+        if (endInput) endInput.required = !isAllDay;
+        if (isAllDay) {
+            if (startInput) startInput.value = '';
+            if (endInput) endInput.value = '';
+        }
     }
 
     async switchAgendaMode(mode) {
@@ -1255,6 +1271,7 @@ class AppController {
 
         const startDate = document.getElementById('agenda-date').value;
         const endDate = document.getElementById('agenda-date-end').value || startDate;
+        const allDay = document.getElementById('agenda-all-day').checked;
         const eventData = {
             title: document.getElementById('agenda-title').value,
             description: document.getElementById('agenda-desc').value,
@@ -1263,8 +1280,8 @@ class AppController {
             relatedTaskId: document.getElementById('agenda-task').value || null,
             date: startDate,
             dateEnd: endDate < startDate ? startDate : endDate,
-            startTime: document.getElementById('agenda-start').value,
-            endTime: document.getElementById('agenda-end').value,
+            startTime: allDay ? '' : document.getElementById('agenda-start').value,
+            endTime: allDay ? '' : document.getElementById('agenda-end').value,
             location: document.getElementById('agenda-location').value
         };
 
@@ -1331,8 +1348,12 @@ class AppController {
         document.getElementById('agenda-task').value = ev.relatedTaskId || '';
         document.getElementById('agenda-date').value = ev.date;
         document.getElementById('agenda-date-end').value = ev.dateEnd || ev.date;
-        document.getElementById('agenda-start').value = ev.startTime;
-        document.getElementById('agenda-end').value = ev.endTime;
+        const isAllDay = !ev.startTime;
+        this.toggleAllDayAgenda(isAllDay);
+        if (!isAllDay) {
+            document.getElementById('agenda-start').value = ev.startTime;
+            document.getElementById('agenda-end').value = ev.endTime;
+        }
         document.getElementById('agenda-location').value = ev.location;
         document.getElementById('agenda-calendar-event-id').value = ev.calendarEventId || '';
         document.getElementById('agenda-sync-google').checked = calendarAPI.isEnabled;
@@ -1456,10 +1477,15 @@ class AppController {
         const clientsMap = {};
         await Promise.all(clientIds.map(async id => { clientsMap[id] = await store.getClient(id); }));
 
-        let eventsHtml = '';
-        events.forEach(ev => {
-            eventsHtml += this.createEventBlockHtml(ev, '100%', clientsMap);
-        });
+        const allDayEvents = events.filter(ev => !ev.startTime);
+        const timedEvents = events.filter(ev => ev.startTime);
+
+        let allDayHtml = allDayEvents.map(ev => this.createAllDayBannerHtml(ev, clientsMap)).join('');
+        let eventsHtml = timedEvents.map(ev => this.createEventBlockHtml(ev, '100%', clientsMap)).join('');
+
+        const allDaySection = allDayEvents.length > 0
+            ? `<div class="agenda-allday-row"><div class="agenda-allday-label">Dia inteiro</div><div class="agenda-allday-events">${allDayHtml}</div></div>`
+            : '';
 
         container.innerHTML = `
             <div class="agenda-grid">
@@ -1470,6 +1496,7 @@ class AppController {
                     <div class="agenda-days-row" style="grid-template-columns: 1fr;">
                         <div class="agenda-day-header active">${this.formatDateBR(this.agendaCurrentDate)}</div>
                     </div>
+                    ${allDaySection}
                     <div class="events-container" style="cursor: pointer;"
                          onclick="app.openNewAgendaEvent('${isoDate}')">
                         <div class="agenda-grid-lines"></div>
@@ -1499,7 +1526,9 @@ class AppController {
 
         const days = ['Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado', 'Domingo'];
         let headersHtml = '';
+        let allDayRowHtml = '';
         let columnsHtml = '';
+        let hasAnyAllDay = false;
 
         for (let i = 0; i < 7; i++) {
             const currentDay = new Date(monday);
@@ -1510,11 +1539,13 @@ class AppController {
             headersHtml += `<div class="agenda-day-header ${isToday ? 'active' : ''}">${days[i]}<br><small>${currentDay.getDate()}/${currentDay.getMonth() + 1}</small></div>`;
 
             const dayEvents = events.filter(e => e.date <= isoCurrentDay && (e.dateEnd || e.date) >= isoCurrentDay);
-            let dayEventsHtml = '';
-            dayEvents.forEach(ev => {
-                dayEventsHtml += this.createEventBlockHtml(ev, 'calc(100% - 8px)', clientsMap);
-            });
+            const allDayDayEvents = dayEvents.filter(ev => !ev.startTime);
+            const timedDayEvents = dayEvents.filter(ev => ev.startTime);
 
+            if (allDayDayEvents.length > 0) hasAnyAllDay = true;
+            allDayRowHtml += `<div class="agenda-allday-col">${allDayDayEvents.map(ev => this.createAllDayBannerHtml(ev, clientsMap)).join('')}</div>`;
+
+            let dayEventsHtml = timedDayEvents.map(ev => this.createEventBlockHtml(ev, 'calc(100% - 8px)', clientsMap)).join('');
             columnsHtml += `
                 <div style="position: relative; height: 100%; cursor: pointer;"
                      onclick="app.openNewAgendaEvent('${isoCurrentDay}')">
@@ -1522,6 +1553,10 @@ class AppController {
                 </div>
             `;
         }
+
+        const allDayWeekSection = hasAnyAllDay
+            ? `<div class="agenda-allday-row agenda-allday-week"><div class="agenda-allday-label">Dia inteiro</div><div class="agenda-allday-events" style="display:grid; grid-template-columns: repeat(7, 1fr); gap:4px;">${allDayRowHtml}</div></div>`
+            : '';
 
         container.innerHTML = `
             <div class="agenda-grid">
@@ -1532,6 +1567,7 @@ class AppController {
                     <div class="agenda-days-row" style="grid-template-columns: repeat(7, 1fr);">
                         ${headersHtml}
                     </div>
+                    ${allDayWeekSection}
                     <div class="events-container" style="display: grid; grid-template-columns: repeat(7, 1fr); gap: 8px;">
                         <div class="agenda-grid-lines"></div>
                         ${columnsHtml}
@@ -1585,9 +1621,10 @@ class AppController {
 
             let eventsHtml = '';
             dayEvents.forEach(ev => {
+                const timeLabel = ev.startTime ? `${ev.startTime} - ${ev.endTime}` : 'Dia inteiro';
                 eventsHtml += `<div class="agenda-month-event type-${ev.type}"
                      onclick="event.stopPropagation(); app.editAgendaEvent('${ev.id}')"
-                     title="${escapeHtml(ev.title)} (${ev.startTime} - ${ev.endTime})">
+                     title="${escapeHtml(ev.title)} (${timeLabel})">
                     ${escapeHtml(ev.title)}
                 </div>`;
             });
@@ -1685,7 +1722,7 @@ class AppController {
                         : '';
                     html += `<div class="schedule-event" onclick="app.editAgendaEvent('${ev.id}')">
                         <div class="schedule-event-dot type-${ev.type}"></div>
-                        <div class="schedule-event-time">${ev.startTime} – ${ev.endTime}</div>
+                        <div class="schedule-event-time">${ev.startTime ? `${ev.startTime} – ${ev.endTime}` : '<span style="font-style:italic; opacity:0.8;">Dia inteiro</span>'}</div>
                         <div class="schedule-event-info">
                             <span class="schedule-event-title">${escapeHtml(ev.title)}</span>
                             ${clientName}
@@ -1699,6 +1736,18 @@ class AppController {
 
         html += '</div>';
         container.innerHTML = html;
+    }
+
+    createAllDayBannerHtml(ev, clientsMap = {}) {
+        const typeClass = 'type-' + ev.type;
+        const clientName = ev.clientId && clientsMap[ev.clientId]
+            ? escapeHtml(clientsMap[ev.clientId].name) : '';
+        return `<div class="allday-event-banner ${typeClass}"
+                     onclick="event.stopPropagation(); app.editAgendaEvent('${ev.id}')"
+                     title="${escapeHtml(ev.title)}${clientName ? ' · ' + clientName : ''}">
+            <i data-lucide="sun" style="width:11px; height:11px; flex-shrink:0;"></i>
+            <span>${escapeHtml(ev.title)}${clientName ? ' · ' + clientName : ''}</span>
+        </div>`;
     }
 
     createEventBlockHtml(ev, width, clientsMap = {}) {
@@ -1784,8 +1833,9 @@ class AppController {
             let match = localEvents.find(le => le.calendarEventId === gEv.id);
 
             let evDate = '';
-            let evStart = '08:00';
-            let evEnd = '09:00';
+            let evStart = '';
+            let evEnd = '';
+            let evDateEnd = '';
 
             // Google lida com dateTime e date (allDay)
             if (gEv.start.dateTime) {
@@ -1796,8 +1846,17 @@ class AppController {
                 evDate = startObj.getFullYear() + "-" + String(startObj.getMonth() + 1).padStart(2, '0') + "-" + String(startObj.getDate()).padStart(2, '0');
                 evStart = String(startObj.getHours()).padStart(2, '0') + ":" + String(startObj.getMinutes()).padStart(2, '0');
                 evEnd = String(endObj.getHours()).padStart(2, '0') + ":" + String(endObj.getMinutes()).padStart(2, '0');
+                evDateEnd = evDate;
             } else if (gEv.start.date) {
-                evDate = gEv.start.date; // YYYY-MM-DD already
+                evDate = gEv.start.date;
+                // Google end date is exclusive for all-day events; subtract 1 day
+                if (gEv.end && gEv.end.date) {
+                    const d = new Date(gEv.end.date + 'T12:00:00');
+                    d.setDate(d.getDate() - 1);
+                    evDateEnd = d.toISOString().split('T')[0];
+                } else {
+                    evDateEnd = evDate;
+                }
             }
 
             if (!evDate) continue; // Pula se n conseguir extrair data
@@ -1808,6 +1867,7 @@ class AppController {
                 type: 'meeting',
                 location: gEv.location || '',
                 date: evDate,
+                dateEnd: evDateEnd || evDate,
                 startTime: evStart,
                 endTime: evEnd,
                 calendarEventId: gEv.id

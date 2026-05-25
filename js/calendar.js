@@ -148,12 +148,25 @@ const GoogleCalendarAPI = {
     },
 
     mapLocalToGoogleEvent(localEventData) {
+        const isAllDay = !localEventData.startTime;
+        const dateEnd = localEventData.dateEnd || localEventData.date;
+        // Google all-day events: end date is exclusive, so add 1 day
+        let googleEndDate = dateEnd;
+        if (isAllDay) {
+            const d = new Date(dateEnd + 'T12:00:00');
+            d.setDate(d.getDate() + 1);
+            googleEndDate = d.toISOString().split('T')[0];
+        }
         return {
             summary: localEventData.title || 'Evento TSP',
             description: (localEventData.description || '') + `\n\n[Gerado por TSP Manager - ID:${localEventData.id || ''}]`,
             location: localEventData.location || '',
-            start: { dateTime: this.toGoogleDateTime(localEventData.date, localEventData.startTime), timeZone: 'America/Sao_Paulo' },
-            end:   { dateTime: this.toGoogleDateTime(localEventData.dateEnd || localEventData.date, localEventData.endTime), timeZone: 'America/Sao_Paulo' }
+            start: isAllDay
+                ? { date: localEventData.date }
+                : { dateTime: this.toGoogleDateTime(localEventData.date, localEventData.startTime), timeZone: 'America/Sao_Paulo' },
+            end: isAllDay
+                ? { date: googleEndDate }
+                : { dateTime: this.toGoogleDateTime(dateEnd, localEventData.endTime), timeZone: 'America/Sao_Paulo' }
         };
     },
 
