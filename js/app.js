@@ -2369,6 +2369,10 @@ class AppController {
         }
     }
 
+    openAgendaHelp() {
+        this.openModal('modal-agenda-help');
+    }
+
     // ===================================
     // CONFIGURAÇÕES DO GOOGLE CALENDAR
     // ===================================

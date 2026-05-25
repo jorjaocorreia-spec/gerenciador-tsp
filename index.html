@@ -327,6 +327,9 @@
                     <button class="btn btn-secondary" id="btn-calendar-settings" onclick="app.openCalendarSettings()" title="Configurar integração Google Calendar">
                         <i data-lucide="settings"></i>
                     </button>
+                    <button class="btn btn-secondary" onclick="app.openAgendaHelp()" title="Como funciona a integração com Google Calendar" style="font-weight:600; min-width:36px;">
+                        <i data-lucide="help-circle"></i>
+                    </button>
                     <button class="btn btn-secondary active-mode" id="btn-agenda-schedule"
                         onclick="app.switchAgendaMode('schedule')">Programação</button>
                     <button class="btn btn-secondary" id="btn-agenda-monthly"
@@ -942,6 +945,76 @@
                     </button>
                 </form>
 
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL: AJUDA AGENDA / GOOGLE CALENDAR -->
+    <div class="modal-overlay" id="modal-agenda-help">
+        <div class="modal glass" style="max-width: 580px;">
+            <div class="modal-header">
+                <h3 style="display:flex; align-items:center; gap:8px;">
+                    <i data-lucide="help-circle" style="width:20px; height:20px; color:var(--primary);"></i>
+                    Como funciona a integração com o Google Calendar
+                </h3>
+                <button class="close-modal" onclick="app.closeModal('modal-agenda-help')">
+                    <i data-lucide="x"></i>
+                </button>
+            </div>
+
+            <div style="display: flex; flex-direction: column; gap: 20px; padding-top: 4px;">
+
+                <div style="display:flex; gap:14px; align-items:flex-start;">
+                    <div style="background:var(--primary); border-radius:50%; min-width:32px; height:32px; display:flex; align-items:center; justify-content:center; font-weight:700; font-size:0.9rem;">1</div>
+                    <div>
+                        <p style="font-weight:600; margin:0 0 4px;">Conecte sua conta Google (primeira vez)</p>
+                        <p class="text-muted" style="margin:0; font-size:0.875rem;">Clique no botão <strong style="color:var(--text-primary);">Sincronizar Google</strong> no topo da tela. Uma janela do Google será aberta pedindo permissão. Autorize e pronto — a conexão fica ativa durante a sessão.</p>
+                    </div>
+                </div>
+
+                <div style="display:flex; gap:14px; align-items:flex-start;">
+                    <div style="background:var(--primary); border-radius:50%; min-width:32px; height:32px; display:flex; align-items:center; justify-content:center; font-weight:700; font-size:0.9rem;">2</div>
+                    <div>
+                        <p style="font-weight:600; margin:0 0 4px;">Criar ou editar eventos na plataforma</p>
+                        <p class="text-muted" style="margin:0; font-size:0.875rem;">Ao criar ou editar um agendamento, o campo <strong style="color:var(--text-primary);">Sincronizar com Google Calendar</strong> já vem marcado automaticamente. Salve normalmente — o evento vai direto para o Google sem nenhuma ação extra.</p>
+                    </div>
+                </div>
+
+                <div style="display:flex; gap:14px; align-items:flex-start;">
+                    <div style="background:var(--primary); border-radius:50%; min-width:32px; height:32px; display:flex; align-items:center; justify-content:center; font-weight:700; font-size:0.9rem;">3</div>
+                    <div>
+                        <p style="font-weight:600; margin:0 0 4px;">Sincronizar o que está no Google Calendar</p>
+                        <p class="text-muted" style="margin:0; font-size:0.875rem;">O botão <strong style="color:var(--text-primary);">Sincronizar Google</strong> faz os dois sentidos: traz eventos do Google para cá <em>e</em> envia para o Google eventos que ainda não foram sincronizados. Use-o sempre que quiser atualizar tudo de uma vez.</p>
+                    </div>
+                </div>
+
+                <div style="display:flex; gap:14px; align-items:flex-start;">
+                    <div style="background: #f59e0b33; border-radius:50%; min-width:32px; height:32px; display:flex; align-items:center; justify-content:center;">
+                        <i data-lucide="alert-triangle" style="width:16px; height:16px; color:#f59e0b;"></i>
+                    </div>
+                    <div>
+                        <p style="font-weight:600; margin:0 0 4px;">A conexão se renova a cada sessão</p>
+                        <p class="text-muted" style="margin:0; font-size:0.875rem;">O Google exige reautorização a cada vez que você abre a plataforma. Se perceber que um evento não foi para o Google, clique em <strong style="color:var(--text-primary);">Sincronizar Google</strong> para reconectar e reenviar tudo.</p>
+                    </div>
+                </div>
+
+                <div style="display:flex; gap:14px; align-items:flex-start;">
+                    <div style="background: var(--bg-glass); border-radius:50%; min-width:32px; height:32px; display:flex; align-items:center; justify-content:center;">
+                        <i data-lucide="settings" style="width:16px; height:16px; color:var(--text-muted);"></i>
+                    </div>
+                    <div>
+                        <p style="font-weight:600; margin:0 0 4px;">Configurações de credenciais</p>
+                        <p class="text-muted" style="margin:0; font-size:0.875rem;">O ícone de <strong style="color:var(--text-primary);">engrenagem</strong> ao lado do botão de sincronização permite configurar o Client ID e API Key do Google Cloud, caso necessário.</p>
+                    </div>
+                </div>
+
+            </div>
+
+            <div style="margin-top: 24px; display:flex; gap:12px; justify-content:flex-end;">
+                <button class="btn btn-primary" onclick="app.closeModal('modal-agenda-help'); app.promptGoogleSync();">
+                    <i data-lucide="refresh-cw"></i> Sincronizar agora
+                </button>
+                <button class="btn btn-secondary" onclick="app.closeModal('modal-agenda-help')">Fechar</button>
             </div>
         </div>
     </div>
