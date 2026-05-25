@@ -2431,6 +2431,9 @@ class AppController {
                     <span class="apt-desc">${escapeHtml(item.description)}</span>
                     <span class="apt-dur">${dur.label}</span>
                     <span class="apt-actions">
+                        <button class="btn-icon-sm" title="Copiar proj. e descrição" onclick="app.copyApontamento('${escapeHtml(item.projectNum)}', ${JSON.stringify(item.description)})">
+                            <i data-lucide="copy"></i>
+                        </button>
                         <button class="btn-icon-sm" title="Editar" onclick="app.openEditApontamento('${item.id}')">
                             <i data-lucide="pencil"></i>
                         </button>
@@ -2524,6 +2527,15 @@ class AppController {
         } finally {
             btn.disabled = false;
         }
+    }
+
+    copyApontamento(projectNum, description) {
+        const text = projectNum ? `${projectNum}\t${description}` : description;
+        navigator.clipboard.writeText(text).then(() => {
+            Toast.show('Copiado!', 'success');
+        }).catch(() => {
+            Toast.show('Não foi possível copiar.', 'error');
+        });
     }
 
     async deleteApontamento(id) {

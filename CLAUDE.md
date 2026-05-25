@@ -133,6 +133,7 @@ Todas têm `user_id uuid references auth.users` + RLS ativa (`auth.uid() = user_
 | `records` | id, user_id, client_id, date, start_time, end_time, minutes, description |
 | `tasks` | id, user_id, client_id, title, description, status, priority, due_date, estimated_minutes, spent_minutes |
 | `agenda_events` | id, user_id, client_id, related_task_id, title, type, date, start_time, end_time, location, calendar_event_id |
+| `apontamentos` | id, user_id, date, start_time, end_time, project_num, description |
 
 ### Fases de migração
 
@@ -144,6 +145,7 @@ Todas têm `user_id uuid references auth.users` + RLS ativa (`auth.uid() = user_
 - **Fase 6** ✅ — Deploy final: correções RLS defense-in-depth, reset de estado no logout, checklist de testes multi-usuário
 - **Fase 7** ✅ — Suite de testes Playwright 48/48 passando; correção do Toast (`lucide.createIcons()`) e headers de segurança nginx
 - **Fase 8** ✅ — Importação de Ata PDF (SAP): parser page-by-page, extração de nome do cliente, criação automática de cliente, validação de horas centesimais
+- **Fase 9** ✅ — View Apontamentos: log diário independente de clientes (horário, nº projeto, descrição) para conferência antes de lançar no ERP; tabela `apontamentos` com RLS
 
 ---
 
@@ -217,12 +219,59 @@ O `docker-entrypoint.sh` injeta essas vars em `js/config.js` via `envsubst` na i
 | **Atendimentos** | Log de horas por cliente; filtros por cliente e período; exportação PDF |
 | **Tarefas** | Kanban (Novas / Em Execução / Finalizadas) com drag-and-drop e métricas |
 | **Agenda** | Calendário diário/semanal; 4 tipos de evento; sincronização Google Calendar |
+| **Apontamentos** | Log diário: horário início/fim, nº projeto (texto livre + autocomplete de clientes), descrição; navegação por dia; total do dia calculado |
 
 ### Sidebar
 - **Recolhível**: botão chevron no cabeçalho (`#btn-sidebar-toggle`) alterna entre expandido (260px) e colapsado (70px)
 - **Estado colapsado**: apenas ícones centralizados; texto oculto via `.sidebar.collapsed .nav-label { display: none }`
 - **Persistência**: `sessionStorage.sidebarCollapsed`; default = expandido; aplicado em `applySidebarState()` dentro de `initAfterAuth()`
 - **Ícone do toggle**: `chevron-left` quando expandido, `chevron-right` quando colapsado (atualizado via `lucide.createIcons()`)
+
+---
+
+## Apontamentos
+
+View de log diário para registrar atividades antes de lançar no ERP. **Independente de clientes** — o número de projeto é texto livre (sem FK para `clients`), mas o campo exibe sugestões autocomplete a partir de `clients.project_num`.
+
+### Fluxo
+1. Usuário navega ao dia desejado com os botões `<` / `>` ou clica "Hoje"
+2. Clica "Novo Apontamento" → modal abre com data do dia atual
+3. Preenche Hora Início + Hora Fim (duração calculada em tempo real) + Nº Projeto + Descrição
+4. Salva → registro aparece na tabela; rodapé mostra total de horas do dia
+
+### Tabela `apontamentos` (Supabase)
+```sql
+id UUID PRIMARY KEY DEFAULT gen_random_uuid()
+user_id UUID REFERENCES auth.users ON DELETE CASCADE NOT NULL
+date DATE NOT NULL
+start_time TEXT NOT NULL
+end_time TEXT NOT NULL DEFAULT ''
+project_num TEXT NOT NULL DEFAULT ''
+description TEXT NOT NULL DEFAULT ''
+created_at TIMESTAMPTZ DEFAULT now()
+```
+RLS policy: `auth.uid() = user_id` (SELECT/INSERT/UPDATE/DELETE).
+
+### Métodos relevantes
+
+| Método | Arquivo | Descrição |
+|--------|---------|-----------|
+| `renderApontamentos()` | `js/app.js` | Render da view; guarda-se em `if (this.currentView !== 'apontamentos') return` |
+| `openNewApontamento()` | `js/app.js` | Abre modal zerado com data = `this.aptCurrentDate` |
+| `openEditApontamento(id)` | `js/app.js` | Busca item do dia atual e pré-preenche modal |
+| `handleApontamentoSubmit(e)` | `js/app.js` | Salva via `store.addApontamento` ou `store.updateApontamento` |
+| `deleteApontamento(id)` | `js/app.js` | Exclui com confirmação |
+| `aptNavigateDay(delta)` | `js/app.js` | Avança/retrocede `this.aptCurrentDate` em `delta` dias |
+| `calcDuration(start, end)` | `js/app.js` | Retorna `{ minutes, label }` — helper reutilizável |
+| `populateAptProjectList()` | `js/app.js` | Preenche `<datalist id="apt-project-list">` com `clients.projectNum` |
+| `getApontamentos(date)` | `js/store.js` | Busca apontamentos de uma data (YYYY-MM-DD) do usuário |
+| `addApontamento(...)` | `js/store.js` | INSERT em `apontamentos` |
+| `updateApontamento(...)` | `js/store.js` | UPDATE por id + user_id |
+| `deleteApontamento(id)` | `js/store.js` | DELETE por id + user_id |
+
+### Estado
+- `this.aptCurrentDate` — string `'YYYY-MM-DD'`, inicializada no constructor com a data de hoje
+- Chamada em `renderAll()` dentro do `Promise.all` junto com as demais views
 
 ---
 
