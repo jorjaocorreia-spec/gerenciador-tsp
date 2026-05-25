@@ -2153,6 +2153,9 @@ class AppController {
         const records = [];
         const warnings = [];
 
+        // DEBUG: loga primeiros 300 chars do texto da página para diagnóstico
+        console.log(`[PDF Import] Pág.${pageNum} texto (300 chars):`, text.substring(0, 300));
+
         // === 1. NÚMERO DO PROJETO + NOME DO CLIENTE ===
         // SAP format: "Projeto.: 22851   17 - CASCAVEL MAQUINAS AGRICOLAS LTDA 001 CVEL"
         // PDF.js pode inverter: "22851 Projeto.:   17 - CASCAVEL..."
@@ -2173,6 +2176,7 @@ class AppController {
         }
         if (projMatch) projectNum = projMatch[1].trim();
 
+        console.log(`[PDF Import] Pág.${pageNum} projectNum="${projectNum}"`);
         if (!projectNum) return { records, warnings };
 
         // 1b. Busca o nome do cliente no texto inteiro da página.
