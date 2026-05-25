@@ -132,7 +132,7 @@ Todas têm `user_id uuid references auth.users` + RLS ativa (`auth.uid() = user_
 | `clients` | id, user_id, name, hours_total, cs_name, project_num, client_pays, notes, status |
 | `records` | id, user_id, client_id, date, start_time, end_time, minutes, description |
 | `tasks` | id, user_id, client_id, title, description, status, priority, due_date, estimated_minutes, spent_minutes |
-| `agenda_events` | id, user_id, client_id, related_task_id, title, type, date, start_time, end_time, location, calendar_event_id |
+| `agenda_events` | id, user_id, client_id, related_task_id, title, type, date, **date_end**, start_time, end_time, location, calendar_event_id |
 | `apontamentos` | id, user_id, date, start_time, end_time, project_num, description |
 
 ### Fases de migração
@@ -146,6 +146,7 @@ Todas têm `user_id uuid references auth.users` + RLS ativa (`auth.uid() = user_
 - **Fase 7** ✅ — Suite de testes Playwright 48/48 passando; correção do Toast (`lucide.createIcons()`) e headers de segurança nginx
 - **Fase 8** ✅ — Importação de Ata PDF (SAP): parser page-by-page, extração de nome do cliente, criação automática de cliente, validação de horas centesimais
 - **Fase 9** ✅ — View Apontamentos: log diário independente de clientes (horário, nº projeto, descrição) para conferência antes de lançar no ERP; tabela `apontamentos` com RLS
+- **Fase 10** ✅ — Agenda: clicar no dia abre novo agendamento direto; campo Data Final (`date_end`) para eventos multi-dia; queries com overlap detection; sync Google Calendar usa dateEnd
 
 ---
 
@@ -201,6 +202,8 @@ O `docker-entrypoint.sh` injeta essas vars em `js/config.js` via `envsubst` na i
 - **Deploy automático (webhook Easypanel) está quebrado** — após cada `git push`, avisar o usuário para fazer deploy manual no Easypanel antes de testar em produção.
 - **Sidebar: todo texto usa `<span class="nav-label">`** — nav-items, botões da `sidebar-bottom` e email do usuário têm o texto em `<span class="nav-label">`. Esse span é o que CSS esconde no estado `.sidebar.collapsed`. Novos itens de menu ou botões adicionados ao sidebar sem esse span não respondem ao colapso. Cada nav-item também precisa do atributo `title="Nome"` para exibir tooltip quando colapsado.
 - **Sidebar: dois estados via `sessionStorage`** — `sidebarCollapsed` ('1' = colapsado) e `moneyHidden` ('1' = oculto). Ambos são aplicados em `initAfterAuth()`. O padrão é: se a chave não existir no sessionStorage, o default é expandido/visível. A sidebar vai de 260px (expandida) para 70px (colapsada) com `transition: width 0.25s ease` no CSS.
+- **Agenda: eventos multi-dia usam `date_end`** — `_event()` retorna `dateEnd: r.date_end || r.date`. Queries usam overlap detection via `.or('date_end.gte.X,and(date_end.is.null,...)')`. Nos renders mensal e semanal, filtrar com `e.date <= iso && (e.dateEnd || e.date) >= iso`; nunca filtrar só por `e.date === iso`.
+- **Agenda: `openNewAgendaEvent(dateStr)` é o ponto de entrada para novo agendamento** — chama `closeModal` + `openModal` em sequência (síncrono) e depois sobrescreve as datas. Cells/colunas do grid chamam este método; o botão "+ Novo Agendamento" ainda usa `openModal` diretamente (abre com hoje). Eventos dentro do grid têm `event.stopPropagation()` para não acionar o click da célula pai.
 
 ### Cálculos automáticos
 - Comissão do consultor = 43% do valor pago pelo cliente (`clientPays * 0.43`)
@@ -218,7 +221,7 @@ O `docker-entrypoint.sh` injeta essas vars em `js/config.js` via `envsubst` na i
 | **Clientes** | CRUD de clientes; campos: nome, horas, CS, nº projeto, valor, notas, status |
 | **Atendimentos** | Log de horas por cliente; filtros por cliente e período; exportação PDF |
 | **Tarefas** | Kanban (Novas / Em Execução / Finalizadas) com drag-and-drop e métricas |
-| **Agenda** | Calendário diário/semanal; 4 tipos de evento; sincronização Google Calendar |
+| **Agenda** | Calendário diário/semanal/mensal; 4 tipos de evento; eventos multi-dia (Data Inicial + Data Final); clicar no dia abre novo agendamento; sincronização Google Calendar |
 | **Apontamentos** | Log diário: horário início/fim, nº projeto (texto livre + autocomplete de clientes), descrição; navegação por dia; total do dia calculado |
 
 ### Sidebar
