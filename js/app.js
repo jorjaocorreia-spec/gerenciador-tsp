@@ -2052,18 +2052,25 @@ class AppController {
         if (description.length > 800) description = description.substring(0, 800).trim();
 
         // === 4. LINHAS DA TABELA DE HORAS ===
-        // Localiza o trecho entre o cabeçalho da tabela e "Total Horas Dia.:"
-        const tableHeaderIdx = text.search(/Hora\s+Inicial\s+Hora\s+Final/i);
+        // Formato antigo: "Horas Aplicadas no Dia DD/MM" vem antes das colunas (Hora Inicial | Hora Final | Horas Aplicadas | Analista)
+        // Formato novo:   colunas (Tarefa Executada | Analista | Hora Inicial | Hora Final | Total Horas) vêm antes de "Horas Aplicadas no Dia DD/MM"
+        // Âncora primária: "Horas Aplicadas no Dia DD/MM/YYYY" — seção imediatamente antes das linhas de dados em ambos os formatos.
+        // Fallback: "Hora Inicial Hora Final" (funciona quando PDF.js extrai linha-a-linha e os cabeçalhos ficam adjacentes).
         const totalHorasIdx = text.search(/Total\s+Horas\s+Dia/i);
 
-        let tableText = text;
-        if (tableHeaderIdx !== -1) {
-            // Pula o cabeçalho da tabela em si (primeira linha após o match)
-            const afterHeader = text.indexOf(' ', tableHeaderIdx + 20);
-            tableText = text.substring(afterHeader !== -1 ? afterHeader : tableHeaderIdx);
+        let tableAnchorIdx = text.search(/Horas\s+Aplicadas\s+no\s+Dia\s+\d{2}\/\d{2}\/\d{4}/i);
+        if (tableAnchorIdx === -1) {
+            tableAnchorIdx = text.search(/Hora\s+Inicial\s+Hora\s+Final/i);
         }
-        if (totalHorasIdx !== -1) {
-            const tableEnd = totalHorasIdx - (tableHeaderIdx !== -1 ? tableHeaderIdx : 0);
+
+        let tableText = text;
+        if (tableAnchorIdx !== -1) {
+            // Avança ~35 chars para pular a linha âncora ("Horas Aplicadas no Dia DD/MM/YYYY")
+            const afterAnchor = text.indexOf(' ', tableAnchorIdx + 30);
+            tableText = text.substring(afterAnchor !== -1 ? afterAnchor : tableAnchorIdx);
+        }
+        if (totalHorasIdx !== -1 && tableAnchorIdx !== -1) {
+            const tableEnd = totalHorasIdx - tableAnchorIdx;
             if (tableEnd > 0) tableText = tableText.substring(0, tableEnd);
         }
 

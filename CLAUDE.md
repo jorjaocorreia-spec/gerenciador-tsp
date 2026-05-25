@@ -292,7 +292,9 @@ Funcionalidade na view **Atendimentos**: botão "Importar Ata (PDF)" lê um PDF 
 3. Modal de confirmação (`openPdfConfirmationModal()`) mostra registros identificados; clientes sem cadastro são criados automaticamente com nota "Cadastro incompleto"
 4. Usuário confirma → `confirmPdfImport()` salva via `store.addRecord()`
 
-### Estrutura da Ata SAP (por página)
+### Estrutura da Ata SAP (por página) — dois formatos suportados
+
+**Formato A (antigo):** colunas incluem "Horas Aplicadas no Dia" como nome de coluna
 ```
 Projeto.: 22851   17 - CASCAVEL MAQUINAS AGRICOLAS LTDA 001 CVEL
 Data......: 09/04/2026
@@ -304,14 +306,27 @@ Hora Inicial  Hora Final  Horas Aplicadas no Dia  Analista
 08:00         09:00       01:00                   JORGE HENRIQUE
 09:30         10:15       00:75                   JORGE HENRIQUE
 Total Horas Dia.: 01:75
-Responsável: ...
+```
+
+**Formato B (novo):** 5 colunas, "Horas Aplicadas no Dia" é cabeçalho de seção
+```
+Projeto.: 22851   17 - CASCAVEL MAQUINAS AGRICOLAS LTDA 001 CVEL
+Data......: 22/05/2026
+Horas contratadas.: 20:00   Horas executadas: 340:70
+Descrição do Atendimento
+[texto da descrição global]
+Tarefa Executada  Analista  Hora Inicial  Hora Final  Total Horas
+Horas Aplicadas no Dia 22/05/2026
+Analise/estudo...  JORGE HENRIQUE CORREIA  09:00  12:00  03:00
+Total Horas Dia.: 03:00
 ```
 
 - **Código do projeto**: `22851` (4–6 dígitos após `"Projeto.:"`)
 - **ID secundário**: `17` — ignorado pelo parser
-- **Nome do cliente**: tudo após `" - "` até `"Horas contratadas"`
+- **Nome do cliente**: tudo após `" - "` até `"Horas contratadas"`, `"Descrição"` ou `"Tarefa Executada"`
 - **PDF.js** pode inverter a ordem: `"22851 Projeto.: 17 - NOME"` — ambos os formatos são suportados
-- **Horas Aplicadas**: formato centesimal (`01:75` = 1,75 h = 105 min). Hora Inicial/Final são HH:MM normais.
+- **Horas Aplicadas / Total Horas**: formato centesimal (`01:75` = 1,75 h = 105 min). Hora Inicial/Final são HH:MM normais.
+- **Âncora da tabela**: parser usa `"Horas Aplicadas no Dia DD/MM/YYYY"` (seção) como âncora primária para delimitar as linhas de dados; fallback para `"Hora Inicial Hora Final"`. Isso suporta ambos os formatos e é robusto a extração coluna-a-coluna pelo PDF.js.
 - **Validação**: `_parseSinglePage` compara soma das linhas com `Total Horas Dia` (divergências → `console.warn`)
 
 ### Métodos relevantes em `js/app.js`
