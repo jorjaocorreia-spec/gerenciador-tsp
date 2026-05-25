@@ -153,7 +153,7 @@ const GoogleCalendarAPI = {
             description: (localEventData.description || '') + `\n\n[Gerado por TSP Manager - ID:${localEventData.id || ''}]`,
             location: localEventData.location || '',
             start: { dateTime: this.toGoogleDateTime(localEventData.date, localEventData.startTime), timeZone: 'America/Sao_Paulo' },
-            end:   { dateTime: this.toGoogleDateTime(localEventData.date, localEventData.endTime),   timeZone: 'America/Sao_Paulo' }
+            end:   { dateTime: this.toGoogleDateTime(localEventData.dateEnd || localEventData.date, localEventData.endTime), timeZone: 'America/Sao_Paulo' }
         };
     },
 

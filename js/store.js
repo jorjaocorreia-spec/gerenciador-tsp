@@ -32,7 +32,8 @@ class TSPStore {
     _event(r) {
         return { id: r.id, clientId: r.client_id, relatedTaskId: r.related_task_id,
             title: r.title, description: r.description || '', type: r.type || 'meeting',
-            date: r.date, startTime: r.start_time || '', endTime: r.end_time || '',
+            date: r.date, dateEnd: r.date_end || r.date,
+            startTime: r.start_time || '', endTime: r.end_time || '',
             location: r.location || '', calendarEventId: r.calendar_event_id || null,
             createdAt: r.created_at };
     }
@@ -230,6 +231,7 @@ class TSPStore {
             related_task_id: eventData.relatedTaskId || null,
             title: eventData.title || '', description: eventData.description || '',
             type: eventData.type || 'meeting', date: eventData.date,
+            date_end: eventData.dateEnd || eventData.date,
             start_time: eventData.startTime || '', end_time: eventData.endTime || '',
             location: eventData.location || '', calendar_event_id: eventData.calendarEventId || null
         }).select().single();
@@ -242,6 +244,7 @@ class TSPStore {
             client_id: eventData.clientId || null, related_task_id: eventData.relatedTaskId || null,
             title: eventData.title || '', description: eventData.description || '',
             type: eventData.type || 'meeting', date: eventData.date,
+            date_end: eventData.dateEnd || eventData.date,
             start_time: eventData.startTime || '', end_time: eventData.endTime || '',
             location: eventData.location || '', calendar_event_id: eventData.calendarEventId || null
         }).eq('id', eventData.id).select().single();
@@ -255,15 +258,21 @@ class TSPStore {
     }
 
     async getEventsByDate(date) {
+        // Include single-day events on this date AND multi-day events spanning this date
         const { data, error } = await this.db.from('agenda_events').select('*')
-            .eq('user_id', this.userId).eq('date', date);
+            .eq('user_id', this.userId)
+            .lte('date', date)
+            .or(`date_end.gte.${date},and(date_end.is.null,date.eq.${date})`);
         if (error) throw error;
         return data.map(r => this._event(r));
     }
 
     async getEventsByWeek(startDate, endDate) {
+        // Include events that overlap with the given range (overlap detection)
         const { data, error } = await this.db.from('agenda_events').select('*')
-            .eq('user_id', this.userId).gte('date', startDate).lte('date', endDate)
+            .eq('user_id', this.userId)
+            .lte('date', endDate)
+            .or(`date_end.gte.${startDate},and(date_end.is.null,date.gte.${startDate})`)
             .order('date');
         if (error) throw error;
         return data.map(r => this._event(r));

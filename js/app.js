@@ -144,7 +144,9 @@ class AppController {
         if (modalId === 'modal-agenda-event') {
             this.updateAgendaTaskSelect();
             if (!document.getElementById('agenda-id').value) {
-                document.getElementById('agenda-date').valueAsDate = new Date();
+                const today = new Date().toISOString().split('T')[0];
+                document.getElementById('agenda-date').value = today;
+                document.getElementById('agenda-date-end').value = today;
             }
         }
     }
@@ -1186,6 +1188,13 @@ class AppController {
     // ===================================
     // AGENDA
     // ===================================
+    openNewAgendaEvent(dateStr) {
+        this.closeModal('modal-agenda-event');
+        this.openModal('modal-agenda-event');
+        document.getElementById('agenda-date').value = dateStr;
+        document.getElementById('agenda-date-end').value = dateStr;
+    }
+
     async switchAgendaMode(mode) {
         this.agendaViewMode = mode;
         document.getElementById('btn-agenda-schedule').classList.toggle('active-mode', mode === 'schedule');
@@ -1240,13 +1249,16 @@ class AppController {
         const btn = e.submitter || document.querySelector('#form-agenda-event button[type="submit"]');
         const originalText = btn.innerText;
 
+        const startDate = document.getElementById('agenda-date').value;
+        const endDate = document.getElementById('agenda-date-end').value || startDate;
         const eventData = {
             title: document.getElementById('agenda-title').value,
             description: document.getElementById('agenda-desc').value,
             type: document.getElementById('agenda-type').value,
             clientId: document.getElementById('agenda-client').value || null,
             relatedTaskId: document.getElementById('agenda-task').value || null,
-            date: document.getElementById('agenda-date').value,
+            date: startDate,
+            dateEnd: endDate < startDate ? startDate : endDate,
             startTime: document.getElementById('agenda-start').value,
             endTime: document.getElementById('agenda-end').value,
             location: document.getElementById('agenda-location').value
@@ -1307,6 +1319,7 @@ class AppController {
         this.updateAgendaTaskSelect();
         document.getElementById('agenda-task').value = ev.relatedTaskId || '';
         document.getElementById('agenda-date').value = ev.date;
+        document.getElementById('agenda-date-end').value = ev.dateEnd || ev.date;
         document.getElementById('agenda-start').value = ev.startTime;
         document.getElementById('agenda-end').value = ev.endTime;
         document.getElementById('agenda-location').value = ev.location;
@@ -1424,7 +1437,8 @@ class AppController {
                     <div class="agenda-days-row" style="grid-template-columns: 1fr;">
                         <div class="agenda-day-header active">${this.formatDateBR(this.agendaCurrentDate)}</div>
                     </div>
-                    <div class="events-container">
+                    <div class="events-container" style="cursor: pointer;"
+                         onclick="app.openNewAgendaEvent('${isoDate}')">
                         <div class="agenda-grid-lines"></div>
                         ${eventsHtml}
                     </div>
@@ -1462,14 +1476,15 @@ class AppController {
 
             headersHtml += `<div class="agenda-day-header ${isToday ? 'active' : ''}">${days[i]}<br><small>${currentDay.getDate()}/${currentDay.getMonth() + 1}</small></div>`;
 
-            const dayEvents = events.filter(e => e.date === isoCurrentDay);
+            const dayEvents = events.filter(e => e.date <= isoCurrentDay && (e.dateEnd || e.date) >= isoCurrentDay);
             let dayEventsHtml = '';
             dayEvents.forEach(ev => {
                 dayEventsHtml += this.createEventBlockHtml(ev, 'calc(100% - 8px)', clientsMap);
             });
 
             columnsHtml += `
-                <div style="position: relative; height: 100%;">
+                <div style="position: relative; height: 100%; cursor: pointer;"
+                     onclick="app.openNewAgendaEvent('${isoCurrentDay}')">
                     ${dayEventsHtml}
                 </div>
             `;
@@ -1533,19 +1548,20 @@ class AppController {
             const iso = cursor.toISOString().split('T')[0];
             const isCurrentMonth = cursor.getMonth() === month;
             const isToday = iso === todayIso;
-            const dayEvents = events.filter(e => e.date === iso);
+            const dayEvents = events.filter(e => e.date <= iso && (e.dateEnd || e.date) >= iso);
 
             let eventsHtml = '';
             dayEvents.forEach(ev => {
                 eventsHtml += `<div class="agenda-month-event type-${ev.type}"
-                     onclick="app.editAgendaEvent('${ev.id}')"
+                     onclick="event.stopPropagation(); app.editAgendaEvent('${ev.id}')"
                      title="${escapeHtml(ev.title)} (${ev.startTime} - ${ev.endTime})">
                     ${escapeHtml(ev.title)}
                 </div>`;
             });
 
             cellsHtml += `
-                <div class="agenda-month-cell ${!isCurrentMonth ? 'other-month' : ''} ${isToday ? 'today' : ''}">
+                <div class="agenda-month-cell ${!isCurrentMonth ? 'other-month' : ''} ${isToday ? 'today' : ''}"
+                     onclick="app.openNewAgendaEvent('${iso}')" style="cursor: pointer;">
                     <div class="agenda-month-day-num">${cursor.getDate()}</div>
                     <div class="agenda-month-events">${eventsHtml}</div>
                 </div>`;
@@ -1666,7 +1682,7 @@ class AppController {
         return `
             <div class="event-block ${typeClass}"
                  style="top: ${top}px; height: ${height}px; width: ${width};"
-                 onclick="app.editAgendaEvent('${ev.id}')">
+                 onclick="event.stopPropagation(); app.editAgendaEvent('${ev.id}')">
 
                 <div style="display: flex; justify-content: space-between; align-items: flex-start;">
                     <div class="event-title">${escapeHtml(ev.title)}</div>
