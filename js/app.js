@@ -1284,10 +1284,17 @@ class AppController {
         try {
             if (id) {
                 eventData.id = id;
-                const updated = await store.updateAgendaEvent(eventData);
-                if (syncGoogle && updated && updated.calendarEventId) {
-                    await calendarAPI.updateGoogleEvent(updated.calendarEventId, eventData);
+                const existingCalId = document.getElementById('agenda-calendar-event-id').value || null;
+                eventData.calendarEventId = existingCalId;
+                if (syncGoogle) {
+                    if (existingCalId) {
+                        await calendarAPI.updateGoogleEvent(existingCalId, eventData);
+                    } else {
+                        const gCalId = await calendarAPI.createGoogleEvent(eventData);
+                        if (gCalId) eventData.calendarEventId = gCalId;
+                    }
                 }
+                await store.updateAgendaEvent(eventData);
             } else {
                 if (syncGoogle) {
                     const gCalId = await calendarAPI.createGoogleEvent(eventData);
@@ -1323,6 +1330,8 @@ class AppController {
         document.getElementById('agenda-start').value = ev.startTime;
         document.getElementById('agenda-end').value = ev.endTime;
         document.getElementById('agenda-location').value = ev.location;
+        document.getElementById('agenda-calendar-event-id').value = ev.calendarEventId || '';
+        document.getElementById('agenda-sync-google').checked = !!ev.calendarEventId;
 
         this.openModal('modal-agenda-event');
     }
