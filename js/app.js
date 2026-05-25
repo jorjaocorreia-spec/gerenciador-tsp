@@ -2161,10 +2161,15 @@ class AppController {
         let clientNamePdf = '';
 
         // 1a. Captura o número do projeto, ancorado em "Projeto.:"
-        let projMatch = text.match(/Projeto[.:]+\s*(\d{4,6})/i);
+        // \s* antes de [.:] tolera PDF.js separando "Projeto " + ".:NNNNN" com espaço
+        let projMatch = text.match(/Projeto\s*[.:]+\s*(\d{4,6})/i);
         if (!projMatch) {
             // PDF.js pode inverter: "22851 Projeto.:"
-            projMatch = text.match(/(?:^|\s)(\d{4,6})\s+Projeto[.:]+/i);
+            projMatch = text.match(/(?:^|\s)(\d{4,6})\s+Projeto\s*[.:]+/i);
+        }
+        if (!projMatch) {
+            // Tecinco: linha Ref "( Projeto 26581 )" quando header é col-by-col
+            projMatch = text.match(/\(\s*Projeto\s+(\d{4,6})\s*\)/i);
         }
         if (projMatch) projectNum = projMatch[1].trim();
 
@@ -2185,10 +2190,10 @@ class AppController {
         if (clientNamePdf.length > 120) clientNamePdf = clientNamePdf.substring(0, 120).trim();
 
         // === 2. DATA ===
-        // Formato primário: "Data......: 09/04/2026"
+        // Formato primário: "Data......: 09/04/2026" (\s* tolera espaço entre "Data" e os pontos)
         // Formato secundário: "Horas Aplicadas no Dia 09/04/2026"
         let dateStr = '';
-        const dateA = text.match(/Data[.:]+\s*(\d{2}\/\d{2}\/\d{4})/i);
+        const dateA = text.match(/Data\s*[.:]+\s*(\d{2}\/\d{2}\/\d{4})/i);
         if (dateA) {
             dateStr = dateA[1];
         } else {
