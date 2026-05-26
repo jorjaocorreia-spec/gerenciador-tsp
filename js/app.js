@@ -71,6 +71,7 @@ class AppController {
         this._modalLabels    = [];
         this._modalChecklist = [];
         this._modalCoverColor = null;
+        this._modalComments  = [];
         // Estado do drag-and-drop Kanban
         this._draggedCard      = null;
         this._dragPlaceholder  = null;
@@ -137,6 +138,12 @@ class AppController {
             ?.addEventListener('submit', (e) => this.handleImplementationSubmit(e));
         ['apt-start', 'apt-end'].forEach(id => {
             document.getElementById(id)?.addEventListener('change', () => this.updateAptDuration());
+        });
+
+        // Comentários de tarefas
+        document.getElementById('btn-add-task-comment')?.addEventListener('click', () => this.handleAddTaskComment());
+        document.getElementById('task-comment-input')?.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' && e.ctrlKey) { e.preventDefault(); this.handleAddTaskComment(); }
         });
 
         // Paste de imagens no modal de tarefa
@@ -257,6 +264,10 @@ class AppController {
             this._modalLabels    = [];
             this._modalChecklist = [];
             this._modalCoverColor = null;
+            this._modalComments  = [];
+            document.getElementById('modal-task-comments-section').style.display = 'none';
+            document.getElementById('modal-task-comments-list').innerHTML = '';
+            document.getElementById('task-comment-input').value = '';
             document.getElementById('task-id').value = '';
             document.getElementById('task-title').value = '';
             document.getElementById('task-description').value = '';
@@ -539,13 +550,19 @@ class AppController {
     async handleTaskTimeSubmit(e) {
         e.preventDefault();
         const id = document.getElementById('time-task-id').value;
-        const minutes = document.getElementById('time-task-minutes').value;
+        const minutes = parseInt(document.getElementById('time-task-minutes').value) || 0;
+        const description = document.getElementById('time-task-desc')?.value?.trim() || '';
 
         if (id && minutes) {
             const btn = e.target.querySelector('[type="submit"]');
             btn.disabled = true;
             try {
                 await store.addTaskTime(id, minutes);
+                await store.logTaskActivity(id, 'time_added', { minutes, description });
+                if (this._modalTaskId === id) {
+                    const t = await store.getTask(id);
+                    if (t) { this._modalComments = t.comments; this._renderTaskComments(); }
+                }
                 this.closeModal('modal-task-time');
                 await this.renderAll();
                 Toast.show('Tempo adicionado.', 'success');
@@ -576,16 +593,19 @@ class AppController {
         document.getElementById('task-due-date').value = t.dueDate || '';
         document.getElementById('task-estimated-minutes').value = t.estimatedMinutes || '';
         this.taskAttachments = t.attachments ? [...t.attachments] : [];
+        this._modalComments  = t.comments ? [...t.comments] : [];
 
         // Botões de edição
         document.getElementById('btn-delete-task').style.display = 'flex';
         document.getElementById('btn-add-time-task').style.display = 'flex';
+        document.getElementById('modal-task-comments-section').style.display = 'flex';
 
         this._syncModalColumnButtons();
         this._syncModalCover();
         this._renderModalLabels();
         this._renderChecklist();
         this._renderTaskAttachmentPreviews();
+        this._renderTaskComments();
 
         this.openModal('modal-task');
     }
@@ -601,6 +621,78 @@ class AppController {
                 <button type="button" class="attach-remove" onclick="app.removeTaskAttachment(${i})" title="Remover">×</button>
             </div>
         `).join('');
+    }
+
+    _renderTaskComments() {
+        const list = document.getElementById('modal-task-comments-list');
+        if (!list) return;
+        const statusLabels = { new: 'Novas', doing: 'Em Execução', done: 'Finalizadas' };
+        const sorted = [...this._modalComments].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+        if (!sorted.length) { list.innerHTML = '<p style="font-size:12px;color:var(--text-secondary);margin:4px 0">Nenhum comentário ainda.</p>'; return; }
+        list.innerHTML = sorted.map(entry => {
+            const date = new Date(entry.createdAt);
+            const dateStr = date.toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' }) + ', ' +
+                date.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+            if (entry.type === 'comment') {
+                return `<div class="task-comment-item">
+                    <div class="task-comment-meta">
+                        <span>${dateStr}</span>
+                        <button type="button" class="task-comment-delete" onclick="app._deleteTaskComment('${entry.id}')" title="Excluir">×</button>
+                    </div>
+                    <div class="task-comment-text">${escapeHtml(entry.text)}</div>
+                </div>`;
+            } else if (entry.type === 'status_change') {
+                const from = statusLabels[entry.activityData?.from] || entry.activityData?.from || '?';
+                const to   = statusLabels[entry.activityData?.to]   || entry.activityData?.to   || '?';
+                return `<div class="task-activity-item">
+                    <i data-lucide="arrow-right" style="width:13px;height:13px;flex-shrink:0"></i>
+                    <span>Movido de <strong>${escapeHtml(from)}</strong> para <strong>${escapeHtml(to)}</strong></span>
+                    <span style="margin-left:auto;white-space:nowrap">${dateStr}</span>
+                </div>`;
+            } else if (entry.type === 'time_added') {
+                const mins = entry.activityData?.minutes || 0;
+                const h = Math.floor(mins / 60), m = mins % 60;
+                const label = h ? `${h}h${m ? ' ' + m + 'min' : ''}` : `${m}min`;
+                const desc = entry.activityData?.description ? ` — ${entry.activityData.description}` : '';
+                return `<div class="task-activity-item">
+                    <i data-lucide="timer" style="width:13px;height:13px;flex-shrink:0"></i>
+                    <span>${escapeHtml(label)} registrados${escapeHtml(desc)}</span>
+                    <span style="margin-left:auto;white-space:nowrap">${dateStr}</span>
+                </div>`;
+            }
+            return '';
+        }).join('');
+        lucide.createIcons();
+    }
+
+    async handleAddTaskComment() {
+        const input = document.getElementById('task-comment-input');
+        const text = input?.value.trim();
+        if (!text || !this._modalTaskId) return;
+        try {
+            this._modalComments = await store.addTaskComment(this._modalTaskId, text);
+            input.value = '';
+            this._renderTaskComments();
+        } catch (err) {
+            Toast.show('Erro ao salvar comentário: ' + err.message, 'error');
+        }
+    }
+
+    async _deleteTaskComment(commentId) {
+        this._modalComments = this._modalComments.filter(c => c.id !== commentId);
+        try {
+            await store.updateTask({ id: this._modalTaskId, comments: this._modalComments,
+                title: document.getElementById('task-title').value,
+                description: document.getElementById('task-description').value,
+                status: this._modalStatus, priority: document.getElementById('task-priority').value,
+                dueDate: document.getElementById('task-due-date').value,
+                estimatedMinutes: document.getElementById('task-estimated-minutes').value,
+                labels: this._modalLabels, checklist: this._modalChecklist,
+                coverColor: this._modalCoverColor, attachments: this.taskAttachments });
+            this._renderTaskComments();
+        } catch (err) {
+            Toast.show('Erro ao excluir comentário: ' + err.message, 'error');
+        }
     }
 
     _openAttachmentLightbox(index) {
@@ -757,8 +849,10 @@ class AppController {
         // Garante que o card arrastado está na lista (coluna vazia)
         if (!ids.includes(draggedId)) ids.push(draggedId);
 
-        if (this._draggingFromStatus !== newStatus) {
+        const oldStatus = this._draggingFromStatus;
+        if (oldStatus !== newStatus) {
             await store.updateTaskStatus(draggedId, newStatus);
+            store.logTaskActivity(draggedId, 'status_change', { from: oldStatus, to: newStatus }).catch(() => {});
         }
         try {
             await store.reorderTasks(ids.map((id, pos) => ({ id, status: newStatus, position: pos })));
@@ -831,10 +925,17 @@ class AppController {
     }
 
     moveTaskToColumn(status) {
+        const oldStatus = this._modalStatus;
         this._modalStatus = status;
         this._syncModalColumnButtons();
         const labels = { new: 'Novas', doing: 'Em Execução', done: 'Finalizadas' };
         document.getElementById('modal-task-column-label').textContent = labels[status] || '';
+        if (this._modalTaskId && oldStatus !== status) {
+            store.logTaskActivity(this._modalTaskId, 'status_change', { from: oldStatus, to: status })
+                .then(() => store.getTask(this._modalTaskId))
+                .then(t => { if (t) { this._modalComments = t.comments; this._renderTaskComments(); } })
+                .catch(() => {});
+        }
     }
 
     _syncModalColumnButtons() {

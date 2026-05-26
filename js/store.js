@@ -32,6 +32,7 @@ class TSPStore {
             estimatedMinutes: parseInt(r.estimated_minutes) || 0,
             spentMinutes: parseInt(r.spent_minutes) || 0,
             attachments: Array.isArray(r.attachments) ? r.attachments : [],
+            comments: Array.isArray(r.comments) ? r.comments : [],
             createdAt: r.created_at, updatedAt: r.updated_at };
     }
 
@@ -185,7 +186,8 @@ class TSPStore {
             due_date: taskData.dueDate || null,
             estimated_minutes: parseInt(taskData.estimatedMinutes) || 0,
             spent_minutes: 0,
-            attachments: taskData.attachments || []
+            attachments: taskData.attachments || [],
+            comments: []
         }).select().single();
         if (error) throw error;
         return this._task(data);
@@ -201,7 +203,8 @@ class TSPStore {
             checklist: taskData.checklist || [],
             cover_color: taskData.coverColor || null,
             updated_at: new Date().toISOString(),
-            attachments: taskData.attachments || []
+            attachments: taskData.attachments || [],
+            ...(taskData.comments !== undefined && { comments: taskData.comments })
         }).eq('id', taskData.id).eq('user_id', this.userId).select().single();
         if (error) throw error;
         return this._task(data);
@@ -252,6 +255,21 @@ class TSPStore {
     async deleteTask(id) {
         const { error } = await this.db.from('tasks').delete().eq('id', id);
         if (error) throw error;
+    }
+
+    async addTaskComment(taskId, text) {
+        const { data } = await this.db.from('tasks').select('comments').eq('id', taskId).eq('user_id', this.userId).single();
+        const comments = Array.isArray(data?.comments) ? data.comments : [];
+        comments.push({ id: crypto.randomUUID(), type: 'comment', text, createdAt: new Date().toISOString() });
+        await this.db.from('tasks').update({ comments }).eq('id', taskId).eq('user_id', this.userId);
+        return comments;
+    }
+
+    async logTaskActivity(taskId, type, activityData) {
+        const { data } = await this.db.from('tasks').select('comments').eq('id', taskId).eq('user_id', this.userId).single();
+        const comments = Array.isArray(data?.comments) ? data.comments : [];
+        comments.push({ id: crypto.randomUUID(), type, activityData, createdAt: new Date().toISOString() });
+        await this.db.from('tasks').update({ comments }).eq('id', taskId).eq('user_id', this.userId);
     }
 
     // ── AGENDA ────────────────────────────────────────────────────
