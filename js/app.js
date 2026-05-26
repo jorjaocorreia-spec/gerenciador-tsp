@@ -2183,6 +2183,18 @@ class AppController {
                     pageTexts.push(textContent.items.map(item => item.str).join(' '));
                 }
 
+                const totalExtractedChars = pageTexts.reduce((sum, t) => sum + t.trim().length, 0);
+                if (totalExtractedChars < 20) {
+                    Toast.show(
+                        'Este PDF parece ser baseado em imagem (escaneado) e não contém texto legível. ' +
+                        'O sistema não consegue extrair os dados automaticamente. ' +
+                        'Por favor, gere novamente a Ata no SAP com a opção de exportação em PDF com texto (não escaneado).',
+                        'error',
+                        10000
+                    );
+                    return;
+                }
+
                 setBtn(`<span style="display:inline-flex;align-items:center;gap:8px;">${spinner}Identificando projetos...</span>`);
                 const records = this.parsePdfPages(pageTexts);
 
