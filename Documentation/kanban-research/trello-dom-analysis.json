@@ -1,0 +1,1386 @@
+{
+  "timestamp": "2026-05-26T17:02:17.481Z",
+  "sections": {
+    "homepage": {
+      "title": "Capture, organize, and tackle your to-dos from anywhere",
+      "metaDescription": "Make the impossible, possible with Trello. The ultimate tool to boost your productivity. Escape the clutter and chaos—stay efficient with Inbox, Boards, and Planner from anywhere, even on mobile.",
+      "fonts": [
+        "Charlie Display",
+        "Charlie Text"
+      ],
+      "primaryColors": [
+        {
+          "bg": "rgba(0, 0, 0, 0)",
+          "color": "rgb(9, 30, 66)",
+          "borderRadius": "0px",
+          "padding": "0px 28.6406px"
+        },
+        {
+          "bg": "rgba(0, 0, 0, 0)",
+          "color": "rgb(85, 85, 85)",
+          "borderRadius": "2px",
+          "padding": "0px"
+        },
+        {
+          "bg": "rgba(0, 0, 0, 0)",
+          "color": "rgb(105, 105, 105)",
+          "borderRadius": "0px",
+          "padding": "0px"
+        }
+      ]
+    },
+    "board": {
+      "cssTokens": {
+        "cssVars": {
+          "--tr-background-list": "#f1f2f4",
+          "--tr-icon-star": "#e2b203"
+        },
+        "elementStyles": {
+          ".board-wrapper": {
+            "backgroundColor": "rgba(0, 0, 0, 0)",
+            "color": "rgb(41, 42, 46)",
+            "borderRadius": "0px",
+            "padding": "0px",
+            "margin": "0px",
+            "fontSize": "14px",
+            "fontWeight": "400",
+            "fontFamily": "\"Atlassian Sans\", ui-sans-serif, -apple-system, BlinkMacSystemFont, \"Segoe UI\", Ubuntu, \"Helvetica Neue\", sans-serif",
+            "boxShadow": "none",
+            "border": "0px none rgb(41, 42, 46)",
+            "width": "1440px",
+            "minWidth": "0px",
+            "maxWidth": "none",
+            "gap": "normal",
+            "display": "block",
+            "flexDirection": "row",
+            "overflow": "hidden",
+            "cursor": "auto",
+            "transition": "all"
+          },
+          "[data-testid=\"board-header\"]": {
+            "backgroundColor": "rgba(0, 0, 0, 0.24)",
+            "color": "rgb(41, 42, 46)",
+            "borderRadius": "0px",
+            "padding": "0px",
+            "margin": "0px",
+            "fontSize": "14px",
+            "fontWeight": "400",
+            "fontFamily": "\"Atlassian Sans\", ui-sans-serif, -apple-system, BlinkMacSystemFont, \"Segoe UI\", Ubuntu, \"Helvetica Neue\", sans-serif",
+            "boxShadow": "none",
+            "border": "0px none rgb(41, 42, 46)",
+            "width": "1440px",
+            "minWidth": "auto",
+            "maxWidth": "none",
+            "gap": "normal",
+            "display": "block",
+            "flexDirection": "row",
+            "overflow": "visible",
+            "cursor": "auto",
+            "transition": "all"
+          },
+          "[data-testid=\"list-header\"]": {
+            "backgroundColor": "rgba(0, 0, 0, 0)",
+            "color": "rgb(80, 82, 88)",
+            "borderRadius": "0px",
+            "padding": "8px 8px 0px",
+            "margin": "0px",
+            "fontSize": "14px",
+            "fontWeight": "400",
+            "fontFamily": "\"Atlassian Sans\", ui-sans-serif, -apple-system, BlinkMacSystemFont, \"Segoe UI\", Ubuntu, \"Helvetica Neue\", sans-serif",
+            "boxShadow": "none",
+            "border": "0px none rgb(80, 82, 88)",
+            "width": "256px",
+            "minWidth": "auto",
+            "maxWidth": "none",
+            "gap": "0px normal",
+            "display": "flex",
+            "flexDirection": "row",
+            "overflow": "visible",
+            "cursor": "auto",
+            "transition": "all"
+          },
+          "[data-testid=\"list-card\"]": {
+            "backgroundColor": "rgba(0, 0, 0, 0)",
+            "color": "rgb(80, 82, 88)",
+            "borderRadius": "0px",
+            "padding": "0px",
+            "margin": "0px",
+            "fontSize": "14px",
+            "fontWeight": "400",
+            "fontFamily": "\"Atlassian Sans\", ui-sans-serif, -apple-system, BlinkMacSystemFont, \"Segoe UI\", Ubuntu, \"Helvetica Neue\", sans-serif",
+            "boxShadow": "none",
+            "border": "0px none rgb(80, 82, 88)",
+            "width": "256px",
+            "minWidth": "auto",
+            "maxWidth": "none",
+            "gap": "8px normal",
+            "display": "flex",
+            "flexDirection": "column",
+            "overflow": "visible",
+            "cursor": "auto",
+            "transition": "all"
+          },
+          "[data-testid=\"card-name\"]": {
+            "backgroundColor": "rgba(0, 0, 0, 0)",
+            "color": "rgb(22, 75, 53)",
+            "borderRadius": "0px",
+            "padding": "0px",
+            "margin": "0px",
+            "fontSize": "16px",
+            "fontWeight": "500",
+            "fontFamily": "\"Atlassian Sans\", ui-sans-serif, -apple-system, BlinkMacSystemFont, \"Segoe UI\", Ubuntu, \"Helvetica Neue\", sans-serif",
+            "boxShadow": "none",
+            "border": "0px none rgb(22, 75, 53)",
+            "width": "236px",
+            "minWidth": "0px",
+            "maxWidth": "none",
+            "gap": "normal",
+            "display": "block",
+            "flexDirection": "row",
+            "overflow": "hidden",
+            "cursor": "pointer",
+            "transition": "all"
+          }
+        }
+      },
+      "domStructure": {
+        "board": {
+          "tag": "div",
+          "id": null,
+          "classes": [
+            "board-wrapper"
+          ],
+          "dataAttrs": {
+            "data-testid": "board-view"
+          },
+          "text": null,
+          "children": [
+            {
+              "tag": "div",
+              "id": null,
+              "classes": [
+                "board-main-content",
+                "ivZ_wF4VZB8iYB"
+              ],
+              "dataAttrs": {},
+              "text": null,
+              "children": [
+                {
+                  "tag": "div",
+                  "id": null,
+                  "classes": [
+                    "board-header",
+                    "u-clearfix",
+                    "js-board-header",
+                    "board-header-redesign-blur"
+                  ],
+                  "dataAttrs": {
+                    "data-testid": "board-header"
+                  },
+                  "text": null,
+                  "children": [
+                    {
+                      "tag": "div",
+                      "id": null,
+                      "classes": [
+                        "Erwy85pXoZaNSd"
+                      ],
+                      "dataAttrs": {
+                        "data-testid": "board-header"
+                      },
+                      "text": null,
+                      "children": [
+                        {
+                          "tag": "span",
+                          "id": null,
+                          "classes": [
+                            "UyGARBfyjlePlW"
+                          ],
+                          "dataAttrs": {},
+                          "text": null,
+                          "children": []
+                        },
+                        {
+                          "tag": "span",
+                          "id": null,
+                          "classes": [
+                            "z0eqWVVZWBQhjv"
+                          ],
+                          "dataAttrs": {},
+                          "text": null,
+                          "children": []
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "tag": "div",
+                  "id": null,
+                  "classes": [
+                    "board-canvas"
+                  ],
+                  "dataAttrs": {
+                    "data-testid": "board-canvas"
+                  },
+                  "text": null,
+                  "children": [
+                    {
+                      "tag": "ul",
+                      "id": "board",
+                      "classes": [
+                        "zj2JnDaAFGfZcN",
+                        "yCwKvw4NFdxHBJ"
+                      ],
+                      "dataAttrs": {
+                        "data-testid": "lists",
+                        "data-auto-scrollable": "true",
+                        "data-drag-scroll-enabled": "true"
+                      },
+                      "text": null,
+                      "children": [
+                        {
+                          "tag": "li",
+                          "id": null,
+                          "classes": [
+                            "Iq1byT5o1KoAi6"
+                          ],
+                          "dataAttrs": {
+                            "data-testid": "list-wrapper",
+                            "data-list-id": "61e6f4692c3bf9414e22da57"
+                          },
+                          "text": null,
+                          "children": []
+                        },
+                        {
+                          "tag": "li",
+                          "id": null,
+                          "classes": [
+                            "Iq1byT5o1KoAi6"
+                          ],
+                          "dataAttrs": {
+                            "data-testid": "list-wrapper",
+                            "data-list-id": "601413e333f1b23a35922c3b"
+                          },
+                          "text": null,
+                          "children": []
+                        },
+                        {
+                          "tag": "li",
+                          "id": null,
+                          "classes": [
+                            "Iq1byT5o1KoAi6"
+                          ],
+                          "dataAttrs": {
+                            "data-testid": "list-wrapper",
+                            "data-list-id": "60140e24e0805d3d5dc832f8"
+                          },
+                          "text": null,
+                          "children": []
+                        },
+                        {
+                          "tag": "li",
+                          "id": null,
+                          "classes": [
+                            "Iq1byT5o1KoAi6"
+                          ],
+                          "dataAttrs": {
+                            "data-testid": "list-wrapper",
+                            "data-list-id": "5f3432967fe075716a550811"
+                          },
+                          "text": null,
+                          "children": []
+                        },
+                        {
+                          "tag": "li",
+                          "id": null,
+                          "classes": [
+                            "Iq1byT5o1KoAi6"
+                          ],
+                          "dataAttrs": {
+                            "data-testid": "list-wrapper",
+                            "data-list-id": "5e9f2d43fd53292b972a7c06"
+                          },
+                          "text": null,
+                          "children": []
+                        },
+                        {
+                          "tag": "li",
+                          "id": null,
+                          "classes": [
+                            "Iq1byT5o1KoAi6"
+                          ],
+                          "dataAttrs": {
+                            "data-testid": "list-wrapper",
+                            "data-list-id": "5e95dd90ad9d405b0e99bf08"
+                          },
+                          "text": null,
+                          "children": []
+                        },
+                        {
+                          "tag": "li",
+                          "id": null,
+                          "classes": [
+                            "Iq1byT5o1KoAi6"
+                          ],
+                          "dataAttrs": {
+                            "data-testid": "list-wrapper",
+                            "data-list-id": "5dd70d46b57c318d99606b22"
+                          },
+                          "text": null,
+                          "children": []
+                        },
+                        {
+                          "tag": "li",
+                          "id": null,
+                          "classes": [
+                            "Iq1byT5o1KoAi6"
+                          ],
+                          "dataAttrs": {
+                            "data-testid": "list-wrapper",
+                            "data-list-id": "5dd6f4e46e7eb03b193dd909"
+                          },
+                          "text": null,
+                          "children": []
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        "list": {
+          "tag": "div",
+          "id": null,
+          "classes": [
+            "cYogZfEaHc9LfO"
+          ],
+          "dataAttrs": {
+            "data-testid": "list",
+            "data-drag-scroll-disabled": "true"
+          },
+          "text": null,
+          "children": [
+            {
+              "tag": "div",
+              "id": null,
+              "classes": [
+                "aqP9FqumyLvTg5"
+              ],
+              "dataAttrs": {
+                "data-testid": "list-header"
+              },
+              "text": null,
+              "children": [
+                {
+                  "tag": "div",
+                  "id": null,
+                  "classes": [
+                    "EWptYUU9xcT6KY"
+                  ],
+                  "dataAttrs": {},
+                  "text": null,
+                  "children": [
+                    {
+                      "tag": "h2",
+                      "id": "list-61e6f4692c3bf9414e22da57",
+                      "classes": [
+                        "b4Keujk7X4O23A"
+                      ],
+                      "dataAttrs": {
+                        "data-testid": "list-name"
+                      },
+                      "text": null,
+                      "children": [
+                        {
+                          "tag": "button",
+                          "id": null,
+                          "classes": [
+                            "_kx6W7TgeWyn4y",
+                            "GJoHRLVAUQGqpY"
+                          ],
+                          "dataAttrs": {},
+                          "text": null,
+                          "children": []
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "tag": "button",
+                  "id": null,
+                  "classes": [
+                    "G7WszObTDQMXsQ",
+                    "ybVBgfOiuWZJtD",
+                    "mUpWqmjL4CZBvn"
+                  ],
+                  "dataAttrs": {
+                    "data-testid": "list-collapse-button",
+                    "aria-labelledby": "list-61e6f4692c3bf9414e22da57"
+                  },
+                  "text": null,
+                  "children": [
+                    {
+                      "tag": "span",
+                      "id": null,
+                      "classes": [
+                        "_1e0c1o8l",
+                        "_vchhusvi",
+                        "_1o9zidpf",
+                        "_vwz4kb7n",
+                        "_y4ti1igz",
+                        "_bozg1mb9"
+                      ],
+                      "dataAttrs": {
+                        "aria-label": "Recolher lista \\"
+                      },
+                      "text": null,
+                      "children": [
+                        {
+                          "tag": "svg",
+                          "id": null,
+                          "classes": [
+                            "_1reo15vq",
+                            "_18m915vq",
+                            "_syaz1r31",
+                            "_lcxvglyw",
+                            "_s7n4yfq0",
+                            "_vc881r31"
+                          ],
+                          "dataAttrs": {},
+                          "text": null,
+                          "children": []
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "tag": "div",
+              "id": null,
+              "classes": [
+                "hmAggTw_52jl8Y",
+                "K2Xd_NTGA1OoxZ"
+              ],
+              "dataAttrs": {
+                "data-testid": "list-card-gap"
+              },
+              "text": null,
+              "children": [
+                {
+                  "tag": "div",
+                  "id": null,
+                  "classes": [
+                    "wwH06nzO7Ortph"
+                  ],
+                  "dataAttrs": {},
+                  "text": null,
+                  "children": []
+                },
+                {
+                  "tag": "div",
+                  "id": null,
+                  "classes": [
+                    "gTTvuOpO2bfrIf"
+                  ],
+                  "dataAttrs": {},
+                  "text": null,
+                  "children": []
+                },
+                {
+                  "tag": "div",
+                  "id": null,
+                  "classes": [
+                    "wwH06nzO7Ortph"
+                  ],
+                  "dataAttrs": {},
+                  "text": null,
+                  "children": []
+                }
+              ]
+            },
+            {
+              "tag": "ol",
+              "id": null,
+              "classes": [
+                "B27wN5INCjrQTV"
+              ],
+              "dataAttrs": {
+                "data-testid": "list-cards",
+                "data-auto-scrollable": "true"
+              },
+              "text": null,
+              "children": [
+                {
+                  "tag": "li",
+                  "id": null,
+                  "classes": [
+                    "csCxU7M5teCNNl"
+                  ],
+                  "dataAttrs": {
+                    "data-testid": "list-card",
+                    "data-planner-draggable": "true"
+                  },
+                  "text": null,
+                  "children": [
+                    {
+                      "tag": "div",
+                      "id": null,
+                      "classes": [
+                        "PPk42xVXm4ipq3"
+                      ],
+                      "dataAttrs": {
+                        "data-testid": "list-card-wrapper"
+                      },
+                      "text": null,
+                      "children": [
+                        {
+                          "tag": "div",
+                          "id": null,
+                          "classes": [
+                            "z1bjoUSvJd2OG5"
+                          ],
+                          "dataAttrs": {
+                            "data-testid": "full-cover-card",
+                            "data-card-id": "61e6f4ace2967858fa4f743b",
+                            "data-drop-target-for-element": "true"
+                          },
+                          "text": null,
+                          "children": []
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "tag": "div",
+                  "id": null,
+                  "classes": [
+                    "hmAggTw_52jl8Y",
+                    "K2Xd_NTGA1OoxZ"
+                  ],
+                  "dataAttrs": {
+                    "data-testid": "list-card-gap"
+                  },
+                  "text": null,
+                  "children": [
+                    {
+                      "tag": "div",
+                      "id": null,
+                      "classes": [
+                        "wwH06nzO7Ortph"
+                      ],
+                      "dataAttrs": {},
+                      "text": null,
+                      "children": []
+                    },
+                    {
+                      "tag": "div",
+                      "id": null,
+                      "classes": [
+                        "gTTvuOpO2bfrIf"
+                      ],
+                      "dataAttrs": {},
+                      "text": null,
+                      "children": []
+                    },
+                    {
+                      "tag": "div",
+                      "id": null,
+                      "classes": [
+                        "wwH06nzO7Ortph"
+                      ],
+                      "dataAttrs": {},
+                      "text": null,
+                      "children": []
+                    }
+                  ]
+                },
+                {
+                  "tag": "li",
+                  "id": null,
+                  "classes": [
+                    "csCxU7M5teCNNl"
+                  ],
+                  "dataAttrs": {
+                    "data-testid": "list-card",
+                    "data-planner-draggable": "true"
+                  },
+                  "text": null,
+                  "children": [
+                    {
+                      "tag": "div",
+                      "id": null,
+                      "classes": [
+                        "PPk42xVXm4ipq3"
+                      ],
+                      "dataAttrs": {
+                        "data-testid": "list-card-wrapper"
+                      },
+                      "text": null,
+                      "children": [
+                        {
+                          "tag": "div",
+                          "id": null,
+                          "classes": [
+                            "z1bjoUSvJd2OG5"
+                          ],
+                          "dataAttrs": {
+                            "data-testid": "link-card",
+                            "data-card-id": "61e6f4731edf085f22e8d484"
+                          },
+                          "text": null,
+                          "children": []
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        "card": {
+          "tag": "li",
+          "id": null,
+          "classes": [
+            "csCxU7M5teCNNl"
+          ],
+          "dataAttrs": {
+            "data-testid": "list-card",
+            "data-planner-draggable": "true"
+          },
+          "text": null,
+          "children": [
+            {
+              "tag": "div",
+              "id": null,
+              "classes": [
+                "PPk42xVXm4ipq3"
+              ],
+              "dataAttrs": {
+                "data-testid": "list-card-wrapper"
+              },
+              "text": null,
+              "children": [
+                {
+                  "tag": "div",
+                  "id": null,
+                  "classes": [
+                    "z1bjoUSvJd2OG5"
+                  ],
+                  "dataAttrs": {
+                    "data-testid": "full-cover-card",
+                    "data-card-id": "61e6f4ace2967858fa4f743b",
+                    "data-drop-target-for-element": "true"
+                  },
+                  "text": null,
+                  "children": [
+                    {
+                      "tag": "div",
+                      "id": null,
+                      "classes": [
+                        "SieqqIzU_bADac",
+                        "eSIkt5u4JZyHet",
+                        "GLOH1coj4lHm_u",
+                        "color-blind-pattern-green"
+                      ],
+                      "dataAttrs": {
+                        "data-testid": "card-front-cover"
+                      },
+                      "text": null,
+                      "children": [
+                        {
+                          "tag": "div",
+                          "id": null,
+                          "classes": [
+                            "UqzSbPVmRqpOQv",
+                            "NYIHAreWw6Ga8y"
+                          ],
+                          "dataAttrs": {
+                            "data-testid": "card-done-state-read-only"
+                          },
+                          "text": null,
+                          "children": []
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        "header": {
+          "tag": "div",
+          "id": null,
+          "classes": [
+            "board-header",
+            "u-clearfix",
+            "js-board-header",
+            "board-header-redesign-blur"
+          ],
+          "dataAttrs": {
+            "data-testid": "board-header"
+          },
+          "text": null,
+          "children": [
+            {
+              "tag": "div",
+              "id": null,
+              "classes": [
+                "Erwy85pXoZaNSd"
+              ],
+              "dataAttrs": {
+                "data-testid": "board-header"
+              },
+              "text": null,
+              "children": [
+                {
+                  "tag": "span",
+                  "id": null,
+                  "classes": [
+                    "UyGARBfyjlePlW"
+                  ],
+                  "dataAttrs": {},
+                  "text": null,
+                  "children": [
+                    {
+                      "tag": "div",
+                      "id": null,
+                      "classes": [
+                        "yFR8tC0K4fD6K5"
+                      ],
+                      "dataAttrs": {
+                        "data-testid": "board-name-container",
+                        "aria-label": "Nome do quadro"
+                      },
+                      "text": null,
+                      "children": [
+                        {
+                          "tag": "input",
+                          "id": null,
+                          "classes": [
+                            "rjY2KOSzslBciY"
+                          ],
+                          "dataAttrs": {
+                            "data-testid": "board-name-input"
+                          },
+                          "text": null,
+                          "children": []
+                        },
+                        {
+                          "tag": "h1",
+                          "id": null,
+                          "classes": [
+                            "DNczSsoZlJuTvn"
+                          ],
+                          "dataAttrs": {
+                            "data-testid": "board-name-display"
+                          },
+                          "text": "Trello Development Roadmap",
+                          "children": []
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "tag": "span",
+                  "id": null,
+                  "classes": [
+                    "z0eqWVVZWBQhjv"
+                  ],
+                  "dataAttrs": {},
+                  "text": null,
+                  "children": [
+                    {
+                      "tag": "div",
+                      "id": null,
+                      "classes": [
+                        "lZkwJjKMXRcxsL",
+                        "c1XTmJvtqApaiU"
+                      ],
+                      "dataAttrs": {},
+                      "text": null,
+                      "children": [
+                        {
+                          "tag": "div",
+                          "id": null,
+                          "classes": [
+                            "DVk8j2DkxFqnKZ"
+                          ],
+                          "dataAttrs": {
+                            "data-id": "5460cf8e8e96f086f772244f"
+                          },
+                          "text": null,
+                          "children": []
+                        },
+                        {
+                          "tag": "div",
+                          "id": null,
+                          "classes": [
+                            "DVk8j2DkxFqnKZ"
+                          ],
+                          "dataAttrs": {
+                            "data-id": "57558857fb97b6ed732b845a"
+                          },
+                          "text": null,
+                          "children": []
+                        },
+                        {
+                          "tag": "div",
+                          "id": null,
+                          "classes": [
+                            "DVk8j2DkxFqnKZ"
+                          ],
+                          "dataAttrs": {
+                            "data-id": "58aef8b62a034906a0891604"
+                          },
+                          "text": null,
+                          "children": []
+                        },
+                        {
+                          "tag": "div",
+                          "id": null,
+                          "classes": [
+                            "DVk8j2DkxFqnKZ"
+                          ],
+                          "dataAttrs": {
+                            "data-id": "57275f68dacc875853637907"
+                          },
+                          "text": null,
+                          "children": []
+                        },
+                        {
+                          "tag": "div",
+                          "id": null,
+                          "classes": [
+                            "DVk8j2DkxFqnKZ"
+                          ],
+                          "dataAttrs": {
+                            "data-id": "5f86a935f3262a4f0e47eb8d"
+                          },
+                          "text": null,
+                          "children": []
+                        },
+                        {
+                          "tag": "div",
+                          "id": null,
+                          "classes": [],
+                          "dataAttrs": {},
+                          "text": null,
+                          "children": []
+                        }
+                      ]
+                    },
+                    {
+                      "tag": "span",
+                      "id": null,
+                      "classes": [
+                        "YD_345cnMuohhp"
+                      ],
+                      "dataAttrs": {
+                        "data-appearance": "default"
+                      },
+                      "text": null,
+                      "children": [
+                        {
+                          "tag": "button",
+                          "id": null,
+                          "classes": [
+                            "_TUxCYptReyC_7",
+                            "PhzBALMp63PY_y",
+                            "ybVBgfOiuWZJtD",
+                            "Yt_v_LmarJM9ZS"
+                          ],
+                          "dataAttrs": {
+                            "data-testid": "filter-popover-button"
+                          },
+                          "text": null,
+                          "children": []
+                        }
+                      ]
+                    },
+                    {
+                      "tag": "div",
+                      "id": null,
+                      "classes": [
+                        "qS4WmrFQa0qtYU"
+                      ],
+                      "dataAttrs": {},
+                      "text": null,
+                      "children": [
+                        {
+                          "tag": "span",
+                          "id": null,
+                          "classes": [
+                            "Ku3JZCLRAogFIc",
+                            "Fhqnv8SYn4_3re"
+                          ],
+                          "dataAttrs": {},
+                          "text": null,
+                          "children": []
+                        }
+                      ]
+                    },
+                    {
+                      "tag": "button",
+                      "id": null,
+                      "classes": [
+                        "QCfb_k37Q8MX7C",
+                        "PhzBALMp63PY_y",
+                        "ybVBgfOiuWZJtD",
+                        "Yt_v_LmarJM9ZS"
+                      ],
+                      "dataAttrs": {
+                        "aria-label": "Mostrar Menu",
+                        "aria-expanded": "false"
+                      },
+                      "text": null,
+                      "children": [
+                        {
+                          "tag": "span",
+                          "id": null,
+                          "classes": [
+                            "HRDK8sNF4Ja3BM"
+                          ],
+                          "dataAttrs": {},
+                          "text": null,
+                          "children": []
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      },
+      "interactions": {
+        "buttons": [
+          {
+            "text": "Funcionalidades",
+            "classes": [
+              "dtw7_AIh1GxqiV",
+              "ybVBgfOiuWZJtD",
+              "mUpWqmjL4CZBvn"
+            ],
+            "dataTestId": "logged-out-header-wide-tab",
+            "ariaLabel": null,
+            "style": {
+              "padding": "20px 16px 16px",
+              "borderRadius": "6px",
+              "background": "rgba(0, 0, 0, 0)",
+              "fontSize": "16px"
+            }
+          },
+          {
+            "text": "Soluções",
+            "classes": [
+              "dtw7_AIh1GxqiV",
+              "ybVBgfOiuWZJtD",
+              "mUpWqmjL4CZBvn"
+            ],
+            "dataTestId": "logged-out-header-wide-tab",
+            "ariaLabel": null,
+            "style": {
+              "padding": "20px 16px 16px",
+              "borderRadius": "6px",
+              "background": "rgba(0, 0, 0, 0)",
+              "fontSize": "16px"
+            }
+          },
+          {
+            "text": "Planos",
+            "classes": [
+              "dtw7_AIh1GxqiV",
+              "ybVBgfOiuWZJtD",
+              "mUpWqmjL4CZBvn"
+            ],
+            "dataTestId": "logged-out-header-wide-tab",
+            "ariaLabel": null,
+            "style": {
+              "padding": "20px 16px 16px",
+              "borderRadius": "6px",
+              "background": "rgba(0, 0, 0, 0)",
+              "fontSize": "16px"
+            }
+          },
+          {
+            "text": "Recursos",
+            "classes": [
+              "dtw7_AIh1GxqiV",
+              "ybVBgfOiuWZJtD",
+              "mUpWqmjL4CZBvn"
+            ],
+            "dataTestId": "logged-out-header-wide-tab",
+            "ariaLabel": null,
+            "style": {
+              "padding": "20px 16px 16px",
+              "borderRadius": "6px",
+              "background": "rgba(0, 0, 0, 0)",
+              "fontSize": "16px"
+            }
+          },
+          {
+            "text": "Voltar",
+            "classes": [
+              "gniMlt5U6Q0qGU",
+              "ybVBgfOiuWZJtD",
+              "mUpWqmjL4CZBvn"
+            ],
+            "dataTestId": null,
+            "ariaLabel": null,
+            "style": {
+              "padding": "16px",
+              "borderRadius": "6px",
+              "background": "rgba(0, 0, 0, 0)",
+              "fontSize": "19.6px"
+            }
+          },
+          {
+            "text": "",
+            "classes": [
+              "Kpuawe3Qceuc2W",
+              "ybVBgfOiuWZJtD",
+              "mUpWqmjL4CZBvn",
+              "Yt_v_LmarJM9ZS"
+            ],
+            "dataTestId": "logged-out-header-menu-button",
+            "ariaLabel": "Menu de navegação",
+            "style": {
+              "padding": "16px",
+              "borderRadius": "6px",
+              "background": "rgba(0, 0, 0, 0)",
+              "fontSize": "14px"
+            }
+          },
+          {
+            "text": "Preferências",
+            "classes": [
+              "_ymio1r31",
+              "_ypr0glyw",
+              "_zcxs1o36",
+              "_mizu194a"
+            ],
+            "dataTestId": "preferences-button",
+            "ariaLabel": null,
+            "style": {
+              "padding": "6px 12px",
+              "borderRadius": "4px",
+              "background": "rgba(0, 0, 0, 0)",
+              "fontSize": "14px"
+            }
+          },
+          {
+            "text": "Apenas o necessário",
+            "classes": [
+              "_ymio1r31",
+              "_ypr0glyw",
+              "_zcxs1o36",
+              "_mizu194a"
+            ],
+            "dataTestId": "only-necessary-button",
+            "ariaLabel": null,
+            "style": {
+              "padding": "6px 12px",
+              "borderRadius": "4px",
+              "background": "rgba(0, 0, 0, 0)",
+              "fontSize": "14px"
+            }
+          },
+          {
+            "text": "Aceitar tudo",
+            "classes": [
+              "_ymio1r31",
+              "_ypr0glyw",
+              "_zcxs1o36",
+              "_mizu194a"
+            ],
+            "dataTestId": "accept-all-button",
+            "ariaLabel": null,
+            "style": {
+              "padding": "6px 12px",
+              "borderRadius": "4px",
+              "background": "rgba(0, 0, 0, 0)",
+              "fontSize": "14px"
+            }
+          },
+          {
+            "text": "",
+            "classes": [
+              "w7KETlmrCN8Ekc",
+              "PkNmqmQLu48HSf",
+              "ybVBgfOiuWZJtD"
+            ],
+            "dataTestId": "board-facepile-member",
+            "ariaLabel": null,
+            "style": {
+              "padding": "0px",
+              "borderRadius": "9999px",
+              "background": "rgba(0, 0, 0, 0)",
+              "fontSize": "14px"
+            }
+          },
+          {
+            "text": "",
+            "classes": [
+              "w7KETlmrCN8Ekc",
+              "PkNmqmQLu48HSf",
+              "ybVBgfOiuWZJtD"
+            ],
+            "dataTestId": "board-facepile-member",
+            "ariaLabel": null,
+            "style": {
+              "padding": "0px",
+              "borderRadius": "9999px",
+              "background": "rgba(0, 0, 0, 0)",
+              "fontSize": "14px"
+            }
+          },
+          {
+            "text": "",
+            "classes": [
+              "w7KETlmrCN8Ekc",
+              "PkNmqmQLu48HSf",
+              "ybVBgfOiuWZJtD"
+            ],
+            "dataTestId": "board-facepile-member",
+            "ariaLabel": null,
+            "style": {
+              "padding": "0px",
+              "borderRadius": "9999px",
+              "background": "rgba(0, 0, 0, 0)",
+              "fontSize": "14px"
+            }
+          },
+          {
+            "text": "",
+            "classes": [
+              "w7KETlmrCN8Ekc",
+              "PkNmqmQLu48HSf",
+              "ybVBgfOiuWZJtD"
+            ],
+            "dataTestId": "board-facepile-member",
+            "ariaLabel": null,
+            "style": {
+              "padding": "0px",
+              "borderRadius": "9999px",
+              "background": "rgba(0, 0, 0, 0)",
+              "fontSize": "14px"
+            }
+          },
+          {
+            "text": "",
+            "classes": [
+              "w7KETlmrCN8Ekc",
+              "PkNmqmQLu48HSf",
+              "ybVBgfOiuWZJtD"
+            ],
+            "dataTestId": "board-facepile-member",
+            "ariaLabel": null,
+            "style": {
+              "padding": "0px",
+              "borderRadius": "9999px",
+              "background": "rgba(0, 0, 0, 0)",
+              "fontSize": "14px"
+            }
+          },
+          {
+            "text": "+8",
+            "classes": [
+              "god0fVOmLMFYbi",
+              "GgZ16m1TqbV_YP",
+              "PhzBALMp63PY_y",
+              "ybVBgfOiuWZJtD"
+            ],
+            "dataTestId": "board-facepile-show-more",
+            "ariaLabel": null,
+            "style": {
+              "padding": "6px 12px",
+              "borderRadius": "9999px",
+              "background": "rgba(0, 0, 0, 0)",
+              "fontSize": "12px"
+            }
+          },
+          {
+            "text": "",
+            "classes": [
+              "_TUxCYptReyC_7",
+              "PhzBALMp63PY_y",
+              "ybVBgfOiuWZJtD",
+              "Yt_v_LmarJM9ZS"
+            ],
+            "dataTestId": "filter-popover-button",
+            "ariaLabel": null,
+            "style": {
+              "padding": "6px",
+              "borderRadius": "6px",
+              "background": "rgba(0, 0, 0, 0)",
+              "fontSize": "14px"
+            }
+          },
+          {
+            "text": "",
+            "classes": [
+              "HpsCFqZygiCyze",
+              "PhzBALMp63PY_y",
+              "ybVBgfOiuWZJtD",
+              "Yt_v_LmarJM9ZS"
+            ],
+            "dataTestId": "board-visibility-option-public",
+            "ariaLabel": "Público",
+            "style": {
+              "padding": "6px",
+              "borderRadius": "6px",
+              "background": "rgba(0, 0, 0, 0)",
+              "fontSize": "14px"
+            }
+          },
+          {
+            "text": "",
+            "classes": [
+              "QCfb_k37Q8MX7C",
+              "PhzBALMp63PY_y",
+              "ybVBgfOiuWZJtD",
+              "Yt_v_LmarJM9ZS"
+            ],
+            "dataTestId": null,
+            "ariaLabel": "Mostrar Menu",
+            "style": {
+              "padding": "6px",
+              "borderRadius": "6px",
+              "background": "rgba(0, 0, 0, 0)",
+              "fontSize": "14px"
+            }
+          },
+          {
+            "text": "New Trello Roadmap",
+            "classes": [
+              "_kx6W7TgeWyn4y",
+              "GJoHRLVAUQGqpY"
+            ],
+            "dataTestId": null,
+            "ariaLabel": null,
+            "style": {
+              "padding": "6px 8px 6px 12px",
+              "borderRadius": "0px",
+              "background": "rgba(0, 0, 0, 0)",
+              "fontSize": "14px"
+            }
+          },
+          {
+            "text": "",
+            "classes": [
+              "G7WszObTDQMXsQ",
+              "ybVBgfOiuWZJtD",
+              "mUpWqmjL4CZBvn"
+            ],
+            "dataTestId": "list-collapse-button",
+            "ariaLabel": null,
+            "style": {
+              "padding": "8px",
+              "borderRadius": "8px",
+              "background": "rgba(0, 0, 0, 0)",
+              "fontSize": "14px"
+            }
+          }
+        ],
+        "inputs": [
+          {
+            "type": "text",
+            "placeholder": "",
+            "classes": [
+              "rjY2KOSzslBciY"
+            ]
+          }
+        ],
+        "navigation": [],
+        "dragElements": [
+          {
+            "tag": "DIV",
+            "classes": [
+              "DVk8j2DkxFqnKZ"
+            ],
+            "cursor": "auto"
+          },
+          {
+            "tag": "DIV",
+            "classes": [
+              "DVk8j2DkxFqnKZ"
+            ],
+            "cursor": "auto"
+          },
+          {
+            "tag": "DIV",
+            "classes": [
+              "DVk8j2DkxFqnKZ"
+            ],
+            "cursor": "auto"
+          },
+          {
+            "tag": "DIV",
+            "classes": [
+              "DVk8j2DkxFqnKZ"
+            ],
+            "cursor": "auto"
+          },
+          {
+            "tag": "DIV",
+            "classes": [
+              "DVk8j2DkxFqnKZ"
+            ],
+            "cursor": "auto"
+          }
+        ]
+      }
+    },
+    "boardMeasurements": {
+      "column": {
+        "width": 272,
+        "height": 244,
+        "padding": "0px 0px 4px",
+        "margin": "0px",
+        "borderRadius": "12px",
+        "background": "rgb(241, 242, 244)",
+        "boxShadow": "rgba(30, 31, 33, 0.25) 0px 1px 1px 0px, rgba(30, 31, 33, 0.31) 0px 0px 1px 0px",
+        "fontSize": "14px",
+        "fontWeight": "400",
+        "color": "rgb(80, 82, 88)"
+      },
+      "card": {
+        "width": 256,
+        "height": 76,
+        "padding": "0px",
+        "margin": "0px",
+        "borderRadius": "0px",
+        "background": "rgba(0, 0, 0, 0)",
+        "boxShadow": "none",
+        "fontSize": "14px",
+        "fontWeight": "400",
+        "color": "rgb(80, 82, 88)"
+      },
+      "columnHeader": {
+        "width": 272,
+        "height": 40,
+        "padding": "8px 8px 0px",
+        "margin": "0px",
+        "borderRadius": "0px",
+        "background": "rgba(0, 0, 0, 0)",
+        "boxShadow": "none",
+        "fontSize": "14px",
+        "fontWeight": "400",
+        "color": "rgb(80, 82, 88)"
+      },
+      "addCardButton": null,
+      "boardBackground": "rgba(0, 0, 0, 0)"
+    }
+  }
+}

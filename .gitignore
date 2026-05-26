@@ -23,3 +23,12 @@ desktop.ini
 
 # Logs
 *.log
+
+# Node modules (Playwright research, etc.)
+node_modules/
+Documentation/kanban-research/node_modules/
+Documentation/kanban-research/screenshots/
+Documentation/kanban-research/package-lock.json
+
+# Claude Code settings locais (credenciais e preferências pessoais)
+.claude/
