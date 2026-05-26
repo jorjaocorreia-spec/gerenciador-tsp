@@ -705,6 +705,13 @@ class AppController {
         const ph = document.createElement('div');
         ph.className = 'kb-drag-placeholder';
         ph.style.height = card.offsetHeight + 'px';
+        // Impede que eventos no placeholder borbulhem até a dropzone (evita piscar)
+        ph.addEventListener('dragover', (e) => { e.preventDefault(); e.stopPropagation(); });
+        ph.addEventListener('drop', async (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            await this._handleDrop(e, ph.closest('.kb-dropzone'));
+        });
         this._dragPlaceholder = ph;
 
         setTimeout(() => {
