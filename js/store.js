@@ -423,6 +423,7 @@ class TSPStore {
             version: r.version || '',
             implementationDate: r.implementation_date || '',
             notes: r.notes || '',
+            attachments: Array.isArray(r.attachments) ? r.attachments : [],
             clientIds: [], // preenchido opcionalmente por getImplementationsWithClients
             createdAt: r.created_at,
             updatedAt: r.updated_at,
@@ -454,23 +455,24 @@ class TSPStore {
         return impls.map(impl => ({ ...impl, clientIds: map[impl.id] || [] }));
     }
 
-    async addImplementation({ name, type, description, codeScript, status, version, implementationDate, notes }) {
+    async addImplementation({ name, type, description, codeScript, status, version, implementationDate, notes, attachments }) {
         const { data, error } = await this.db.from('implementations').insert({
             user_id: this.userId, name, type, description: description || '',
             code_script: codeScript || '', status: status || 'active',
             version: version || '', implementation_date: implementationDate || null,
-            notes: notes || ''
+            notes: notes || '', attachments: attachments || []
         }).select().single();
         if (error) throw error;
         return this._implementation(data);
     }
 
-    async updateImplementation(id, { name, type, description, codeScript, status, version, implementationDate, notes }) {
+    async updateImplementation(id, { name, type, description, codeScript, status, version, implementationDate, notes, attachments }) {
         const { data, error } = await this.db.from('implementations').update({
             name, type, description: description || '',
             code_script: codeScript || '', status: status || 'active',
             version: version || '', implementation_date: implementationDate || null,
-            notes: notes || '', updated_at: new Date().toISOString()
+            notes: notes || '', attachments: attachments || [],
+            updated_at: new Date().toISOString()
         }).eq('id', id).eq('user_id', this.userId).select().single();
         if (error) throw error;
         return this._implementation(data);

@@ -64,6 +64,7 @@ class AppController {
         this.agendaViewMode = 'schedule'; // daily, weekly, monthly or schedule
         this.aptCurrentDate = new Date().toISOString().split('T')[0]; // 'YYYY-MM-DD'
         this.taskAttachments = []; // [{name, data}] — imagens em base64 do modal de tarefa
+        this.implAttachments = []; // [{name, data}] — imagens em base64 do modal de implementação
         this.init();
     }
 
@@ -131,7 +132,9 @@ class AppController {
 
         // Paste de imagens no modal de tarefa
         document.addEventListener('paste', (e) => {
-            if (!document.getElementById('modal-task')?.classList.contains('active')) return;
+            const taskActive = document.getElementById('modal-task')?.classList.contains('active');
+            const implActive = document.getElementById('modal-implementation')?.classList.contains('active');
+            if (!taskActive && !implActive) return;
             const items = e.clipboardData?.items;
             if (!items) return;
             for (const item of items) {
@@ -139,16 +142,23 @@ class AppController {
                     e.preventDefault();
                     const file = item.getAsFile();
                     const name = `print_${new Date().toISOString().replace(/[:.]/g, '-')}.jpg`;
-                    compressImageFile(file).then(data => {
-                        this.taskAttachments.push({ name, data });
-                        this._renderTaskAttachmentPreviews();
-                    });
+                    if (taskActive) {
+                        compressImageFile(file).then(data => {
+                            this.taskAttachments.push({ name, data });
+                            this._renderTaskAttachmentPreviews();
+                        });
+                    } else {
+                        compressImageFile(file).then(data => {
+                            this.implAttachments.push({ name, data });
+                            this._renderImplAttachmentPreviews();
+                        });
+                    }
                     break;
                 }
             }
         });
 
-        // Seleção de arquivos de imagem via input
+        // Seleção de arquivos de imagem via input — tarefa
         document.getElementById('task-attachments')?.addEventListener('change', async (e) => {
             for (const file of e.target.files) {
                 const data = await compressImageFile(file);
@@ -156,6 +166,16 @@ class AppController {
             }
             e.target.value = '';
             this._renderTaskAttachmentPreviews();
+        });
+
+        // Seleção de arquivos de imagem via input — implementação
+        document.getElementById('impl-attachments')?.addEventListener('change', async (e) => {
+            for (const file of e.target.files) {
+                const data = await compressImageFile(file);
+                this.implAttachments.push({ name: file.name, data });
+            }
+            e.target.value = '';
+            this._renderImplAttachmentPreviews();
         });
 
         // Renderizar Views
@@ -225,6 +245,10 @@ class AppController {
             document.getElementById('modal-task-title').innerText = 'Nova Tarefa';
             this.taskAttachments = [];
             this._renderTaskAttachmentPreviews();
+        }
+        if (modalId === 'modal-implementation') {
+            this.implAttachments = [];
+            this._renderImplAttachmentPreviews();
         }
         if (modalId === 'modal-task-time') {
             document.getElementById('form-task-time').reset();
@@ -562,6 +586,41 @@ class AppController {
     removeTaskAttachment(index) {
         this.taskAttachments.splice(index, 1);
         this._renderTaskAttachmentPreviews();
+    }
+
+    _renderImplAttachmentPreviews() {
+        const container = document.getElementById('impl-attach-previews');
+        const hint = document.getElementById('impl-attach-hint');
+        if (!container) return;
+        if (hint) hint.style.display = this.implAttachments.length ? 'none' : '';
+        container.innerHTML = this.implAttachments.map((att, i) => `
+            <div class="attach-thumb">
+                <img src="${att.data}" alt="${escapeHtml(att.name)}" onclick="app._openImplAttachmentLightbox(${i})" title="${escapeHtml(att.name)}">
+                <button type="button" class="attach-remove" onclick="app.removeImplAttachment(${i})" title="Remover">×</button>
+            </div>
+        `).join('');
+    }
+
+    _openImplAttachmentLightbox(index) {
+        const att = this.implAttachments[index];
+        if (!att) return;
+        const overlay = document.createElement('div');
+        overlay.style.cssText = 'position:fixed;inset:0;z-index:99999;background:rgba(0,0,0,0.88);display:flex;align-items:center;justify-content:center;cursor:zoom-out;';
+        const img = document.createElement('img');
+        img.src = att.data;
+        img.style.cssText = 'max-width:90vw;max-height:90vh;border-radius:8px;object-fit:contain;box-shadow:0 8px 40px rgba(0,0,0,0.6);cursor:default;';
+        img.addEventListener('click', (e) => e.stopPropagation());
+        overlay.appendChild(img);
+        overlay.addEventListener('click', () => overlay.remove());
+        document.addEventListener('keydown', function esc(e) {
+            if (e.key === 'Escape') { overlay.remove(); document.removeEventListener('keydown', esc); }
+        });
+        document.body.appendChild(overlay);
+    }
+
+    removeImplAttachment(index) {
+        this.implAttachments.splice(index, 1);
+        this._renderImplAttachmentPreviews();
     }
 
     async handleDeleteTask(id) {
@@ -3022,8 +3081,8 @@ class AppController {
             }
 
             // Agrupar por tipo
-            const typeLabels = { trigger: 'Trigger', procedure: 'Procedure / Função', feature: 'Funcionalidade', customization: 'Customização', integration: 'Integração' };
-            const typeIcons  = { trigger: 'zap', procedure: 'function-square', feature: 'sparkles', customization: 'settings-2', integration: 'plug-2' };
+            const typeLabels = { trigger: 'Trigger', procedure: 'Procedure / Função', feature: 'Funcionalidade', customization: 'Customização', integration: 'Integração', report: 'Relatório Customizado' };
+            const typeIcons  = { trigger: 'zap', procedure: 'function-square', feature: 'sparkles', customization: 'settings-2', integration: 'plug-2', report: 'file-bar-chart-2' };
             const groups = {};
             filtered.forEach(impl => {
                 if (!groups[impl.type]) groups[impl.type] = [];
@@ -3059,13 +3118,14 @@ class AppController {
                     const versionHtml = impl.version ? `<span style="font-size:.7rem;color:var(--text-muted);"> · v${escapeHtml(impl.version)}</span>` : '';
                     const dateHtml = impl.implementationDate ? `<span style="font-size:.7rem;color:var(--text-muted);"> · ${new Date(impl.implementationDate + 'T12:00').toLocaleDateString('pt-BR')}</span>` : '';
                     const hasCode = impl.codeScript && impl.codeScript.trim().length > 0;
+                    const attachCount = impl.attachments ? impl.attachments.length : 0;
 
                     html += `<div class="glass" style="padding:16px;cursor:pointer;transition:border-color .2s;" onclick="app.openEditImplementation('${impl.id}')">
                         <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;margin-bottom:8px;">
                             <span style="font-weight:600;flex:1;">${escapeHtml(impl.name)}</span>
                             ${statusBadge(impl.status)}
                         </div>
-                        <div style="font-size:.75rem;color:var(--text-muted);margin-bottom:8px;">${versionHtml}${dateHtml}${hasCode ? ' · <i data-lucide="file-code-2" style="width:12px;height:12px;vertical-align:middle;"></i> código' : ''}</div>
+                        <div style="font-size:.75rem;color:var(--text-muted);margin-bottom:8px;">${versionHtml}${dateHtml}${hasCode ? ' · <i data-lucide="file-code-2" style="width:12px;height:12px;vertical-align:middle;"></i> código' : ''}${attachCount ? ` · <i data-lucide="paperclip" style="width:12px;height:12px;vertical-align:middle;"></i> ${attachCount}` : ''}</div>
                         ${impl.description ? `<p style="font-size:.8rem;color:var(--text-secondary);margin-bottom:10px;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;">${escapeHtml(impl.description)}</p>` : ''}
                         <div style="display:flex;flex-wrap:wrap;gap:4px;">${chipsHtml}${extraChip}${noClients}</div>
                     </div>`;
@@ -3108,6 +3168,8 @@ class AppController {
         document.getElementById('impl-code').value = '';
         document.getElementById('impl-notes').value = '';
         document.getElementById('btn-delete-implementation').style.display = 'none';
+        this.implAttachments = [];
+        this._renderImplAttachmentPreviews();
         await this._populateImplClientCheckboxes([]);
         this.openModal('modal-implementation');
     }
@@ -3128,6 +3190,8 @@ class AppController {
         document.getElementById('impl-code').value = impl.codeScript;
         document.getElementById('impl-notes').value = impl.notes;
         document.getElementById('btn-delete-implementation').style.display = 'flex';
+        this.implAttachments = impl.attachments ? [...impl.attachments] : [];
+        this._renderImplAttachmentPreviews();
         await this._populateImplClientCheckboxes(impl.clientIds);
         this.openModal('modal-implementation');
     }
@@ -3144,6 +3208,7 @@ class AppController {
             description: document.getElementById('impl-description').value.trim(),
             codeScript: document.getElementById('impl-code').value.trim(),
             notes: document.getElementById('impl-notes').value.trim(),
+            attachments: this.implAttachments,
         };
 
         const selectedClientIds = Array.from(
