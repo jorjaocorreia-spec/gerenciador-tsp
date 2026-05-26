@@ -71,6 +71,10 @@ class AppController {
         this._modalLabels    = [];
         this._modalChecklist = [];
         this._modalCoverColor = null;
+        // Estado do drag-and-drop Kanban
+        this._draggedCard      = null;
+        this._dragPlaceholder  = null;
+        this._draggingFromStatus = null;
         this.init();
     }
 
@@ -692,43 +696,65 @@ class AppController {
     // KANBAN — Drag and Drop
     // ===================================
     dragStart(e) {
-        e.dataTransfer.setData('text/plain', e.currentTarget.dataset.id);
-        this._draggingFromStatus = e.currentTarget.closest('.kb-dropzone')?.dataset.status;
-        setTimeout(() => e.currentTarget.classList.add('dragging'), 0);
+        const card = e.currentTarget;
+        e.dataTransfer.setData('text/plain', card.dataset.id);
+        e.dataTransfer.effectAllowed = 'move';
+        this._draggingFromStatus = card.closest('.kb-dropzone')?.dataset.status;
+        this._draggedCard = card;
+
+        const ph = document.createElement('div');
+        ph.className = 'kb-drag-placeholder';
+        ph.style.height = card.offsetHeight + 'px';
+        this._dragPlaceholder = ph;
+
+        setTimeout(() => {
+            card.classList.add('dragging');
+            card.after(ph);
+        }, 0);
     }
 
     dragEnd(e) {
         e.currentTarget.classList.remove('dragging');
+        this._dragPlaceholder?.remove();
+        this._dragPlaceholder = null;
+        this._draggedCard = null;
         document.querySelectorAll('.kb-dropzone').forEach(z => z.classList.remove('drag-over'));
-        document.querySelectorAll('.kb-card').forEach(c => c.classList.remove('drag-over-above', 'drag-over-below'));
     }
 
     allowDrop(e) {
         e.preventDefault();
-        e.currentTarget.classList.add('drag-over');
+        if (!this._dragPlaceholder) return;
+        // Só dispara quando o mouse está no espaço vazio da coluna (abaixo dos cards),
+        // pois os cards chamam stopPropagation no seu próprio dragover.
+        this._dragPlaceholder.remove();
+        e.currentTarget.appendChild(this._dragPlaceholder);
     }
 
     async dropTask(e) {
         e.preventDefault();
-        const dropzone = e.currentTarget;
-        dropzone.classList.remove('drag-over');
+        e.currentTarget.classList.remove('drag-over');
+        await this._handleDrop(e, e.currentTarget);
+    }
+
+    async _handleDrop(e, colEl) {
         const draggedId = e.dataTransfer.getData('text/plain');
-        const newStatus = dropzone.dataset.status;
+        const newStatus = colEl?.dataset.status;
         if (!draggedId || !newStatus) return;
 
-        // Coletar cards visíveis na coluna (ordem do DOM já inclui o dragged)
-        const allCards = [...document.querySelectorAll(`#kb-col-${newStatus} .kb-card`)];
-        // Remover o dragged e re-inserir no final se veio de outra coluna
-        const ids = allCards.map(c => c.dataset.id).filter(id => id !== draggedId);
-        ids.push(draggedId);
+        // Lê a ordem do DOM: substitui o placeholder pelo id do card arrastado
+        const elements = [...colEl.querySelectorAll('.kb-card:not(.dragging), .kb-drag-placeholder')];
+        const ids = elements.map(el =>
+            el.classList.contains('kb-drag-placeholder') ? draggedId : el.dataset.id
+        ).filter(Boolean);
 
-        const updates = ids.map((id, idx) => ({ id, status: newStatus, position: idx }));
-        store.reorderTasks(updates).catch(() => Toast.show('Erro ao salvar ordem.', 'error'));
+        // Garante que o card arrastado está na lista (coluna vazia)
+        if (!ids.includes(draggedId)) ids.push(draggedId);
 
-        // Atualizar status se mudou de coluna
         if (this._draggingFromStatus !== newStatus) {
             await store.updateTaskStatus(draggedId, newStatus);
         }
+        store.reorderTasks(ids.map((id, pos) => ({ id, status: newStatus, position: pos })))
+            .catch(() => Toast.show('Erro ao salvar ordem.', 'error'));
         await this.renderAll();
     }
 
@@ -1536,30 +1562,19 @@ class AppController {
         card.addEventListener('dragover', (e) => {
             e.preventDefault();
             e.stopPropagation();
-            const mid = card.getBoundingClientRect().top + card.getBoundingClientRect().height / 2;
-            document.querySelectorAll('.kb-card').forEach(c => c.classList.remove('drag-over-above', 'drag-over-below'));
-            card.classList.add(e.clientY < mid ? 'drag-over-above' : 'drag-over-below');
+            if (!this._dragPlaceholder || card === this._draggedCard) return;
+            const rect = card.getBoundingClientRect();
+            const mid = rect.top + rect.height / 2;
+            if (e.clientY < mid) {
+                card.parentNode.insertBefore(this._dragPlaceholder, card);
+            } else {
+                card.insertAdjacentElement('afterend', this._dragPlaceholder);
+            }
         });
-        card.addEventListener('dragleave', () => card.classList.remove('drag-over-above', 'drag-over-below'));
         card.addEventListener('drop', async (e) => {
             e.preventDefault();
             e.stopPropagation();
-            card.classList.remove('drag-over-above', 'drag-over-below');
-            const draggedId = e.dataTransfer.getData('text/plain');
-            if (!draggedId || draggedId === task.id) return;
-            const colEl = card.closest('.kb-dropzone');
-            const newStatus = colEl?.dataset.status;
-            if (this._draggingFromStatus !== newStatus) {
-                await store.updateTaskStatus(draggedId, newStatus);
-            }
-            const mid = card.getBoundingClientRect().top + card.getBoundingClientRect().height / 2;
-            const allCards = [...colEl.querySelectorAll('.kb-card')].map(c => c.dataset.id).filter(id => id !== draggedId);
-            const targetIdx = allCards.indexOf(task.id);
-            if (targetIdx === -1) allCards.push(draggedId);
-            else allCards.splice(e.clientY < mid ? targetIdx : targetIdx + 1, 0, draggedId);
-            store.reorderTasks(allCards.map((id, pos) => ({ id, status: newStatus, position: pos })))
-                .catch(() => {});
-            await this.renderAll();
+            await this._handleDrop(e, card.closest('.kb-dropzone'));
         });
 
         const client = clientsMap[task.clientId];

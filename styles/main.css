@@ -663,11 +663,18 @@ h4 {
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
 }
 .kb-card.dragging {
-  opacity: 0.5;
+  opacity: 0.4;
   transform: rotate(1deg);
+  pointer-events: none;
 }
-.kb-card.drag-over-above { border-top: 2px solid var(--primary-color); }
-.kb-card.drag-over-below { border-bottom: 2px solid var(--primary-color); }
+.kb-drag-placeholder {
+  background: rgba(99, 102, 241, 0.08);
+  border: 2px dashed var(--primary-color);
+  border-radius: var(--kb-card-radius, 10px);
+  margin-bottom: 8px;
+  min-height: 56px;
+  transition: height 0.1s ease;
+}
 
 /* Cover do card */
 .kb-card-cover {
