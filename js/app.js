@@ -90,7 +90,7 @@ class AppController {
         document.getElementById('agenda-sync-google').addEventListener('change', (e) => {
             const row = document.getElementById('agenda-generate-meet-row');
             const hasMeet = document.getElementById('agenda-meet-link').value;
-            row.style.display = (e.target.checked && !hasMeet) ? '' : 'none';
+            row.style.display = (e.target.checked && !hasMeet) ? 'flex' : 'none';
             if (!e.target.checked) document.getElementById('agenda-generate-meet').checked = false;
         });
 
@@ -1393,7 +1393,7 @@ class AppController {
         document.getElementById('agenda-generate-meet').checked = false;
         // Mostra opção de Meet apenas se sync Google estiver ativo
         const syncChecked = document.getElementById('agenda-sync-google').checked;
-        document.getElementById('agenda-generate-meet-row').style.display = syncChecked ? '' : 'none';
+        document.getElementById('agenda-generate-meet-row').style.display = syncChecked ? 'flex' : 'none';
     }
 
     toggleAllDayAgenda(isAllDay) {
@@ -1529,13 +1529,29 @@ class AppController {
                         if (result.meetLink) eventData.meetLink = result.meetLink;
                     }
                 }
-                await store.addAgendaEvent(eventData);
+                const saved = await store.addAgendaEvent(eventData);
+                if (saved) eventData.id = saved.id;
             }
-            this.closeModal('modal-agenda-event');
-            await this.renderAgenda();
-            const meetMsg = eventData.meetLink ? ` Link Meet copiado.` : '';
-            if (eventData.meetLink) navigator.clipboard.writeText(eventData.meetLink).catch(() => {});
-            Toast.show((id ? 'Agendamento atualizado.' : 'Agendamento criado.') + meetMsg, 'success');
+            const newMeetGenerated = generateMeet && eventData.meetLink;
+            if (newMeetGenerated) {
+                // Mantém o modal aberto e exibe o link imediatamente
+                document.getElementById('agenda-id').value = eventData.id || id;
+                document.getElementById('agenda-calendar-event-id').value = eventData.calendarEventId || '';
+                document.getElementById('agenda-meet-link').value = eventData.meetLink;
+                document.getElementById('agenda-meet-link-display').href = eventData.meetLink;
+                document.getElementById('agenda-meet-link-display').textContent = eventData.meetLink;
+                document.getElementById('agenda-meet-link-block').style.display = 'flex';
+                document.getElementById('agenda-generate-meet-row').style.display = 'none';
+                document.getElementById('agenda-generate-meet').checked = false;
+                document.getElementById('modal-agenda-title').innerText = id ? 'Agendamento atualizado' : 'Agendamento criado';
+                navigator.clipboard.writeText(eventData.meetLink).catch(() => {});
+                Toast.show('Agendamento salvo! Link Meet gerado e copiado.', 'success');
+                this.renderAgenda();
+            } else {
+                this.closeModal('modal-agenda-event');
+                await this.renderAgenda();
+                Toast.show(id ? 'Agendamento atualizado.' : 'Agendamento criado.', 'success');
+            }
         } catch (err) {
             Toast.show('Erro ao salvar agendamento: ' + err.message, 'error');
         } finally {
@@ -1582,7 +1598,7 @@ class AppController {
         }
         // Se já tem Meet link, oculta a checkbox de gerar (já existe)
         const genMeetRow = document.getElementById('agenda-generate-meet-row');
-        genMeetRow.style.display = ev.meetLink ? 'none' : '';
+        genMeetRow.style.display = ev.meetLink ? 'none' : 'flex';
         document.getElementById('agenda-generate-meet').checked = false;
 
         this.openModal('modal-agenda-event');
