@@ -65,6 +65,12 @@ class AppController {
         this.aptCurrentDate = new Date().toISOString().split('T')[0]; // 'YYYY-MM-DD'
         this.taskAttachments = []; // [{name, data}] — imagens em base64 do modal de tarefa
         this.implAttachments = []; // [{name, data}] — imagens em base64 do modal de implementação
+        // Estado do modal de tarefa
+        this._modalTaskId    = null;
+        this._modalStatus    = 'new';
+        this._modalLabels    = [];
+        this._modalChecklist = [];
+        this._modalCoverColor = null;
         this.init();
     }
 
@@ -83,7 +89,6 @@ class AppController {
         // Configurar Formulários
         document.getElementById('form-client').addEventListener('submit', this.handleClientSubmit.bind(this));
         document.getElementById('form-record').addEventListener('submit', this.handleRecordSubmit.bind(this));
-        document.getElementById('form-task').addEventListener('submit', this.handleTaskSubmit.bind(this));
         document.getElementById('form-task-time').addEventListener('submit', this.handleTaskTimeSubmit.bind(this));
         document.getElementById('form-agenda-event').addEventListener('submit', this.handleAgendaSubmit.bind(this));
 
@@ -217,8 +222,11 @@ class AppController {
         }
         if (modalId === 'modal-task') {
             if (!document.getElementById('task-id').value) {
-                document.getElementById('task-status').value = 'new';
                 document.getElementById('task-priority').value = 'medium';
+                this._syncModalColumnButtons();
+                this._renderLabelPicker();
+                this._renderCoverPicker();
+                this._renderChecklist();
             }
         }
         if (modalId === 'modal-agenda-event') {
@@ -240,9 +248,20 @@ class AppController {
             document.getElementById('modal-client-title').innerText = 'Novo Cliente';
         }
         if (modalId === 'modal-task') {
-            document.getElementById('form-task').reset();
+            this._modalTaskId    = null;
+            this._modalStatus    = 'new';
+            this._modalLabels    = [];
+            this._modalChecklist = [];
+            this._modalCoverColor = null;
             document.getElementById('task-id').value = '';
-            document.getElementById('modal-task-title').innerText = 'Nova Tarefa';
+            document.getElementById('task-title').value = '';
+            document.getElementById('task-description').value = '';
+            document.getElementById('task-due-date').value = '';
+            document.getElementById('task-estimated-minutes').value = '';
+            document.getElementById('task-priority').value = 'medium';
+            document.getElementById('btn-delete-task').style.display = 'none';
+            document.getElementById('btn-add-time-task').style.display = 'none';
+            document.getElementById('modal-task-cover').style.display = 'none';
             this.taskAttachments = [];
             this._renderTaskAttachmentPreviews();
         }
@@ -474,28 +493,27 @@ class AppController {
     // TAREFAS (Ações e Submits)
     // ===================================
     async handleTaskSubmit(e) {
-        e.preventDefault();
+        if (e) e.preventDefault();
         const id = document.getElementById('task-id').value;
-        const clientId = document.getElementById('task-client').value;
-        const title = document.getElementById('task-title').value;
-        const desc = document.getElementById('task-desc').value;
-        const priority = document.getElementById('task-priority').value;
-        const dueDate = document.getElementById('task-due-date').value;
-        const estimated = document.getElementById('task-estimated').value;
-        const status = document.getElementById('task-status').value;
+        const title = document.getElementById('task-title').value.trim();
+        if (!title) { Toast.show('Informe o título da tarefa.', 'error'); return; }
+
         const taskData = {
-            clientId,
+            clientId: document.getElementById('task-client').value,
             title,
-            description: desc,
-            status,
-            priority,
-            dueDate,
-            estimatedMinutes: estimated,
+            description: document.getElementById('task-description').value,
+            status: this._modalStatus || 'new',
+            priority: document.getElementById('task-priority').value,
+            dueDate: document.getElementById('task-due-date').value,
+            estimatedMinutes: document.getElementById('task-estimated-minutes').value,
+            labels: this._modalLabels || [],
+            checklist: this._modalChecklist || [],
+            coverColor: this._modalCoverColor || null,
             attachments: this.taskAttachments
         };
 
-        const btn = e.target.querySelector('[type="submit"]');
-        btn.disabled = true;
+        const btn = document.querySelector('#form-task [type="submit"]');
+        if (btn) btn.disabled = true;
 
         try {
             if (id) {
@@ -510,7 +528,7 @@ class AppController {
         } catch (err) {
             Toast.show('Erro ao salvar tarefa: ' + err.message, 'error');
         } finally {
-            btn.disabled = false;
+            if (btn) btn.disabled = false;
         }
     }
 
@@ -538,16 +556,31 @@ class AppController {
     async handleEditTask(id) {
         const t = await store.getTask(id);
         if (!t) return;
-        document.getElementById('modal-task-title').innerText = 'Editar Tarefa';
+
+        // Estado modal
+        this._modalTaskId    = t.id;
+        this._modalStatus    = t.status || 'new';
+        this._modalLabels    = t.labels ? [...t.labels] : [];
+        this._modalChecklist = t.checklist ? [...t.checklist] : [];
+        this._modalCoverColor = t.coverColor || null;
+
         document.getElementById('task-id').value = t.id;
-        document.getElementById('task-client').value = t.clientId;
         document.getElementById('task-title').value = t.title;
-        document.getElementById('task-desc').value = t.description;
+        document.getElementById('task-description').value = t.description;
+        document.getElementById('task-client').value = t.clientId || '';
         document.getElementById('task-priority').value = t.priority;
-        document.getElementById('task-due-date').value = t.dueDate;
-        document.getElementById('task-estimated').value = t.estimatedMinutes || '';
-        document.getElementById('task-status').value = t.status;
+        document.getElementById('task-due-date').value = t.dueDate || '';
+        document.getElementById('task-estimated-minutes').value = t.estimatedMinutes || '';
         this.taskAttachments = t.attachments ? [...t.attachments] : [];
+
+        // Botões de edição
+        document.getElementById('btn-delete-task').style.display = 'flex';
+        document.getElementById('btn-add-time-task').style.display = 'flex';
+
+        this._syncModalColumnButtons();
+        this._syncModalCover();
+        this._renderModalLabels();
+        this._renderChecklist();
         this._renderTaskAttachmentPreviews();
 
         this.openModal('modal-task');
@@ -635,94 +668,289 @@ class AppController {
         }
     }
 
+    async handleDeleteTaskFromModal() {
+        const id = document.getElementById('task-id').value;
+        if (!id) return;
+        if (confirm("Deseja realmente apagar esta tarefa?")) {
+            try {
+                await store.deleteTask(id);
+                this.closeModal('modal-task');
+                await this.renderAll();
+                Toast.show('Tarefa excluída.', 'success');
+            } catch (err) {
+                Toast.show('Erro ao excluir tarefa: ' + err.message, 'error');
+            }
+        }
+    }
+
     handleOpenTaskTime(id) {
         document.getElementById('time-task-id').value = id;
         this.openModal('modal-task-time');
     }
 
-    // Drag and Drop Tarefas
+    // ===================================
+    // KANBAN — Drag and Drop
+    // ===================================
     dragStart(e) {
         e.dataTransfer.setData('text/plain', e.currentTarget.dataset.id);
-        this._draggingFromStatus = e.currentTarget.closest('.kanban-dropzone')?.dataset.status;
-        setTimeout(() => e.target.classList.add('dragging'), 0);
+        this._draggingFromStatus = e.currentTarget.closest('.kb-dropzone')?.dataset.status;
+        setTimeout(() => e.currentTarget.classList.add('dragging'), 0);
     }
 
     dragEnd(e) {
-        e.target.classList.remove('dragging');
-        document.querySelectorAll('.kanban-dropzone').forEach(zone => zone.classList.remove('drag-over'));
-        document.querySelectorAll('.task-card').forEach(c => c.classList.remove('drag-over-above', 'drag-over-below'));
+        e.currentTarget.classList.remove('dragging');
+        document.querySelectorAll('.kb-dropzone').forEach(z => z.classList.remove('drag-over'));
+        document.querySelectorAll('.kb-card').forEach(c => c.classList.remove('drag-over-above', 'drag-over-below'));
     }
 
     allowDrop(e) {
         e.preventDefault();
-        if (e.currentTarget.classList.contains('kanban-dropzone')) {
-            e.currentTarget.classList.add('drag-over');
-        }
+        e.currentTarget.classList.add('drag-over');
     }
 
     async dropTask(e) {
         e.preventDefault();
         const dropzone = e.currentTarget;
         dropzone.classList.remove('drag-over');
-
-        const taskId = e.dataTransfer.getData('text/plain');
+        const draggedId = e.dataTransfer.getData('text/plain');
         const newStatus = dropzone.dataset.status;
+        if (!draggedId || !newStatus) return;
 
-        if (taskId && newStatus) {
-            const oldStatus = this._draggingFromStatus;
-            if (oldStatus !== newStatus) {
-                await store.updateTaskStatus(taskId, newStatus);
-            }
-            // Mover para o final da coluna destino na ordem salva
-            const order = this._getTaskOrder();
-            for (const col of ['new', 'doing', 'done']) {
-                order[col] = (order[col] || []).filter(id => id !== taskId);
-            }
-            order[newStatus] = [...(order[newStatus] || []), taskId];
-            this._saveTaskOrder(order);
-            await this.renderAll();
+        // Coletar cards visíveis na coluna (ordem do DOM já inclui o dragged)
+        const allCards = [...document.querySelectorAll(`#kb-col-${newStatus} .kb-card`)];
+        // Remover o dragged e re-inserir no final se veio de outra coluna
+        const ids = allCards.map(c => c.dataset.id).filter(id => id !== draggedId);
+        ids.push(draggedId);
+
+        const updates = ids.map((id, idx) => ({ id, status: newStatus, position: idx }));
+        store.reorderTasks(updates).catch(() => Toast.show('Erro ao salvar ordem.', 'error'));
+
+        // Atualizar status se mudou de coluna
+        if (this._draggingFromStatus !== newStatus) {
+            await store.updateTaskStatus(draggedId, newStatus);
         }
+        await this.renderAll();
     }
 
-    _getTaskOrder() {
-        const userId = Auth.getUserId();
-        if (!userId) return { new: [], doing: [], done: [] };
+    // ===================================
+    // KANBAN — Quick-add
+    // ===================================
+    openQuickAdd(status) {
+        document.getElementById(`kb-quick-add-${status}`).style.display = 'block';
+        document.getElementById(`kb-add-btn-${status}`).style.display = 'none';
+        const input = document.getElementById(`kb-quick-input-${status}`);
+        input.value = '';
+        setTimeout(() => input.focus(), 50);
+    }
+
+    closeQuickAdd(status) {
+        document.getElementById(`kb-quick-add-${status}`).style.display = 'none';
+        document.getElementById(`kb-add-btn-${status}`).style.display = 'flex';
+    }
+
+    async submitQuickAdd(status) {
+        const input = document.getElementById(`kb-quick-input-${status}`);
+        const title = input.value.trim();
+        if (!title) { this.closeQuickAdd(status); return; }
         try {
-            return JSON.parse(localStorage.getItem(`tsp_task_order_${userId}`)) || { new: [], doing: [], done: [] };
-        } catch { return { new: [], doing: [], done: [] }; }
+            await store.addTask({ title, status, priority: 'medium' });
+            this.closeQuickAdd(status);
+            await this.renderAll();
+        } catch (err) {
+            Toast.show('Erro ao criar tarefa: ' + err.message, 'error');
+        }
     }
 
-    _saveTaskOrder(order) {
-        const userId = Auth.getUserId();
-        if (userId) localStorage.setItem(`tsp_task_order_${userId}`, JSON.stringify(order));
+    handleQuickAddKey(e, status) {
+        if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); this.submitQuickAdd(status); }
+        if (e.key === 'Escape') this.closeQuickAdd(status);
     }
 
-    _getSortedTasks(tasks, status) {
-        const order = this._getTaskOrder()[status] || [];
-        return [...tasks].sort((a, b) => {
-            const ai = order.indexOf(a.id);
-            const bi = order.indexOf(b.id);
-            if (ai === -1 && bi === -1) return 0;
-            if (ai === -1) return 1;
-            if (bi === -1) return -1;
-            return ai - bi;
+    // ===================================
+    // KANBAN — Modal helpers
+    // ===================================
+    _openNewTaskModal(status) {
+        this._modalTaskId    = null;
+        this._modalStatus    = status || 'new';
+        this._modalLabels    = [];
+        this._modalChecklist = [];
+        this._modalCoverColor = null;
+        document.getElementById('task-id').value = '';
+        document.getElementById('task-title').value = '';
+        document.getElementById('task-description').value = '';
+        document.getElementById('task-client').value = '';
+        document.getElementById('task-priority').value = 'medium';
+        document.getElementById('task-due-date').value = '';
+        document.getElementById('task-estimated-minutes').value = '';
+        document.getElementById('btn-delete-task').style.display = 'none';
+        document.getElementById('btn-add-time-task').style.display = 'none';
+        this.taskAttachments = [];
+        this._syncModalColumnButtons();
+        this._syncModalCover();
+        this._renderModalLabels();
+        this._renderChecklist();
+        this._renderTaskAttachmentPreviews();
+        this.openModal('modal-task');
+    }
+
+    moveTaskToColumn(status) {
+        this._modalStatus = status;
+        this._syncModalColumnButtons();
+        const labels = { new: 'Novas', doing: 'Em Execução', done: 'Finalizadas' };
+        document.getElementById('modal-task-column-label').textContent = labels[status] || '';
+    }
+
+    _syncModalColumnButtons() {
+        const labels = { new: 'Novas', doing: 'Em Execução', done: 'Finalizadas' };
+        document.querySelectorAll('.kb-col-btn').forEach(btn => {
+            btn.classList.toggle('active', btn.dataset.status === this._modalStatus);
         });
+        document.getElementById('modal-task-column-label').textContent = labels[this._modalStatus] || '';
     }
 
-    _updateTaskOrderAfterDrop(draggedId, targetId, insertBefore, newStatus) {
-        const order = this._getTaskOrder();
-        for (const col of ['new', 'doing', 'done']) {
-            order[col] = (order[col] || []).filter(id => id !== draggedId);
-        }
-        const colOrder = order[newStatus] || [];
-        const targetIdx = colOrder.indexOf(targetId);
-        if (targetIdx === -1) {
-            insertBefore ? colOrder.unshift(draggedId) : colOrder.push(draggedId);
+    _syncModalCover() {
+        const cover = document.getElementById('modal-task-cover');
+        if (this._modalCoverColor) {
+            cover.style.background = this._modalCoverColor;
+            cover.style.display = 'block';
         } else {
-            colOrder.splice(insertBefore ? targetIdx : targetIdx + 1, 0, draggedId);
+            cover.style.display = 'none';
         }
-        order[newStatus] = colOrder;
-        this._saveTaskOrder(order);
+        this._renderCoverPicker();
+    }
+
+    setCoverColor(color) {
+        this._modalCoverColor = color;
+        this._syncModalCover();
+    }
+
+    _renderCoverPicker() {
+        const picker = document.getElementById('kb-cover-picker');
+        if (!picker) return;
+        const colors = ['#4a9eff','#ff922b','#51cf66','#ffd43b','#cc5de8','#ff6b6b','#22d3ee','#f97316'];
+        picker.innerHTML = `<button type="button" class="kb-cover-swatch kb-cover-none${!this._modalCoverColor ? ' active' : ''}"
+            onclick="app.setCoverColor(null)" title="Sem cover"></button>` +
+            colors.map(c => `<button type="button" class="kb-cover-swatch${this._modalCoverColor===c?' active':''}"
+                style="background:${c}" onclick="app.setCoverColor('${c}')" title="${c}"></button>`).join('');
+    }
+
+    // ===================================
+    // KANBAN — Labels
+    // ===================================
+    _renderLabelPicker() {
+        const picker = document.getElementById('kb-label-picker');
+        if (!picker) return;
+        const colors = ['#4a9eff','#22d3ee','#51cf66','#a3e635','#ffd43b','#ff922b','#ff6b6b','#cc5de8'];
+        picker.innerHTML = colors.map(c => {
+            const active = this._modalLabels.some(l => l.color === c);
+            return `<button type="button" class="kb-label-option${active?' selected':''}"
+                style="background:${c}" onclick="app.toggleLabel('${c}')" title="${c}"></button>`;
+        }).join('');
+    }
+
+    toggleLabel(color) {
+        const idx = this._modalLabels.findIndex(l => l.color === color);
+        if (idx >= 0) this._modalLabels.splice(idx, 1);
+        else this._modalLabels.push({ color, text: '' });
+        this._renderLabelPicker();
+        this._renderModalLabels();
+    }
+
+    _renderModalLabels() {
+        this._renderLabelPicker();
+        const container = document.getElementById('kb-labels-applied');
+        const section = document.getElementById('modal-labels-applied-section');
+        if (!container || !section) return;
+        if (this._modalLabels.length === 0) {
+            section.style.display = 'none';
+            container.innerHTML = '';
+            return;
+        }
+        section.style.display = 'block';
+        container.innerHTML = this._modalLabels.map(l =>
+            `<span class="kb-label-applied-tag" style="background:${l.color}"
+                onclick="app.toggleLabel('${l.color}')">${l.text || '&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;'}</span>`
+        ).join('');
+    }
+
+    // ===================================
+    // KANBAN — Checklist
+    // ===================================
+    _renderChecklist() {
+        const container = document.getElementById('modal-checklist-items');
+        const bar = document.getElementById('modal-checklist-bar-wrap');
+        const fill = document.getElementById('modal-checklist-bar-fill');
+        const progress = document.getElementById('modal-checklist-progress');
+        if (!container) return;
+
+        const list = this._modalChecklist;
+        const done = list.filter(i => i.done).length;
+        const total = list.length;
+        const pct = total > 0 ? Math.round(done / total * 100) : 0;
+
+        if (bar) bar.style.display = total > 0 ? 'block' : 'none';
+        if (fill) fill.style.width = pct + '%';
+        if (progress) progress.textContent = total > 0 ? `${done}/${total}` : '';
+
+        container.innerHTML = list.map((item, idx) => `
+            <div class="checklist-item">
+                <input type="checkbox" ${item.done ? 'checked' : ''}
+                       onchange="app.toggleChecklistItem(${idx})">
+                <span class="checklist-item-text${item.done ? ' done' : ''}">${escapeHtml(item.text)}</span>
+                <button type="button" class="checklist-item-delete"
+                        onclick="app.deleteChecklistItem(${idx})" title="Remover">×</button>
+            </div>
+        `).join('');
+    }
+
+    addChecklistItem() {
+        const input = document.getElementById('modal-checklist-new-item');
+        const text = input.value.trim();
+        if (!text) return;
+        this._modalChecklist.push({ id: 'cl-' + Date.now(), text, done: false });
+        input.value = '';
+        this._renderChecklist();
+    }
+
+    handleChecklistItemKey(e) {
+        if (e.key === 'Enter') { e.preventDefault(); this.addChecklistItem(); }
+    }
+
+    toggleChecklistItem(idx) {
+        if (this._modalChecklist[idx]) {
+            this._modalChecklist[idx].done = !this._modalChecklist[idx].done;
+            this._renderChecklist();
+        }
+    }
+
+    deleteChecklistItem(idx) {
+        this._modalChecklist.splice(idx, 1);
+        this._renderChecklist();
+    }
+
+    // ===================================
+    // KANBAN — Filtros
+    // ===================================
+    clearKanbanFilters() {
+        const fc = document.getElementById('filter-task-client');
+        const fp = document.getElementById('filter-task-priority');
+        const fl = document.getElementById('filter-task-label');
+        if (fc) fc.value = '';
+        if (fp) fp.value = '';
+        if (fl) fl.value = '';
+        this.renderTasks();
+    }
+
+    _populateLabelFilter(tasks) {
+        const select = document.getElementById('filter-task-label');
+        if (!select) return;
+        const current = select.value;
+        // Coletar cores únicas
+        const colors = new Set();
+        tasks.forEach(t => (t.labels || []).forEach(l => colors.add(l.color)));
+        const extra = [...colors].map(c => `<option value="${c}" style="background:${c}">${c}</option>`).join('');
+        select.innerHTML = `<option value="">Todas</option>${extra}`;
+        if (current) select.value = current;
     }
 
     // Chamado após login bem-sucedido
@@ -1023,10 +1251,11 @@ class AppController {
             // SALVA O VALOR ATUAL ANTES DE LIMPAR O CONTEÚDO
             const currentValue = select.value;
 
-            const isFilter = select.id === 'filter-client';
+            const isFilter = select.id === 'filter-client' || select.id === 'filter-task-client';
+            const isTaskModal = select.id === 'task-client';
             select.innerHTML = isFilter
-                ? '<option value="">Todos os Clientes</option>'
-                : '<option value="" disabled selected>-- Escolha um cliente --</option>';
+                ? '<option value="">Todos</option>'
+                : (isTaskModal ? '<option value="">Sem cliente</option>' : '<option value="" disabled selected>-- Escolha um cliente --</option>');
 
             clients.forEach(c => {
                 const option = document.createElement('option');
@@ -1250,145 +1479,144 @@ class AppController {
         if (this.currentView !== 'tasks') return;
 
         let tasks = await store.getTasks();
+        this._populateLabelFilter(tasks);
 
-        // Filters
-        const filterClient = document.getElementById('filter-task-client')?.value;
+        const filterClient   = document.getElementById('filter-task-client')?.value;
         const filterPriority = document.getElementById('filter-task-priority')?.value;
+        const filterLabel    = document.getElementById('filter-task-label')?.value;
 
-        if (filterClient) {
-            tasks = tasks.filter(t => t.clientId === filterClient);
-        }
-        if (filterPriority) {
-            tasks = tasks.filter(t => t.priority === filterPriority);
-        }
+        if (filterClient)   tasks = tasks.filter(t => t.clientId === filterClient);
+        if (filterPriority) tasks = tasks.filter(t => t.priority === filterPriority);
+        if (filterLabel)    tasks = tasks.filter(t => (t.labels || []).some(l => l.color === filterLabel));
 
         const cols = {
-            new: document.getElementById('kb-col-new'),
+            new:   document.getElementById('kb-col-new'),
             doing: document.getElementById('kb-col-doing'),
-            done: document.getElementById('kb-col-done')
+            done:  document.getElementById('kb-col-done')
         };
+        if (!cols.new) return;
 
-        if (!cols.new || !cols.doing || !cols.done) return;
-
-        Object.values(cols).forEach(col => col.innerHTML = spinnerHtml);
-
-        const counts = { new: 0, doing: 0, done: 0 };
+        Object.values(cols).forEach(col => { if (col) col.innerHTML = spinnerHtml; });
 
         const clientIds = [...new Set(tasks.map(t => t.clientId).filter(Boolean))];
         const clientsMap = {};
         await Promise.all(clientIds.map(async id => { clientsMap[id] = await store.getClient(id); }));
 
-        Object.values(cols).forEach(col => col.innerHTML = '');
+        Object.values(cols).forEach(col => { if (col) col.innerHTML = ''; });
+        const counts = { new: 0, doing: 0, done: 0 };
 
-        // Agrupar por status e ordenar pela ordem salva
-        const grouped = { new: [], doing: [], done: [] };
-        tasks.forEach(t => { const s = t.status || 'new'; if (grouped[s]) grouped[s].push(t); });
-        const sortedTasks = [
-            ...this._getSortedTasks(grouped.new, 'new'),
-            ...this._getSortedTasks(grouped.doing, 'doing'),
-            ...this._getSortedTasks(grouped.done, 'done'),
-        ];
-
-        sortedTasks.forEach(task => {
-            const client = clientsMap[task.clientId];
-            const clientName = client ? escapeHtml(client.name) : '&lt;Desconhecido&gt;';
-
+        tasks.forEach(task => {
             const status = task.status || 'new';
             if (counts[status] !== undefined) counts[status]++;
-
-            const card = document.createElement('div');
-            card.className = 'task-card';
-            card.draggable = true;
-            card.dataset.id = task.id;
-
-            card.addEventListener('dragstart', this.dragStart.bind(this));
-            card.addEventListener('dragend', this.dragEnd.bind(this));
-
-            // Clicar no card abre edição (exceto quando clica em botões)
-            card.addEventListener('click', (e) => {
-                if (!e.target.closest('button')) this.handleEditTask(task.id);
-            });
-
-            // Drag sobre o card para reordenar dentro da coluna
-            card.addEventListener('dragover', (e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                const mid = card.getBoundingClientRect().top + card.getBoundingClientRect().height / 2;
-                document.querySelectorAll('.task-card').forEach(c => c.classList.remove('drag-over-above', 'drag-over-below'));
-                card.classList.add(e.clientY < mid ? 'drag-over-above' : 'drag-over-below');
-            });
-
-            card.addEventListener('dragleave', () => {
-                card.classList.remove('drag-over-above', 'drag-over-below');
-            });
-
-            card.addEventListener('drop', async (e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                card.classList.remove('drag-over-above', 'drag-over-below');
-                const draggedId = e.dataTransfer.getData('text/plain');
-                if (!draggedId || draggedId === task.id) return;
-                const newStatus = card.closest('.kanban-dropzone').dataset.status;
-                const oldStatus = this._draggingFromStatus;
-                if (oldStatus && oldStatus !== newStatus) {
-                    await store.updateTaskStatus(draggedId, newStatus);
-                }
-                const mid = card.getBoundingClientRect().top + card.getBoundingClientRect().height / 2;
-                this._updateTaskOrderAfterDrop(draggedId, task.id, e.clientY < mid, newStatus);
-                await this.renderAll();
-            });
-
-            let priorityClass = 'priority-low';
-            if (task.priority === 'high') priorityClass = 'priority-high';
-            if (task.priority === 'medium') priorityClass = 'priority-medium';
-
-            let delayHtml = '';
-            if (task.dueDate && task.status !== 'done') {
-                const today = new Date().toISOString().split('T')[0];
-                if (task.dueDate < today) {
-                    delayHtml = `<span class="task-alert"><i data-lucide="alert-circle" style="width: 12px; height: 12px;"></i> Atrasada (${task.dueDate.split('-').reverse().join('/')})</span>`;
-                } else {
-                    delayHtml = `<span>Prazo: ${task.dueDate.split('-').reverse().join('/')}</span>`;
-                }
-            }
-
-            const estMinutes = parseInt(task.estimatedMinutes) || 0;
-            const spentMinutes = parseInt(task.spentMinutes) || 0;
-            const timeInfo = (estMinutes > 0 || spentMinutes > 0) ? `<span><i data-lucide="clock" style="width: 12px; height: 12px;"></i> ${spentMinutes}m / ${estMinutes}m</span>` : '';
-
-            let attachmentsHtml = '';
-            if (task.attachments && task.attachments.length > 0) {
-                const thumb = task.attachments[0]?.data
-                    ? `<img src="${task.attachments[0].data}" style="width:14px;height:14px;object-fit:cover;border-radius:2px;vertical-align:middle;margin-right:3px;">`
-                    : '';
-                attachmentsHtml = `<span>${thumb}<i data-lucide="paperclip" style="width:12px;height:12px;"></i> ${task.attachments.length} anexo(s)</span>`;
-            }
-
-            card.innerHTML = `
-                <div class="task-priority-bar ${priorityClass}"></div>
-                <div class="task-title">${escapeHtml(task.title)}</div>
-                <div class="task-client-name">${clientName}</div>
-                <div class="task-meta">
-                    ${delayHtml ? `<div>${delayHtml}</div>` : ''}
-                    ${timeInfo ? `<div>${timeInfo}</div>` : ''}
-                    ${attachmentsHtml ? `<div>${attachmentsHtml}</div>` : ''}
-                </div>
-                <div class="task-actions" style="margin-top: 8px;">
-                    <button type="button" onclick="app.handleEditTask('${task.id}')" title="Editar"><i data-lucide="pencil" style="width: 14px; height: 14px;"></i></button>
-                    ${task.status !== 'done' ? `<button type="button" onclick="app.handleOpenTaskTime('${task.id}')" title="Adicionar Tempo"><i data-lucide="play" style="width: 14px; height: 14px;"></i></button>` : ''}
-                    <button type="button" onclick="app.handleDeleteTask('${task.id}')" title="Excluir"><i data-lucide="trash-2" style="width: 14px; height: 14px;"></i></button>
-                </div>
-            `;
-
-            if (cols[status]) cols[status].appendChild(card);
+            const col = cols[status];
+            if (!col) return;
+            const card = this.createKanbanCard(task, clientsMap);
+            col.appendChild(card);
         });
 
-        document.getElementById('kanban-count-new').innerText = counts.new;
-        document.getElementById('kanban-count-doing').innerText = counts.doing;
-        document.getElementById('kanban-count-done').innerText = counts.done;
+        document.getElementById('kb-count-new').textContent   = counts.new;
+        document.getElementById('kb-count-doing').textContent = counts.doing;
+        document.getElementById('kb-count-done').textContent  = counts.done;
 
         await this.renderTasksDashboard(tasks, filterClient);
         lucide.createIcons();
+    }
+
+    createKanbanCard(task, clientsMap) {
+        const card = document.createElement('div');
+        card.className = 'kb-card';
+        card.draggable = true;
+        card.dataset.id = task.id;
+
+        card.addEventListener('dragstart', this.dragStart.bind(this));
+        card.addEventListener('dragend', this.dragEnd.bind(this));
+        card.addEventListener('click', (e) => {
+            if (!e.target.closest('button')) this.handleEditTask(task.id);
+        });
+        card.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            const mid = card.getBoundingClientRect().top + card.getBoundingClientRect().height / 2;
+            document.querySelectorAll('.kb-card').forEach(c => c.classList.remove('drag-over-above', 'drag-over-below'));
+            card.classList.add(e.clientY < mid ? 'drag-over-above' : 'drag-over-below');
+        });
+        card.addEventListener('dragleave', () => card.classList.remove('drag-over-above', 'drag-over-below'));
+        card.addEventListener('drop', async (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            card.classList.remove('drag-over-above', 'drag-over-below');
+            const draggedId = e.dataTransfer.getData('text/plain');
+            if (!draggedId || draggedId === task.id) return;
+            const colEl = card.closest('.kb-dropzone');
+            const newStatus = colEl?.dataset.status;
+            if (this._draggingFromStatus !== newStatus) {
+                await store.updateTaskStatus(draggedId, newStatus);
+            }
+            const mid = card.getBoundingClientRect().top + card.getBoundingClientRect().height / 2;
+            const allCards = [...colEl.querySelectorAll('.kb-card')].map(c => c.dataset.id).filter(id => id !== draggedId);
+            const targetIdx = allCards.indexOf(task.id);
+            if (targetIdx === -1) allCards.push(draggedId);
+            else allCards.splice(e.clientY < mid ? targetIdx : targetIdx + 1, 0, draggedId);
+            store.reorderTasks(allCards.map((id, pos) => ({ id, status: newStatus, position: pos })))
+                .catch(() => {});
+            await this.renderAll();
+        });
+
+        const client = clientsMap[task.clientId];
+        const clientName = client ? escapeHtml(client.name) : '';
+        const today = new Date().toISOString().split('T')[0];
+
+        // Cover
+        const coverHtml = task.coverColor
+            ? `<div class="kb-card-cover" style="background:${task.coverColor}"></div>` : '';
+
+        // Labels
+        const labelsHtml = (task.labels || []).length > 0
+            ? `<div class="kb-card-labels">${task.labels.map(l =>
+                `<span class="kb-label" style="background:${l.color}" title="${escapeHtml(l.text||'')}"></span>`
+              ).join('')}</div>` : '';
+
+        // Badges
+        const priMap = { high: ['priority-high','Alta'], medium: ['priority-medium','Média'], low: ['priority-low','Baixa'] };
+        const [priClass, priLabel] = priMap[task.priority] || priMap.medium;
+        let badgesHtml = `<span class="kb-badge kb-badge-${priClass}">${priLabel}</span>`;
+
+        if (task.dueDate && task.status !== 'done') {
+            const overdue = task.dueDate < today;
+            badgesHtml += `<span class="kb-badge${overdue ? ' kb-badge-due-overdue' : ''}">
+                <i data-lucide="clock" style="width:10px;height:10px"></i> ${task.dueDate.split('-').reverse().join('/')}
+            </span>`;
+        }
+        const cl = task.checklist || [];
+        if (cl.length > 0) {
+            const done = cl.filter(i => i.done).length;
+            badgesHtml += `<span class="kb-badge"><i data-lucide="check-square" style="width:10px;height:10px"></i> ${done}/${cl.length}</span>`;
+        }
+        if ((task.attachments || []).length > 0) {
+            badgesHtml += `<span class="kb-badge"><i data-lucide="paperclip" style="width:10px;height:10px"></i> ${task.attachments.length}</span>`;
+        }
+        if (task.estimatedMinutes > 0 || task.spentMinutes > 0) {
+            badgesHtml += `<span class="kb-badge"><i data-lucide="clock-3" style="width:10px;height:10px"></i> ${task.spentMinutes}/${task.estimatedMinutes}m</span>`;
+        }
+
+        card.innerHTML = `
+            ${coverHtml}
+            ${labelsHtml}
+            <p class="kb-card-title">${escapeHtml(task.title)}</p>
+            <div class="kb-card-badges">${badgesHtml}</div>
+            <div class="kb-card-footer">
+                <span class="kb-card-client">${clientName}</span>
+                <div class="kb-card-actions">
+                    <button type="button" class="kb-action-btn" onclick="event.stopPropagation();app.handleEditTask('${task.id}')" title="Editar">
+                        <i data-lucide="pencil" style="width:12px;height:12px"></i>
+                    </button>
+                    <button type="button" class="kb-action-btn kb-action-danger" onclick="event.stopPropagation();app.handleDeleteTask('${task.id}')" title="Excluir">
+                        <i data-lucide="trash-2" style="width:12px;height:12px"></i>
+                    </button>
+                </div>
+            </div>
+        `;
+        return card;
     }
 
     async renderTasksDashboard(tasks, filteredClientId) {

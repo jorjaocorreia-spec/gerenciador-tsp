@@ -23,7 +23,12 @@ class TSPStore {
     _task(r) {
         return { id: r.id, clientId: r.client_id, title: r.title,
             description: r.description || '', status: r.status || 'new',
-            priority: r.priority || 'medium', dueDate: r.due_date || '',
+            priority: r.priority || 'medium',
+            position: parseInt(r.position) || 0,
+            labels: Array.isArray(r.labels) ? r.labels : [],
+            checklist: Array.isArray(r.checklist) ? r.checklist : [],
+            coverColor: r.cover_color || null,
+            dueDate: r.due_date || '',
             estimatedMinutes: parseInt(r.estimated_minutes) || 0,
             spentMinutes: parseInt(r.spent_minutes) || 0,
             attachments: Array.isArray(r.attachments) ? r.attachments : [],
@@ -143,7 +148,7 @@ class TSPStore {
 
     async getTasks() {
         const { data, error } = await this.db.from('tasks').select('*')
-            .eq('user_id', this.userId).order('created_at');
+            .eq('user_id', this.userId).order('status').order('position');
         if (error) throw error;
         return data.map(r => this._task(r));
     }
@@ -163,10 +168,20 @@ class TSPStore {
     }
 
     async addTask(taskData) {
+        const targetStatus = taskData.status || 'new';
+        const { data: existing } = await this.db.from('tasks')
+            .select('position').eq('user_id', this.userId).eq('status', targetStatus)
+            .order('position', { ascending: false }).limit(1);
+        const nextPosition = (existing && existing.length > 0) ? (existing[0].position + 1) : 0;
+
         const { data, error } = await this.db.from('tasks').insert({
             user_id: this.userId, client_id: taskData.clientId || null,
             title: taskData.title, description: taskData.description || '',
-            status: taskData.status || 'new', priority: taskData.priority || 'medium',
+            status: targetStatus, priority: taskData.priority || 'medium',
+            position: nextPosition,
+            labels: taskData.labels || [],
+            checklist: taskData.checklist || [],
+            cover_color: taskData.coverColor || null,
             due_date: taskData.dueDate || null,
             estimated_minutes: parseInt(taskData.estimatedMinutes) || 0,
             spent_minutes: 0,
@@ -182,9 +197,32 @@ class TSPStore {
             description: taskData.description || '', status: taskData.status,
             priority: taskData.priority, due_date: taskData.dueDate || null,
             estimated_minutes: parseInt(taskData.estimatedMinutes) || 0,
+            labels: taskData.labels || [],
+            checklist: taskData.checklist || [],
+            cover_color: taskData.coverColor || null,
             updated_at: new Date().toISOString(),
             attachments: taskData.attachments || []
-        }).eq('id', taskData.id).select().single();
+        }).eq('id', taskData.id).eq('user_id', this.userId).select().single();
+        if (error) throw error;
+        return this._task(data);
+    }
+
+    async reorderTasks(updates) {
+        // updates: [{id, status, position}]
+        const rows = updates.map(u => ({
+            id: u.id, user_id: this.userId,
+            status: u.status, position: u.position,
+            updated_at: new Date().toISOString()
+        }));
+        const { error } = await this.db.from('tasks')
+            .upsert(rows, { onConflict: 'id', ignoreDuplicates: false });
+        if (error) throw error;
+    }
+
+    async updateTaskChecklist(id, checklist) {
+        const { data, error } = await this.db.from('tasks').update({
+            checklist, updated_at: new Date().toISOString()
+        }).eq('id', id).eq('user_id', this.userId).select().single();
         if (error) throw error;
         return this._task(data);
     }

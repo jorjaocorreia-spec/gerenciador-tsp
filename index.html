@@ -247,7 +247,7 @@
                     <h1>Tarefas</h1>
                     <p class="text-muted">Gestão ágil de requisições e projetos.</p>
                 </div>
-                <button class="btn btn-primary" onclick="app.openModal('modal-task')">
+                <button class="btn btn-primary" onclick="app._openNewTaskModal('new')">
                     <i data-lucide="plus"></i> Nova Tarefa
                 </button>
             </div>
@@ -257,16 +257,15 @@
                 <!-- Preenchido via JS -->
             </div>
 
-            <!-- Área de Filtros Kanban -->
-            <div class="glass"
-                style="padding: 16px; margin-bottom: 24px; display: flex; gap: 16px; flex-wrap: wrap; align-items: flex-end;">
-                <div class="form-group" style="flex: 1; min-width: 200px; margin-bottom: 0;">
-                    <label>Filtrar por Cliente</label>
+            <!-- Filtros Kanban -->
+            <div class="kanban-filters glass">
+                <div class="form-group">
+                    <label>Cliente</label>
                     <select id="filter-task-client" class="form-control" onchange="app.renderTasks()">
-                        <option value="">Todos os Clientes</option>
+                        <option value="">Todos</option>
                     </select>
                 </div>
-                <div class="form-group" style="flex: 1; min-width: 150px; margin-bottom: 0;">
+                <div class="form-group">
                     <label>Prioridade</label>
                     <select id="filter-task-priority" class="form-control" onchange="app.renderTasks()">
                         <option value="">Todas</option>
@@ -275,45 +274,106 @@
                         <option value="low">Baixa</option>
                     </select>
                 </div>
+                <div class="form-group">
+                    <label>Label</label>
+                    <select id="filter-task-label" class="form-control" onchange="app.renderTasks()">
+                        <option value="">Todas</option>
+                    </select>
+                </div>
+                <div class="kanban-filters-actions">
+                    <button class="btn btn-ghost" onclick="app.clearKanbanFilters()" title="Limpar filtros">
+                        <i data-lucide="x"></i>
+                    </button>
+                </div>
             </div>
 
             <!-- KANBAN BOARD -->
-            <div class="kanban-board">
+            <div class="kanban-board" id="kanban-board">
+
                 <!-- Coluna Novas -->
-                <div class="kanban-column glass">
-                    <div class="kanban-header">
-                        <h3>Novas</h3>
-                        <span class="badge" id="kanban-count-new">0</span>
+                <div class="kb-column" data-status="new">
+                    <div class="kb-column-header">
+                        <div class="kb-column-title">
+                            <span class="kb-column-dot" style="background: var(--kb-color-new)"></span>
+                            <h3>Novas</h3>
+                            <span class="kb-count" id="kb-count-new">0</span>
+                        </div>
+                        <button class="kb-header-add" onclick="app.openQuickAdd('new')" title="Adicionar card">
+                            <i data-lucide="plus"></i>
+                        </button>
                     </div>
-                    <div class="kanban-dropzone" id="kb-col-new" data-status="new" ondragover="app.allowDrop(event)"
-                        ondrop="app.dropTask(event)">
-                        <!-- Tasks go here -->
+                    <div class="kb-dropzone" id="kb-col-new" data-status="new"
+                         ondragover="app.allowDrop(event)" ondrop="app.dropTask(event)"></div>
+                    <div class="kb-quick-add" id="kb-quick-add-new" style="display:none">
+                        <textarea class="kb-quick-add-input" id="kb-quick-input-new" rows="3"
+                                  placeholder="Título do card..."
+                                  onkeydown="app.handleQuickAddKey(event,'new')"></textarea>
+                        <div class="kb-quick-add-actions">
+                            <button class="btn btn-primary" onclick="app.submitQuickAdd('new')">Adicionar</button>
+                            <button class="btn btn-ghost" onclick="app.closeQuickAdd('new')"><i data-lucide="x"></i></button>
+                        </div>
                     </div>
+                    <button class="kb-add-card-btn" id="kb-add-btn-new" onclick="app.openQuickAdd('new')">
+                        <i data-lucide="plus"></i> Adicionar card
+                    </button>
                 </div>
 
                 <!-- Coluna Em Execução -->
-                <div class="kanban-column glass">
-                    <div class="kanban-header">
-                        <h3 style="color: var(--secondary-color);">Em Execução</h3>
-                        <span class="badge" id="kanban-count-doing">0</span>
+                <div class="kb-column" data-status="doing">
+                    <div class="kb-column-header">
+                        <div class="kb-column-title">
+                            <span class="kb-column-dot" style="background: var(--kb-color-doing)"></span>
+                            <h3>Em Execução</h3>
+                            <span class="kb-count" id="kb-count-doing">0</span>
+                        </div>
+                        <button class="kb-header-add" onclick="app.openQuickAdd('doing')" title="Adicionar card">
+                            <i data-lucide="plus"></i>
+                        </button>
                     </div>
-                    <div class="kanban-dropzone" id="kb-col-doing" data-status="doing" ondragover="app.allowDrop(event)"
-                        ondrop="app.dropTask(event)">
-                        <!-- Tasks go here -->
+                    <div class="kb-dropzone" id="kb-col-doing" data-status="doing"
+                         ondragover="app.allowDrop(event)" ondrop="app.dropTask(event)"></div>
+                    <div class="kb-quick-add" id="kb-quick-add-doing" style="display:none">
+                        <textarea class="kb-quick-add-input" id="kb-quick-input-doing" rows="3"
+                                  placeholder="Título do card..."
+                                  onkeydown="app.handleQuickAddKey(event,'doing')"></textarea>
+                        <div class="kb-quick-add-actions">
+                            <button class="btn btn-primary" onclick="app.submitQuickAdd('doing')">Adicionar</button>
+                            <button class="btn btn-ghost" onclick="app.closeQuickAdd('doing')"><i data-lucide="x"></i></button>
+                        </div>
                     </div>
+                    <button class="kb-add-card-btn" id="kb-add-btn-doing" onclick="app.openQuickAdd('doing')">
+                        <i data-lucide="plus"></i> Adicionar card
+                    </button>
                 </div>
 
                 <!-- Coluna Finalizadas -->
-                <div class="kanban-column glass">
-                    <div class="kanban-header">
-                        <h3 style="color: var(--success-color);">Finalizadas</h3>
-                        <span class="badge" id="kanban-count-done">0</span>
+                <div class="kb-column" data-status="done">
+                    <div class="kb-column-header">
+                        <div class="kb-column-title">
+                            <span class="kb-column-dot" style="background: var(--kb-color-done)"></span>
+                            <h3>Finalizadas</h3>
+                            <span class="kb-count" id="kb-count-done">0</span>
+                        </div>
+                        <button class="kb-header-add" onclick="app.openQuickAdd('done')" title="Adicionar card">
+                            <i data-lucide="plus"></i>
+                        </button>
                     </div>
-                    <div class="kanban-dropzone" id="kb-col-done" data-status="done" ondragover="app.allowDrop(event)"
-                        ondrop="app.dropTask(event)">
-                        <!-- Tasks go here -->
+                    <div class="kb-dropzone" id="kb-col-done" data-status="done"
+                         ondragover="app.allowDrop(event)" ondrop="app.dropTask(event)"></div>
+                    <div class="kb-quick-add" id="kb-quick-add-done" style="display:none">
+                        <textarea class="kb-quick-add-input" id="kb-quick-input-done" rows="3"
+                                  placeholder="Título do card..."
+                                  onkeydown="app.handleQuickAddKey(event,'done')"></textarea>
+                        <div class="kb-quick-add-actions">
+                            <button class="btn btn-primary" onclick="app.submitQuickAdd('done')">Adicionar</button>
+                            <button class="btn btn-ghost" onclick="app.closeQuickAdd('done')"><i data-lucide="x"></i></button>
+                        </div>
                     </div>
+                    <button class="kb-add-card-btn" id="kb-add-btn-done" onclick="app.openQuickAdd('done')">
+                        <i data-lucide="plus"></i> Adicionar card
+                    </button>
                 </div>
+
             </div>
         </section>
 
@@ -715,76 +775,153 @@
 
     <!-- MODAL: TAREFA -->
     <div class="modal-overlay" id="modal-task">
-        <div class="modal glass" style="max-width: 600px; max-height: 90vh; overflow-y: auto;">
-            <div class="modal-header">
-                <h3 id="modal-task-title">Nova Tarefa</h3>
-                <button class="close-modal" onclick="app.closeModal('modal-task')"><i data-lucide="x"></i></button>
+        <div class="modal modal-task-two-panel glass">
+            <input type="hidden" id="task-id" value="">
+
+            <!-- Cover bar -->
+            <div class="modal-task-cover" id="modal-task-cover" style="display:none"></div>
+
+            <!-- Header -->
+            <div class="modal-header" style="padding: 20px 24px 0; border-bottom: none; align-items: flex-start; gap: 12px;">
+                <div class="modal-task-header-info">
+                    <span class="modal-task-column-label" id="modal-task-column-label">Novas</span>
+                    <textarea class="modal-task-title-input" id="task-title" rows="2"
+                              placeholder="Título da tarefa..."></textarea>
+                </div>
+                <button class="close-modal" onclick="app.closeModal('modal-task')" style="margin-top: 20px;">
+                    <i data-lucide="x"></i>
+                </button>
             </div>
-            <form id="form-task">
-                <input type="hidden" id="task-id" value="">
 
-                <div class="form-group">
-                    <label>Cliente Associado</label>
-                    <select id="task-client" class="form-control" required>
-                        <!-- Options carregados via JS -->
-                    </select>
+            <!-- Body dois painéis -->
+            <form id="form-task" onsubmit="app.handleTaskSubmit(event)">
+            <div class="modal-task-body">
+
+                <!-- Painel Esquerdo -->
+                <div class="modal-task-main">
+
+                    <!-- Labels aplicadas -->
+                    <div class="modal-task-section" id="modal-labels-applied-section" style="display:none">
+                        <div class="kb-labels-applied" id="kb-labels-applied"></div>
+                    </div>
+
+                    <!-- Descrição -->
+                    <div class="modal-task-section">
+                        <h4 class="modal-task-section-label">
+                            <i data-lucide="align-left" style="width:14px;height:14px"></i> Descrição
+                        </h4>
+                        <textarea id="task-description" class="form-control" rows="4"
+                                  placeholder="Adicione uma descrição mais detalhada..."></textarea>
+                    </div>
+
+                    <!-- Checklist -->
+                    <div class="modal-task-section">
+                        <div class="modal-checklist-header">
+                            <h4 class="modal-task-section-label">
+                                <i data-lucide="check-square" style="width:14px;height:14px"></i> Checklist
+                            </h4>
+                            <span class="modal-checklist-progress" id="modal-checklist-progress"></span>
+                        </div>
+                        <div class="modal-checklist-bar" id="modal-checklist-bar-wrap" style="display:none">
+                            <div class="modal-checklist-bar-fill" id="modal-checklist-bar-fill" style="width:0%"></div>
+                        </div>
+                        <div id="modal-checklist-items"></div>
+                        <div class="modal-checklist-add">
+                            <input type="text" id="modal-checklist-new-item" class="form-control"
+                                   placeholder="Adicionar item..."
+                                   onkeydown="app.handleChecklistItemKey(event)">
+                            <button type="button" class="btn btn-secondary" onclick="app.addChecklistItem()">Adicionar</button>
+                        </div>
+                    </div>
+
+                    <!-- Anexos -->
+                    <div class="modal-task-section">
+                        <h4 class="modal-task-section-label">
+                            <i data-lucide="paperclip" style="width:14px;height:14px"></i> Anexos
+                        </h4>
+                        <div id="task-attach-previews" class="attach-previews"></div>
+                        <div class="attach-zone-hint" id="task-attach-hint">
+                            <i data-lucide="clipboard-paste"></i>
+                            <span>Cole com <kbd>Ctrl+V</kbd> ou
+                                <label style="cursor:pointer;color:var(--primary-color);text-decoration:underline">
+                                    selecione arquivo
+                                    <input type="file" id="task-attachments" accept="image/*" multiple style="display:none">
+                                </label>
+                            </span>
+                        </div>
+                    </div>
+
                 </div>
 
-                <div class="form-group">
-                    <label>Título da Tarefa</label>
-                    <input type="text" id="task-title" class="form-control" placeholder="Ex: Ajuste no layout" required>
-                </div>
+                <!-- Painel Direito -->
+                <div class="modal-task-sidebar">
 
-                <div class="form-group">
-                    <label>Descrição Detalhada</label>
-                    <textarea id="task-desc" class="form-control" rows="3"
-                        placeholder="Detalhes do que precisa ser feito..."></textarea>
-                </div>
+                    <div class="modal-sidebar-section">
+                        <h5 class="modal-sidebar-label">Mover para</h5>
+                        <div class="modal-sidebar-col-buttons">
+                            <button type="button" class="kb-col-btn" data-status="new" onclick="app.moveTaskToColumn('new')">
+                                <span class="kb-column-dot" style="background:var(--kb-color-new)"></span> Novas
+                            </button>
+                            <button type="button" class="kb-col-btn" data-status="doing" onclick="app.moveTaskToColumn('doing')">
+                                <span class="kb-column-dot" style="background:var(--kb-color-doing)"></span> Em Execução
+                            </button>
+                            <button type="button" class="kb-col-btn" data-status="done" onclick="app.moveTaskToColumn('done')">
+                                <span class="kb-column-dot" style="background:var(--kb-color-done)"></span> Finalizadas
+                            </button>
+                        </div>
+                    </div>
 
-                <div style="display: flex; gap: 16px;">
-                    <div class="form-group" style="flex: 1;">
-                        <label>Prioridade</label>
-                        <select id="task-priority" class="form-control" required>
+                    <div class="modal-sidebar-section">
+                        <h5 class="modal-sidebar-label">Labels</h5>
+                        <div class="kb-label-picker" id="kb-label-picker"></div>
+                    </div>
+
+                    <div class="modal-sidebar-section">
+                        <h5 class="modal-sidebar-label">Cover</h5>
+                        <div class="kb-cover-picker" id="kb-cover-picker"></div>
+                    </div>
+
+                    <div class="modal-sidebar-section">
+                        <h5 class="modal-sidebar-label">Cliente</h5>
+                        <select id="task-client" class="form-control"></select>
+                    </div>
+
+                    <div class="modal-sidebar-section">
+                        <h5 class="modal-sidebar-label">Prioridade</h5>
+                        <select id="task-priority" class="form-control">
                             <option value="low">Baixa</option>
                             <option value="medium" selected>Média</option>
                             <option value="high">Alta</option>
                         </select>
                     </div>
-                    <div class="form-group" style="flex: 1;">
-                        <label>Prazo de Entrega</label>
+
+                    <div class="modal-sidebar-section">
+                        <h5 class="modal-sidebar-label">Prazo</h5>
                         <input type="date" id="task-due-date" class="form-control">
                     </div>
-                </div>
 
-                <div style="display: flex; gap: 16px;">
-                    <div class="form-group" style="flex: 1;">
-                        <label>Tempo Estimado (minutos)</label>
-                        <input type="number" id="task-estimated" class="form-control" placeholder="Ex: 120 (2 horas)">
+                    <div class="modal-sidebar-section">
+                        <h5 class="modal-sidebar-label">Estimado (min)</h5>
+                        <input type="number" id="task-estimated-minutes" class="form-control" placeholder="Ex: 120">
                     </div>
-                    <div class="form-group" style="flex: 1;">
-                        <label>Status</label>
-                        <select id="task-status" class="form-control" required>
-                            <option value="new" selected>Nova</option>
-                            <option value="doing">Em Execução</option>
-                            <option value="done">Finalizada</option>
-                        </select>
-                    </div>
-                </div>
 
-                <div class="form-group">
-                    <label>Anexos</label>
-                    <div id="task-attach-zone" class="attach-zone" tabindex="0">
-                        <div class="attach-zone-hint" id="task-attach-hint">
-                            <i data-lucide="clipboard-paste"></i>
-                            <span>Cole uma imagem aqui <kbd>Ctrl+V</kbd> ou <label for="task-attachments" style="cursor:pointer;color:var(--primary);text-decoration:underline">escolha arquivos</label></span>
-                        </div>
-                        <input type="file" id="task-attachments" accept="image/*" multiple style="display:none">
-                        <div id="task-attach-previews" class="attach-previews"></div>
+                    <div class="modal-sidebar-actions">
+                        <button type="submit" class="btn btn-primary btn-block">
+                            <i data-lucide="save" style="width:14px;height:14px"></i> Salvar
+                        </button>
+                        <button type="button" class="btn btn-ghost btn-block" id="btn-add-time-task"
+                                onclick="app.handleOpenTaskTime(document.getElementById('task-id').value)"
+                                style="display:none">
+                            <i data-lucide="clock" style="width:14px;height:14px"></i> Registrar Tempo
+                        </button>
+                        <button type="button" class="btn btn-danger btn-block" id="btn-delete-task"
+                                onclick="app.handleDeleteTaskFromModal()" style="display:none">
+                            <i data-lucide="trash-2" style="width:14px;height:14px"></i> Excluir
+                        </button>
                     </div>
-                </div>
 
-                <button type="submit" class="btn btn-primary" style="width: 100%; justify-content: center;">Salvar
-                    Tarefa</button>
+                </div>
+            </div>
             </form>
         </div>
     </div>
