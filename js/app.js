@@ -3096,7 +3096,7 @@ class AppController {
             </label>`).join('');
     }
 
-    openNewImplementation() {
+    async openNewImplementation() {
         document.getElementById('modal-implementation-title').textContent = 'Nova Implementação';
         document.getElementById('impl-id').value = '';
         document.getElementById('impl-name').value = '';
@@ -3108,7 +3108,7 @@ class AppController {
         document.getElementById('impl-code').value = '';
         document.getElementById('impl-notes').value = '';
         document.getElementById('btn-delete-implementation').style.display = 'none';
-        this._populateImplClientCheckboxes([]);
+        await this._populateImplClientCheckboxes([]);
         this.openModal('modal-implementation');
     }
 
