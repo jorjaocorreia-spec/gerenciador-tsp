@@ -59,7 +59,8 @@ class AppController {
         this.currentView = 'dashboard';
         this.selectedClient = null;
         this.selectedMonth = null;
-        this.pendingPdfRecords = []; // Armazena temporariamente os registros do PDF lido
+        this.pendingPdfRecords = [];
+        this.pendingPdfWarnings = [];
         this.agendaCurrentDate = new Date();
         this.agendaViewMode = 'schedule'; // daily, weekly, monthly or schedule
         this.aptCurrentDate = new Date().toISOString().split('T')[0]; // 'YYYY-MM-DD'
@@ -2616,11 +2617,12 @@ class AppController {
                 }
 
                 setBtn(`<span style="display:inline-flex;align-items:center;gap:8px;">${spinner}Identificando projetos...</span>`);
-                const records = this.parsePdfPages(pageTexts);
+                const { records, warnings: pdfWarnings } = this.parsePdfPages(pageTexts);
 
                 if (records && records.length > 0) {
                     setBtn(`<span style="display:inline-flex;align-items:center;gap:8px;">${spinner}Identificando clientes...</span>`);
                     this.pendingPdfRecords = records;
+                    this.pendingPdfWarnings = pdfWarnings;
                     await this.openPdfConfirmationModal();
                 } else if (records) {
                     Toast.show('Nenhum atendimento válido encontrado no PDF.', 'info');
@@ -2652,7 +2654,7 @@ class AppController {
             console.warn('[PDF Import] Avisos:', warnings.join(' | '));
         }
 
-        return allRecords;
+        return { records: allRecords, warnings };
     }
 
     _parseSinglePage(text, pageNum) {
@@ -2818,8 +2820,10 @@ class AppController {
             const totalMinutes = Math.round((tH * 100 + tC) / 100 * 60);
             const sumMinutes = records.reduce((s, r) => s + r.minutes, 0);
             if (Math.abs(sumMinutes - totalMinutes) > 2) {
-                warnings.push(`Pág.${pageNum} (${dateStr}, Proj.${projectNum}): soma=${sumMinutes}min, Total Horas Dia=${totalMinutes}min`);
+                const warnMsg = `Pág.${pageNum} (${dateStr}, Proj.${projectNum}): soma dos registros = ${sumMinutes}min ≠ Total Horas Dia = ${totalMinutes}min`;
+                warnings.push(warnMsg);
                 console.warn(`[PDF Import] Divergência de horas — Pág.${pageNum}: ${dateStr} Proj.${projectNum} soma=${sumMinutes}min total=${totalMinutes}min`);
+                records.forEach(r => { r._warningMsg = warnMsg; });
             }
         }
 
@@ -2904,6 +2908,16 @@ class AppController {
             statusInput.value = `Múltiplos Clientes Identificados (${uniqueClientIds.size})`;
         }
 
+        const warningsEl = document.getElementById('pdf-warnings');
+        const warnings = this.pendingPdfWarnings || [];
+        if (warnings.length > 0) {
+            warningsEl.innerHTML = `<strong>⚠ Divergência de horas detectada em ${warnings.length} página(s):</strong><ul style="margin:6px 0 0 16px;padding:0;">${warnings.map(w => `<li>${w}</li>`).join('')}</ul>`;
+            warningsEl.style.display = 'block';
+        } else {
+            warningsEl.style.display = 'none';
+            warningsEl.innerHTML = '';
+        }
+
         document.getElementById('modal-import-pdf').classList.add('active');
 
         const tbody = document.querySelector('#pdf-records-table tbody');
@@ -2911,11 +2925,14 @@ class AppController {
 
         this.pendingPdfRecords.forEach((r, idx) => {
             const tr = document.createElement('tr');
+            const warnIcon = r._warningMsg
+                ? `<span title="${r._warningMsg.replace(/"/g, '&quot;')}" style="margin-left:4px;color:var(--warning-color,#f59e0b);cursor:help;">⚠</span>`
+                : '';
             tr.innerHTML = `
                 <td style="font-size: 0.9rem;">${r.dateStrBrazil}</td>
                 <td style="font-size: 0.9rem; font-weight: 500; color: var(--primary-color);">${r.matchedClientName}${r.autoCreated ? ' <span style="font-size:0.75rem;background:var(--primary-color);color:#fff;border-radius:4px;padding:1px 5px;">Novo</span>' : ''}</td>
                 <td style="font-size: 0.9rem;">${r.startTime} - ${r.endTime}</td>
-                <td style="font-size: 0.9rem;">${Math.floor(r.minutes / 60)}h${String(r.minutes % 60).padStart(2,'0')}min</td>
+                <td style="font-size: 0.9rem;">${Math.floor(r.minutes / 60)}h${String(r.minutes % 60).padStart(2,'0')}min${warnIcon}</td>
                 <td><textarea class="form-control" id="pdf-desc-${idx}" style="font-size: 0.85rem; padding: 4px; width: 100%; min-width: 250px; resize: vertical;" rows="3">${r.description}</textarea></td>
                 <td style="text-align: center;"><input type="checkbox" id="pdf-check-${idx}" checked style="width: 18px; height: 18px; cursor: pointer;"></td>
             `;
@@ -2958,6 +2975,7 @@ class AppController {
         Toast.show(`${importedCount} atendimento(s) importado(s) com sucesso!`, 'success');
         this.closeModal('modal-import-pdf');
         this.pendingPdfRecords = [];
+        this.pendingPdfWarnings = [];
 
         // Restaura botão para uso futuro
         confirmBtn.disabled = false;
@@ -3661,6 +3679,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             window.app.currentView = 'dashboard';
             window.app.agendaCurrentDate = new Date();
             window.app.pendingPdfRecords = [];
+            window.app.pendingPdfWarnings = [];
         }
         await Auth.signOut();
     });
