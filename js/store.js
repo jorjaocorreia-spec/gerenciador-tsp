@@ -209,14 +209,17 @@ class TSPStore {
 
     async reorderTasks(updates) {
         // updates: [{id, status, position}]
-        const rows = updates.map(u => ({
-            id: u.id, user_id: this.userId,
-            status: u.status, position: u.position,
-            updated_at: new Date().toISOString()
-        }));
-        const { error } = await this.db.from('tasks')
-            .upsert(rows, { onConflict: 'id', ignoreDuplicates: false });
-        if (error) throw error;
+        const now = new Date().toISOString();
+        const results = await Promise.all(
+            updates.map(u =>
+                this.db.from('tasks')
+                    .update({ status: u.status, position: u.position, updated_at: now })
+                    .eq('id', u.id)
+                    .eq('user_id', this.userId)
+            )
+        );
+        const failed = results.find(r => r.error);
+        if (failed) throw failed.error;
     }
 
     async updateTaskChecklist(id, checklist) {

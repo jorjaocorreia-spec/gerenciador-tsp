@@ -753,8 +753,12 @@ class AppController {
         if (this._draggingFromStatus !== newStatus) {
             await store.updateTaskStatus(draggedId, newStatus);
         }
-        store.reorderTasks(ids.map((id, pos) => ({ id, status: newStatus, position: pos })))
-            .catch(() => Toast.show('Erro ao salvar ordem.', 'error'));
+        try {
+            await store.reorderTasks(ids.map((id, pos) => ({ id, status: newStatus, position: pos })));
+        } catch (err) {
+            console.error('reorderTasks error:', err);
+            Toast.show('Erro ao salvar ordem.', 'error');
+        }
         await this.renderAll();
     }
 
