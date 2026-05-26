@@ -230,7 +230,7 @@ O `docker-entrypoint.sh` injeta essas vars em `js/config.js` via `envsubst` na i
 | View | Descrição |
 |------|-----------|
 | **Login** | Tela de autenticação (email/senha) via Supabase Auth |
-| **Dashboard** | Visão geral dos clientes com barras de consumo de horas |
+| **Dashboard** | Visão geral dos clientes com barras de consumo de horas; hover no card exibe tooltip com número do projeto (`title` nativo) |
 | **Clientes** | CRUD de clientes; campos: nome, horas, CS, nº projeto, valor, notas, status |
 | **Atendimentos** | Log de horas por cliente; filtros por cliente e período; exportação PDF |
 | **Tarefas** | Kanban (Novas / Em Execução / Finalizadas) com drag-and-drop e métricas |
