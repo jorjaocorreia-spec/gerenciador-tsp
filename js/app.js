@@ -734,6 +734,7 @@ class AppController {
             const card = document.createElement('div');
             card.className = 'stat-card glass';
             card.style.cursor = 'pointer';
+            if (stat.client.projectNum) card.title = `Projeto: ${stat.client.projectNum}`;
             card.onclick = () => app.openClientDashboard(stat.client.id);
 
             card.innerHTML = `
