@@ -442,7 +442,12 @@
         <div class="modal glass" style="max-width: 600px;">
             <div class="modal-header">
                 <h3 id="modal-client-title">Novo Cliente</h3>
-                <button class="close-modal" onclick="app.closeModal('modal-client')"><i data-lucide="x"></i></button>
+                <div style="display: flex; gap: 8px; align-items: center;">
+                    <button type="button" class="btn btn-secondary" id="btn-toggle-money-modal" onclick="app.toggleMoneyVisibility()" title="Mostrar/ocultar valores monetários" style="padding: 8px 12px;">
+                        <i data-lucide="eye" id="icon-toggle-money-modal" style="width: 18px; height: 18px;"></i>
+                    </button>
+                    <button class="close-modal" onclick="app.closeModal('modal-client')"><i data-lucide="x"></i></button>
+                </div>
             </div>
             <form id="form-client">
                 <input type="hidden" id="client-id" value="">

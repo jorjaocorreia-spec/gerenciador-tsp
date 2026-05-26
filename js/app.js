@@ -782,22 +782,23 @@ class AppController {
     toggleMoneyVisibility() {
         const hidden = document.body.classList.toggle('money-hidden');
         sessionStorage.setItem('moneyHidden', hidden ? '1' : '0');
-        const icon = document.getElementById('icon-toggle-money');
-        if (icon) {
-            icon.setAttribute('data-lucide', hidden ? 'eye-off' : 'eye');
-            lucide.createIcons();
-        }
+        this._applyMoneyIcons(hidden);
     }
 
     applyMoneyVisibility() {
         const stored = sessionStorage.getItem('moneyHidden');
         const hidden = stored === null ? true : stored === '1';
         document.body.classList.toggle('money-hidden', hidden);
-        const icon = document.getElementById('icon-toggle-money');
-        if (icon) {
-            icon.setAttribute('data-lucide', hidden ? 'eye-off' : 'eye');
-            lucide.createIcons();
-        }
+        this._applyMoneyIcons(hidden);
+    }
+
+    _applyMoneyIcons(hidden) {
+        const lucideName = hidden ? 'eye-off' : 'eye';
+        ['icon-toggle-money', 'icon-toggle-money-modal'].forEach(id => {
+            const icon = document.getElementById(id);
+            if (icon) icon.setAttribute('data-lucide', lucideName);
+        });
+        lucide.createIcons();
     }
 
     async renderClients() {
