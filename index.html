@@ -869,53 +869,57 @@
                 <!-- Painel Direito -->
                 <div class="modal-task-sidebar">
 
-                    <div class="modal-sidebar-section">
-                        <h5 class="modal-sidebar-label">Mover para</h5>
-                        <div class="modal-sidebar-col-buttons">
-                            <button type="button" class="kb-col-btn" data-status="new" onclick="app.moveTaskToColumn('new')">
-                                <span class="kb-column-dot" style="background:var(--kb-color-new)"></span> Novas
-                            </button>
-                            <button type="button" class="kb-col-btn" data-status="doing" onclick="app.moveTaskToColumn('doing')">
-                                <span class="kb-column-dot" style="background:var(--kb-color-doing)"></span> Em Execução
-                            </button>
-                            <button type="button" class="kb-col-btn" data-status="done" onclick="app.moveTaskToColumn('done')">
-                                <span class="kb-column-dot" style="background:var(--kb-color-done)"></span> Finalizadas
-                            </button>
+                    <div class="modal-task-sidebar-scroll">
+
+                        <div class="modal-sidebar-section">
+                            <h5 class="modal-sidebar-label">Mover para</h5>
+                            <div class="modal-sidebar-col-buttons">
+                                <button type="button" class="kb-col-btn" data-status="new" onclick="app.moveTaskToColumn('new')">
+                                    <span class="kb-column-dot" style="background:var(--kb-color-new)"></span> Novas
+                                </button>
+                                <button type="button" class="kb-col-btn" data-status="doing" onclick="app.moveTaskToColumn('doing')">
+                                    <span class="kb-column-dot" style="background:var(--kb-color-doing)"></span> Em Execução
+                                </button>
+                                <button type="button" class="kb-col-btn" data-status="done" onclick="app.moveTaskToColumn('done')">
+                                    <span class="kb-column-dot" style="background:var(--kb-color-done)"></span> Finalizadas
+                                </button>
+                            </div>
                         </div>
-                    </div>
 
-                    <div class="modal-sidebar-section">
-                        <h5 class="modal-sidebar-label">Labels</h5>
-                        <div class="kb-label-picker" id="kb-label-picker"></div>
-                    </div>
+                        <div class="modal-sidebar-section">
+                            <h5 class="modal-sidebar-label">Labels</h5>
+                            <div class="kb-label-picker" id="kb-label-picker"></div>
+                        </div>
 
-                    <div class="modal-sidebar-section">
-                        <h5 class="modal-sidebar-label">Cover</h5>
-                        <div class="kb-cover-picker" id="kb-cover-picker"></div>
-                    </div>
+                        <div class="modal-sidebar-section">
+                            <h5 class="modal-sidebar-label">Cover</h5>
+                            <div class="kb-cover-picker" id="kb-cover-picker"></div>
+                        </div>
 
-                    <div class="modal-sidebar-section">
-                        <h5 class="modal-sidebar-label">Cliente</h5>
-                        <select id="task-client" class="form-control"></select>
-                    </div>
+                        <div class="modal-sidebar-section">
+                            <h5 class="modal-sidebar-label">Cliente</h5>
+                            <select id="task-client" class="form-control"></select>
+                        </div>
 
-                    <div class="modal-sidebar-section">
-                        <h5 class="modal-sidebar-label">Prioridade</h5>
-                        <select id="task-priority" class="form-control">
-                            <option value="low">Baixa</option>
-                            <option value="medium" selected>Média</option>
-                            <option value="high">Alta</option>
-                        </select>
-                    </div>
+                        <div class="modal-sidebar-section">
+                            <h5 class="modal-sidebar-label">Prioridade</h5>
+                            <select id="task-priority" class="form-control">
+                                <option value="low">Baixa</option>
+                                <option value="medium" selected>Média</option>
+                                <option value="high">Alta</option>
+                            </select>
+                        </div>
 
-                    <div class="modal-sidebar-section">
-                        <h5 class="modal-sidebar-label">Prazo</h5>
-                        <input type="date" id="task-due-date" class="form-control">
-                    </div>
+                        <div class="modal-sidebar-section">
+                            <h5 class="modal-sidebar-label">Prazo</h5>
+                            <input type="date" id="task-due-date" class="form-control">
+                        </div>
 
-                    <div class="modal-sidebar-section">
-                        <h5 class="modal-sidebar-label">Estimado (min)</h5>
-                        <input type="number" id="task-estimated-minutes" class="form-control" placeholder="Ex: 120">
+                        <div class="modal-sidebar-section">
+                            <h5 class="modal-sidebar-label">Estimado (min)</h5>
+                            <input type="number" id="task-estimated-minutes" class="form-control" placeholder="Ex: 120">
+                        </div>
+
                     </div>
 
                     <div class="modal-sidebar-actions">
