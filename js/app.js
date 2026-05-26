@@ -2854,7 +2854,12 @@ class AppController {
             container.appendChild(table);
             lucide.createIcons();
             table.querySelectorAll('.apt-copy-proj-btn, .apt-copy-desc-btn').forEach(btn => {
-                btn.addEventListener('click', () => this.copyApontamento(btn.dataset.value));
+                btn.addEventListener('click', () => {
+                    const value = btn.classList.contains('apt-copy-proj-btn')
+                        ? btn.dataset.value.slice(0, -1)
+                        : btn.dataset.value;
+                    this.copyApontamento(value);
+                });
             });
         } catch (err) {
             container.innerHTML = `<div class="glass" style="padding:24px;"><p class="text-muted">Erro ao carregar: ${err.message}</p></div>`;
