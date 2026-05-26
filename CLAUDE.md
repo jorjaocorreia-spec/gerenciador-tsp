@@ -134,6 +134,8 @@ Todas têm `user_id uuid references auth.users` + RLS ativa (`auth.uid() = user_
 | `tasks` | id, user_id, client_id, title, description, status, priority, due_date, estimated_minutes, spent_minutes |
 | `agenda_events` | id, user_id, client_id, related_task_id, title, type, date, **date_end**, start_time, end_time, location, calendar_event_id, **meet_link**, **attendees** |
 | `apontamentos` | id, user_id, date, start_time, end_time, project_num, description |
+| `implementations` | id, user_id, name, type, description, code_script, status, version, implementation_date, notes |
+| `implementation_clients` | id, user_id, implementation_id, client_id, notes — junção M:N |
 
 ### Fases de migração
 
@@ -150,6 +152,7 @@ Todas têm `user_id uuid references auth.users` + RLS ativa (`auth.uid() = user_
 - **Fase 11** ✅ — Agenda: botão "Excluir" no modal de edição de agendamento (visível apenas ao editar); `deleteAgendaEventFromModal()` lida com remoção no Supabase + Google Calendar + fechamento do modal
 - **Fase 12** ✅ — Agenda: checkbox "Dia inteiro" no modal; quando marcado, oculta campos de horário e salva `startTime: ''`; eventos dia-inteiro exibidos como banners coloridos acima da grade horária nas views diária e semanal; view schedule exibe "Dia inteiro"; tooltip mensal atualizado; Google Calendar recebe formato `date` (sem hora) para eventos dia-inteiro
 - **Fase 13** ✅ — Tarefas: anexos reais com paste de prints (Ctrl+V) e seleção de arquivos; imagens salvas como base64 JPEG em coluna `attachments JSONB` na tabela `tasks`; thumbnails no modal com remoção individual; miniatura no card Kanban; compressão automática via Canvas (max 1400px, JPEG 75%)
+- **Fase 15** ✅ — Implementações: biblioteca de recursos técnicos (triggers, procedures, features, customizações, integrações) vinculados a zero, um ou vários clientes; tabelas `implementations` + `implementation_clients` (M:N) com RLS; view com grade de cards agrupada por tipo, filtros por tipo/status/cliente; modal com campos nome, tipo, status, versão, data, descrição, código (monospace), multi-select de clientes, notas; botão excluir visível apenas ao editar
 - **Fase 14** ✅ — Agenda: Google Meet + convites por e-mail; checkbox "Gerar link do Google Meet" no modal (visível apenas quando sync Google ativo); campo Participantes (e-mails separados por vírgula); `createGoogleEvent()` usa `conferenceDataVersion=1` + `sendUpdates='all'` — Google gera a sala e envia convites automaticamente; `meetLink` salvo localmente; sync bidirecional captura `hangoutLink` e `attendees` do Google; ícone de vídeo clicável nos event blocks e na view schedule; botão Copiar no bloco read-only do link Meet
 
 ---
@@ -218,6 +221,11 @@ O `docker-entrypoint.sh` injeta essas vars em `js/config.js` via `envsubst` na i
 - **Agenda: Meet não é regenerado no update** — `mapLocalToGoogleEvent()` só inclui `conferenceData` quando `generateMeet === true && !meetLink`. Se o evento já tem um Meet link, o update preserva o link original e não cria uma nova sala.
 - **Agenda: "Dia inteiro" — identificação e renderização** — eventos dia-inteiro são identificados por `startTime === ''` (string vazia no banco). `toggleAllDayAgenda(bool)` controla visibilidade de `#agenda-time-fields` e o atributo `required` dos inputs de hora. `editAgendaEvent()` detecta allDay e chama `toggleAllDayAgenda(true)`. Nas views diária/semanal, allDay events são filtrados ANTES de `createEventBlockHtml` (que crasharia com `startTime=''`) e renderizados em `createAllDayBannerHtml`. Google Calendar: `mapLocalToGoogleEvent` envia `{ date }` (sem hora) para allDay; na sync reversa, `gEv.end.date` é exclusivo — subtrai 1 dia para `dateEnd`.
 
+- **Implementações: `renderImplementations()` tem guard `currentView`** — igual a `renderApontamentos()`, só executa se `this.currentView === 'implementations'`. Chamado no `renderAll()` dentro do `Promise.all`; quando a view não está ativa retorna imediatamente sem consultar o banco.
+- **Implementações: `setImplementationClients()` faz DELETE + INSERT** — substituição completa dos vínculos a cada save; não há update parcial. Seguro porque `implementation_clients` não tem dados editáveis além do vínculo.
+- **Implementações: select de clientes no filtro é populado na primeira renderização** — o código verifica `clientSelect.options.length <= 1` antes de adicionar; se navegar para a view sem clientes cadastrados, ao cadastrar um cliente e voltar a view, o select não recarrega automaticamente (workaround: limpar filtros dispara re-render).
+- **Implementações: `btn-delete-implementation` começa com `display:none`** — exibido via `display:flex` apenas em `openEditImplementation()`; `openNewImplementation()` o força de volta a `none`.
+
 ### Cálculos automáticos
 - Comissão do consultor = 43% do valor pago pelo cliente (`clientPays * 0.43`)
 - Duração do atendimento calculada a partir de `startTime` e `endTime`
@@ -236,6 +244,7 @@ O `docker-entrypoint.sh` injeta essas vars em `js/config.js` via `envsubst` na i
 | **Tarefas** | Kanban (Novas / Em Execução / Finalizadas) com drag-and-drop e métricas |
 | **Agenda** | Calendário diário/semanal/mensal; 4 tipos de evento; eventos multi-dia (Data Inicial + Data Final); clicar no dia abre novo agendamento; excluir pelo modal de edição; sincronização Google Calendar |
 | **Apontamentos** | Log diário: horário início/fim, nº projeto (texto livre + autocomplete de clientes), descrição; navegação por dia; total do dia calculado |
+| **Implementações** | Biblioteca de recursos técnicos vinculados a clientes (M:N); tipos: trigger, procedure, feature, customization, integration; filtros por tipo/status/cliente; cards agrupados por tipo; modal com código monospace |
 
 ### Sidebar
 - **Recolhível**: botão chevron no cabeçalho (`#btn-sidebar-toggle`) alterna entre expandido (260px) e colapsado (70px)

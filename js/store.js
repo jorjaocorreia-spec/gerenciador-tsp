@@ -409,6 +409,92 @@ class TSPStore {
             .eq('id', id).eq('user_id', this.userId);
         if (error) throw error;
     }
+
+    // ── IMPLEMENTAÇÕES ────────────────────────────────────────────
+
+    _implementation(r) {
+        return {
+            id: r.id,
+            name: r.name,
+            type: r.type || 'feature',
+            description: r.description || '',
+            codeScript: r.code_script || '',
+            status: r.status || 'active',
+            version: r.version || '',
+            implementationDate: r.implementation_date || '',
+            notes: r.notes || '',
+            clientIds: [], // preenchido opcionalmente por getImplementationsWithClients
+            createdAt: r.created_at,
+            updatedAt: r.updated_at,
+        };
+    }
+
+    async getImplementations() {
+        const { data, error } = await this.db.from('implementations')
+            .select('*')
+            .eq('user_id', this.userId)
+            .order('name');
+        if (error) throw error;
+        return (data || []).map(r => this._implementation(r));
+    }
+
+    async getImplementationsWithClients() {
+        const [impls, links] = await Promise.all([
+            this.getImplementations(),
+            this.db.from('implementation_clients')
+                .select('implementation_id, client_id')
+                .eq('user_id', this.userId)
+        ]);
+        if (links.error) throw links.error;
+        const map = {};
+        (links.data || []).forEach(l => {
+            if (!map[l.implementation_id]) map[l.implementation_id] = [];
+            map[l.implementation_id].push(l.client_id);
+        });
+        return impls.map(impl => ({ ...impl, clientIds: map[impl.id] || [] }));
+    }
+
+    async addImplementation({ name, type, description, codeScript, status, version, implementationDate, notes }) {
+        const { data, error } = await this.db.from('implementations').insert({
+            user_id: this.userId, name, type, description: description || '',
+            code_script: codeScript || '', status: status || 'active',
+            version: version || '', implementation_date: implementationDate || null,
+            notes: notes || ''
+        }).select().single();
+        if (error) throw error;
+        return this._implementation(data);
+    }
+
+    async updateImplementation(id, { name, type, description, codeScript, status, version, implementationDate, notes }) {
+        const { data, error } = await this.db.from('implementations').update({
+            name, type, description: description || '',
+            code_script: codeScript || '', status: status || 'active',
+            version: version || '', implementation_date: implementationDate || null,
+            notes: notes || '', updated_at: new Date().toISOString()
+        }).eq('id', id).eq('user_id', this.userId).select().single();
+        if (error) throw error;
+        return this._implementation(data);
+    }
+
+    async deleteImplementation(id) {
+        const { error } = await this.db.from('implementations').delete()
+            .eq('id', id).eq('user_id', this.userId);
+        if (error) throw error;
+    }
+
+    async setImplementationClients(implementationId, clientIds) {
+        // Substituição completa dos vínculos
+        await this.db.from('implementation_clients').delete()
+            .eq('implementation_id', implementationId).eq('user_id', this.userId);
+        if (!clientIds || clientIds.length === 0) return;
+        const rows = clientIds.map(cid => ({
+            user_id: this.userId,
+            implementation_id: implementationId,
+            client_id: cid
+        }));
+        const { error } = await this.db.from('implementation_clients').insert(rows);
+        if (error) throw error;
+    }
 }
 
 window.store = new TSPStore();

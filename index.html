@@ -93,6 +93,9 @@
             <li class="nav-item" data-view="apontamentos" title="Apontamentos">
                 <i data-lucide="clipboard-list"></i><span class="nav-label">Apontamentos</span>
             </li>
+            <li class="nav-item" data-view="implementations" title="Implementações">
+                <i data-lucide="code-2"></i><span class="nav-label">Implementações</span>
+            </li>
         </ul>
         <div class="sidebar-bottom">
             <p class="text-muted sidebar-section-label">SISTEMA</p>
@@ -433,6 +436,56 @@
                 </div>
             </div>
             <div id="apontamentos-container"></div>
+        </section>
+
+        <!-- VIEW: IMPLEMENTAÇÕES -->
+        <section class="view-section" id="view-implementations">
+            <div class="header-actions">
+                <div>
+                    <h1>Implementações</h1>
+                    <p class="text-muted">Biblioteca de recursos técnicos implantados nos clientes.</p>
+                </div>
+                <button class="btn btn-primary" onclick="app.openNewImplementation()">
+                    <i data-lucide="plus"></i> Nova Implementação
+                </button>
+            </div>
+
+            <!-- Filtros -->
+            <div class="glass" style="padding: 16px; margin-bottom: 24px; display: flex; gap: 16px; align-items: flex-end; flex-wrap: wrap;">
+                <div class="form-group" style="flex: 1; min-width: 160px; margin-bottom: 0;">
+                    <label>Tipo</label>
+                    <select id="impl-filter-type" class="form-control" onchange="app.renderImplementations()">
+                        <option value="">Todos</option>
+                        <option value="trigger">Trigger</option>
+                        <option value="procedure">Procedure / Função</option>
+                        <option value="feature">Funcionalidade</option>
+                        <option value="customization">Customização</option>
+                        <option value="integration">Integração</option>
+                    </select>
+                </div>
+                <div class="form-group" style="flex: 1; min-width: 160px; margin-bottom: 0;">
+                    <label>Status</label>
+                    <select id="impl-filter-status" class="form-control" onchange="app.renderImplementations()">
+                        <option value="">Todos</option>
+                        <option value="active">Ativo</option>
+                        <option value="testing">Em Teste</option>
+                        <option value="discontinued">Descontinuado</option>
+                    </select>
+                </div>
+                <div class="form-group" style="flex: 2; min-width: 200px; margin-bottom: 0;">
+                    <label>Cliente</label>
+                    <select id="impl-filter-client" class="form-control" onchange="app.renderImplementations()">
+                        <option value="">Todos os clientes</option>
+                    </select>
+                </div>
+                <div style="flex: 0; margin-bottom: 0;">
+                    <button class="btn btn-secondary" onclick="app.clearImplFilters()" style="padding: 12px 16px; height: 42px;" title="Limpar filtros">
+                        <i data-lucide="filter-x"></i>
+                    </button>
+                </div>
+            </div>
+
+            <div id="implementations-container"></div>
         </section>
 
     </main>
@@ -1134,6 +1187,88 @@
                 <div style="display: flex; gap: 12px; margin-top: 8px;">
                     <button type="button" class="btn btn-secondary" style="flex: 1; justify-content: center;" onclick="app.closeModal('modal-apontamento')">Cancelar</button>
                     <button type="submit" class="btn btn-primary" style="flex: 2; justify-content: center;">Salvar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- MODAL: IMPLEMENTAÇÃO -->
+    <div class="modal-overlay" id="modal-implementation">
+        <div class="modal glass" style="max-width: 680px; max-height: 92vh; overflow-y: auto;">
+            <div class="modal-header">
+                <h3 id="modal-implementation-title">Nova Implementação</h3>
+                <button class="close-modal" onclick="app.closeModal('modal-implementation')"><i data-lucide="x"></i></button>
+            </div>
+            <form id="form-implementation">
+                <input type="hidden" id="impl-id">
+
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+                    <div class="form-group" style="grid-column: 1 / -1;">
+                        <label class="form-label">Nome *</label>
+                        <input type="text" id="impl-name" class="form-control" placeholder="Ex: Trigger de atualização de saldo" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label">Tipo *</label>
+                        <select id="impl-type" class="form-control" required>
+                            <option value="trigger">Trigger</option>
+                            <option value="procedure">Procedure / Função</option>
+                            <option value="feature" selected>Funcionalidade</option>
+                            <option value="customization">Customização</option>
+                            <option value="integration">Integração</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label">Status</label>
+                        <select id="impl-status" class="form-control">
+                            <option value="active" selected>Ativo</option>
+                            <option value="testing">Em Teste</option>
+                            <option value="discontinued">Descontinuado</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label">Versão</label>
+                        <input type="text" id="impl-version" class="form-control" placeholder="Ex: 1.0, 2025-05">
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label">Data de Implantação</label>
+                        <input type="date" id="impl-date" class="form-control">
+                    </div>
+
+                    <div class="form-group" style="grid-column: 1 / -1;">
+                        <label class="form-label">Descrição</label>
+                        <textarea id="impl-description" class="form-control" rows="3" placeholder="O que este recurso faz, qual problema resolve..."></textarea>
+                    </div>
+
+                    <div class="form-group" style="grid-column: 1 / -1;">
+                        <label class="form-label">Código / Script</label>
+                        <textarea id="impl-code" class="form-control" rows="6" style="font-family: 'Courier New', monospace; font-size: 0.8rem;" placeholder="Cole aqui o SQL, script ou pseudocódigo..."></textarea>
+                    </div>
+
+                    <div class="form-group" style="grid-column: 1 / -1;">
+                        <label class="form-label">Clientes vinculados</label>
+                        <div id="impl-clients-checkboxes" style="display: flex; flex-wrap: wrap; gap: 8px; padding: 12px; background: var(--bg-glass); border-radius: 8px; max-height: 140px; overflow-y: auto;">
+                            <!-- preenchido via JS -->
+                        </div>
+                    </div>
+
+                    <div class="form-group" style="grid-column: 1 / -1;">
+                        <label class="form-label">Observações</label>
+                        <textarea id="impl-notes" class="form-control" rows="2" placeholder="Notas adicionais..."></textarea>
+                    </div>
+                </div>
+
+                <div style="display: flex; gap: 12px; margin-top: 8px; justify-content: space-between;">
+                    <button type="button" id="btn-delete-implementation" class="btn btn-danger" style="display:none;" onclick="app.handleDeleteImplementation()">
+                        <i data-lucide="trash-2"></i> Excluir
+                    </button>
+                    <div style="display: flex; gap: 12px; margin-left: auto;">
+                        <button type="button" class="btn btn-secondary" onclick="app.closeModal('modal-implementation')">Cancelar</button>
+                        <button type="submit" class="btn btn-primary">Salvar</button>
+                    </div>
                 </div>
             </form>
         </div>

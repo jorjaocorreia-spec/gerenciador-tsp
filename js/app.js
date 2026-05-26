@@ -122,6 +122,9 @@ class AppController {
             });
         document.getElementById('form-apontamento')
             ?.addEventListener('submit', (e) => this.handleApontamentoSubmit(e));
+
+        document.getElementById('form-implementation')
+            ?.addEventListener('submit', (e) => this.handleImplementationSubmit(e));
         ['apt-start', 'apt-end'].forEach(id => {
             document.getElementById(id)?.addEventListener('change', () => this.updateAptDuration());
         });
@@ -688,7 +691,8 @@ class AppController {
             this.renderMonthRecords(),
             this.renderTasks(),
             this.renderAgenda(),
-            this.renderApontamentos()
+            this.renderApontamentos(),
+            this.renderImplementations()
         ]);
         lucide.createIcons();
     }
@@ -2968,6 +2972,224 @@ class AppController {
         } catch (err) {
             Toast.show('Erro ao excluir: ' + err.message, 'error');
         }
+    }
+
+    // ===================================
+    // IMPLEMENTAÇÕES
+    // ===================================
+
+    async renderImplementations() {
+        if (this.currentView !== 'implementations') return;
+        const container = document.getElementById('implementations-container');
+        if (!container) return;
+        container.innerHTML = spinnerHtml;
+
+        try {
+            const [impls, clients] = await Promise.all([
+                store.getImplementationsWithClients(),
+                store.getClients()
+            ]);
+
+            const filterType   = document.getElementById('impl-filter-type')?.value || '';
+            const filterStatus = document.getElementById('impl-filter-status')?.value || '';
+            const filterClient = document.getElementById('impl-filter-client')?.value || '';
+
+            // Popular select de clientes do filtro (apenas na primeira chamada)
+            const clientSelect = document.getElementById('impl-filter-client');
+            if (clientSelect && clientSelect.options.length <= 1) {
+                clients.forEach(c => {
+                    const opt = document.createElement('option');
+                    opt.value = c.id;
+                    opt.textContent = c.name;
+                    clientSelect.appendChild(opt);
+                });
+            }
+
+            const clientsMap = {};
+            clients.forEach(c => { clientsMap[c.id] = c; });
+
+            let filtered = impls;
+            if (filterType)   filtered = filtered.filter(i => i.type === filterType);
+            if (filterStatus) filtered = filtered.filter(i => i.status === filterStatus);
+            if (filterClient) filtered = filtered.filter(i => i.clientIds.includes(filterClient));
+
+            if (filtered.length === 0) {
+                container.innerHTML = `<div class="glass" style="padding:40px; text-align:center; color:var(--text-muted);">
+                    <i data-lucide="code-2" style="width:48px;height:48px;opacity:.3;margin-bottom:12px;"></i>
+                    <p>Nenhuma implementação encontrada.</p></div>`;
+                lucide.createIcons();
+                return;
+            }
+
+            // Agrupar por tipo
+            const typeLabels = { trigger: 'Trigger', procedure: 'Procedure / Função', feature: 'Funcionalidade', customization: 'Customização', integration: 'Integração' };
+            const typeIcons  = { trigger: 'zap', procedure: 'function-square', feature: 'sparkles', customization: 'settings-2', integration: 'plug-2' };
+            const groups = {};
+            filtered.forEach(impl => {
+                if (!groups[impl.type]) groups[impl.type] = [];
+                groups[impl.type].push(impl);
+            });
+
+            const statusBadge = (s) => {
+                const map = { active: ['Ativo', 'var(--success-color)'], testing: ['Em Teste', 'var(--warning-color)'], discontinued: ['Descontinuado', 'var(--danger-color)'] };
+                const [label, color] = map[s] || ['—', 'var(--text-muted)'];
+                return `<span style="font-size:.7rem;padding:2px 8px;border-radius:20px;background:${color}22;color:${color};font-weight:600;">${label}</span>`;
+            };
+
+            let html = '';
+            for (const [type, items] of Object.entries(groups)) {
+                const icon = typeIcons[type] || 'code-2';
+                html += `<div style="margin-bottom:28px;">
+                    <h3 style="display:flex;align-items:center;gap:8px;margin-bottom:12px;font-size:1rem;color:var(--primary);">
+                        <i data-lucide="${icon}" style="width:18px;height:18px;"></i>${typeLabels[type] || type}
+                        <span style="font-size:.75rem;color:var(--text-muted);font-weight:400;">(${items.length})</span>
+                    </h3>
+                    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:14px;">`;
+
+                items.forEach(impl => {
+                    const linkedClients = impl.clientIds.map(id => clientsMap[id]?.name).filter(Boolean);
+                    const maxChips = 3;
+                    const chipsHtml = linkedClients.slice(0, maxChips).map(n =>
+                        `<span style="font-size:.7rem;padding:2px 8px;border-radius:12px;background:var(--bg-glass);border:1px solid var(--border-color);">${escapeHtml(n)}</span>`
+                    ).join('');
+                    const extraChip = linkedClients.length > maxChips
+                        ? `<span style="font-size:.7rem;padding:2px 8px;border-radius:12px;background:var(--bg-glass);color:var(--text-muted);">+${linkedClients.length - maxChips}</span>` : '';
+                    const noClients = linkedClients.length === 0
+                        ? `<span style="font-size:.7rem;color:var(--text-muted);">Sem clientes vinculados</span>` : '';
+                    const versionHtml = impl.version ? `<span style="font-size:.7rem;color:var(--text-muted);"> · v${escapeHtml(impl.version)}</span>` : '';
+                    const dateHtml = impl.implementationDate ? `<span style="font-size:.7rem;color:var(--text-muted);"> · ${new Date(impl.implementationDate + 'T12:00').toLocaleDateString('pt-BR')}</span>` : '';
+                    const hasCode = impl.codeScript && impl.codeScript.trim().length > 0;
+
+                    html += `<div class="glass" style="padding:16px;cursor:pointer;transition:border-color .2s;" onclick="app.openEditImplementation('${impl.id}')">
+                        <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;margin-bottom:8px;">
+                            <span style="font-weight:600;flex:1;">${escapeHtml(impl.name)}</span>
+                            ${statusBadge(impl.status)}
+                        </div>
+                        <div style="font-size:.75rem;color:var(--text-muted);margin-bottom:8px;">${versionHtml}${dateHtml}${hasCode ? ' · <i data-lucide="file-code-2" style="width:12px;height:12px;vertical-align:middle;"></i> código' : ''}</div>
+                        ${impl.description ? `<p style="font-size:.8rem;color:var(--text-secondary);margin-bottom:10px;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;">${escapeHtml(impl.description)}</p>` : ''}
+                        <div style="display:flex;flex-wrap:wrap;gap:4px;">${chipsHtml}${extraChip}${noClients}</div>
+                    </div>`;
+                });
+
+                html += `</div></div>`;
+            }
+
+            container.innerHTML = html;
+            lucide.createIcons();
+        } catch (err) {
+            container.innerHTML = `<p class="text-muted">Erro ao carregar implementações: ${escapeHtml(err.message)}</p>`;
+        }
+    }
+
+    async _populateImplClientCheckboxes(selectedIds = []) {
+        const wrap = document.getElementById('impl-clients-checkboxes');
+        if (!wrap) return;
+        const clients = await store.getClients();
+        if (clients.length === 0) {
+            wrap.innerHTML = '<span style="font-size:.8rem;color:var(--text-muted);">Nenhum cliente cadastrado.</span>';
+            return;
+        }
+        wrap.innerHTML = clients.map(c => `
+            <label style="display:flex;align-items:center;gap:6px;font-size:.85rem;cursor:pointer;padding:4px 8px;border-radius:6px;background:var(--bg-primary);">
+                <input type="checkbox" value="${c.id}" ${selectedIds.includes(c.id) ? 'checked' : ''} style="cursor:pointer;">
+                ${escapeHtml(c.name)}
+            </label>`).join('');
+    }
+
+    openNewImplementation() {
+        document.getElementById('modal-implementation-title').textContent = 'Nova Implementação';
+        document.getElementById('impl-id').value = '';
+        document.getElementById('impl-name').value = '';
+        document.getElementById('impl-type').value = 'feature';
+        document.getElementById('impl-status').value = 'active';
+        document.getElementById('impl-version').value = '';
+        document.getElementById('impl-date').value = '';
+        document.getElementById('impl-description').value = '';
+        document.getElementById('impl-code').value = '';
+        document.getElementById('impl-notes').value = '';
+        document.getElementById('btn-delete-implementation').style.display = 'none';
+        this._populateImplClientCheckboxes([]);
+        this.openModal('modal-implementation');
+    }
+
+    async openEditImplementation(id) {
+        const impls = await store.getImplementationsWithClients();
+        const impl = impls.find(i => i.id === id);
+        if (!impl) return;
+
+        document.getElementById('modal-implementation-title').textContent = 'Editar Implementação';
+        document.getElementById('impl-id').value = impl.id;
+        document.getElementById('impl-name').value = impl.name;
+        document.getElementById('impl-type').value = impl.type;
+        document.getElementById('impl-status').value = impl.status;
+        document.getElementById('impl-version').value = impl.version;
+        document.getElementById('impl-date').value = impl.implementationDate;
+        document.getElementById('impl-description').value = impl.description;
+        document.getElementById('impl-code').value = impl.codeScript;
+        document.getElementById('impl-notes').value = impl.notes;
+        document.getElementById('btn-delete-implementation').style.display = 'flex';
+        await this._populateImplClientCheckboxes(impl.clientIds);
+        this.openModal('modal-implementation');
+    }
+
+    async handleImplementationSubmit(e) {
+        e.preventDefault();
+        const id = document.getElementById('impl-id').value;
+        const payload = {
+            name: document.getElementById('impl-name').value.trim(),
+            type: document.getElementById('impl-type').value,
+            status: document.getElementById('impl-status').value,
+            version: document.getElementById('impl-version').value.trim(),
+            implementationDate: document.getElementById('impl-date').value || null,
+            description: document.getElementById('impl-description').value.trim(),
+            codeScript: document.getElementById('impl-code').value.trim(),
+            notes: document.getElementById('impl-notes').value.trim(),
+        };
+
+        const selectedClientIds = Array.from(
+            document.querySelectorAll('#impl-clients-checkboxes input[type="checkbox"]:checked')
+        ).map(cb => cb.value);
+
+        const btn = e.target.querySelector('[type="submit"]');
+        btn.disabled = true;
+        try {
+            let savedId;
+            if (id) {
+                await store.updateImplementation(id, payload);
+                savedId = id;
+            } else {
+                const created = await store.addImplementation(payload);
+                savedId = created.id;
+            }
+            await store.setImplementationClients(savedId, selectedClientIds);
+            this.closeModal('modal-implementation');
+            await this.renderImplementations();
+            Toast.show(id ? 'Implementação atualizada.' : 'Implementação criada.', 'success');
+        } catch (err) {
+            Toast.show('Erro ao salvar: ' + err.message, 'error');
+        } finally {
+            btn.disabled = false;
+        }
+    }
+
+    async handleDeleteImplementation() {
+        const id = document.getElementById('impl-id').value;
+        if (!id) return;
+        if (!confirm('Excluir esta implementação? Os vínculos com clientes também serão removidos.')) return;
+        try {
+            await store.deleteImplementation(id);
+            this.closeModal('modal-implementation');
+            await this.renderImplementations();
+            Toast.show('Implementação excluída.', 'success');
+        } catch (err) {
+            Toast.show('Erro ao excluir: ' + err.message, 'error');
+        }
+    }
+
+    clearImplFilters() {
+        const els = ['impl-filter-type', 'impl-filter-status', 'impl-filter-client'];
+        els.forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
+        this.renderImplementations();
     }
 
     async handleCalendarSettingsSave(e) {
