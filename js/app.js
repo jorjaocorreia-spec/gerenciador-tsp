@@ -66,6 +66,8 @@ class AppController {
         this.aptCurrentDate = new Date().toISOString().split('T')[0]; // 'YYYY-MM-DD'
         this.taskAttachments = []; // [{name, data}] — imagens em base64 do modal de tarefa
         this.implAttachments = []; // [{name, data}] — imagens em base64 do modal de implementação
+        this.trainingAttachments = []; // [{name, data}] — imagens do modal de treinamento
+        this.trainingLinks = []; // [{label, url, urlType}] — links externos do modal de treinamento
         // Estado do modal de tarefa
         this._modalTaskId    = null;
         this._modalStatus    = 'new';
@@ -73,6 +75,11 @@ class AppController {
         this._modalChecklist = [];
         this._modalCoverColor = null;
         this._modalComments  = [];
+        // Colunas Kanban do cliente atual
+        this._currentColumns     = [];
+        // Estado do modal Gerenciar Colunas
+        this._manageCols         = [];
+        this._manageColsOriginal = [];
         // Estado do drag-and-drop Kanban
         this._draggedCard      = null;
         this._dragPlaceholder  = null;
@@ -142,6 +149,8 @@ class AppController {
 
         document.getElementById('form-implementation')
             ?.addEventListener('submit', (e) => this.handleImplementationSubmit(e));
+        document.getElementById('form-training')
+            ?.addEventListener('submit', (e) => this.handleTrainingSubmit(e));
         ['apt-start', 'apt-end'].forEach(id => {
             document.getElementById(id)?.addEventListener('change', () => this.updateAptDuration());
         });
@@ -152,11 +161,12 @@ class AppController {
             if (e.key === 'Enter' && e.ctrlKey) { e.preventDefault(); this.handleAddTaskComment(); }
         });
 
-        // Paste de imagens no modal de tarefa
+        // Paste de imagens nos modais de tarefa, implementação e treinamento
         document.addEventListener('paste', (e) => {
-            const taskActive = document.getElementById('modal-task')?.classList.contains('active');
-            const implActive = document.getElementById('modal-implementation')?.classList.contains('active');
-            if (!taskActive && !implActive) return;
+            const taskActive     = document.getElementById('modal-task')?.classList.contains('active');
+            const implActive     = document.getElementById('modal-implementation')?.classList.contains('active');
+            const trainingActive = document.getElementById('modal-training')?.classList.contains('active');
+            if (!taskActive && !implActive && !trainingActive) return;
             const items = e.clipboardData?.items;
             if (!items) return;
             for (const item of items) {
@@ -168,6 +178,11 @@ class AppController {
                         compressImageFile(file).then(data => {
                             this.taskAttachments.push({ name, data });
                             this._renderTaskAttachmentPreviews();
+                        });
+                    } else if (trainingActive) {
+                        compressImageFile(file).then(data => {
+                            this.trainingAttachments.push({ name, data });
+                            this._renderTrainingAttachmentPreviews();
                         });
                     } else {
                         compressImageFile(file).then(data => {
@@ -198,6 +213,16 @@ class AppController {
             }
             e.target.value = '';
             this._renderImplAttachmentPreviews();
+        });
+
+        // Seleção de arquivos de imagem via input — treinamento
+        document.getElementById('training-attachments')?.addEventListener('change', async (e) => {
+            for (const file of e.target.files) {
+                const data = await compressImageFile(file);
+                this.trainingAttachments.push({ name: file.name, data });
+            }
+            e.target.value = '';
+            this._renderTrainingAttachmentPreviews();
         });
 
         // Renderizar Views
@@ -290,6 +315,10 @@ class AppController {
             this.implAttachments = [];
             this._renderImplAttachmentPreviews();
         }
+        if (modalId === 'modal-training') {
+            this.trainingAttachments = [];
+            this.trainingLinks = [];
+        }
         if (modalId === 'modal-task-time') {
             document.getElementById('form-task-time').reset();
             document.getElementById('time-task-id').value = '';
@@ -305,6 +334,10 @@ class AppController {
             document.getElementById('modal-agenda-title').innerText = 'Novo Agendamento';
             document.getElementById('agenda-sync-google').checked = calendarAPI.isEnabled;
             this._updateDescLinks('');
+        }
+        if (modalId === 'modal-manage-columns') {
+            this._manageCols = [];
+            this._manageColsOriginal = [];
         }
     }
 
@@ -519,9 +552,11 @@ class AppController {
         const id = document.getElementById('task-id').value;
         const title = document.getElementById('task-title').value.trim();
         if (!title) { Toast.show('Informe o título da tarefa.', 'error'); return; }
+        const clientId = document.getElementById('task-client').value;
+        if (!clientId) { Toast.show('Selecione um cliente para a tarefa.', 'error'); return; }
 
         const taskData = {
-            clientId: document.getElementById('task-client').value,
+            clientId,
             title,
             description: document.getElementById('task-description').value,
             status: this._modalStatus || 'new',
@@ -585,9 +620,14 @@ class AppController {
         const t = await store.getTask(id);
         if (!t) return;
 
+        // Garante colunas carregadas para o cliente desta tarefa
+        if (t.clientId && !this._currentColumns.find(c => c.clientId === t.clientId)) {
+            this._currentColumns = await store.ensureDefaultColumns(t.clientId).catch(() => []);
+        }
+
         // Estado modal
         this._modalTaskId    = t.id;
-        this._modalStatus    = t.status || 'new';
+        this._modalStatus    = t.status || this._currentColumns[0]?.id || 'new';
         this._modalLabels    = t.labels ? [...t.labels] : [];
         this._modalChecklist = t.checklist ? [...t.checklist] : [];
         this._modalCoverColor = t.coverColor || null;
@@ -633,7 +673,12 @@ class AppController {
     _renderTaskComments() {
         const list = document.getElementById('modal-task-comments-list');
         if (!list) return;
-        const statusLabels = { new: 'Novas', doing: 'Em Execução', done: 'Finalizadas' };
+        const LEGACY_LABELS = { new: 'Novas', doing: 'Em Execução', done: 'Finalizadas' };
+        const getColName = (id) => {
+            if (!id) return '?';
+            const col = this._currentColumns.find(c => c.id === id);
+            return col?.name || LEGACY_LABELS[id] || id;
+        };
         const sorted = [...this._modalComments].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
         if (!sorted.length) { list.innerHTML = '<p style="font-size:12px;color:var(--text-secondary);margin:4px 0">Nenhum comentário ainda.</p>'; return; }
         list.innerHTML = sorted.map(entry => {
@@ -649,8 +694,8 @@ class AppController {
                     <div class="task-comment-text">${escapeHtml(entry.text)}</div>
                 </div>`;
             } else if (entry.type === 'status_change') {
-                const from = statusLabels[entry.activityData?.from] || entry.activityData?.from || '?';
-                const to   = statusLabels[entry.activityData?.to]   || entry.activityData?.to   || '?';
+                const from = getColName(entry.activityData?.from);
+                const to   = getColName(entry.activityData?.to);
                 return `<div class="task-activity-item">
                     <i data-lucide="arrow-right" style="width:13px;height:13px;flex-shrink:0"></i>
                     <span>Movido de <strong>${escapeHtml(from)}</strong> para <strong>${escapeHtml(to)}</strong></span>
@@ -873,50 +918,57 @@ class AppController {
     // ===================================
     // KANBAN — Quick-add
     // ===================================
-    openQuickAdd(status) {
-        document.getElementById(`kb-quick-add-${status}`).style.display = 'block';
-        document.getElementById(`kb-add-btn-${status}`).style.display = 'none';
-        const input = document.getElementById(`kb-quick-input-${status}`);
-        input.value = '';
-        setTimeout(() => input.focus(), 50);
+    openQuickAdd(colId) {
+        const qa = document.getElementById(`kb-quick-add-${colId}`);
+        const btn = document.getElementById(`kb-add-btn-${colId}`);
+        if (!qa) return;
+        qa.style.display = 'block';
+        if (btn) btn.style.display = 'none';
+        const input = document.getElementById(`kb-quick-input-${colId}`);
+        if (input) { input.value = ''; setTimeout(() => input.focus(), 50); }
     }
 
-    closeQuickAdd(status) {
-        document.getElementById(`kb-quick-add-${status}`).style.display = 'none';
-        document.getElementById(`kb-add-btn-${status}`).style.display = 'flex';
+    closeQuickAdd(colId) {
+        const qa = document.getElementById(`kb-quick-add-${colId}`);
+        const btn = document.getElementById(`kb-add-btn-${colId}`);
+        if (qa) qa.style.display = 'none';
+        if (btn) btn.style.display = 'flex';
     }
 
-    async submitQuickAdd(status) {
-        const input = document.getElementById(`kb-quick-input-${status}`);
-        const title = input.value.trim();
-        if (!title) { this.closeQuickAdd(status); return; }
+    async submitQuickAdd(colId) {
+        const input = document.getElementById(`kb-quick-input-${colId}`);
+        const title = input?.value.trim();
+        if (!title) { this.closeQuickAdd(colId); return; }
+        const clientId = document.getElementById('filter-task-client')?.value || null;
         try {
-            await store.addTask({ title, status, priority: 'medium' });
-            this.closeQuickAdd(status);
+            await store.addTask({ title, status: colId, clientId, priority: 'medium' });
+            this.closeQuickAdd(colId);
             await this.renderAll();
         } catch (err) {
             Toast.show('Erro ao criar tarefa: ' + err.message, 'error');
         }
     }
 
-    handleQuickAddKey(e, status) {
-        if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); this.submitQuickAdd(status); }
-        if (e.key === 'Escape') this.closeQuickAdd(status);
+    handleQuickAddKey(e, colId) {
+        if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); this.submitQuickAdd(colId); }
+        if (e.key === 'Escape') this.closeQuickAdd(colId);
     }
 
     // ===================================
     // KANBAN — Modal helpers
     // ===================================
-    _openNewTaskModal(status) {
+    _openNewTaskModal(colId) {
         this._modalTaskId    = null;
-        this._modalStatus    = status || 'new';
+        this._modalStatus    = colId || this._currentColumns[0]?.id || 'new';
         this._modalLabels    = [];
         this._modalChecklist = [];
         this._modalCoverColor = null;
         document.getElementById('task-id').value = '';
         document.getElementById('task-title').value = '';
         document.getElementById('task-description').value = '';
-        document.getElementById('task-client').value = '';
+        // Pre-seleciona o cliente filtrado, se houver
+        const filteredClient = document.getElementById('filter-task-client')?.value || '';
+        document.getElementById('task-client').value = filteredClient;
         document.getElementById('task-priority').value = 'medium';
         document.getElementById('task-due-date').value = '';
         document.getElementById('task-estimated-minutes').value = '';
@@ -931,14 +983,12 @@ class AppController {
         this.openModal('modal-task');
     }
 
-    moveTaskToColumn(status) {
+    moveTaskToColumn(colId) {
         const oldStatus = this._modalStatus;
-        this._modalStatus = status;
+        this._modalStatus = colId;
         this._syncModalColumnButtons();
-        const labels = { new: 'Novas', doing: 'Em Execução', done: 'Finalizadas' };
-        document.getElementById('modal-task-column-label').textContent = labels[status] || '';
-        if (this._modalTaskId && oldStatus !== status) {
-            store.logTaskActivity(this._modalTaskId, 'status_change', { from: oldStatus, to: status })
+        if (this._modalTaskId && oldStatus !== colId) {
+            store.logTaskActivity(this._modalTaskId, 'status_change', { from: oldStatus, to: colId })
                 .then(() => store.getTask(this._modalTaskId))
                 .then(t => { if (t) { this._modalComments = t.comments; this._renderTaskComments(); } })
                 .catch(() => {});
@@ -946,11 +996,22 @@ class AppController {
     }
 
     _syncModalColumnButtons() {
-        const labels = { new: 'Novas', doing: 'Em Execução', done: 'Finalizadas' };
-        document.querySelectorAll('.kb-col-btn').forEach(btn => {
-            btn.classList.toggle('active', btn.dataset.status === this._modalStatus);
-        });
-        document.getElementById('modal-task-column-label').textContent = labels[this._modalStatus] || '';
+        const container = document.getElementById('modal-sidebar-col-buttons');
+        if (!container) return;
+        const LEGACY = { new: { name: 'Novas', color: '#4a9eff' }, doing: { name: 'Em Execução', color: '#ff922b' }, done: { name: 'Finalizadas', color: '#51cf66' } };
+        const cols = this._currentColumns.length > 0 ? this._currentColumns
+            : Object.entries(LEGACY).map(([id, v]) => ({ id, name: v.name, color: v.color }));
+        container.innerHTML = cols.map(col => `
+            <button type="button" class="kb-col-btn${this._modalStatus === col.id ? ' active' : ''}"
+                    data-status="${col.id}" onclick="app.moveTaskToColumn('${col.id}')">
+                <span class="kb-column-dot" style="background:${escapeHtml(col.color)}"></span>
+                ${escapeHtml(col.name)}
+            </button>`).join('');
+        const labelEl = document.getElementById('modal-task-column-label');
+        if (labelEl) {
+            const col = cols.find(c => c.id === this._modalStatus);
+            labelEl.textContent = col?.name || LEGACY[this._modalStatus]?.name || '';
+        }
     }
 
     _syncModalCover() {
@@ -1074,6 +1135,170 @@ class AppController {
     }
 
     // ===================================
+    // KANBAN — Gerenciar Colunas
+    // ===================================
+    openManageColumns() {
+        const clientId = document.getElementById('filter-task-client')?.value;
+        if (!clientId) { Toast.show('Selecione um cliente para gerenciar colunas.', 'error'); return; }
+        this._manageCols = this._currentColumns.map(c => ({ ...c }));
+        this._manageColsOriginal = this._currentColumns.map(c => ({ ...c }));
+        this._renderManageColumnsList();
+        this.openModal('modal-manage-columns');
+    }
+
+    _renderManageColumnsList() {
+        const container = document.getElementById('mc-columns-list');
+        if (!container) return;
+        const COLORS = ['#4a9eff','#ff922b','#51cf66','#ffd43b','#ff6b6b','#cc5de8','#22d3ee','#a3e635','#94a3b8'];
+        if (this._manageCols.length === 0) {
+            container.innerHTML = '<p style="text-align:center;color:var(--text-secondary);font-size:13px;padding:16px 0">Nenhuma coluna. Adicione uma abaixo.</p>';
+            return;
+        }
+        container.innerHTML = this._manageCols.map((col, idx) => `
+            <div class="mc-row">
+                <div class="mc-order-btns">
+                    <button type="button" class="mc-order-btn" onclick="app._mcMoveUp(${idx})" ${idx===0?'disabled':''} title="Subir">▲</button>
+                    <button type="button" class="mc-order-btn" onclick="app._mcMoveDown(${idx})" ${idx===this._manageCols.length-1?'disabled':''} title="Descer">▼</button>
+                </div>
+                <div class="mc-color-area">
+                    <button type="button" class="mc-color-dot" style="background:${col.color}"
+                            onclick="app._mcToggleColorPicker(${idx})" title="Cor da coluna"></button>
+                    <div class="mc-color-palette" id="mc-palette-${idx}" style="display:none">
+                        ${COLORS.map(c => `<button type="button" class="mc-swatch${col.color===c?' active':''}"
+                            style="background:${c}" onclick="app._mcPickColor(${idx},'${c}')"></button>`).join('')}
+                    </div>
+                </div>
+                <input type="text" class="mc-name-input form-control" value="${escapeHtml(col.name)}"
+                       placeholder="Nome da coluna"
+                       oninput="app._mcSetName(${idx}, this.value)">
+                <label class="mc-done-check" title="Tarefas nesta coluna contam como concluídas">
+                    <input type="checkbox" ${col.isDone?'checked':''} onchange="app._mcToggleDone(${idx}, this.checked)">
+                    <span>Finalizada</span>
+                </label>
+                <button type="button" class="mc-delete-btn" onclick="app._mcDelete(${idx})" title="Excluir coluna">
+                    <i data-lucide="trash-2" style="width:14px;height:14px"></i>
+                </button>
+            </div>
+        `).join('');
+        lucide.createIcons();
+    }
+
+    _mcMoveUp(idx) {
+        if (idx === 0) return;
+        [this._manageCols[idx - 1], this._manageCols[idx]] = [this._manageCols[idx], this._manageCols[idx - 1]];
+        this._renderManageColumnsList();
+    }
+
+    _mcMoveDown(idx) {
+        if (idx >= this._manageCols.length - 1) return;
+        [this._manageCols[idx], this._manageCols[idx + 1]] = [this._manageCols[idx + 1], this._manageCols[idx]];
+        this._renderManageColumnsList();
+    }
+
+    async _mcDelete(idx) {
+        const col = this._manageCols[idx];
+        if (!col.id) {
+            // Coluna nova ainda não salva: remove direto
+            this._manageCols.splice(idx, 1);
+            this._renderManageColumnsList();
+            return;
+        }
+        // Verifica tasks na coluna
+        const clientId = document.getElementById('filter-task-client')?.value;
+        const tasks = await store.getTasks();
+        const count = tasks.filter(t => t.status === col.id && t.clientId === clientId).length;
+        if (count > 0) {
+            Toast.show(`"${col.name}" possui ${count} tarefa(s). Mova-as antes de excluir.`, 'error', 4000);
+            return;
+        }
+        this._manageCols.splice(idx, 1);
+        this._renderManageColumnsList();
+    }
+
+    _mcAdd() {
+        this._manageCols.push({ id: null, name: 'Nova Coluna', color: '#94a3b8', isDone: false, clientId: null });
+        this._renderManageColumnsList();
+        // Foca no input da nova linha
+        const inputs = document.querySelectorAll('.mc-name-input');
+        const last = inputs[inputs.length - 1];
+        if (last) { last.focus(); last.select(); }
+    }
+
+    _mcSetName(idx, val) { if (this._manageCols[idx]) this._manageCols[idx].name = val; }
+
+    _mcToggleDone(idx, val) {
+        if (this._manageCols[idx]) { this._manageCols[idx].isDone = val; }
+    }
+
+    _mcPickColor(idx, color) {
+        if (this._manageCols[idx]) { this._manageCols[idx].color = color; }
+        this._renderManageColumnsList();
+    }
+
+    _mcToggleColorPicker(idx) {
+        const palette = document.getElementById(`mc-palette-${idx}`);
+        if (!palette) return;
+        const visible = palette.style.display !== 'none';
+        // Fecha todos os palettes
+        document.querySelectorAll('.mc-color-palette').forEach(p => p.style.display = 'none');
+        if (!visible) palette.style.display = 'flex';
+    }
+
+    async saveManageColumns() {
+        const clientId = document.getElementById('filter-task-client')?.value;
+        if (!clientId) return;
+
+        // Valida nomes
+        for (const col of this._manageCols) {
+            if (!col.name?.trim()) { Toast.show('Todas as colunas precisam ter um nome.', 'error'); return; }
+        }
+
+        // Colunas removidas (estavam no original mas não estão mais em _manageCols)
+        const currentIds = new Set(this._manageCols.map(c => c.id).filter(Boolean));
+        const deletedIds = this._manageColsOriginal.map(c => c.id).filter(id => id && !currentIds.has(id));
+
+        // Verifica tasks em colunas a deletar
+        const tasks = await store.getTasks();
+        for (const id of deletedIds) {
+            const count = tasks.filter(t => t.status === id && t.clientId === clientId).length;
+            if (count > 0) {
+                const col = this._manageColsOriginal.find(c => c.id === id);
+                Toast.show(`"${col?.name}" possui tarefas. Mova-as antes de excluir.`, 'error');
+                return;
+            }
+        }
+
+        try {
+            // Deleta colunas removidas
+            await Promise.all(deletedIds.map(id => store.deleteColumn(id)));
+
+            // Cria/atualiza colunas e coleta IDs finais com posições
+            const posUpdates = [];
+            for (let i = 0; i < this._manageCols.length; i++) {
+                const col = this._manageCols[i];
+                if (col.id) {
+                    await store.updateColumn(col.id, { name: col.name.trim(), color: col.color, isDone: col.isDone });
+                    posUpdates.push({ id: col.id, position: i });
+                } else {
+                    const created = await store.addColumn(clientId, col.name.trim(), col.color, col.isDone);
+                    posUpdates.push({ id: created.id, position: i });
+                }
+            }
+
+            // Reordena
+            await store.reorderColumns(posUpdates);
+
+            Toast.show('Colunas salvas!', 'success');
+            this.closeModal('modal-manage-columns');
+            // Recarrega e re-renderiza
+            sessionStorage.removeItem('kbMigrated'); // permite re-checagem se necessário
+            await this.renderAll();
+        } catch (err) {
+            Toast.show('Erro ao salvar colunas: ' + err.message, 'error');
+        }
+    }
+
+    // ===================================
     // KANBAN — Filtros
     // ===================================
     clearKanbanFilters() {
@@ -1124,7 +1349,8 @@ class AppController {
             this.renderTasks(),
             this.renderAgenda(),
             this.renderApontamentos(),
-            this.renderImplementations()
+            this.renderImplementations(),
+            this.renderTrainings()
         ]);
         lucide.createIcons();
     }
@@ -1623,48 +1849,144 @@ class AppController {
     async renderTasks() {
         if (this.currentView !== 'tasks') return;
 
-        let tasks = await store.getTasks();
-        this._populateLabelFilter(tasks);
+        // Migração única por sessão: status antigos ('new','doing','done') → UUIDs
+        if (!sessionStorage.getItem('kbMigrated')) {
+            await this._migrateOldStatuses();
+            sessionStorage.setItem('kbMigrated', '1');
+        }
 
         const filterClient   = document.getElementById('filter-task-client')?.value;
         const filterPriority = document.getElementById('filter-task-priority')?.value;
         const filterLabel    = document.getElementById('filter-task-label')?.value;
 
-        if (filterClient)   tasks = tasks.filter(t => t.clientId === filterClient);
+        const allTasks = await store.getTasks();
+        this._populateLabelFilter(allTasks);
+
+        const board = document.getElementById('kanban-board');
+        if (!board) return;
+
+        // Botão Gerenciar Colunas — só visível com cliente selecionado
+        const btnManage = document.getElementById('btn-manage-columns');
+
+        if (!filterClient) {
+            // Sem cliente: placeholder
+            this._currentColumns = [];
+            if (btnManage) btnManage.style.display = 'none';
+            board.innerHTML = `
+                <div class="kb-empty-state">
+                    <i data-lucide="columns" style="width:48px;height:48px;opacity:0.25"></i>
+                    <p>Selecione um cliente nos filtros para visualizar o Kanban</p>
+                </div>`;
+            await this.renderTasksDashboard(allTasks, '');
+            lucide.createIcons();
+            return;
+        }
+
+        if (btnManage) btnManage.style.display = 'flex';
+
+        // Carrega (ou cria) colunas do cliente selecionado
+        try {
+            this._currentColumns = await store.ensureDefaultColumns(filterClient);
+        } catch (err) {
+            console.error('Erro ao carregar colunas:', err);
+            this._currentColumns = [];
+            Toast.show('Erro ao carregar colunas. Execute o SQL de migração no Supabase.', 'error', 5000);
+        }
+
+        // Filtra tasks do cliente
+        let tasks = allTasks.filter(t => t.clientId === filterClient);
         if (filterPriority) tasks = tasks.filter(t => t.priority === filterPriority);
         if (filterLabel)    tasks = tasks.filter(t => (t.labels || []).some(l => l.color === filterLabel));
 
-        const cols = {
-            new:   document.getElementById('kb-col-new'),
-            doing: document.getElementById('kb-col-doing'),
-            done:  document.getElementById('kb-col-done')
-        };
-        if (!cols.new) return;
-
-        Object.values(cols).forEach(col => { if (col) col.innerHTML = spinnerHtml; });
+        board.innerHTML = spinnerHtml;
 
         const clientIds = [...new Set(tasks.map(t => t.clientId).filter(Boolean))];
         const clientsMap = {};
         await Promise.all(clientIds.map(async id => { clientsMap[id] = await store.getClient(id); }));
 
-        Object.values(cols).forEach(col => { if (col) col.innerHTML = ''; });
-        const counts = { new: 0, doing: 0, done: 0 };
-
-        tasks.forEach(task => {
-            const status = task.status || 'new';
-            if (counts[status] !== undefined) counts[status]++;
-            const col = cols[status];
-            if (!col) return;
-            const card = this.createKanbanCard(task, clientsMap);
-            col.appendChild(card);
-        });
-
-        document.getElementById('kb-count-new').textContent   = counts.new;
-        document.getElementById('kb-count-doing').textContent = counts.doing;
-        document.getElementById('kb-count-done').textContent  = counts.done;
-
+        this._renderKanbanBoard(this._currentColumns, tasks, clientsMap);
         await this.renderTasksDashboard(tasks, filterClient);
         lucide.createIcons();
+    }
+
+    async _migrateOldStatuses() {
+        const OLD = ['new', 'doing', 'done'];
+        let tasks;
+        try { tasks = await store.getTasks(); } catch (_) { return; }
+        const toMigrate = tasks.filter(t => OLD.includes(t.status));
+        if (toMigrate.length === 0) return;
+
+        // Agrupa por clientId
+        const groups = {};
+        toMigrate.forEach(t => {
+            const key = t.clientId || '__global__';
+            if (!groups[key]) groups[key] = [];
+            groups[key].push(t);
+        });
+
+        for (const [key, group] of Object.entries(groups)) {
+            const clientId = key === '__global__' ? null : key;
+            let cols;
+            try { cols = await store.ensureDefaultColumns(clientId); } catch (_) { continue; }
+            // cols[0]=Novas, cols[1]=Em Execução, cols[2]=Finalizadas
+            const map = { new: cols[0]?.id, doing: cols[1]?.id, done: cols[2]?.id };
+            await Promise.all(group.map(t => {
+                const newId = map[t.status];
+                return newId ? store.updateTaskStatus(t.id, newId) : Promise.resolve();
+            }));
+        }
+    }
+
+    _renderKanbanBoard(columns, tasks, clientsMap) {
+        const board = document.getElementById('kanban-board');
+        if (!board) return;
+        board.innerHTML = '';
+
+        if (columns.length === 0) {
+            board.innerHTML = `<div class="kb-empty-state"><i data-lucide="columns" style="width:48px;height:48px;opacity:0.25"></i><p>Nenhuma coluna configurada.</p></div>`;
+            return;
+        }
+
+        columns.forEach(col => {
+            const colTasks = tasks.filter(t => t.status === col.id);
+            const colId = col.id;
+            const colEl = document.createElement('div');
+            colEl.className = 'kb-column';
+            colEl.dataset.status = colId;
+
+            colEl.innerHTML = `
+                <div class="kb-column-header">
+                    <div class="kb-column-title">
+                        <span class="kb-column-dot" style="background:${escapeHtml(col.color)}"></span>
+                        <h3>${escapeHtml(col.name)}</h3>
+                        ${col.isDone ? '<span class="kb-done-badge" title="Finalizada">✓</span>' : ''}
+                        <span class="kb-count" id="kb-count-${colId}">${colTasks.length}</span>
+                    </div>
+                    <button class="kb-header-add" onclick="app.openQuickAdd('${colId}')" title="Adicionar card">
+                        <i data-lucide="plus"></i>
+                    </button>
+                </div>
+                <div class="kb-dropzone" id="kb-col-${colId}" data-status="${colId}"
+                     ondragover="app.allowDrop(event)" ondrop="app.dropTask(event)"></div>
+                <div class="kb-quick-add" id="kb-quick-add-${colId}" style="display:none">
+                    <textarea class="kb-quick-add-input" id="kb-quick-input-${colId}" rows="3"
+                              placeholder="Título do card..."
+                              onkeydown="app.handleQuickAddKey(event,'${colId}')"></textarea>
+                    <div class="kb-quick-add-actions">
+                        <button class="btn btn-primary" onclick="app.submitQuickAdd('${colId}')">Adicionar</button>
+                        <button class="btn btn-ghost" onclick="app.closeQuickAdd('${colId}')"><i data-lucide="x"></i></button>
+                    </div>
+                </div>
+                <button class="kb-add-card-btn" id="kb-add-btn-${colId}" onclick="app.openQuickAdd('${colId}')">
+                    <i data-lucide="plus"></i> Adicionar card
+                </button>
+            `;
+
+            const dropzone = colEl.querySelector('.kb-dropzone');
+            colTasks.forEach(task => dropzone.appendChild(this.createKanbanCard(task, clientsMap)));
+
+            board.appendChild(colEl);
+        });
     }
 
     createKanbanCard(task, clientsMap) {
@@ -1757,7 +2079,9 @@ class AppController {
         const container = document.getElementById('tasks-dashboard-container');
         if (!container) return;
 
-        const openTasks = tasks.filter(t => t.status !== 'done');
+        const doneIds = new Set(this._currentColumns.filter(c => c.isDone).map(c => c.id));
+        doneIds.add('done'); // suporte legado
+        const openTasks = tasks.filter(t => !doneIds.has(t.status));
         let delayed = 0;
         let totalEst = 0;
         let totalSpent = 0;
@@ -1877,7 +2201,10 @@ class AppController {
         const select = document.getElementById('agenda-task');
         if (!select) return;
         select.innerHTML = '<option value="">-- Nenhuma tarefa vinculada --</option>';
-        const tasks = (await store.getTasks()).filter(t => t.status !== 'done');
+        const allCols = await store.getAllColumns().catch(() => []);
+        const doneIds = new Set(allCols.filter(c => c.isDone).map(c => c.id));
+        doneIds.add('done');
+        const tasks = (await store.getTasks()).filter(t => !doneIds.has(t.status));
         tasks.forEach(t => {
             const opt = document.createElement('option');
             opt.value = t.id;
@@ -3665,6 +3992,314 @@ class AppController {
         const els = ['impl-filter-type', 'impl-filter-status', 'impl-filter-client'];
         els.forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
         this.renderImplementations();
+    }
+
+    // ===================================
+    // TREINAMENTOS
+    // ===================================
+
+    async renderTrainings() {
+        if (this.currentView !== 'trainings') return;
+        const container = document.getElementById('trainings-container');
+        if (!container) return;
+        container.innerHTML = spinnerHtml;
+
+        try {
+            const [trainings, clients] = await Promise.all([
+                store.getTrainingsWithClients(),
+                store.getClients()
+            ]);
+
+            const filterCategory = document.getElementById('training-filter-category')?.value || '';
+            const filterStatus   = document.getElementById('training-filter-status')?.value || '';
+            const filterClient   = document.getElementById('training-filter-client')?.value || '';
+
+            const clientSelect = document.getElementById('training-filter-client');
+            if (clientSelect && clientSelect.options.length <= 1) {
+                clients.forEach(c => {
+                    const opt = document.createElement('option');
+                    opt.value = c.id;
+                    opt.textContent = c.name;
+                    clientSelect.appendChild(opt);
+                });
+            }
+
+            const clientsMap = {};
+            clients.forEach(c => { clientsMap[c.id] = c; });
+
+            let filtered = trainings;
+            if (filterCategory) filtered = filtered.filter(t => t.category === filterCategory);
+            if (filterStatus)   filtered = filtered.filter(t => t.status === filterStatus);
+            if (filterClient)   filtered = filtered.filter(t => t.clientIds.includes(filterClient));
+
+            if (filtered.length === 0) {
+                container.innerHTML = `<div class="glass" style="padding:40px; text-align:center; color:var(--text-muted);">
+                    <i data-lucide="graduation-cap" style="width:48px;height:48px;opacity:.3;margin-bottom:12px;"></i>
+                    <p>Nenhum treinamento encontrado.</p></div>`;
+                lucide.createIcons();
+                return;
+            }
+
+            const categoryLabels = { geral: 'Geral', sap: 'SAP', sistema: 'Sistema', processo: 'Processo', ferramenta: 'Ferramenta' };
+            const categoryIcons  = { geral: 'graduation-cap', sap: 'layers', sistema: 'monitor', processo: 'workflow', ferramenta: 'wrench' };
+
+            const groups = {};
+            filtered.forEach(t => {
+                if (!groups[t.category]) groups[t.category] = [];
+                groups[t.category].push(t);
+            });
+
+            const statusBadge = (s) => {
+                const map = { active: ['Ativo', 'var(--success-color)'], archived: ['Arquivado', 'var(--text-muted)'] };
+                const [label, color] = map[s] || ['—', 'var(--text-muted)'];
+                return `<span style="font-size:.7rem;padding:2px 8px;border-radius:20px;background:${color}22;color:${color};font-weight:600;">${label}</span>`;
+            };
+
+            let html = '';
+            for (const [cat, items] of Object.entries(groups)) {
+                const icon = categoryIcons[cat] || 'graduation-cap';
+                html += `<div style="margin-bottom:28px;">
+                    <h3 style="display:flex;align-items:center;gap:8px;margin-bottom:12px;font-size:1rem;color:var(--primary);">
+                        <i data-lucide="${icon}" style="width:18px;height:18px;"></i>${categoryLabels[cat] || cat}
+                        <span style="font-size:.75rem;color:var(--text-muted);font-weight:400;">(${items.length})</span>
+                    </h3>
+                    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:14px;">`;
+
+                items.forEach(t => {
+                    const linkedClients = t.clientIds.map(id => clientsMap[id]?.name).filter(Boolean);
+                    const maxChips = 3;
+                    const chipsHtml = linkedClients.slice(0, maxChips).map(n =>
+                        `<span style="font-size:.7rem;padding:2px 8px;border-radius:12px;background:var(--bg-glass);border:1px solid var(--border-color);">${escapeHtml(n)}</span>`
+                    ).join('');
+                    const extraChip = linkedClients.length > maxChips
+                        ? `<span style="font-size:.7rem;padding:2px 8px;border-radius:12px;background:var(--bg-glass);color:var(--text-muted);">+${linkedClients.length - maxChips}</span>` : '';
+
+                    const links  = (t.attachments || []).filter(a => a.type === 'link');
+                    const images = (t.attachments || []).filter(a => a.type === 'image');
+                    const metaParts = [];
+                    if (links.length)  metaParts.push(`<i data-lucide="link" style="width:12px;height:12px;vertical-align:middle;"></i> ${links.length} link${links.length > 1 ? 's' : ''}`);
+                    if (images.length) metaParts.push(`<i data-lucide="image" style="width:12px;height:12px;vertical-align:middle;"></i> ${images.length}`);
+                    const metaHtml = metaParts.length ? `<div style="font-size:.75rem;color:var(--text-muted);margin-bottom:8px;">${metaParts.join(' · ')}</div>` : '';
+
+                    html += `<div class="glass" style="padding:16px;cursor:pointer;transition:border-color .2s;" onclick="app.openEditTraining('${t.id}')">
+                        <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;margin-bottom:8px;">
+                            <span style="font-weight:600;flex:1;">${escapeHtml(t.title)}</span>
+                            ${statusBadge(t.status)}
+                        </div>
+                        ${t.description ? `<p style="font-size:.8rem;color:var(--text-secondary);margin-bottom:8px;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;">${escapeHtml(t.description)}</p>` : ''}
+                        ${metaHtml}
+                        <div style="display:flex;flex-wrap:wrap;gap:4px;">${chipsHtml}${extraChip}</div>
+                    </div>`;
+                });
+
+                html += `</div></div>`;
+            }
+
+            container.innerHTML = html;
+            lucide.createIcons();
+        } catch (err) {
+            container.innerHTML = `<p class="text-muted">Erro ao carregar treinamentos: ${escapeHtml(err.message)}</p>`;
+        }
+    }
+
+    async _populateTrainingClientCheckboxes(selectedIds = []) {
+        const wrap = document.getElementById('training-clients-checkboxes');
+        if (!wrap) return;
+        const clients = await store.getClients();
+        if (clients.length === 0) {
+            wrap.innerHTML = '<span style="font-size:.8rem;color:var(--text-muted);">Nenhum cliente cadastrado.</span>';
+            return;
+        }
+        wrap.innerHTML = clients.map(c => `
+            <label style="display:flex;align-items:center;gap:6px;font-size:.85rem;cursor:pointer;padding:4px 8px;border-radius:6px;background:var(--bg-primary);">
+                <input type="checkbox" value="${c.id}" ${selectedIds.includes(c.id) ? 'checked' : ''} style="cursor:pointer;">
+                ${escapeHtml(c.name)}
+            </label>`).join('');
+    }
+
+    _detectUrlType(url) {
+        if (/youtube\.com|youtu\.be/i.test(url)) return 'video';
+        if (/drive\.google\.com/i.test(url))     return 'drive';
+        if (/\.pdf(\?|$)/i.test(url))            return 'pdf';
+        return 'generic';
+    }
+
+    addTrainingLink() {
+        const labelEl = document.getElementById('training-link-label');
+        const urlEl   = document.getElementById('training-link-url');
+        const label = labelEl?.value.trim();
+        const url   = urlEl?.value.trim();
+        if (!url) { Toast.show('Informe a URL do link.', 'error'); return; }
+        const urlType = this._detectUrlType(url);
+        this.trainingLinks.push({ label: label || url, url, urlType });
+        if (labelEl) labelEl.value = '';
+        if (urlEl)   urlEl.value   = '';
+        this._renderTrainingLinks();
+    }
+
+    removeTrainingLink(index) {
+        this.trainingLinks.splice(index, 1);
+        this._renderTrainingLinks();
+    }
+
+    _renderTrainingLinks() {
+        const container = document.getElementById('training-links-list');
+        if (!container) return;
+        if (this.trainingLinks.length === 0) { container.innerHTML = ''; return; }
+        const iconMap = { video: 'play-circle', drive: 'hard-drive', pdf: 'file-text', generic: 'link' };
+        container.innerHTML = this.trainingLinks.map((l, i) => `
+            <div style="display:flex;align-items:center;gap:8px;padding:6px 10px;background:var(--bg-glass);border-radius:6px;border:1px solid var(--border-color);">
+                <i data-lucide="${iconMap[l.urlType] || 'link'}" style="width:14px;height:14px;flex-shrink:0;color:var(--primary);"></i>
+                <span style="flex:1;font-size:.85rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${escapeHtml(l.url)}">${escapeHtml(l.label)}</span>
+                <a href="${escapeHtml(l.url)}" target="_blank" rel="noopener noreferrer" style="color:var(--text-muted);flex-shrink:0;" title="Abrir link" onclick="event.stopPropagation()">
+                    <i data-lucide="external-link" style="width:13px;height:13px;"></i>
+                </a>
+                <button type="button" onclick="app.removeTrainingLink(${i})" style="background:none;border:none;cursor:pointer;color:var(--text-muted);padding:0;flex-shrink:0;" title="Remover">
+                    <i data-lucide="x" style="width:14px;height:14px;"></i>
+                </button>
+            </div>`).join('');
+        lucide.createIcons();
+    }
+
+    _renderTrainingAttachmentPreviews() {
+        const container = document.getElementById('training-attach-previews');
+        const hint = document.getElementById('training-attach-hint');
+        if (!container) return;
+        if (hint) hint.style.display = this.trainingAttachments.length ? 'none' : '';
+        container.innerHTML = this.trainingAttachments.map((att, i) => `
+            <div class="attach-thumb">
+                <img src="${att.data}" alt="${escapeHtml(att.name)}" onclick="app._openTrainingAttachmentLightbox(${i})" title="${escapeHtml(att.name)}">
+                <button type="button" class="attach-remove" onclick="app.removeTrainingAttachment(${i})" title="Remover">×</button>
+            </div>
+        `).join('');
+    }
+
+    _openTrainingAttachmentLightbox(index) {
+        const att = this.trainingAttachments[index];
+        if (!att) return;
+        const overlay = document.createElement('div');
+        overlay.style.cssText = 'position:fixed;inset:0;z-index:99999;background:rgba(0,0,0,0.88);display:flex;align-items:center;justify-content:center;cursor:zoom-out;';
+        const img = document.createElement('img');
+        img.src = att.data;
+        img.style.cssText = 'max-width:90vw;max-height:90vh;border-radius:8px;object-fit:contain;box-shadow:0 8px 40px rgba(0,0,0,0.6);cursor:default;';
+        img.addEventListener('click', (e) => e.stopPropagation());
+        overlay.appendChild(img);
+        overlay.addEventListener('click', () => overlay.remove());
+        document.addEventListener('keydown', function esc(e) {
+            if (e.key === 'Escape') { overlay.remove(); document.removeEventListener('keydown', esc); }
+        });
+        document.body.appendChild(overlay);
+    }
+
+    removeTrainingAttachment(index) {
+        this.trainingAttachments.splice(index, 1);
+        this._renderTrainingAttachmentPreviews();
+    }
+
+    async openNewTraining() {
+        document.getElementById('modal-training-title').textContent = 'Novo Treinamento';
+        document.getElementById('training-id').value = '';
+        document.getElementById('training-title').value = '';
+        document.getElementById('training-category').value = 'geral';
+        document.getElementById('training-status').value = 'active';
+        document.getElementById('training-description').value = '';
+        document.getElementById('btn-delete-training').style.display = 'none';
+        this.trainingAttachments = [];
+        this.trainingLinks = [];
+        this._renderTrainingAttachmentPreviews();
+        this._renderTrainingLinks();
+        await this._populateTrainingClientCheckboxes([]);
+        this.openModal('modal-training');
+    }
+
+    async openEditTraining(id) {
+        const trainings = await store.getTrainingsWithClients();
+        const t = trainings.find(x => x.id === id);
+        if (!t) return;
+
+        document.getElementById('modal-training-title').textContent = 'Editar Treinamento';
+        document.getElementById('training-id').value = t.id;
+        document.getElementById('training-title').value = t.title;
+        document.getElementById('training-category').value = t.category;
+        document.getElementById('training-status').value = t.status;
+        document.getElementById('training-description').value = t.description;
+        document.getElementById('btn-delete-training').style.display = 'flex';
+
+        const allAttachments = t.attachments || [];
+        this.trainingAttachments = allAttachments.filter(a => a.type === 'image');
+        this.trainingLinks = allAttachments.filter(a => a.type === 'link');
+        this._renderTrainingAttachmentPreviews();
+        this._renderTrainingLinks();
+        await this._populateTrainingClientCheckboxes(t.clientIds);
+        this.openModal('modal-training');
+    }
+
+    async handleTrainingSubmit(e) {
+        e.preventDefault();
+        const id = document.getElementById('training-id').value;
+
+        const selectedClientIds = Array.from(
+            document.querySelectorAll('#training-clients-checkboxes input[type="checkbox"]:checked')
+        ).map(cb => cb.value);
+
+        if (selectedClientIds.length === 0) {
+            Toast.show('Selecione pelo menos um cliente.', 'error');
+            return;
+        }
+
+        const attachments = [
+            ...this.trainingLinks.map(l => ({ type: 'link', label: l.label, url: l.url, urlType: l.urlType })),
+            ...this.trainingAttachments.map(a => ({ type: 'image', name: a.name, data: a.data })),
+        ];
+
+        const payload = {
+            title:       document.getElementById('training-title').value.trim(),
+            category:    document.getElementById('training-category').value,
+            status:      document.getElementById('training-status').value,
+            description: document.getElementById('training-description').value.trim(),
+            attachments,
+        };
+
+        const btn = e.target.querySelector('[type="submit"]');
+        btn.disabled = true;
+        try {
+            let savedId;
+            if (id) {
+                await store.updateTraining(id, payload);
+                savedId = id;
+            } else {
+                const created = await store.addTraining(payload);
+                savedId = created.id;
+            }
+            await store.setTrainingClients(savedId, selectedClientIds);
+            this.closeModal('modal-training');
+            await this.renderTrainings();
+            Toast.show(id ? 'Treinamento atualizado.' : 'Treinamento criado.', 'success');
+        } catch (err) {
+            Toast.show('Erro ao salvar: ' + err.message, 'error');
+        } finally {
+            btn.disabled = false;
+        }
+    }
+
+    async handleDeleteTraining() {
+        const id = document.getElementById('training-id').value;
+        if (!id) return;
+        if (!confirm('Excluir este treinamento? Os vínculos com clientes também serão removidos.')) return;
+        try {
+            await store.deleteTraining(id);
+            this.closeModal('modal-training');
+            await this.renderTrainings();
+            Toast.show('Treinamento excluído.', 'success');
+        } catch (err) {
+            Toast.show('Erro ao excluir: ' + err.message, 'error');
+        }
+    }
+
+    clearTrainingFilters() {
+        const els = ['training-filter-category', 'training-filter-status', 'training-filter-client'];
+        els.forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
+        this.renderTrainings();
     }
 
     async handleCalendarSettingsSave(e) {

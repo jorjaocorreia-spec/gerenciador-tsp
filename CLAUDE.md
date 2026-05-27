@@ -136,6 +136,7 @@ Todas têm `user_id uuid references auth.users` + RLS ativa (`auth.uid() = user_
 | `apontamentos` | id, user_id, date, start_time, end_time, project_num, description |
 | `implementations` | id, user_id, name, type, description, code_script, status, version, implementation_date, notes |
 | `implementation_clients` | id, user_id, implementation_id, client_id, notes — junção M:N |
+| `kanban_columns` | id, user_id, client_id (nullable), name, color, position, is_done, created_at |
 
 ### Fases de migração
 
@@ -160,6 +161,7 @@ Todas têm `user_id uuid references auth.users` + RLS ativa (`auth.uid() = user_
 - **Fase 19** ✅ — Comentários e atividade nas tarefas: seção abaixo de Anexos no modal; comentários manuais (textarea + botão Comentar, Ctrl+Enter); log automático de mudanças de status (via botões "Mover para" no modal e DnD) e lançamentos de tempo; entradas armazenadas em coluna `comments JSONB DEFAULT '[]'` na tabela `tasks`; migration SQL: `ALTER TABLE tasks ADD COLUMN IF NOT EXISTS comments JSONB DEFAULT '[]'`; exibição mais recente primeiro; atividades compactas com ícone Lucide; comentários manuais com botão de excluir visível no hover
 - **Fase 20** ✅ — Importação PDF: UI de divergência de horas; `parsePdfPages` retorna `{ records, warnings }`; records de página divergente recebem `_warningMsg`; modal de confirmação exibe painel amarelo de aviso acima da tabela (com lista das páginas divergentes) e ícone `⚠` inline na coluna "Tempo" de cada linha afetada (com tooltip mostrando detalhe); `pendingPdfWarnings` limpo no logout e após confirmação
 - **Fase 21** ✅ — Sync Google Calendar robusto: `syncEventsFromGoogle` busca de **todos os calendários** do usuário (não só `primary`) via `calendarList.list` + deduplica por `id`; loop de import (parte 1) tem try-catch por evento — falha em um não impede os demais; loop de push (parte 2) corrigido para só enviar eventos SEM `calendarEventId` (evita recriar no Google eventos antigos fora da janela ±30 dias); toast de aviso mostra contagem de falhas parciais
+- **Fase 22** ✅ — Colunas Kanban personalizadas por cliente: nova tabela `kanban_columns` (id, user_id, client_id, name, color, position, is_done, created_at) com RLS; cada cliente tem seu próprio conjunto de colunas; migration automática na primeira abertura (status antigos 'new'/'doing'/'done' → UUIDs das novas colunas padrão); botão "Gerenciar Colunas" no header da view Tarefas (visível apenas com cliente filtrado); modal com lista reordenável (▲▼), color picker, checkbox "Finalizada", delete com bloqueio se houver tasks; Kanban requer seleção de cliente para exibir board (placeholder quando sem filtro); quick-add usa clientId do filtro; campo Cliente obrigatório no modal de tarefa; `store.getClientStats` detecta colunas "done" dinamicamente
 
 ---
 
@@ -248,6 +250,13 @@ O `docker-entrypoint.sh` injeta essas vars em `js/config.js` via `envsubst` na i
 - **Comentários de tarefa: `_deleteTaskComment` salva via `store.updateTask`** — passa o `taskData` completo (título, status, labels, etc.) lido do DOM no momento da exclusão, mais o array `comments` filtrado. Nunca chamar apenas um update parcial de `comments` sem o spread restante dos campos, pois `updateTask` substitui todos os campos mapeados.
 - **Auto-log via DnD: `oldStatus` lido de `this._draggingFromStatus`** — disponível no momento do drop. O log de atividade é fire-and-forget (`.catch(() => {})`) para não bloquear o re-render.
 - **Auto-log via `moveTaskToColumn`: só loga se `this._modalTaskId` existe** — cliques no modal de nova tarefa (sem ID ainda salvo) não disparam log.
+
+- **Kanban Fase 22: `kanban_columns` deve ser criada antes do primeiro uso** — sem a tabela, `ensureDefaultColumns()` lança erro; `renderTasks()` captura o erro, exibe toast e mostra board vazio. Migration SQL: vide seção abaixo. A migration de dados existentes ('new'/'doing'/'done' → UUIDs) é automática via `_migrateOldStatuses()` na primeira abertura da view Tarefas, controlada por `sessionStorage.kbMigrated`.
+- **Kanban Fase 22: `task.status` agora é UUID de `kanban_columns.id`** — todo código que compara `t.status === 'done'` está quebrado pós-migração. Usar `isDone` via `_currentColumns` ou `store.getAllColumns()`. O fingerprint do backup/migração localStorage (`['new','doing','done'].includes(first.status)`) ainda funciona para backups antigos mas não detectará backups gerados pós-fase-22.
+- **Kanban Fase 22: board requer cliente selecionado** — sem filtro de cliente, `renderTasks()` exibe placeholder e retorna. Cards e quick-add só aparecem com cliente filtrado. Botão "Gerenciar Colunas" também fica oculto sem filtro.
+- **Kanban Fase 22: `_currentColumns` é instância de AppController** — populado por `renderTasks()` e, se necessário, por `handleEditTask()`. `_syncModalColumnButtons()` usa `_currentColumns` para gerar os botões "Mover para" dinamicamente. Se `_currentColumns` estiver vazio, usa fallback legado (3 botões hardcoded).
+- **Kanban Fase 22: `reorderColumns` usa mesmo padrão de `reorderTasks`** — `Promise.all` de `UPDATE` individuais, nunca `upsert` (conflita com RLS).
+- **Kanban Fase 22: `mc-color-palette` fecha via re-render** — `_mcPickColor(idx, color)` chama `_renderManageColumnsList()` que recria o DOM; todas as palettes ficam `display:none` novamente. `_mcToggleColorPicker` fecha todos antes de abrir o selecionado.
 
 ### Cálculos automáticos
 - Comissão do consultor = 43% do valor pago pelo cliente (`clientPays * 0.43`)

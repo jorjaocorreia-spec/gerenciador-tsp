@@ -96,6 +96,9 @@
             <li class="nav-item" data-view="implementations" title="Implementações">
                 <i data-lucide="code-2"></i><span class="nav-label">Implementações</span>
             </li>
+            <li class="nav-item" data-view="trainings" title="Treinamentos">
+                <i data-lucide="graduation-cap"></i><span class="nav-label">Treinamentos</span>
+            </li>
         </ul>
         <div class="sidebar-bottom">
             <p class="text-muted sidebar-section-label">SISTEMA</p>
@@ -247,9 +250,15 @@
                     <h1>Tarefas</h1>
                     <p class="text-muted">Gestão ágil de requisições e projetos.</p>
                 </div>
-                <button class="btn btn-primary" onclick="app._openNewTaskModal('new')">
-                    <i data-lucide="plus"></i> Nova Tarefa
-                </button>
+                <div style="display:flex;gap:8px;align-items:center">
+                    <button class="btn btn-ghost" id="btn-manage-columns" onclick="app.openManageColumns()"
+                            style="display:none" title="Personalizar colunas deste cliente">
+                        <i data-lucide="columns"></i> Gerenciar Colunas
+                    </button>
+                    <button class="btn btn-primary" onclick="app._openNewTaskModal()">
+                        <i data-lucide="plus"></i> Nova Tarefa
+                    </button>
+                </div>
             </div>
 
             <!-- Dashboard de Tarefas (Métricas simplificadas) -->
@@ -287,93 +296,9 @@
                 </div>
             </div>
 
-            <!-- KANBAN BOARD -->
+            <!-- KANBAN BOARD — colunas geradas dinamicamente por JS -->
             <div class="kanban-board" id="kanban-board">
-
-                <!-- Coluna Novas -->
-                <div class="kb-column" data-status="new">
-                    <div class="kb-column-header">
-                        <div class="kb-column-title">
-                            <span class="kb-column-dot" style="background: var(--kb-color-new)"></span>
-                            <h3>Novas</h3>
-                            <span class="kb-count" id="kb-count-new">0</span>
-                        </div>
-                        <button class="kb-header-add" onclick="app.openQuickAdd('new')" title="Adicionar card">
-                            <i data-lucide="plus"></i>
-                        </button>
-                    </div>
-                    <div class="kb-dropzone" id="kb-col-new" data-status="new"
-                         ondragover="app.allowDrop(event)" ondrop="app.dropTask(event)"></div>
-                    <div class="kb-quick-add" id="kb-quick-add-new" style="display:none">
-                        <textarea class="kb-quick-add-input" id="kb-quick-input-new" rows="3"
-                                  placeholder="Título do card..."
-                                  onkeydown="app.handleQuickAddKey(event,'new')"></textarea>
-                        <div class="kb-quick-add-actions">
-                            <button class="btn btn-primary" onclick="app.submitQuickAdd('new')">Adicionar</button>
-                            <button class="btn btn-ghost" onclick="app.closeQuickAdd('new')"><i data-lucide="x"></i></button>
-                        </div>
-                    </div>
-                    <button class="kb-add-card-btn" id="kb-add-btn-new" onclick="app.openQuickAdd('new')">
-                        <i data-lucide="plus"></i> Adicionar card
-                    </button>
-                </div>
-
-                <!-- Coluna Em Execução -->
-                <div class="kb-column" data-status="doing">
-                    <div class="kb-column-header">
-                        <div class="kb-column-title">
-                            <span class="kb-column-dot" style="background: var(--kb-color-doing)"></span>
-                            <h3>Em Execução</h3>
-                            <span class="kb-count" id="kb-count-doing">0</span>
-                        </div>
-                        <button class="kb-header-add" onclick="app.openQuickAdd('doing')" title="Adicionar card">
-                            <i data-lucide="plus"></i>
-                        </button>
-                    </div>
-                    <div class="kb-dropzone" id="kb-col-doing" data-status="doing"
-                         ondragover="app.allowDrop(event)" ondrop="app.dropTask(event)"></div>
-                    <div class="kb-quick-add" id="kb-quick-add-doing" style="display:none">
-                        <textarea class="kb-quick-add-input" id="kb-quick-input-doing" rows="3"
-                                  placeholder="Título do card..."
-                                  onkeydown="app.handleQuickAddKey(event,'doing')"></textarea>
-                        <div class="kb-quick-add-actions">
-                            <button class="btn btn-primary" onclick="app.submitQuickAdd('doing')">Adicionar</button>
-                            <button class="btn btn-ghost" onclick="app.closeQuickAdd('doing')"><i data-lucide="x"></i></button>
-                        </div>
-                    </div>
-                    <button class="kb-add-card-btn" id="kb-add-btn-doing" onclick="app.openQuickAdd('doing')">
-                        <i data-lucide="plus"></i> Adicionar card
-                    </button>
-                </div>
-
-                <!-- Coluna Finalizadas -->
-                <div class="kb-column" data-status="done">
-                    <div class="kb-column-header">
-                        <div class="kb-column-title">
-                            <span class="kb-column-dot" style="background: var(--kb-color-done)"></span>
-                            <h3>Finalizadas</h3>
-                            <span class="kb-count" id="kb-count-done">0</span>
-                        </div>
-                        <button class="kb-header-add" onclick="app.openQuickAdd('done')" title="Adicionar card">
-                            <i data-lucide="plus"></i>
-                        </button>
-                    </div>
-                    <div class="kb-dropzone" id="kb-col-done" data-status="done"
-                         ondragover="app.allowDrop(event)" ondrop="app.dropTask(event)"></div>
-                    <div class="kb-quick-add" id="kb-quick-add-done" style="display:none">
-                        <textarea class="kb-quick-add-input" id="kb-quick-input-done" rows="3"
-                                  placeholder="Título do card..."
-                                  onkeydown="app.handleQuickAddKey(event,'done')"></textarea>
-                        <div class="kb-quick-add-actions">
-                            <button class="btn btn-primary" onclick="app.submitQuickAdd('done')">Adicionar</button>
-                            <button class="btn btn-ghost" onclick="app.closeQuickAdd('done')"><i data-lucide="x"></i></button>
-                        </div>
-                    </div>
-                    <button class="kb-add-card-btn" id="kb-add-btn-done" onclick="app.openQuickAdd('done')">
-                        <i data-lucide="plus"></i> Adicionar card
-                    </button>
-                </div>
-
+                <!-- Preenchido por _renderKanbanBoard() -->
             </div>
         </section>
 
@@ -547,6 +472,55 @@
             </div>
 
             <div id="implementations-container"></div>
+        </section>
+
+        <!-- VIEW: TREINAMENTOS -->
+        <section class="view-section" id="view-trainings">
+            <div class="header-actions">
+                <div>
+                    <h1>Treinamentos</h1>
+                    <p class="text-muted">Gestão de materiais e recursos de treinamento por cliente.</p>
+                </div>
+                <button class="btn btn-primary" onclick="app.openNewTraining()">
+                    <i data-lucide="plus"></i> Novo Treinamento
+                </button>
+            </div>
+
+            <!-- Filtros -->
+            <div class="glass" style="padding: 16px; margin-bottom: 24px; display: flex; gap: 16px; align-items: flex-end; flex-wrap: wrap;">
+                <div class="form-group" style="flex: 1; min-width: 160px; margin-bottom: 0;">
+                    <label>Categoria</label>
+                    <select id="training-filter-category" class="form-control" onchange="app.renderTrainings()">
+                        <option value="">Todas</option>
+                        <option value="geral">Geral</option>
+                        <option value="sap">SAP</option>
+                        <option value="sistema">Sistema</option>
+                        <option value="processo">Processo</option>
+                        <option value="ferramenta">Ferramenta</option>
+                    </select>
+                </div>
+                <div class="form-group" style="flex: 1; min-width: 160px; margin-bottom: 0;">
+                    <label>Status</label>
+                    <select id="training-filter-status" class="form-control" onchange="app.renderTrainings()">
+                        <option value="">Todos</option>
+                        <option value="active">Ativo</option>
+                        <option value="archived">Arquivado</option>
+                    </select>
+                </div>
+                <div class="form-group" style="flex: 2; min-width: 200px; margin-bottom: 0;">
+                    <label>Cliente</label>
+                    <select id="training-filter-client" class="form-control" onchange="app.renderTrainings()">
+                        <option value="">Todos os clientes</option>
+                    </select>
+                </div>
+                <div style="flex: 0; margin-bottom: 0;">
+                    <button class="btn btn-secondary" onclick="app.clearTrainingFilters()" style="padding: 12px 16px; height: 42px;" title="Limpar filtros">
+                        <i data-lucide="filter-x"></i>
+                    </button>
+                </div>
+            </div>
+
+            <div id="trainings-container"></div>
         </section>
 
     </main>
@@ -874,16 +848,8 @@
 
                         <div class="modal-sidebar-section">
                             <h5 class="modal-sidebar-label">Mover para</h5>
-                            <div class="modal-sidebar-col-buttons">
-                                <button type="button" class="kb-col-btn" data-status="new" onclick="app.moveTaskToColumn('new')">
-                                    <span class="kb-column-dot" style="background:var(--kb-color-new)"></span> Novas
-                                </button>
-                                <button type="button" class="kb-col-btn" data-status="doing" onclick="app.moveTaskToColumn('doing')">
-                                    <span class="kb-column-dot" style="background:var(--kb-color-doing)"></span> Em Execução
-                                </button>
-                                <button type="button" class="kb-col-btn" data-status="done" onclick="app.moveTaskToColumn('done')">
-                                    <span class="kb-column-dot" style="background:var(--kb-color-done)"></span> Finalizadas
-                                </button>
+                            <div class="modal-sidebar-col-buttons" id="modal-sidebar-col-buttons">
+                                <!-- Preenchido dinamicamente por _syncModalColumnButtons() -->
                             </div>
                         </div>
 
@@ -1450,9 +1416,128 @@
     <!-- SCRIPTS -->
     <script src="js/config.js"></script>
     <script src="js/auth.js?v=1"></script>
+    <!-- MODAL: GERENCIAR COLUNAS KANBAN -->
+    <div class="modal-overlay" id="modal-manage-columns">
+        <div class="modal glass" style="max-width:500px">
+            <div class="modal-header">
+                <h3>Gerenciar Colunas</h3>
+                <button class="close-modal" onclick="app.closeModal('modal-manage-columns')">
+                    <i data-lucide="x"></i>
+                </button>
+            </div>
+            <div style="padding:0 24px 16px">
+                <p style="font-size:13px;color:var(--text-secondary);margin-bottom:16px">
+                    Personalize as colunas do Kanban para este cliente.
+                    A última coluna marcada como <strong>Finalizada</strong> determina quais tarefas saem dos indicadores de abertas.
+                </p>
+                <div id="mc-columns-list">
+                    <!-- Preenchido por _renderManageColumnsList() -->
+                </div>
+                <button type="button" class="btn btn-ghost" style="margin-top:12px;width:100%"
+                        onclick="app._mcAdd()">
+                    <i data-lucide="plus" style="width:14px;height:14px"></i> Adicionar Coluna
+                </button>
+            </div>
+            <div style="padding:0 24px 24px;display:flex;gap:8px">
+                <button type="button" class="btn btn-primary" style="flex:1;justify-content:center"
+                        onclick="app.saveManageColumns()">
+                    <i data-lucide="save" style="width:14px;height:14px"></i> Salvar
+                </button>
+                <button type="button" class="btn btn-ghost" onclick="app.closeModal('modal-manage-columns')">
+                    Cancelar
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL: TREINAMENTO -->
+    <div class="modal-overlay" id="modal-training">
+        <div class="modal glass" style="max-width: 640px; max-height: 92vh; overflow-y: auto;">
+            <div class="modal-header">
+                <h3 id="modal-training-title">Novo Treinamento</h3>
+                <button class="close-modal" onclick="app.closeModal('modal-training')"><i data-lucide="x"></i></button>
+            </div>
+            <form id="form-training">
+                <input type="hidden" id="training-id">
+
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+                    <div class="form-group" style="grid-column: 1 / -1;">
+                        <label class="form-label">Título *</label>
+                        <input type="text" id="training-title" class="form-control" placeholder="Ex: Cadastro de Fornecedores no SAP" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label">Categoria *</label>
+                        <select id="training-category" class="form-control" required>
+                            <option value="geral">Geral</option>
+                            <option value="sap">SAP</option>
+                            <option value="sistema">Sistema</option>
+                            <option value="processo">Processo</option>
+                            <option value="ferramenta">Ferramenta</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label">Status</label>
+                        <select id="training-status" class="form-control">
+                            <option value="active" selected>Ativo</option>
+                            <option value="archived">Arquivado</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group" style="grid-column: 1 / -1;">
+                        <label class="form-label">Descrição</label>
+                        <textarea id="training-description" class="form-control" rows="3" placeholder="O que este treinamento cobre, para quem é destinado..."></textarea>
+                    </div>
+
+                    <div class="form-group" style="grid-column: 1 / -1;">
+                        <label class="form-label">Clientes *</label>
+                        <div id="training-clients-checkboxes" style="display: flex; flex-wrap: wrap; gap: 8px; padding: 12px; background: var(--bg-glass); border-radius: 8px; max-height: 140px; overflow-y: auto;">
+                            <!-- preenchido via JS -->
+                        </div>
+                    </div>
+
+                    <div class="form-group" style="grid-column: 1 / -1;">
+                        <label class="form-label">Links externos (vídeos, PDFs, manuais)</label>
+                        <div style="display: flex; gap: 8px; margin-bottom: 8px;">
+                            <input type="text" id="training-link-label" class="form-control" style="flex: 1;" placeholder="Rótulo (ex: Tutorial YouTube)">
+                            <input type="url" id="training-link-url" class="form-control" style="flex: 2;" placeholder="https://...">
+                            <button type="button" class="btn btn-secondary" onclick="app.addTrainingLink()" style="flex-shrink: 0;" title="Adicionar link">
+                                <i data-lucide="plus"></i>
+                            </button>
+                        </div>
+                        <div id="training-links-list" style="display: flex; flex-direction: column; gap: 4px;"></div>
+                    </div>
+
+                    <div class="form-group" style="grid-column: 1 / -1;">
+                        <label class="form-label">Prints de tela</label>
+                        <div id="training-attach-zone" class="attach-zone" tabindex="0">
+                            <div class="attach-zone-hint" id="training-attach-hint">
+                                <i data-lucide="image-plus" style="width:24px;height:24px;opacity:.4;"></i>
+                                <span>Cole uma imagem aqui <kbd>Ctrl+V</kbd> ou <label for="training-attachments" style="cursor:pointer;color:var(--primary);text-decoration:underline">escolha arquivos</label></span>
+                            </div>
+                            <input type="file" id="training-attachments" accept="image/*" multiple style="display:none">
+                            <div id="training-attach-previews" class="attach-previews"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <div style="display: flex; gap: 12px; margin-top: 8px; justify-content: space-between;">
+                    <button type="button" id="btn-delete-training" class="btn btn-danger" style="display:none;" onclick="app.handleDeleteTraining()">
+                        <i data-lucide="trash-2"></i> Excluir
+                    </button>
+                    <div style="display: flex; gap: 12px; margin-left: auto;">
+                        <button type="button" class="btn btn-secondary" onclick="app.closeModal('modal-training')">Cancelar</button>
+                        <button type="submit" class="btn btn-primary">Salvar</button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+
     <script src="js/calendar.js?v=21"></script>
-    <script src="js/store.js?v=22"></script>
-    <script src="js/app.js?v=22"></script>
+    <script src="js/store.js?v=23"></script>
+    <script src="js/app.js?v=23"></script>
 </body>
 
 </html>

@@ -53,6 +53,13 @@ class TSPStore {
             createdAt: r.created_at };
     }
 
+    _column(r) {
+        return { id: r.id, clientId: r.client_id || null,
+            name: r.name, color: r.color || '#6366f1',
+            position: parseInt(r.position) || 0, isDone: !!r.is_done,
+            createdAt: r.created_at };
+    }
+
     // ── CLIENTES ─────────────────────────────────────────────────
 
     async getClients() {
@@ -352,7 +359,12 @@ class TSPStore {
         let records = await this.getRecordsByClient(clientId);
         if (yearMonth) records = records.filter(r => r.date.startsWith(yearMonth));
 
-        const openTasks = (await this.getTasksByClient(clientId)).filter(t => t.status !== 'done');
+        let doneIds = new Set(['done']);
+        try {
+            const cols = await this.getColumns(clientId);
+            if (cols.length > 0) { doneIds = new Set(cols.filter(c => c.isDone).map(c => c.id)); doneIds.add('done'); }
+        } catch (_) { /* use legacy fallback */ }
+        const openTasks = (await this.getTasksByClient(clientId)).filter(t => !doneIds.has(t.status));
         const totalMinutesUsed = records.reduce((acc, r) => acc + r.minutes, 0);
         const hoursUsed = totalMinutesUsed / 60;
         const tasksEstimatedHours = openTasks.reduce((acc, t) => acc + t.estimatedMinutes, 0) / 60;
@@ -469,6 +481,76 @@ class TSPStore {
         if (error) throw error;
     }
 
+    // ── KANBAN COLUMNS ────────────────────────────────────────────
+
+    async getColumns(clientId) {
+        let q = this.db.from('kanban_columns').select('*')
+            .eq('user_id', this.userId).order('position');
+        if (clientId) q = q.eq('client_id', clientId);
+        else q = q.is('client_id', null);
+        const { data, error } = await q;
+        if (error) throw error;
+        return (data || []).map(r => this._column(r));
+    }
+
+    async getAllColumns() {
+        const { data, error } = await this.db.from('kanban_columns').select('*')
+            .eq('user_id', this.userId).order('position');
+        if (error) throw error;
+        return (data || []).map(r => this._column(r));
+    }
+
+    async ensureDefaultColumns(clientId) {
+        const existing = await this.getColumns(clientId);
+        if (existing.length > 0) return existing;
+        const rows = [
+            { user_id: this.userId, client_id: clientId || null, name: 'Novas',       color: '#4a9eff', position: 0, is_done: false },
+            { user_id: this.userId, client_id: clientId || null, name: 'Em Execução', color: '#ff922b', position: 1, is_done: false },
+            { user_id: this.userId, client_id: clientId || null, name: 'Finalizadas', color: '#51cf66', position: 2, is_done: true  },
+        ];
+        const { data, error } = await this.db.from('kanban_columns').insert(rows).select();
+        if (error) throw error;
+        return (data || []).map(r => this._column(r)).sort((a, b) => a.position - b.position);
+    }
+
+    async addColumn(clientId, name, color, isDone) {
+        const existing = await this.getColumns(clientId);
+        const position = existing.length > 0 ? Math.max(...existing.map(c => c.position)) + 1 : 0;
+        const { data, error } = await this.db.from('kanban_columns').insert({
+            user_id: this.userId, client_id: clientId || null,
+            name, color: color || '#6366f1', position, is_done: !!isDone
+        }).select().single();
+        if (error) throw error;
+        return this._column(data);
+    }
+
+    async updateColumn(id, { name, color, isDone }) {
+        const { data, error } = await this.db.from('kanban_columns').update({
+            name, color: color || '#6366f1', is_done: !!isDone
+        }).eq('id', id).eq('user_id', this.userId).select().single();
+        if (error) throw error;
+        return this._column(data);
+    }
+
+    async deleteColumn(id) {
+        const { error } = await this.db.from('kanban_columns').delete()
+            .eq('id', id).eq('user_id', this.userId);
+        if (error) throw error;
+    }
+
+    async reorderColumns(updates) {
+        // updates: [{id, position}]
+        const results = await Promise.all(
+            updates.map(u =>
+                this.db.from('kanban_columns')
+                    .update({ position: u.position })
+                    .eq('id', u.id).eq('user_id', this.userId)
+            )
+        );
+        const failed = results.find(r => r.error);
+        if (failed) throw failed.error;
+    }
+
     // ── IMPLEMENTAÇÕES ────────────────────────────────────────────
 
     _implementation(r) {
@@ -554,6 +636,90 @@ class TSPStore {
             client_id: cid
         }));
         const { error } = await this.db.from('implementation_clients').insert(rows);
+        if (error) throw error;
+    }
+
+    // ── TREINAMENTOS ────────────────────────────────────────────
+
+    _training(r) {
+        return {
+            id: r.id,
+            title: r.title,
+            description: r.description || '',
+            category: r.category || 'geral',
+            status: r.status || 'active',
+            attachments: Array.isArray(r.attachments) ? r.attachments : [],
+            clientIds: [],
+            createdAt: r.created_at,
+            updatedAt: r.updated_at,
+        };
+    }
+
+    async getTrainings() {
+        const { data, error } = await this.db.from('trainings')
+            .select('*')
+            .eq('user_id', this.userId)
+            .order('title');
+        if (error) throw error;
+        return (data || []).map(r => this._training(r));
+    }
+
+    async getTrainingsWithClients() {
+        const [trainings, links] = await Promise.all([
+            this.getTrainings(),
+            this.db.from('training_clients')
+                .select('training_id, client_id')
+                .eq('user_id', this.userId)
+        ]);
+        if (links.error) throw links.error;
+        const map = {};
+        (links.data || []).forEach(l => {
+            if (!map[l.training_id]) map[l.training_id] = [];
+            map[l.training_id].push(l.client_id);
+        });
+        return trainings.map(t => ({ ...t, clientIds: map[t.id] || [] }));
+    }
+
+    async addTraining({ title, description, category, status, attachments }) {
+        const { data, error } = await this.db.from('trainings').insert({
+            user_id: this.userId, title,
+            description: description || '',
+            category: category || 'geral',
+            status: status || 'active',
+            attachments: attachments || []
+        }).select().single();
+        if (error) throw error;
+        return this._training(data);
+    }
+
+    async updateTraining(id, { title, description, category, status, attachments }) {
+        const { data, error } = await this.db.from('trainings').update({
+            title, description: description || '',
+            category: category || 'geral',
+            status: status || 'active',
+            attachments: attachments || [],
+            updated_at: new Date().toISOString()
+        }).eq('id', id).eq('user_id', this.userId).select().single();
+        if (error) throw error;
+        return this._training(data);
+    }
+
+    async deleteTraining(id) {
+        const { error } = await this.db.from('trainings').delete()
+            .eq('id', id).eq('user_id', this.userId);
+        if (error) throw error;
+    }
+
+    async setTrainingClients(trainingId, clientIds) {
+        await this.db.from('training_clients').delete()
+            .eq('training_id', trainingId).eq('user_id', this.userId);
+        if (!clientIds || clientIds.length === 0) return;
+        const rows = clientIds.map(cid => ({
+            user_id: this.userId,
+            training_id: trainingId,
+            client_id: cid
+        }));
+        const { error } = await this.db.from('training_clients').insert(rows);
         if (error) throw error;
     }
 }

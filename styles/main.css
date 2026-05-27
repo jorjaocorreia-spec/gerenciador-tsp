@@ -816,6 +816,132 @@ h4 {
 }
 
 /* =========================================
+   Kanban — Empty state & done badge
+   ========================================= */
+.kb-empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  width: 100%;
+  padding: 64px 24px;
+  color: var(--text-secondary);
+  font-size: 14px;
+  text-align: center;
+}
+.kb-done-badge {
+  font-size: 10px;
+  font-weight: 700;
+  color: #51cf66;
+  background: rgba(81, 207, 102, 0.12);
+  border: 1px solid rgba(81, 207, 102, 0.25);
+  border-radius: 4px;
+  padding: 1px 5px;
+  line-height: 1.4;
+  flex-shrink: 0;
+}
+
+/* =========================================
+   Modal Gerenciar Colunas
+   ========================================= */
+.mc-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 0;
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+}
+.mc-row:last-child { border-bottom: none; }
+.mc-order-btns {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex-shrink: 0;
+}
+.mc-order-btn {
+  background: none;
+  border: 1px solid rgba(255,255,255,0.1);
+  color: var(--text-secondary);
+  cursor: pointer;
+  font-size: 10px;
+  padding: 2px 5px;
+  border-radius: 4px;
+  line-height: 1;
+  font-family: inherit;
+}
+.mc-order-btn:hover:not(:disabled) { background: rgba(255,255,255,0.08); color: var(--text-primary); }
+.mc-order-btn:disabled { opacity: 0.3; cursor: default; }
+.mc-color-area {
+  position: relative;
+  flex-shrink: 0;
+}
+.mc-color-dot {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  border: 2px solid rgba(255,255,255,0.2);
+  cursor: pointer;
+  transition: transform 0.15s;
+}
+.mc-color-dot:hover { transform: scale(1.15); }
+.mc-color-palette {
+  position: absolute;
+  top: 28px;
+  left: 0;
+  background: var(--bg-card);
+  border: 1px solid rgba(255,255,255,0.12);
+  border-radius: 8px;
+  padding: 8px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  width: 130px;
+  z-index: 100;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+}
+.mc-swatch {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  border: 2px solid transparent;
+  cursor: pointer;
+  transition: transform 0.12s;
+}
+.mc-swatch:hover, .mc-swatch.active { border-color: white; transform: scale(1.2); }
+.mc-name-input {
+  flex: 1;
+  min-width: 0;
+  font-size: 13px;
+  padding: 5px 10px;
+  height: 32px;
+}
+.mc-done-check {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
+  color: var(--text-secondary);
+  cursor: pointer;
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+.mc-done-check input[type="checkbox"] { cursor: pointer; }
+.mc-delete-btn {
+  background: none;
+  border: none;
+  color: var(--text-secondary);
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+  transition: color 0.15s, background 0.15s;
+}
+.mc-delete-btn:hover { color: var(--danger-color); background: rgba(239,68,68,0.1); }
+
+/* =========================================
    Modal de Tarefa (dois painéis)
    ========================================= */
 .modal-task-two-panel {
