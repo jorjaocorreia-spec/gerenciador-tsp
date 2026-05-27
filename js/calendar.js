@@ -131,16 +131,37 @@ const GoogleCalendarAPI = {
         const timeMax = new Date();
         timeMax.setDate(timeMax.getDate() + syncRangeDays);
         try {
-            const response = await gapi.client.calendar.events.list({
-                calendarId: 'primary',
-                timeMin: timeMin.toISOString(),
-                timeMax: timeMax.toISOString(),
-                showDeleted: false,
-                singleEvents: true,
-                maxResults: 250,
-                orderBy: 'startTime',
-            });
-            return response.result.items;
+            // Busca todos os calendários do usuário para capturar convites e calendários compartilhados
+            let calendarIds = ['primary'];
+            try {
+                const calList = await gapi.client.calendar.calendarList.list({ minAccessRole: 'reader' });
+                const items = calList.result.items || [];
+                calendarIds = [...new Set(['primary', ...items.map(c => c.id)])];
+            } catch (e) {
+                console.warn('Não foi possível listar calendários; usando apenas primary.', e);
+            }
+
+            const seen = new Set();
+            let allEvents = [];
+            for (const calId of calendarIds) {
+                try {
+                    const response = await gapi.client.calendar.events.list({
+                        calendarId: calId,
+                        timeMin: timeMin.toISOString(),
+                        timeMax: timeMax.toISOString(),
+                        showDeleted: false,
+                        singleEvents: true,
+                        maxResults: 250,
+                        orderBy: 'startTime',
+                    });
+                    for (const ev of (response.result.items || [])) {
+                        if (!seen.has(ev.id)) { seen.add(ev.id); allEvents.push(ev); }
+                    }
+                } catch (err) {
+                    console.warn(`Falha ao buscar eventos do calendário ${calId}:`, err);
+                }
+            }
+            return allEvents;
         } catch (err) {
             console.error('Falha ao buscar eventos do Google.', err);
             return null;

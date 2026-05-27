@@ -2477,7 +2477,11 @@ class AppController {
             Toast.show('Sincronização concluída com sucesso!', 'success');
         } catch (error) {
             console.error("Erro no sync", error);
-            Toast.show('Erro durante a sincronização.', 'error');
+            // Erros parciais (alguns eventos falharam mas outros foram salvos)
+            const msg = error.message && error.message.includes('falharam')
+                ? error.message
+                : 'Erro durante a sincronização.';
+            Toast.show(msg, 'warning');
         } finally {
             btn.innerHTML = '<i data-lucide="refresh-cw"></i> Sincronizar Google';
             btn.disabled = false;
@@ -2486,85 +2490,97 @@ class AppController {
     }
 
     async executeBiDirectionalSync() {
-        // Fetch do google (ultimos 30 dias até proximos 30)
+        // Fetch do google (ultimos 30 dias até proximos 30) — inclui todos os calendários
         const googleEvents = await calendarAPI.syncEventsFromGoogle(30);
         if (!googleEvents) return;
 
         const localEvents = await store.getAgendaEvents();
+        let syncErrors = 0;
 
         // 1. O que tem no Google que não temos (ou foi atualizado lá)
         for (const gEv of googleEvents) {
             if (gEv.status === 'cancelled') continue;
 
-            // Procura localmente pelo ID do google
-            let match = localEvents.find(le => le.calendarEventId === gEv.id);
+            try {
+                // Procura localmente pelo ID do google
+                const match = localEvents.find(le => le.calendarEventId === gEv.id);
 
-            let evDate = '';
-            let evStart = '';
-            let evEnd = '';
-            let evDateEnd = '';
+                let evDate = '';
+                let evStart = '';
+                let evEnd = '';
+                let evDateEnd = '';
 
-            // Google lida com dateTime e date (allDay)
-            if (gEv.start.dateTime) {
-                const startObj = new Date(gEv.start.dateTime);
-                const endObj = new Date(gEv.end.dateTime);
+                // Google lida com dateTime e date (allDay)
+                if (gEv.start && gEv.start.dateTime) {
+                    const startObj = new Date(gEv.start.dateTime);
+                    const endObj = new Date(gEv.end.dateTime);
 
-                // Formata local YYYY-MM-DD
-                evDate = startObj.getFullYear() + "-" + String(startObj.getMonth() + 1).padStart(2, '0') + "-" + String(startObj.getDate()).padStart(2, '0');
-                evStart = String(startObj.getHours()).padStart(2, '0') + ":" + String(startObj.getMinutes()).padStart(2, '0');
-                evEnd = String(endObj.getHours()).padStart(2, '0') + ":" + String(endObj.getMinutes()).padStart(2, '0');
-                evDateEnd = evDate;
-            } else if (gEv.start.date) {
-                evDate = gEv.start.date;
-                // Google end date is exclusive for all-day events; subtract 1 day
-                if (gEv.end && gEv.end.date) {
-                    const d = new Date(gEv.end.date + 'T12:00:00');
-                    d.setDate(d.getDate() - 1);
-                    evDateEnd = d.toISOString().split('T')[0];
-                } else {
+                    // Formata local YYYY-MM-DD
+                    evDate = startObj.getFullYear() + "-" + String(startObj.getMonth() + 1).padStart(2, '0') + "-" + String(startObj.getDate()).padStart(2, '0');
+                    evStart = String(startObj.getHours()).padStart(2, '0') + ":" + String(startObj.getMinutes()).padStart(2, '0');
+                    evEnd = String(endObj.getHours()).padStart(2, '0') + ":" + String(endObj.getMinutes()).padStart(2, '0');
                     evDateEnd = evDate;
+                } else if (gEv.start && gEv.start.date) {
+                    evDate = gEv.start.date;
+                    // Google end date is exclusive for all-day events; subtract 1 day
+                    if (gEv.end && gEv.end.date) {
+                        const d = new Date(gEv.end.date + 'T12:00:00');
+                        d.setDate(d.getDate() - 1);
+                        evDateEnd = d.toISOString().split('T')[0];
+                    } else {
+                        evDateEnd = evDate;
+                    }
                 }
-            }
 
-            if (!evDate) continue; // Pula se n conseguir extrair data
+                if (!evDate) continue; // Pula se n conseguir extrair data
 
-            const mappedData = {
-                title: gEv.summary || 'Sem Título',
-                description: gEv.description || '',
-                type: 'meeting',
-                location: gEv.location || '',
-                date: evDate,
-                dateEnd: evDateEnd || evDate,
-                startTime: evStart,
-                endTime: evEnd,
-                calendarEventId: gEv.id,
-                meetLink: gEv.hangoutLink || '',
-                attendees: (gEv.attendees || []).map(a => a.email).join(', ')
-            };
+                const mappedData = {
+                    title: gEv.summary || 'Sem Título',
+                    description: gEv.description || '',
+                    type: 'meeting',
+                    location: gEv.location || '',
+                    date: evDate,
+                    dateEnd: evDateEnd || evDate,
+                    startTime: evStart,
+                    endTime: evEnd,
+                    calendarEventId: gEv.id,
+                    meetLink: gEv.hangoutLink || '',
+                    attendees: (gEv.attendees || []).map(a => a.email).join(', ')
+                };
 
-            if (match) {
-                mappedData.id = match.id;
-                mappedData.type = match.type; // Preserva o tipo customizado do TSP
-                mappedData.clientId = match.clientId;
-                mappedData.relatedTaskId = match.relatedTaskId;
-                if (!mappedData.meetLink) mappedData.meetLink = match.meetLink || '';
-                await store.updateAgendaEvent(mappedData);
-            } else {
-                await store.addAgendaEvent(mappedData);
+                if (match) {
+                    mappedData.id = match.id;
+                    mappedData.type = match.type; // Preserva o tipo customizado do TSP
+                    mappedData.clientId = match.clientId;
+                    mappedData.relatedTaskId = match.relatedTaskId;
+                    if (!mappedData.meetLink) mappedData.meetLink = match.meetLink || '';
+                    await store.updateAgendaEvent(mappedData);
+                } else {
+                    await store.addAgendaEvent(mappedData);
+                }
+            } catch (err) {
+                console.error('Erro ao sincronizar evento do Google:', gEv.summary, err);
+                syncErrors++;
             }
         }
 
-        // 2. Empurra eventos locais que ainda não têm calendarEventId
-        const googleIds = new Set(googleEvents.map(g => g.id));
+        // 2. Empurra eventos locais que NUNCA foram enviados ao Google (sem calendarEventId)
         for (const le of localEvents) {
-            if (le.calendarEventId && googleIds.has(le.calendarEventId)) continue; // já existe no Google
-            const result = await calendarAPI.createGoogleEvent(le);
-            if (result) {
-                le.calendarEventId = result.id;
-                if (result.meetLink) le.meetLink = result.meetLink;
-                await store.updateAgendaEvent(le);
+            if (le.calendarEventId) continue; // Já existe no Google (mesmo que fora da janela atual)
+            try {
+                const result = await calendarAPI.createGoogleEvent(le);
+                if (result) {
+                    le.calendarEventId = result.id;
+                    if (result.meetLink) le.meetLink = result.meetLink;
+                    await store.updateAgendaEvent(le);
+                }
+            } catch (err) {
+                console.error('Erro ao empurrar evento para o Google:', le.title, err);
+                syncErrors++;
             }
         }
+
+        if (syncErrors > 0) throw new Error(`${syncErrors} evento(s) falharam na sincronização`);
     }
 
     // ===================================
