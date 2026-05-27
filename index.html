@@ -481,7 +481,7 @@
                     <h1>Treinamentos</h1>
                     <p class="text-muted">Gestão de materiais e recursos de treinamento por cliente.</p>
                 </div>
-                <button class="btn btn-primary" onclick="app.openNewTraining()">
+                <button id="btn-new-training" class="btn btn-primary" onclick="app.openNewTraining()">
                     <i data-lucide="plus"></i> Novo Treinamento
                 </button>
             </div>
@@ -514,7 +514,7 @@
                     </select>
                 </div>
                 <div style="flex: 0; margin-bottom: 0;">
-                    <button class="btn btn-secondary" onclick="app.clearTrainingFilters()" style="padding: 12px 16px; height: 42px;" title="Limpar filtros">
+                    <button id="btn-clear-training-filters" class="btn btn-secondary" onclick="app.clearTrainingFilters()" style="padding: 12px 16px; height: 42px;" title="Limpar filtros">
                         <i data-lucide="filter-x"></i>
                     </button>
                 </div>
@@ -1502,7 +1502,7 @@
                         <div style="display: flex; gap: 8px; margin-bottom: 8px;">
                             <input type="text" id="training-link-label" class="form-control" style="flex: 1;" placeholder="Rótulo (ex: Tutorial YouTube)">
                             <input type="url" id="training-link-url" class="form-control" style="flex: 2;" placeholder="https://...">
-                            <button type="button" class="btn btn-secondary" onclick="app.addTrainingLink()" style="flex-shrink: 0;" title="Adicionar link">
+                            <button type="button" id="btn-add-training-link" class="btn btn-secondary" onclick="app.addTrainingLink()" style="flex-shrink: 0;" title="Adicionar link">
                                 <i data-lucide="plus"></i>
                             </button>
                         </div>
@@ -1528,7 +1528,7 @@
                     </button>
                     <div style="display: flex; gap: 12px; margin-left: auto;">
                         <button type="button" class="btn btn-secondary" onclick="app.closeModal('modal-training')">Cancelar</button>
-                        <button type="submit" class="btn btn-primary">Salvar</button>
+                        <button type="submit" id="btn-save-training" class="btn btn-primary">Salvar</button>
                     </div>
                 </div>
             </form>
@@ -1536,8 +1536,8 @@
     </div>
 
     <script src="js/calendar.js?v=21"></script>
-    <script src="js/store.js?v=23"></script>
-    <script src="js/app.js?v=23"></script>
+    <script src="js/store.js?v=23.1"></script>
+    <script src="js/app.js?v=23.1"></script>
 </body>
 
 </html>
