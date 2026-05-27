@@ -98,6 +98,11 @@ class AppController {
         document.getElementById('form-task-time').addEventListener('submit', this.handleTaskTimeSubmit.bind(this));
         document.getElementById('form-agenda-event').addEventListener('submit', this.handleAgendaSubmit.bind(this));
 
+        // Links clicáveis na descrição do agendamento
+        document.getElementById('agenda-desc').addEventListener('input', (e) => {
+            this._updateDescLinks(e.target.value);
+        });
+
         // Mostrar/ocultar opção de Meet conforme sync Google
         document.getElementById('agenda-sync-google').addEventListener('change', (e) => {
             const row = document.getElementById('agenda-generate-meet-row');
@@ -299,6 +304,7 @@ class AppController {
             document.getElementById('agenda-generate-meet').checked = false;
             document.getElementById('modal-agenda-title').innerText = 'Novo Agendamento';
             document.getElementById('agenda-sync-google').checked = calendarAPI.isEnabled;
+            this._updateDescLinks('');
         }
     }
 
@@ -1989,6 +1995,7 @@ class AppController {
         document.getElementById('agenda-id').value = ev.id;
         document.getElementById('agenda-title').value = ev.title;
         document.getElementById('agenda-desc').value = ev.description;
+        this._updateDescLinks(ev.description);
         document.getElementById('agenda-type').value = ev.type;
         document.getElementById('agenda-client').value = ev.clientId || '';
         this.updateAgendaTaskSelect();
@@ -3211,6 +3218,20 @@ class AppController {
             statusEl.innerHTML = '';
             Toast.show('Erro ao carregar configurações: ' + err.message, 'error');
         }
+    }
+
+    _updateDescLinks(text) {
+        const linksDiv = document.getElementById('agenda-desc-links');
+        const linksList = document.getElementById('agenda-desc-links-list');
+        if (!linksDiv || !linksList) return;
+        const urls = [...new Set((text || '').match(/https?:\/\/[^\s<>"{}|\\^`[\]]+/g) || [])];
+        if (urls.length === 0) { linksDiv.style.display = 'none'; return; }
+        linksDiv.style.display = 'block';
+        linksList.innerHTML = urls.map(url => {
+            const display = url.length > 70 ? url.substring(0, 67) + '…' : url;
+            return `<a href="${escapeHtml(url)}" target="_blank" rel="noopener noreferrer" class="agenda-desc-link">${escapeHtml(display)}</a>`;
+        }).join('');
+        lucide.createIcons();
     }
 
     // ===================================
