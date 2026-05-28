@@ -37,6 +37,7 @@
   --kb-label-height:  8px;
   --kb-label-radius:  4px;
   --kb-label-min-w:   40px;
+  --warning-color:    #eab308;
 }
 
 /* =========================================
@@ -2154,4 +2155,139 @@ kbd {
     font-size: 0.82rem;
     color: var(--text-muted);
 }
---warning-color: #eab308;
+
+/* ── Mini-calendário do preview de agendamento ─────────────────── */
+.preview-mini-cal {
+    margin-top: 8px;
+    border: 1px solid var(--surface-border);
+    border-radius: 8px;
+    background: rgba(255,255,255,0.03);
+    padding: 8px;
+    -webkit-user-select: none;
+    user-select: none;
+}
+.preview-mini-cal-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 6px;
+}
+.preview-mini-cal-month-label {
+    font-size: 0.82rem;
+    font-weight: 600;
+    color: var(--text-main);
+}
+.preview-mini-cal-nav {
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: var(--text-muted);
+    display: flex;
+    align-items: center;
+    padding: 2px 4px;
+    border-radius: 4px;
+    transition: background 0.15s;
+}
+.preview-mini-cal-nav:hover {
+    background: var(--surface-border);
+    color: var(--text-main);
+}
+.preview-mini-cal-grid {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 2px;
+}
+.pmc-dow {
+    text-align: center;
+    font-size: 0.68rem;
+    color: var(--text-muted);
+    padding: 2px 0 4px;
+    font-weight: 500;
+}
+.pmc-cell {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    aspect-ratio: 1;
+    border-radius: 50%;
+    cursor: pointer;
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+    transition: background 0.12s;
+    flex-direction: column;
+    gap: 0;
+    line-height: 1;
+    padding-bottom: 5px;
+}
+.pmc-cell:hover {
+    background: rgba(255,255,255,0.08);
+    color: var(--text-main);
+}
+.pmc-cell.pmc-other-month {
+    opacity: 0.25;
+}
+.pmc-cell.pmc-today {
+    border: 1px solid var(--primary-color);
+    color: var(--text-main);
+}
+.pmc-cell.pmc-selected {
+    background: var(--primary-color);
+    color: #fff;
+    font-weight: 600;
+}
+.pmc-cell.pmc-selected:hover {
+    background: var(--primary-hover);
+}
+.pmc-dot {
+    position: absolute;
+    bottom: 3px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 4px;
+    height: 4px;
+    border-radius: 50%;
+}
+.pmc-dot-pending {
+    background: var(--secondary-color);
+}
+.pmc-dot-conflict {
+    background: var(--warning-color);
+}
+/* quando dia tem pending e conflict, shifta os dois dots */
+.pmc-cell .pmc-dot-pending + .pmc-dot-conflict,
+.pmc-cell .pmc-dot-conflict + .pmc-dot-pending {
+    left: calc(50% + 4px);
+}
+.pmc-cell .pmc-dot-pending:first-of-type:not(:only-of-type) {
+    left: calc(50% - 4px);
+}
+.preview-mini-cal-footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-top: 6px;
+    flex-wrap: wrap;
+    gap: 4px;
+}
+.pmc-selected-label {
+    font-size: 0.75rem;
+    color: var(--text-main);
+    font-weight: 500;
+}
+.pmc-selected-empty {
+    color: var(--text-muted);
+    font-style: italic;
+}
+.preview-mini-cal-legend {
+    display: flex;
+    gap: 10px;
+    font-size: 0.7rem;
+    color: var(--text-muted);
+    align-items: center;
+}
+.preview-mini-cal-legend span {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}

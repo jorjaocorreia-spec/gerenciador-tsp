@@ -5030,6 +5030,107 @@ class AppController {
         this._renderMiniCal();
     }
 
+    _renderMiniCal() {
+        const container = document.getElementById('preview-mini-cal-container');
+        if (!container) return;
+
+        const year  = this._miniCalYear;
+        const month = this._miniCalMonth;
+        const monthNames = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho',
+                            'Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+
+        const pendingSet  = new Set(this._pendingPreviewEvents.map(e => e.date));
+        const conflictSet = this._pendingPreviewConflictSet;
+        const todayIso    = new Date().toISOString().split('T')[0];
+        const selected    = this._miniCalSelected;
+
+        // Primeiro dia do mês e início do grid (domingo anterior ou o próprio domingo)
+        const firstDay  = new Date(year, month, 1);
+        const startGrid = new Date(firstDay);
+        startGrid.setDate(startGrid.getDate() - firstDay.getDay());
+
+        // Último dia do mês e fim do grid
+        const lastDay  = new Date(year, month + 1, 0);
+        const endGrid  = new Date(lastDay);
+        const dowLast  = endGrid.getDay();
+        if (dowLast !== 6) endGrid.setDate(endGrid.getDate() + (6 - dowLast));
+
+        const dowHeaders = ['D','S','T','Q','Q','S','S'];
+        const headerHtml = dowHeaders.map(d =>
+            `<div class="pmc-dow">${d}</div>`
+        ).join('');
+
+        let cellsHtml = '';
+        const cursor = new Date(startGrid);
+        while (cursor <= endGrid) {
+            const iso         = cursor.toISOString().split('T')[0];
+            const isThisMonth = cursor.getMonth() === month;
+            const isToday     = iso === todayIso;
+            const isSelected  = iso === selected;
+            const isPending   = pendingSet.has(iso);
+            const isConflict  = conflictSet.has(iso);
+
+            const classes = [
+                'pmc-cell',
+                !isThisMonth  ? 'pmc-other-month' : '',
+                isToday       ? 'pmc-today'        : '',
+                isSelected    ? 'pmc-selected'     : '',
+            ].filter(Boolean).join(' ');
+
+            let dots = '';
+            if (!isSelected) {
+                if (isPending)  dots += `<span class="pmc-dot pmc-dot-pending"></span>`;
+                if (isConflict) dots += `<span class="pmc-dot pmc-dot-conflict"></span>`;
+            }
+
+            cellsHtml += `<div class="${classes}" onclick="app._miniCalSelectDate('${iso}')" title="${iso}">${cursor.getDate()}${dots}</div>`;
+            cursor.setDate(cursor.getDate() + 1);
+        }
+
+        const selectedLabel = selected
+            ? (() => {
+                const [y,m,d] = selected.split('-');
+                const dt = new Date(parseInt(y), parseInt(m)-1, parseInt(d));
+                const dn = ['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'];
+                return `<span class="pmc-selected-label">${dn[dt.getDay()]}, ${d}/${m}/${y}</span>`;
+              })()
+            : `<span class="pmc-selected-label pmc-selected-empty">Nenhuma data selecionada</span>`;
+
+        const legendHtml = `<div class="preview-mini-cal-legend">
+            <span><span class="pmc-dot pmc-dot-pending" style="position:static;display:inline-block;vertical-align:middle;margin-right:3px;"></span>Agendado</span>
+            <span><span class="pmc-dot pmc-dot-conflict" style="position:static;display:inline-block;vertical-align:middle;margin-right:3px;"></span>Conflito</span>
+        </div>`;
+
+        container.innerHTML = `<div class="preview-mini-cal">
+            <div class="preview-mini-cal-header">
+                <button type="button" class="preview-mini-cal-nav" onclick="app._miniCalNav(-1)">
+                    <i data-lucide="chevron-left" style="width:13px;height:13px;"></i>
+                </button>
+                <span class="preview-mini-cal-month-label">${monthNames[month]} ${year}</span>
+                <button type="button" class="preview-mini-cal-nav" onclick="app._miniCalNav(1)">
+                    <i data-lucide="chevron-right" style="width:13px;height:13px;"></i>
+                </button>
+            </div>
+            <div class="preview-mini-cal-grid">${headerHtml}${cellsHtml}</div>
+            <div class="preview-mini-cal-footer">${selectedLabel}${legendHtml}</div>
+        </div>`;
+        lucide.createIcons();
+    }
+
+    _miniCalNav(delta) {
+        this._miniCalMonth += delta;
+        if (this._miniCalMonth > 11) { this._miniCalMonth = 0; this._miniCalYear++; }
+        if (this._miniCalMonth < 0)  { this._miniCalMonth = 11; this._miniCalYear--; }
+        this._renderMiniCal();
+    }
+
+    _miniCalSelectDate(dateStr) {
+        this._miniCalSelected = (this._miniCalSelected === dateStr) ? null : dateStr;
+        const input = document.getElementById('preview-manual-date');
+        if (input) input.value = this._miniCalSelected || '';
+        this._renderMiniCal();
+    }
+
     _previewRemoveEvent(idx) {
         this._pendingPreviewEvents.splice(idx, 1);
         this._renderPreviewContent();
@@ -5162,6 +5263,7 @@ class AppController {
         });
 
         this._pendingPreviewEvents.sort((a, b) => a.date.localeCompare(b.date));
+        this._miniCalSelected = null;
         this._renderPreviewContent();
     }
 
