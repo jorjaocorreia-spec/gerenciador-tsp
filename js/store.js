@@ -393,6 +393,82 @@ class TSPStore {
         };
     }
 
+    // Cálculo puro de stats — sem DB, usado por getBatchStats()
+    _computeClientStats(client, records, tasks, columns) {
+        let doneIds = new Set(['done']);
+        if (columns.length > 0) {
+            doneIds = new Set(columns.filter(c => c.isDone).map(c => c.id));
+            doneIds.add('done');
+        }
+        const openTasks = tasks.filter(t => !doneIds.has(t.status));
+        const totalMinutesUsed = records.reduce((acc, r) => acc + r.minutes, 0);
+        const hoursUsed = totalMinutesUsed / 60;
+        const tasksEstimatedHours = openTasks.reduce((acc, t) => acc + t.estimatedMinutes, 0) / 60;
+        const tasksSpentHours = openTasks.reduce((acc, t) => acc + t.spentMinutes, 0) / 60;
+        const totalUsedWithTasks = hoursUsed + tasksSpentHours;
+        const projectedHours = hoursUsed + tasksEstimatedHours;
+        const percentage = client.hoursTotal > 0 ? (totalUsedWithTasks / client.hoursTotal) * 100 : 0;
+        return {
+            client,
+            hoursTotal: client.hoursTotal,
+            hoursUsed: parseFloat(hoursUsed.toFixed(2)),
+            totalUsedWithTasks: parseFloat(totalUsedWithTasks.toFixed(2)),
+            projectedHours: parseFloat(projectedHours.toFixed(2)),
+            tasksEstimatedHours: parseFloat(tasksEstimatedHours.toFixed(2)),
+            tasksSpentHours: parseFloat(tasksSpentHours.toFixed(2)),
+            hoursRemaining: parseFloat((Math.max(0, client.hoursTotal - totalUsedWithTasks)).toFixed(2)),
+            percentage: Math.min(100, Math.round(percentage)),
+            isOverLimit: projectedHours > client.hoursTotal
+        };
+    }
+
+    // 4 queries para todos os clientes — substitui N×4 queries do loop de getClientStats
+    async getBatchStats() {
+        const uid = this.userId;
+        const [clientsRes, recordsRes, tasksRes, columnsRes] = await Promise.all([
+            this.db.from('clients').select('*').eq('user_id', uid).order('created_at'),
+            this.db.from('records').select('client_id, minutes').eq('user_id', uid),
+            this.db.from('tasks').select('id, client_id, status, estimated_minutes, spent_minutes').eq('user_id', uid),
+            this.db.from('kanban_columns').select('*').eq('user_id', uid)
+        ]);
+        if (clientsRes.error) throw clientsRes.error;
+        if (recordsRes.error) throw recordsRes.error;
+        if (tasksRes.error) throw tasksRes.error;
+
+        const clients = (clientsRes.data || []).map(r => this._client(r));
+
+        const recordsByClient = {};
+        (recordsRes.data || []).forEach(r => {
+            if (!recordsByClient[r.client_id]) recordsByClient[r.client_id] = [];
+            recordsByClient[r.client_id].push({ minutes: parseInt(r.minutes) || 0 });
+        });
+
+        const tasksByClient = {};
+        (tasksRes.data || []).forEach(t => {
+            if (!tasksByClient[t.client_id]) tasksByClient[t.client_id] = [];
+            tasksByClient[t.client_id].push({
+                status: t.status,
+                estimatedMinutes: parseInt(t.estimated_minutes) || 0,
+                spentMinutes: parseInt(t.spent_minutes) || 0
+            });
+        });
+
+        const columnsByClient = {};
+        (columnsRes.data || []).forEach(c => {
+            if (!columnsByClient[c.client_id]) columnsByClient[c.client_id] = [];
+            columnsByClient[c.client_id].push(this._column(c));
+        });
+
+        return clients.map(client =>
+            this._computeClientStats(
+                client,
+                recordsByClient[client.id] || [],
+                tasksByClient[client.id] || [],
+                columnsByClient[client.id] || []
+            )
+        );
+    }
+
     async getAllStats() {
         const clients = await this.getClients();
         return Promise.all(clients.map(c => this.getClientStats(c.id)));

@@ -1393,11 +1393,14 @@ class AppController {
         this._renderAllRunning = true;
         this._renderAllPending = false;
         try {
-            await this.updateClientSelects();
+            // Pre-busca tudo em 4 queries (antes: 4×N queries por ciclo)
+            const batchStats = await store.getBatchStats();
+            const clients = batchStats.map(s => s.client);
+            await this.updateClientSelects(clients);
             await Promise.all([
-                this.renderDashboard(),
-                this.renderClients(),
-                this.renderRecords(),
+                this.renderDashboard(clients, batchStats),
+                this.renderClients(clients, batchStats),
+                this.renderRecords(clients),
                 this.renderClientDashboard(),
                 this.renderMonthRecords(),
                 this.renderTasks(),
@@ -1416,7 +1419,7 @@ class AppController {
         }
     }
 
-    async renderDashboard() {
+    async renderDashboard(preloadedClients, batchStats) {
         const container = document.getElementById('dashboard-container');
         container.innerHTML = spinnerHtml;
 
@@ -1428,15 +1431,24 @@ class AppController {
         if (filterActiveEl) showActive = filterActiveEl.checked;
         if (filterFinishedEl) showFinished = filterFinishedEl.checked;
 
-        const allClients = await store.getClients();
-        const clients = allClients.filter(c => {
-            const status = c.status || 'active';
-            if (status === 'active' && showActive) return true;
-            if (status === 'finished' && showFinished) return true;
-            return false;
-        });
-
-        let stats = await Promise.all(clients.map(c => store.getClientStats(c.id)));
+        let stats;
+        if (batchStats) {
+            stats = batchStats.filter(s => {
+                const status = s.client.status || 'active';
+                if (status === 'active' && showActive) return true;
+                if (status === 'finished' && showFinished) return true;
+                return false;
+            });
+        } else {
+            const allClients = preloadedClients || await store.getClients();
+            const clients = allClients.filter(c => {
+                const status = c.status || 'active';
+                if (status === 'active' && showActive) return true;
+                if (status === 'finished' && showFinished) return true;
+                return false;
+            });
+            stats = await Promise.all(clients.map(c => store.getClientStats(c.id)));
+        }
         stats = stats.filter(s => s !== null);
 
         container.innerHTML = '';
@@ -1524,12 +1536,12 @@ class AppController {
         lucide.createIcons();
     }
 
-    async renderClients() {
+    async renderClients(preloadedClients, batchStats) {
         const tbody = document.querySelector('#clients-table tbody');
         tbody.innerHTML = `<tr><td colspan="3">${spinnerHtml}</td></tr>`;
 
-        const clients = await store.getClients();
-        const stats = await Promise.all(clients.map(c => store.getClientStats(c.id)));
+        const clients = preloadedClients || await store.getClients();
+        const stats = batchStats || await Promise.all(clients.map(c => store.getClientStats(c.id)));
 
         // A partir daqui tudo é síncrono — sem yields, sem race condition possível
         tbody.innerHTML = '';
@@ -1727,7 +1739,7 @@ class AppController {
         }
     }
 
-    async renderRecords() {
+    async renderRecords(preloadedClients) {
         const tbody = document.querySelector('#records-table tbody');
         tbody.innerHTML = `<tr><td colspan="5">${spinnerHtml}</td></tr>`;
         let records = (await store.getRecords()).sort((a, b) => new Date(b.date) - new Date(a.date));
@@ -1754,12 +1766,9 @@ class AppController {
             return;
         }
 
+        const clientsList = preloadedClients || await store.getClients();
         const clientsMap = {};
-        for (const r of records) {
-            if (r.clientId && !clientsMap[r.clientId]) {
-                clientsMap[r.clientId] = await store.getClient(r.clientId);
-            }
-        }
+        clientsList.forEach(c => { clientsMap[c.id] = c; });
 
         records.forEach(r => {
             const client = clientsMap[r.clientId];
@@ -1791,7 +1800,7 @@ class AppController {
         });
     }
 
-    async updateClientSelects() {
+    async updateClientSelects(clients) {
         const selects = [
             document.getElementById('record-client'),
             document.getElementById('filter-client'),
@@ -1800,7 +1809,7 @@ class AppController {
             document.getElementById('agenda-client')
         ];
 
-        const clients = await store.getClients();
+        if (!clients) clients = await store.getClients();
 
         selects.forEach(select => {
             if (!select) return;
@@ -1883,12 +1892,9 @@ class AppController {
         const tableColumn = ["Data e Hora", "Cliente", "Descrição da Atividade", "Tempo Gasto"];
         const tableRows = [];
 
+        const allClients = await store.getClients();
         const clientsMap = {};
-        for (const r of records) {
-            if (r.clientId && !clientsMap[r.clientId]) {
-                clientsMap[r.clientId] = await store.getClient(r.clientId);
-            }
-        }
+        allClients.forEach(c => { clientsMap[c.id] = c; });
 
         records.forEach(r => {
             const client = clientsMap[r.clientId];
