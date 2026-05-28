@@ -90,6 +90,10 @@ class AppController {
         this._pendingPreviewRule = null;
         this._pendingPreviewClient = null;
         this._pendingPreviewConflictSet = new Set();
+        // Mini-calendário do preview de agendamento
+        this._miniCalYear     = new Date().getFullYear();
+        this._miniCalMonth    = new Date().getMonth();
+        this._miniCalSelected = null;
         // Sync Google Calendar automático
         this._lastGoogleSync = 0;
         this._googleSyncInterval = null;
@@ -4853,6 +4857,10 @@ class AppController {
         this._pendingPreviewClient = client || null;
         this._pendingPreviewConflictSet = conflictSet;
         this._pendingPreviewRuleId = ruleId;
+        const [py, pm] = rule.periodStart.split('-').map(Number);
+        this._miniCalYear     = py;
+        this._miniCalMonth    = pm - 1;
+        this._miniCalSelected = null;
         this._pendingPreviewEvents = occurrences.map(date => ({
             date,
             startTime: rule.startTime,
@@ -5008,16 +5016,18 @@ class AppController {
             ${suggestBtn}
             <div class="preview-manual-add">
                 <span class="preview-manual-label">+ Adicionar data específica</span>
+                <input type="hidden" id="preview-manual-date">
+                <div id="preview-mini-cal-container"></div>
                 <div style="display:flex;gap:6px;align-items:center;margin-top:6px;flex-wrap:wrap;">
-                    <input type="date" id="preview-manual-date" class="form-control" style="flex:1;min-width:130px;font-size:0.82rem;padding:5px 7px;">
                     ${manualTimeFields}
-                    <button type="button" class="btn btn-primary" style="padding:5px 14px;font-size:0.82rem;" onclick="app._previewAddManual()">Adicionar</button>
+                    <button type="button" class="btn btn-primary" style="padding:5px 14px;font-size:0.82rem;margin-left:auto;" onclick="app._previewAddManual()">Adicionar</button>
                 </div>
             </div>
         </div>`;
 
         document.getElementById('preview-content').innerHTML = hoursPanel + eventsList + actionsHtml;
         lucide.createIcons();
+        this._renderMiniCal();
     }
 
     _previewRemoveEvent(idx) {
