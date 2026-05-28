@@ -162,6 +162,9 @@
                     <button class="btn btn-secondary" id="btn-toggle-money" onclick="app.toggleMoneyVisibility()" title="Mostrar/ocultar valores monetários" style="padding: 8px 12px;">
                         <i data-lucide="eye" id="icon-toggle-money" style="width: 18px; height: 18px;"></i>
                     </button>
+                    <button class="btn btn-secondary" id="btn-open-saldo" onclick="app.openSaldoPanel()" title="Posição de horas por projeto" style="padding: 8px 14px; gap: 6px;">
+                        <i data-lucide="scale" style="width: 16px; height: 16px;"></i> Saldo
+                    </button>
                     <button class="btn btn-primary" onclick="app.openModal('modal-client')">
                         <i data-lucide="plus"></i> Novo Cliente
                     </button>
@@ -601,9 +604,39 @@
                     <textarea id="client-notes" class="form-control" rows="2" placeholder="Diversos..." spellcheck="true"></textarea>
                 </div>
 
+                <div style="border-top: 1px solid rgba(255,255,255,0.08); margin: 8px 0 16px; padding-top: 16px;">
+                    <p style="font-size: 0.8rem; color: var(--text-muted); margin: 0 0 12px;">Controle de saldo de horas — preencha para ativar o painel de posição.</p>
+                    <div style="display: flex; gap: 16px;">
+                        <div class="form-group" style="flex: 1; margin-bottom: 0;">
+                            <label>Saldo inicial (h)</label>
+                            <input type="number" step="0.5" id="client-initial-balance" class="form-control" placeholder="Ex: -3.5 ou 10">
+                        </div>
+                        <div class="form-group" style="flex: 1; margin-bottom: 0;" id="client-balance-start-row">
+                            <label>Início do controle</label>
+                            <input type="date" id="client-balance-start" class="form-control">
+                        </div>
+                    </div>
+                </div>
+
                 <button type="submit" class="btn btn-primary" style="width: 100%; justify-content: center;">Salvar
                     Cliente</button>
             </form>
+        </div>
+    </div>
+
+    <!-- MODAL: SALDO DE HORAS -->
+    <div class="modal-overlay" id="modal-saldo">
+        <div class="modal glass" style="max-width: 720px;">
+            <div class="modal-header">
+                <div>
+                    <h3>Posição de Horas</h3>
+                    <p class="text-muted" id="saldo-subtitle" style="font-size: 0.85rem; margin: 2px 0 0;"></p>
+                </div>
+                <button class="close-modal" onclick="app.closeModal('modal-saldo')"><i data-lucide="x"></i></button>
+            </div>
+            <div id="saldo-content" style="padding: 8px 0;">
+                <!-- preenchido dinamicamente -->
+            </div>
         </div>
     </div>
 

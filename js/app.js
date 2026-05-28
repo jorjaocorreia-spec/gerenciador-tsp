@@ -367,14 +367,26 @@ class AppController {
         const consultantBonus = document.getElementById('consultant-bonus').value;
         const notes = document.getElementById('client-notes').value;
         const status = document.getElementById('client-status').value;
+        const initialBalanceH = document.getElementById('client-initial-balance').value;
+        const balanceStartDate = document.getElementById('client-balance-start').value;
         const btn = e.target.querySelector('[type="submit"]');
-        btn.disabled = true;
 
+        // Saldo inicial preenchido exige data de início
+        if (initialBalanceH !== '' && !balanceStartDate) {
+            Toast.show('Informe a data de início do controle para usar saldo inicial.', 'error');
+            return;
+        }
+
+        const initialBalanceMinutes = initialBalanceH !== ''
+            ? Math.round(parseFloat(initialBalanceH) * 60)
+            : 0;
+
+        btn.disabled = true;
         try {
             if (id) {
-                await store.updateClient(id, name, hours, csName, projectNum, clientPays, consultantBonus, notes, status);
+                await store.updateClient(id, name, hours, csName, projectNum, clientPays, consultantBonus, notes, status, initialBalanceMinutes, balanceStartDate || null);
             } else {
-                await store.addClient(name, hours, csName, projectNum, clientPays, consultantBonus, notes, status);
+                await store.addClient(name, hours, csName, projectNum, clientPays, consultantBonus, notes, status, initialBalanceMinutes, balanceStartDate || null);
             }
             e.target.reset();
             document.getElementById('client-id').value = '';
@@ -1546,11 +1558,133 @@ class AppController {
         document.getElementById('consultant-bonus').value = client.consultantBonus || '';
         document.getElementById('client-notes').value = client.notes || '';
         document.getElementById('client-status').value = client.status || 'active';
+        document.getElementById('client-initial-balance').value =
+            client.initialBalanceMinutes ? (client.initialBalanceMinutes / 60) : '';
+        document.getElementById('client-balance-start').value = client.balanceStartDate || '';
 
-        // Recalcular recebimento no modal ao abrir para edição
         this.calculateConsultantValue();
-
         this.openModal('modal-client');
+    }
+
+    // ── SALDO DE HORAS ────────────────────────────────────────────
+
+    _calcClientBalance(client, allRecords) {
+        const clientRecords = allRecords.filter(r => r.clientId === client.id);
+        const now = new Date();
+        const nowYear = now.getFullYear();
+        const nowMonth = now.getMonth(); // 0-indexed
+        const yearMonthStr = `${nowYear}-${String(nowMonth + 1).padStart(2, '0')}`;
+
+        // Horas aplicadas no mês atual
+        const thisMonthMinutes = clientRecords
+            .filter(r => r.date.startsWith(yearMonthStr))
+            .reduce((s, r) => s + r.minutes, 0);
+
+        if (!client.balanceStartDate) {
+            // Sem controle configurado — só exibe mês atual
+            return {
+                hasTracking: false,
+                thisMonthApplied: thisMonthMinutes / 60,
+                contracted: client.hoursTotal,
+                thisMonthDelta: thisMonthMinutes / 60 - client.hoursTotal,
+                balanceH: null
+            };
+        }
+
+        // Meses desde balance_start_date até o mês atual (inclusive)
+        const start = new Date(client.balanceStartDate + 'T00:00:00');
+        const startYear = start.getFullYear();
+        const startMonth = start.getMonth();
+        const monthsCount = Math.max(1, (nowYear - startYear) * 12 + (nowMonth - startMonth) + 1);
+
+        const totalContractedMinutes = monthsCount * client.hoursTotal * 60;
+        const totalAppliedMinutes = clientRecords
+            .filter(r => r.date >= client.balanceStartDate)
+            .reduce((s, r) => s + r.minutes, 0);
+
+        const balanceMinutes = client.initialBalanceMinutes + totalAppliedMinutes - totalContractedMinutes;
+
+        return {
+            hasTracking: true,
+            monthsCount,
+            totalContractedH: totalContractedMinutes / 60,
+            totalAppliedH: totalAppliedMinutes / 60,
+            balanceH: balanceMinutes / 60,
+            thisMonthApplied: thisMonthMinutes / 60,
+            contracted: client.hoursTotal
+        };
+    }
+
+    async openSaldoPanel() {
+        const content = document.getElementById('saldo-content');
+        const subtitle = document.getElementById('saldo-subtitle');
+        content.innerHTML = `<div style="text-align:center; padding: 24px;">${spinnerHtml}</div>`;
+        this.openModal('modal-saldo');
+
+        try {
+            const [clients, allRecords] = await Promise.all([
+                store.getClients(),
+                store.getRecords()
+            ]);
+
+            const now = new Date();
+            const monthName = now.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
+            subtitle.textContent = `Posição acumulada até ${monthName}`;
+
+            const activeClients = clients.filter(c => c.status === 'active');
+            if (activeClients.length === 0) {
+                content.innerHTML = `<p class="text-muted" style="text-align:center; padding: 24px;">Nenhum cliente ativo.</p>`;
+                return;
+            }
+
+            const rows = activeClients.map(c => {
+                const b = this._calcClientBalance(c, allRecords);
+                const fmtH = h => {
+                    const sign = h > 0 ? '+' : '';
+                    return `${sign}${h.toFixed(1)}h`;
+                };
+
+                let balanceCell = '';
+                if (b.hasTracking) {
+                    const color = b.balanceH >= 0 ? '#4ade80' : '#f87171';
+                    balanceCell = `<span style="color:${color}; font-weight:600;">${fmtH(b.balanceH)}</span>`;
+                } else {
+                    balanceCell = `<span class="text-muted" style="font-size:0.8rem;">sem controle</span>`;
+                }
+
+                const deltaColor = b.thisMonthDelta >= 0 ? '#4ade80' : '#f87171';
+                const monthCell = `${b.thisMonthApplied.toFixed(1)}h
+                    <span style="color:${deltaColor}; font-size:0.8rem; margin-left:4px;">(${fmtH(b.thisMonthDelta)})</span>`;
+
+                const proj = c.projectNum ? `<span style="color:var(--text-muted); font-size:0.8rem;">#${escapeHtml(c.projectNum)}</span> ` : '';
+
+                return `<tr>
+                    <td>${proj}<strong>${escapeHtml(c.name)}</strong></td>
+                    <td style="text-align:center;">${c.hoursTotal}h</td>
+                    <td style="text-align:center;">${monthCell}</td>
+                    <td style="text-align:center;">${balanceCell}</td>
+                </tr>`;
+            }).join('');
+
+            content.innerHTML = `
+                <table class="data-table" style="margin: 0;">
+                    <thead>
+                        <tr>
+                            <th>Cliente</th>
+                            <th style="text-align:center;">Cota/mês</th>
+                            <th style="text-align:center;">Mês atual</th>
+                            <th style="text-align:center;">Saldo acumulado</th>
+                        </tr>
+                    </thead>
+                    <tbody>${rows}</tbody>
+                </table>
+                <p class="text-muted" style="font-size:0.75rem; padding: 12px 0 0; margin:0;">
+                    Saldo = aplicado − contratado acumulado desde o início do controle. Positivo = você entregou mais que o contratado.
+                </p>`;
+            lucide.createIcons();
+        } catch (err) {
+            content.innerHTML = `<p style="color:var(--danger-color); padding:16px;">Erro ao carregar saldo: ${err.message}</p>`;
+        }
     }
 
     async renderRecords() {

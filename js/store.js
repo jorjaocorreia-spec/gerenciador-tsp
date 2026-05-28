@@ -9,8 +9,10 @@ class TSPStore {
             csName: r.cs_name || '', projectNum: r.project_num || '',
             clientPays: parseFloat(r.client_pays) || 0,
             consultantBonus: parseFloat(r.consultant_bonus) || 0,
-            notes: r.notes || '',
-            status: r.status || 'active', createdAt: r.created_at };
+            notes: r.notes || '', status: r.status || 'active',
+            initialBalanceMinutes: parseInt(r.initial_balance_minutes) || 0,
+            balanceStartDate: r.balance_start_date || null,
+            createdAt: r.created_at };
     }
 
     _record(r) {
@@ -76,24 +78,28 @@ class TSPStore {
         return this._client(data);
     }
 
-    async addClient(name, hoursTotal, csName, projectNum, clientPays, consultantBonus, notes, status) {
+    async addClient(name, hoursTotal, csName, projectNum, clientPays, consultantBonus, notes, status, initialBalanceMinutes, balanceStartDate) {
         const { data, error } = await this.db.from('clients').insert({
             user_id: this.userId, name,
             hours_total: parseFloat(hoursTotal) || 0, cs_name: csName || '',
             project_num: projectNum || '', client_pays: parseFloat(clientPays) || 0,
             consultant_bonus: parseFloat(consultantBonus) || 0,
-            notes: notes || '', status: status || 'active'
+            notes: notes || '', status: status || 'active',
+            initial_balance_minutes: parseInt(initialBalanceMinutes) || 0,
+            balance_start_date: balanceStartDate || null
         }).select().single();
         if (error) throw error;
         return this._client(data);
     }
 
-    async updateClient(id, name, hoursTotal, csName, projectNum, clientPays, consultantBonus, notes, status) {
+    async updateClient(id, name, hoursTotal, csName, projectNum, clientPays, consultantBonus, notes, status, initialBalanceMinutes, balanceStartDate) {
         const { data, error } = await this.db.from('clients').update({
             name, hours_total: parseFloat(hoursTotal) || 0, cs_name: csName || '',
             project_num: projectNum || '', client_pays: parseFloat(clientPays) || 0,
             consultant_bonus: parseFloat(consultantBonus) || 0,
-            notes: notes || '', status: status || 'active'
+            notes: notes || '', status: status || 'active',
+            initial_balance_minutes: parseInt(initialBalanceMinutes) || 0,
+            balance_start_date: balanceStartDate || null
         }).eq('id', id).select().single();
         if (error) throw error;
         return this._client(data);
