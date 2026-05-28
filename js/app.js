@@ -4873,7 +4873,7 @@ class AppController {
                     });
                     if (googleReady) {
                         try {
-                            const result = await calendarAPI.createGoogleEvent(savedEvent);
+                            const result = await calendarAPI.createGoogleEvent({ ...savedEvent, generateMeet: ev.generateMeet });
                             if (result) {
                                 await store.updateAgendaEvent({
                                     ...savedEvent,
