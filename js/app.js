@@ -93,6 +93,9 @@ class AppController {
         // Sync Google Calendar automático
         this._lastGoogleSync = 0;
         this._googleSyncInterval = null;
+        // Guard para evitar renderAll() concorrente
+        this._renderAllRunning = false;
+        this._renderAllPending = false;
         this.init();
     }
 
@@ -1383,20 +1386,34 @@ class AppController {
     // RENDERS
     // ===================================
     async renderAll() {
-        await this.updateClientSelects();
-        await Promise.all([
-            this.renderDashboard(),
-            this.renderClients(),
-            this.renderRecords(),
-            this.renderClientDashboard(),
-            this.renderMonthRecords(),
-            this.renderTasks(),
-            this.renderAgenda(),
-            this.renderApontamentos(),
-            this.renderImplementations(),
-            this.renderTrainings()
-        ]);
-        lucide.createIcons();
+        if (this._renderAllRunning) {
+            this._renderAllPending = true;
+            return;
+        }
+        this._renderAllRunning = true;
+        this._renderAllPending = false;
+        try {
+            await this.updateClientSelects();
+            await Promise.all([
+                this.renderDashboard(),
+                this.renderClients(),
+                this.renderRecords(),
+                this.renderClientDashboard(),
+                this.renderMonthRecords(),
+                this.renderTasks(),
+                this.renderAgenda(),
+                this.renderApontamentos(),
+                this.renderImplementations(),
+                this.renderTrainings()
+            ]);
+            lucide.createIcons();
+        } finally {
+            this._renderAllRunning = false;
+            if (this._renderAllPending) {
+                this._renderAllPending = false;
+                await this.renderAll();
+            }
+        }
     }
 
     async renderDashboard() {
@@ -1510,7 +1527,11 @@ class AppController {
     async renderClients() {
         const tbody = document.querySelector('#clients-table tbody');
         tbody.innerHTML = `<tr><td colspan="3">${spinnerHtml}</td></tr>`;
+
         const clients = await store.getClients();
+        const stats = await Promise.all(clients.map(c => store.getClientStats(c.id)));
+
+        // A partir daqui tudo é síncrono — sem yields, sem race condition possível
         tbody.innerHTML = '';
 
         if (clients.length === 0) {
@@ -1518,15 +1539,13 @@ class AppController {
             return;
         }
 
-        for (const c of clients) {
-            const tr = document.createElement('tr');
-            const stat = await store.getClientStats(c.id);
-            const overLimitBadge = stat && stat.isOverLimit ? `<span style="background: var(--danger-color); color: white; padding: 2px 6px; border-radius: 4px; font-size: 0.7rem; margin-left: 8px;">Estourado</span>` : '';
+        const formatMoney = (val) => {
+            return (val && !isNaN(val)) ? `R$ ${parseFloat(val).toFixed(2).replace('.', ',')}` : 'R$ 0,00';
+        };
 
-            // Formatador de Moeda
-            const formatMoney = (val) => {
-                return (val && !isNaN(val)) ? `R$ ${parseFloat(val).toFixed(2).replace('.', ',')}` : 'R$ 0,00';
-            };
+        clients.forEach((c, i) => {
+            const stat = stats[i];
+            const overLimitBadge = stat && stat.isOverLimit ? `<span style="background: var(--danger-color); color: white; padding: 2px 6px; border-radius: 4px; font-size: 0.7rem; margin-left: 8px;">Estourado</span>` : '';
 
             const clientPaysStr = formatMoney(c.clientPays);
             const base43 = (c.clientPays && !isNaN(c.clientPays)) ? c.clientPays * 0.43 : 0;
@@ -1543,6 +1562,7 @@ class AppController {
                 </div>
             `;
 
+            const tr = document.createElement('tr');
             tr.innerHTML = `
                 <td>
                     <strong>${escapeHtml(c.name)}</strong> ${overLimitBadge}
@@ -1561,7 +1581,7 @@ class AppController {
                 </td>
             `;
             tbody.appendChild(tr);
-        }
+        });
     }
 
     async openEditClientModal(id) {
