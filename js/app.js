@@ -3419,44 +3419,45 @@ class AppController {
         });
 
         if (!allMatched) {
-            const sessionCreated = new Map(); // projectNum → client (evita criar o mesmo 2x na mesma rodada)
-            let createdCount = 0;
+            let pendingCount = 0;
 
             for (const projectNum of unMatchedProjects) {
                 const searchNum = projectNum.replace(/\D/g, '');
 
-                // Verifica se já existe no banco (importação anterior) ou foi criado nesta rodada
+                // Verifica se já existe no banco (importação anterior)
                 const existing = clients.find(c => {
                     if (!c.projectNum) return false;
                     return c.projectNum.split(/\D+/).filter(Boolean).includes(searchNum);
-                }) || sessionCreated.get(searchNum);
+                });
 
-                let targetClient = existing;
-                if (!targetClient) {
+                if (existing) {
+                    // Já existe — associa diretamente
+                    this.pendingPdfRecords.forEach(r => {
+                        if (r.clientProjectPdf.replace(/\D/g, '') === searchNum && !r.matchedClientId) {
+                            r.matchedClientId = existing.id;
+                            r.matchedClientName = existing.name;
+                            r.autoCreated = false;
+                        }
+                    });
+                } else {
+                    // Não existe — marca para criação apenas quando o usuário confirmar
                     const clientName = this.pendingPdfRecords.find(r =>
                         r.clientProjectPdf.replace(/\D/g, '') === searchNum && r.clientNamePdf
                     )?.clientNamePdf || `Projeto ${projectNum}`;
-                    targetClient = await store.addClient(
-                        clientName, 0, '', projectNum, 0,
-                        0,
-                        'Cliente criado automaticamente via importação de Ata PDF. Cadastro incompleto — por favor, complete os dados.',
-                        'active'
-                    );
-                    sessionCreated.set(searchNum, targetClient);
-                    createdCount++;
+                    this.pendingPdfRecords.forEach(r => {
+                        if (r.clientProjectPdf.replace(/\D/g, '') === searchNum && !r.matchedClientId) {
+                            r.matchedClientId = null;
+                            r.matchedClientName = clientName;
+                            r.autoCreated = true;
+                            r.pendingCreate = { name: clientName, projectNum };
+                        }
+                    });
+                    pendingCount++;
                 }
-
-                this.pendingPdfRecords.forEach(r => {
-                    if (r.clientProjectPdf.replace(/\D/g, '') === searchNum && !r.matchedClientId) {
-                        r.matchedClientId = targetClient.id;
-                        r.matchedClientName = targetClient.name;
-                        r.autoCreated = !existing;
-                    }
-                });
             }
 
-            if (createdCount > 0) {
-                Toast.show(`${createdCount} cliente(s) criado(s) automaticamente. Verifique e complete os dados após a importação.`, 'info', 5000);
+            if (pendingCount > 0) {
+                Toast.show(`${pendingCount} cliente(s) novo(s) serão criados ao confirmar a importação.`, 'info', 5000);
             }
         }
 
@@ -3506,7 +3507,7 @@ class AppController {
 
         const toImport = this.pendingPdfRecords.filter((r, idx) => {
             const cb = document.getElementById(`pdf-check-${idx}`);
-            return cb && cb.checked && r.matchedClientId;
+            return cb && cb.checked && (r.matchedClientId || r.pendingCreate);
         });
         const total = toImport.length;
 
@@ -3514,6 +3515,44 @@ class AppController {
         confirmBtn.disabled = true;
         cancelBtn.disabled = true;
         if (closeBtn) closeBtn.disabled = true;
+
+        // Cria clientes pendentes com verificação fresca do banco (evita duplicatas)
+        const sessionCreated = new Map(); // searchNum → clientId
+        const freshClients = await store.getClients();
+        for (const r of toImport) {
+            if (!r.matchedClientId && r.pendingCreate) {
+                const searchNum = r.pendingCreate.projectNum.replace(/\D/g, '');
+                if (sessionCreated.has(searchNum)) {
+                    r.matchedClientId = sessionCreated.get(searchNum);
+                    continue;
+                }
+                const existing = freshClients.find(c => {
+                    if (!c.projectNum) return false;
+                    return c.projectNum.split(/\D+/).filter(Boolean).includes(searchNum);
+                });
+                if (existing) {
+                    r.matchedClientId = existing.id;
+                    sessionCreated.set(searchNum, existing.id);
+                } else {
+                    const created = await store.addClient(
+                        r.pendingCreate.name, 0, '', r.pendingCreate.projectNum, 0, 0,
+                        'Cliente criado automaticamente via importação de Ata PDF. Cadastro incompleto — por favor, complete os dados.',
+                        'active'
+                    );
+                    r.matchedClientId = created.id;
+                    sessionCreated.set(searchNum, created.id);
+                    freshClients.push(created); // evita recriar em iterações seguintes
+                }
+            }
+        }
+        // Propaga matchedClientId para todos os records com o mesmo projeto (não só os do toImport)
+        for (const [searchNum, clientId] of sessionCreated) {
+            this.pendingPdfRecords.forEach(r => {
+                if (r.pendingCreate && r.pendingCreate.projectNum.replace(/\D/g, '') === searchNum) {
+                    r.matchedClientId = clientId;
+                }
+            });
+        }
 
         let importedCount = 0;
         const setProgress = (n) => {
