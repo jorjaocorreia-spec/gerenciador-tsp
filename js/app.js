@@ -4752,6 +4752,17 @@ class AppController {
         const events = this._pendingPreviewEvents;
         const ruleId = this._pendingPreviewRuleId;
 
+        // Garantir autenticação Google antes de gerar eventos
+        const googleAvailable = typeof calendarAPI !== 'undefined' && calendarAPI.isEnabled;
+        let googleReady = googleAvailable && calendarAPI.isAuthenticated;
+        if (googleAvailable && !googleReady) {
+            Toast.show('Conectando ao Google Calendar...', 'info');
+            googleReady = await calendarAPI.authenticateGoogle();
+            if (!googleReady) {
+                Toast.show('Sem acesso ao Google Calendar — eventos serão criados só na plataforma.', 'info');
+            }
+        }
+
         let created = 0, failed = 0;
         try {
             for (const ev of events) {
@@ -4768,8 +4779,7 @@ class AppController {
                         attendees: ev.attendees,
                         description: '',
                     });
-                    // Tentar push ao Google Calendar se ativo
-                    if (typeof calendarAPI !== 'undefined' && calendarAPI.isSignedIn && calendarAPI.isSignedIn()) {
+                    if (googleReady) {
                         try {
                             const result = await calendarAPI.createGoogleEvent(savedEvent);
                             if (result) {
