@@ -90,6 +90,7 @@ class AppController {
         this._pendingPreviewRule = null;
         this._pendingPreviewClient = null;
         this._pendingPreviewConflictSet = new Set();
+        this._pendingPreviewExistingDates = new Set();
         // Mini-calendário do preview de agendamento
         this._miniCalYear     = new Date().getFullYear();
         this._miniCalMonth    = new Date().getMonth();
@@ -4861,6 +4862,11 @@ class AppController {
         this._pendingPreviewRule = rule;
         this._pendingPreviewClient = client || null;
         this._pendingPreviewConflictSet = conflictSet;
+        this._pendingPreviewExistingDates = new Set(
+            existingEvents
+                .filter(ev => ev.date >= rule.periodStart && ev.date <= rule.periodEnd)
+                .map(ev => ev.date)
+        );
         this._pendingPreviewRuleId = ruleId;
         const [py, pm] = rule.periodStart.split('-').map(Number);
         this._miniCalYear     = py;
@@ -5044,8 +5050,9 @@ class AppController {
         const monthNames = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho',
                             'Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
 
-        const pendingSet  = new Set(this._pendingPreviewEvents.map(e => e.date));
-        const conflictSet = this._pendingPreviewConflictSet;
+        const pendingSet      = new Set(this._pendingPreviewEvents.map(e => e.date));
+        const conflictSet     = this._pendingPreviewConflictSet;
+        const existingDates   = this._pendingPreviewExistingDates;
         const todayIso    = new Date().toISOString().split('T')[0];
         const selected    = this._miniCalSelected;
 
@@ -5073,7 +5080,7 @@ class AppController {
             const isToday     = iso === todayIso;
             const isSelected  = iso === selected;
             const isPending   = pendingSet.has(iso);
-            const isConflict  = conflictSet.has(iso);
+            const isConflict  = existingDates.has(iso);
 
             const classes = [
                 'pmc-cell',
