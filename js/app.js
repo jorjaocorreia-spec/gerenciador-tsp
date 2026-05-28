@@ -87,6 +87,9 @@ class AppController {
         // Agendamento automático
         this._pendingPreviewEvents = [];
         this._pendingPreviewRuleId = null;
+        // Sync Google Calendar automático
+        this._lastGoogleSync = 0;
+        this._googleSyncInterval = null;
         this.init();
     }
 
@@ -237,6 +240,7 @@ class AppController {
     // NAVEGAÇÃO / ROTEAMENTO
     // ===================================
     switchView(viewName) {
+        const prevView = this.currentView;
         this.currentView = viewName;
 
         // Update nav UI
@@ -256,6 +260,11 @@ class AppController {
         });
 
         this.renderAll();
+
+        // Auto-sync Google Calendar ao entrar na view agenda
+        if (viewName === 'agenda' && prevView !== 'agenda' && calendarAPI.isAuthenticated) {
+            this._autoSyncGoogle().catch(() => {});
+        }
     }
 
     // ===================================
@@ -2401,7 +2410,11 @@ class AppController {
         btn.innerText = "Salvando...";
         btn.disabled = true;
 
-        if (syncGoogle) {
+        // Força sync se: (a) usuário marcou o checkbox, OU (b) evento já estava no Google
+        const existingCalId = id ? (document.getElementById('agenda-calendar-event-id').value || null) : null;
+        const needsGoogleSync = (syncGoogle || !!existingCalId) && calendarAPI.isEnabled;
+
+        if (needsGoogleSync) {
             if (!calendarAPI.isAuthenticated) {
                 const success = await calendarAPI.authenticateGoogle();
                 if (!success) {
@@ -2416,9 +2429,8 @@ class AppController {
         try {
             if (id) {
                 eventData.id = id;
-                const existingCalId = document.getElementById('agenda-calendar-event-id').value || null;
                 eventData.calendarEventId = existingCalId;
-                if (syncGoogle) {
+                if (needsGoogleSync && calendarAPI.isAuthenticated) {
                     if (existingCalId) {
                         const upd = await calendarAPI.updateGoogleEvent(existingCalId, eventData);
                         if (upd && upd.meetLink) eventData.meetLink = upd.meetLink;
@@ -2432,7 +2444,7 @@ class AppController {
                 }
                 await store.updateAgendaEvent(eventData);
             } else {
-                if (syncGoogle) {
+                if (syncGoogle && calendarAPI.isAuthenticated) {
                     const result = await calendarAPI.createGoogleEvent(eventData);
                     if (result) {
                         eventData.calendarEventId = result.id;
@@ -2944,7 +2956,27 @@ class AppController {
 
     async onCalendarAuthenticated() {
         console.log("App ciente que Calendar está autenticado");
+        // Inicia sync periódico a cada 5 minutos
+        if (this._googleSyncInterval) clearInterval(this._googleSyncInterval);
+        this._googleSyncInterval = setInterval(() => {
+            if (calendarAPI.isAuthenticated && this.currentView === 'agenda') {
+                this._autoSyncGoogle().catch(() => {});
+            }
+        }, 5 * 60 * 1000);
         await this.renderAgenda();
+    }
+
+    async _autoSyncGoogle() {
+        const COOLDOWN_MS = 120_000; // 2 minutos
+        const now = Date.now();
+        if (now - this._lastGoogleSync < COOLDOWN_MS) return;
+        this._lastGoogleSync = now;
+        try {
+            await this.executeBiDirectionalSync();
+            if (this.currentView === 'agenda') await this.renderAgenda();
+        } catch (err) {
+            console.warn('Auto-sync Google Calendar falhou:', err);
+        }
     }
 
     async promptGoogleSync() {
@@ -4885,6 +4917,11 @@ document.addEventListener('DOMContentLoaded', async () => {
             window.app.agendaCurrentDate = new Date();
             window.app.pendingPdfRecords = [];
             window.app.pendingPdfWarnings = [];
+            if (window.app._googleSyncInterval) {
+                clearInterval(window.app._googleSyncInterval);
+                window.app._googleSyncInterval = null;
+            }
+            window.app._lastGoogleSync = 0;
         }
         await Auth.signOut();
     });
