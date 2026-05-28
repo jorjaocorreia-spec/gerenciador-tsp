@@ -112,6 +112,8 @@ DOMContentLoaded
 - Todas as operações são `async`, usam `this.db` (supabaseClient) e `this.userId` (Auth.getUserId())
 - Mappers `_client()`, `_record()`, `_task()`, `_event()` convertem snake_case → camelCase
 - CRUD para: Clientes, Registros (horas), Tarefas, Eventos de agenda + stats + backup
+- `_computeClientStats(client, records, tasks, columns)` — cálculo puro de stats em memória, sem DB; usado por `getBatchStats()` e `getClientStats()`
+- `getBatchStats()` — busca clients + records (só `client_id, minutes`) + tasks (sem blobs JSONB) + columns em **4 queries paralelas** e computa stats para todos os clientes; chamado por `renderAll()` para eliminar o padrão N×4 queries
 
 **`GoogleCalendarAPI`** (`js/calendar.js`)
 - Lê credenciais de `window.TSP_CONFIG.CLIENT_ID` e `window.TSP_CONFIG.API_KEY`
@@ -207,16 +209,16 @@ O `docker-entrypoint.sh` injeta essas vars em `js/config.js` via `envsubst` na i
 - JavaScript vanilla ES6+; sem TypeScript, sem React, sem bundler
 - CSS usa variáveis (`--primary`, `--bg-glass`, etc.) definidas em `:root`
 - Todas as chamadas ao `store` são `async/await` — nunca chamar métodos do store sem `await`
-- Pre-fetch de `clientsMap` antes de `forEach` para evitar chamadas async dentro de loops síncronos
+- Pre-fetch de dados antes de loops de render — nunca fazer `await` dentro de `forEach`; usar `getBatchStats()` para stats de múltiplos clientes e passar arrays pré-buscados como parâmetro para as funções de render
 
 ### Armadilhas conhecidas
 - **`switchView()` chama `renderAll()` sem `await`** — views sub-nível (client-dashboard, month-records) ficam com spinner briefly após navegação; testes ou código que dependem do conteúdo renderizado devem aguardar o elemento concreto aparecer no DOM
 - **`renderAll()` tem mutex guard (`_renderAllRunning` / `_renderAllPending`)** — chamadas concorrentes são descartadas (a segunda aguarda e roda uma vez após a primeira terminar). Isso evita que `switchView()` e `initAfterAuth()` executem `renderAll()` em paralelo. O guard foi necessário porque `Auth.hideAuthScreen()` exibe a sidebar ANTES de `initAfterAuth()` terminar o `await calendarAPI.configure()`, permitindo que o usuário clique em um nav-item e dispare `switchView()` → `renderAll()` concorrente. **Nunca remover esses flags** sem entender essa janela de concorrência.
-- **`renderClients()` coleta todos os stats antes de tocar no DOM** — usa `Promise.all(clients.map(c => store.getClientStats(c.id)))` e só depois chama `tbody.innerHTML = ''` + `forEach` síncrono. Isso garante que nenhum `await` ocorra dentro do loop de render, eliminando a causa raiz da duplicação visual de clientes: dois `renderClients()` concorrentes interleaving `tbody.appendChild()`. **Nunca introduzir `await` dentro do `forEach` de renderização de clientes.**
+- **`renderClients()` coleta todos os stats antes de tocar no DOM** — recebe `batchStats` pré-buscado de `renderAll()` e só depois chama `tbody.innerHTML = ''` + `forEach` síncrono. Isso garante que nenhum `await` ocorra dentro do loop de render, eliminando a causa raiz da duplicação visual de clientes: dois `renderClients()` concorrentes interleaving `tbody.appendChild()`. **Nunca introduzir `await` dentro do `forEach` de renderização de clientes.**
 - **`const Toast` e `const spinnerHtml` em `app.js` são script-scoped** — não estão em `window`; inacessíveis de `page.evaluate()` no Playwright e de outros scripts. Não mover para `window` sem avaliar impacto
 - **`lucide.createIcons({ nodes: [...] })` NÃO é suportado no Lucide 0.469.0 UMD** — usar sempre `lucide.createIcons()` sem opções para re-processar ícones no DOM
 - **`store.userId` dentro de `page.evaluate()` async retorna `null`** — ao testar via Playwright, usar `window.supabaseClient` com `uid = Auth.getUserId()` capturado localmente em vez de chamar `store.addXxx()` ou `store.getXxx()` dentro de evaluate
-- **`renderClients()` faz `await store.getClientStats(c.id)` por cliente** — chamadas sequenciais; com muitos clientes a renderização pode levar 2-3s; esperar o elemento aparecer no DOM antes de interagir
+- **`renderAll()` usa `getBatchStats()` como única fonte de dados para Dashboard e Clientes** — chama `store.getBatchStats()` (4 queries) antes do `Promise.all`, extrai `clients` do resultado e passa `(clients, batchStats)` para `renderDashboard`, `renderClients` e `(clients)` para `renderRecords`. Nunca chamar `store.getClientStats(id)` em loop dentro dessas funções — seria regressão de N×4 queries. `renderDashboard` e `renderClients` aceitam os parâmetros opcionalmente (fallback para busca individual quando chamados direto fora do `renderAll`).
 - **Google Calendar API mantém conexões em background** — `page.waitForLoadState('networkidle')` nunca dispara; sempre adicionar `.catch(() => {})`
 - **PDF.js só extrai texto de PDFs text-based** — PDFs baseados em imagem (sem operadores BT/ET nos streams de conteúdo) retornam 0 itens de texto; o parser retorna vazio sem erro. Para diagnosticar: verificar se o texto é selecionável no Chrome; inspecionar o binário com `grep 'BT '` após descompressão FlateDecode. PDFs de imagem precisam de OCR (não implementado) — a solução correta é gerar o PDF com texto real na fonte (ex.: configuração de exportação do SAP).
 - **CSP nginx: `worker-src blob:` é obrigatório para PDF.js** — sem a diretiva `worker-src blob:`, o nginx bloqueia o Web Worker que PDF.js cria internamente como blob URL. O resultado é texto vazio em PDFs text-based. O `nginx.conf` já inclui `worker-src blob: https://cdnjs.cloudflare.com` desde o commit `6285b38`.
@@ -451,6 +453,16 @@ node run.js "C:\Users\jorge\AppData\Local\Temp\playwright-test-tsp-v2.js"
 **Usuários de teste:**
 - user_a: `jorjaocorreia@gmail.com` / `Jhc1881//`
 - user_b: `testes@teste.com` / `123testes`
+
+---
+
+## Backlog (planejado, não implementado)
+
+| # | Feature | Descrição |
+| --- | ------- | --------- |
+| B1 | **Resumo mensal de agendamentos por cliente** | Gerar resumo dos eventos do mês de um cliente para envio (texto, PDF ou e-mail). Pontos a definir: onde exibir (view Agenda / painel do cliente), formato de saída, período (mês corrente ou selecionável), quais campos exibir (data, horário, tipo, Meet, local), se abrange só agendamentos automáticos ou todos os eventos do cliente. |
+| B2 | **Chamados OTOBO** | Plano completo em `.planning/phases/22-chamados/`; SQL migrations prontas, aguardando execução. |
+| B3 | **Corretor ortográfico (LanguageTool)** | Sublinhados e sugestões inline PT-BR via LanguageTool API; spellcheck nativo já ativo desde 2026-05-27. |
 
 ---
 
