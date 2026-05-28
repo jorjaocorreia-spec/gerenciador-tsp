@@ -1970,7 +1970,7 @@ class AppController {
                      ondragover="app.allowDrop(event)" ondrop="app.dropTask(event)"></div>
                 <div class="kb-quick-add" id="kb-quick-add-${colId}" style="display:none">
                     <textarea class="kb-quick-add-input" id="kb-quick-input-${colId}" rows="3"
-                              placeholder="Título do card..."
+                              placeholder="Título do card..." spellcheck="true"
                               onkeydown="app.handleQuickAddKey(event,'${colId}')"></textarea>
                     <div class="kb-quick-add-actions">
                         <button class="btn btn-primary" onclick="app.submitQuickAdd('${colId}')">Adicionar</button>
@@ -3283,7 +3283,7 @@ class AppController {
                 <td style="font-size: 0.9rem; font-weight: 500; color: var(--primary-color);">${r.matchedClientName}${r.autoCreated ? ' <span style="font-size:0.75rem;background:var(--primary-color);color:#fff;border-radius:4px;padding:1px 5px;">Novo</span>' : ''}</td>
                 <td style="font-size: 0.9rem;">${r.startTime} - ${r.endTime}</td>
                 <td style="font-size: 0.9rem;">${Math.floor(r.minutes / 60)}h${String(r.minutes % 60).padStart(2,'0')}min${warnIcon}</td>
-                <td><textarea class="form-control" id="pdf-desc-${idx}" style="font-size: 0.85rem; padding: 4px; width: 100%; min-width: 250px; resize: vertical;" rows="3">${r.description}</textarea></td>
+                <td><textarea class="form-control" id="pdf-desc-${idx}" style="font-size: 0.85rem; padding: 4px; width: 100%; min-width: 250px; resize: vertical;" rows="3" spellcheck="true">${r.description}</textarea></td>
                 <td style="text-align: center;"><input type="checkbox" id="pdf-check-${idx}" checked style="width: 18px; height: 18px; cursor: pointer;"></td>
             `;
             tbody.appendChild(tr);

@@ -598,7 +598,7 @@
 
                 <div class="form-group">
                     <label>Observações</label>
-                    <textarea id="client-notes" class="form-control" rows="2" placeholder="Diversos..."></textarea>
+                    <textarea id="client-notes" class="form-control" rows="2" placeholder="Diversos..." spellcheck="true"></textarea>
                 </div>
 
                 <button type="submit" class="btn btn-primary" style="width: 100%; justify-content: center;">Salvar
@@ -651,7 +651,7 @@
                 <div class="form-group">
                     <label>Descrição do que foi feito</label>
                     <textarea id="record-desc" class="form-control" rows="3" placeholder="Detalhes da atividade..."
-                        required></textarea>
+                        required spellcheck="true"></textarea>
                 </div>
                 <button type="submit" class="btn btn-primary" style="width: 100%; justify-content: center;">Salvar
                     Atendimento</button>
@@ -694,7 +694,7 @@
                 <div class="form-group">
                     <label>Descrição</label>
                     <textarea id="view-record-desc" class="form-control" rows="4"
-                        style="background: rgba(0,0,0,0.2); cursor: not-allowed; color: #fff;" readonly></textarea>
+                        style="background: rgba(0,0,0,0.2); cursor: not-allowed; color: #fff;" readonly spellcheck="false"></textarea>
                 </div>
             </div>
         </div>
@@ -761,7 +761,7 @@
                 <div class="modal-task-header-info">
                     <span class="modal-task-column-label" id="modal-task-column-label">Novas</span>
                     <textarea class="modal-task-title-input" id="task-title" rows="2"
-                              placeholder="Título da tarefa..."></textarea>
+                              placeholder="Título da tarefa..." spellcheck="true"></textarea>
                 </div>
                 <button class="close-modal" onclick="app.closeModal('modal-task')" style="margin-top: 20px;">
                     <i data-lucide="x"></i>
@@ -786,7 +786,7 @@
                             <i data-lucide="align-left" style="width:14px;height:14px"></i> Descrição
                         </h4>
                         <textarea id="task-description" class="form-control" rows="4"
-                                  placeholder="Adicione uma descrição mais detalhada..."></textarea>
+                                  placeholder="Adicione uma descrição mais detalhada..." spellcheck="true"></textarea>
                     </div>
 
                     <!-- Checklist -->
@@ -833,7 +833,7 @@
                             <span>Comentários e atividade</span>
                         </div>
                         <div class="task-comment-input-row">
-                            <textarea id="task-comment-input" placeholder="Escrever um comentário..." rows="2"></textarea>
+                            <textarea id="task-comment-input" placeholder="Escrever um comentário..." rows="2" spellcheck="true"></textarea>
                             <button type="button" id="btn-add-task-comment" class="btn-primary" style="align-self:flex-end;padding:6px 14px;font-size:13px">Comentar</button>
                         </div>
                         <div id="modal-task-comments-list"></div>
@@ -929,7 +929,7 @@
                 <div class="form-group">
                     <label>Descrição do que foi feito (Opcional)</label>
                     <textarea id="time-task-desc" class="form-control" rows="2"
-                        placeholder="Ex: Desenvolvi o layout do header..."></textarea>
+                        placeholder="Ex: Desenvolvi o layout do header..." spellcheck="true"></textarea>
                 </div>
 
                 <button type="submit" class="btn btn-primary" style="width: 100%; justify-content: center;">Registrar
@@ -959,7 +959,7 @@
                 <div class="form-group">
                     <label>Descrição (Opcional)</label>
                     <textarea id="agenda-desc" class="form-control" rows="2"
-                        placeholder="Detalhes ou pauta..."></textarea>
+                        placeholder="Detalhes ou pauta..." spellcheck="true"></textarea>
                     <div id="agenda-desc-links" class="agenda-desc-links" style="display:none;">
                         <div class="agenda-desc-links-header"><i data-lucide="link-2" style="width:11px;height:11px;vertical-align:middle;margin-right:4px;"></i>Links detectados:</div>
                         <div id="agenda-desc-links-list"></div>
@@ -1308,7 +1308,7 @@
                 </div>
                 <div class="form-group">
                     <label>Descrição</label>
-                    <textarea id="apt-description" class="form-control" rows="3" placeholder="O que foi feito..."></textarea>
+                    <textarea id="apt-description" class="form-control" rows="3" placeholder="O que foi feito..." spellcheck="true"></textarea>
                 </div>
                 <div style="display: flex; gap: 12px; margin-top: 8px;">
                     <button type="button" class="btn btn-secondary" style="flex: 1; justify-content: center;" onclick="app.closeModal('modal-apontamento')">Cancelar</button>
@@ -1367,12 +1367,12 @@
 
                     <div class="form-group" style="grid-column: 1 / -1;">
                         <label class="form-label">Descrição</label>
-                        <textarea id="impl-description" class="form-control" rows="3" placeholder="O que este recurso faz, qual problema resolve..."></textarea>
+                        <textarea id="impl-description" class="form-control" rows="3" placeholder="O que este recurso faz, qual problema resolve..." spellcheck="true"></textarea>
                     </div>
 
                     <div class="form-group" style="grid-column: 1 / -1;">
                         <label class="form-label">Código / Script</label>
-                        <textarea id="impl-code" class="form-control" rows="6" style="font-family: 'Courier New', monospace; font-size: 0.8rem;" placeholder="Cole aqui o SQL, script ou pseudocódigo..."></textarea>
+                        <textarea id="impl-code" class="form-control" rows="6" style="font-family: 'Courier New', monospace; font-size: 0.8rem;" placeholder="Cole aqui o SQL, script ou pseudocódigo..." spellcheck="false"></textarea>
                     </div>
 
                     <div class="form-group" style="grid-column: 1 / -1;">
@@ -1384,7 +1384,7 @@
 
                     <div class="form-group" style="grid-column: 1 / -1;">
                         <label class="form-label">Observações</label>
-                        <textarea id="impl-notes" class="form-control" rows="2" placeholder="Notas adicionais..."></textarea>
+                        <textarea id="impl-notes" class="form-control" rows="2" placeholder="Notas adicionais..." spellcheck="true"></textarea>
                     </div>
 
                     <div class="form-group" style="grid-column: 1 / -1;">
@@ -1487,7 +1487,7 @@
 
                     <div class="form-group" style="grid-column: 1 / -1;">
                         <label class="form-label">Descrição</label>
-                        <textarea id="training-description" class="form-control" rows="3" placeholder="O que este treinamento cobre, para quem é destinado..."></textarea>
+                        <textarea id="training-description" class="form-control" rows="3" placeholder="O que este treinamento cobre, para quem é destinado..." spellcheck="true"></textarea>
                     </div>
 
                     <div class="form-group" style="grid-column: 1 / -1;">
