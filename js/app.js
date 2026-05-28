@@ -4595,10 +4595,14 @@ class AppController {
                 const days = (r.daysOfWeek || []).map(d => dayNames[d]).join(', ') || '—';
                 const period = `${r.periodStart} → ${r.periodEnd}`;
                 const genLabel = r.lastGeneratedUntil ? `Gerado até ${r.lastGeneratedUntil}` : 'Não gerado ainda';
+                const timeLabel = r.startTime === '' ? 'Dia inteiro' : `${r.startTime}–${r.endTime}`;
+                const typeLabels = { meeting: 'Reunião', consulting: 'Consultoria', task: 'Tarefa', reminder: 'Lembrete' };
+                const metaLine = [typeLabels[r.eventType] || r.eventType, days, timeLabel].filter(Boolean).join(' · ');
                 return `<div class="scheduling-rule-card">
                     <div class="sr-card-info">
                         <strong>${escapeHtml(r.title)}</strong>
-                        <span class="text-muted" style="font-size:0.8rem;">${days} · ${r.startTime}–${r.endTime}</span>
+                        ${r.description ? `<span class="text-muted" style="font-size:0.8rem;">${escapeHtml(r.description)}</span>` : ''}
+                        <span class="text-muted" style="font-size:0.8rem;">${metaLine}</span>
                         <span class="text-muted" style="font-size:0.8rem;">${freqLabel[r.frequency] || r.frequency} · ${period}</span>
                         <span style="font-size:0.75rem; color: var(--primary-color);">${genLabel}</span>
                     </div>
@@ -4624,13 +4628,32 @@ class AppController {
         document.getElementById('modal-rule-title').textContent = 'Nova Regra de Agendamento';
         document.getElementById('rule-id').value = '';
         document.getElementById('rule-client-id').value = clientId;
+        document.getElementById('rule-title').value = '';
+        document.getElementById('rule-event-type').value = 'meeting';
+        document.getElementById('rule-description').value = '';
         document.getElementById('btn-delete-scheduling-rule').style.display = 'none';
         document.querySelectorAll('input[name="rule-dow"]').forEach(cb => cb.checked = false);
         document.getElementById('rule-period-start').valueAsDate = new Date();
-        // Exibir row do Meet somente se Google Calendar sync está ativo
-        const hasSyncActive = document.getElementById('agenda-sync-google')?.checked;
-        document.getElementById('rule-meet-row').style.display = hasSyncActive ? 'flex' : 'none';
+        document.getElementById('rule-period-end').value = '';
+        document.getElementById('rule-location').value = '';
+        document.getElementById('rule-attendees').value = '';
+        document.getElementById('rule-generate-meet').checked = false;
+        this.toggleAllDayRule(false);
         this.openModal('modal-scheduling-rule');
+    }
+
+    toggleAllDayRule(isAllDay) {
+        const timeFields = document.getElementById('rule-time-fields');
+        const startInput = document.getElementById('rule-start-time');
+        const endInput = document.getElementById('rule-end-time');
+        document.getElementById('rule-all-day').checked = isAllDay;
+        timeFields.style.display = isAllDay ? 'none' : 'flex';
+        startInput.required = !isAllDay;
+        endInput.required = !isAllDay;
+        if (isAllDay) {
+            startInput.value = '';
+            endInput.value = '';
+        }
     }
 
     _openEditSchedulingRule(rule) {
@@ -4639,8 +4662,7 @@ class AppController {
         document.getElementById('rule-client-id').value = rule.clientId;
         document.getElementById('rule-title').value = rule.title;
         document.getElementById('rule-event-type').value = rule.eventType;
-        document.getElementById('rule-start-time').value = rule.startTime;
-        document.getElementById('rule-end-time').value = rule.endTime;
+        document.getElementById('rule-description').value = rule.description || '';
         document.getElementById('rule-frequency').value = rule.frequency;
         document.getElementById('rule-period-start').value = rule.periodStart;
         document.getElementById('rule-period-end').value = rule.periodEnd;
@@ -4650,8 +4672,12 @@ class AppController {
         document.querySelectorAll('input[name="rule-dow"]').forEach(cb => {
             cb.checked = rule.daysOfWeek.includes(parseInt(cb.value));
         });
-        const hasSyncActive = document.getElementById('agenda-sync-google')?.checked;
-        document.getElementById('rule-meet-row').style.display = hasSyncActive ? 'flex' : 'none';
+        const isAllDay = rule.startTime === '';
+        this.toggleAllDayRule(isAllDay);
+        if (!isAllDay) {
+            document.getElementById('rule-start-time').value = rule.startTime;
+            document.getElementById('rule-end-time').value = rule.endTime;
+        }
         document.getElementById('btn-delete-scheduling-rule').style.display = 'flex';
         this.openModal('modal-scheduling-rule');
     }
@@ -4666,13 +4692,15 @@ class AppController {
             Toast.show('Selecione pelo menos um dia da semana.', 'error');
             return;
         }
+        const isAllDay = document.getElementById('rule-all-day').checked;
         const ruleData = {
             clientId,
             title: document.getElementById('rule-title').value,
             eventType: document.getElementById('rule-event-type').value,
+            description: document.getElementById('rule-description').value.trim(),
             daysOfWeek,
-            startTime: document.getElementById('rule-start-time').value,
-            endTime: document.getElementById('rule-end-time').value,
+            startTime: isAllDay ? '' : document.getElementById('rule-start-time').value,
+            endTime: isAllDay ? '' : document.getElementById('rule-end-time').value,
             frequency: document.getElementById('rule-frequency').value,
             periodStart: document.getElementById('rule-period-start').value,
             periodEnd: document.getElementById('rule-period-end').value,
@@ -4801,6 +4829,7 @@ class AppController {
             endTime: rule.endTime,
             title: rule.title,
             type: rule.eventType,
+            description: rule.description || '',
             clientId: rule.clientId,
             location: rule.location,
             attendees: rule.attendees,
@@ -4829,7 +4858,7 @@ class AppController {
                     <div class="preview-event-row ${ev.hasConflict ? 'preview-event-conflict' : ''}">
                         <i data-lucide="${ev.hasConflict ? 'alert-triangle' : 'check'}" style="width:14px;height:14px;flex-shrink:0;"></i>
                         <span>${formatDate(ev.date)}</span>
-                        <span class="text-muted" style="font-size:0.8rem;">${ev.startTime}–${ev.endTime}</span>
+                        <span class="text-muted" style="font-size:0.8rem;">${ev.startTime === '' ? 'Dia inteiro' : `${ev.startTime}–${ev.endTime}`}</span>
                         ${ev.hasConflict ? '<span style="font-size:0.75rem;color:var(--warning-color);">conflito</span>' : ''}
                     </div>
                 `).join('')}
@@ -4869,7 +4898,7 @@ class AppController {
                         endTime: ev.endTime,
                         location: ev.location,
                         attendees: ev.attendees,
-                        description: '',
+                        description: ev.description || '',
                     });
                     if (googleReady) {
                         try {

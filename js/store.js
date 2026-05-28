@@ -737,6 +737,7 @@ class TSPStore {
             clientId: r.client_id,
             title: r.title,
             eventType: r.event_type || 'meeting',
+            description: r.description || '',
             daysOfWeek: Array.isArray(r.days_of_week) ? r.days_of_week : [],
             startTime: r.start_time || '',
             endTime: r.end_time || '',
@@ -762,12 +763,13 @@ class TSPStore {
         return (data || []).map(r => this._rule(r));
     }
 
-    async addSchedulingRule({ clientId, title, eventType, daysOfWeek, startTime, endTime, frequency, periodStart, periodEnd, location, attendees, generateMeet }) {
+    async addSchedulingRule({ clientId, title, eventType, description, daysOfWeek, startTime, endTime, frequency, periodStart, periodEnd, location, attendees, generateMeet }) {
         const { data, error } = await this.db.from('scheduling_rules').insert({
             user_id: this.userId,
             client_id: clientId,
             title: title || 'Atendimento',
             event_type: eventType || 'meeting',
+            description: description || '',
             days_of_week: daysOfWeek || [],
             start_time: startTime || '',
             end_time: endTime || '',
@@ -783,10 +785,11 @@ class TSPStore {
         return this._rule(data);
     }
 
-    async updateSchedulingRule(id, { title, eventType, daysOfWeek, startTime, endTime, frequency, periodStart, periodEnd, location, attendees, generateMeet }) {
+    async updateSchedulingRule(id, { title, eventType, description, daysOfWeek, startTime, endTime, frequency, periodStart, periodEnd, location, attendees, generateMeet }) {
         const { data, error } = await this.db.from('scheduling_rules').update({
             title: title || 'Atendimento',
             event_type: eventType || 'meeting',
+            description: description || '',
             days_of_week: daysOfWeek || [],
             start_time: startTime || '',
             end_time: endTime || '',
