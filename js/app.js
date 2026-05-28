@@ -4849,7 +4849,12 @@ class AppController {
         try { existingEvents = await store.getAgendaEvents(); } catch (_) {}
         const conflictSet = new Set(
             existingEvents
-                .filter(ev => ev.startTime === rule.startTime && ev.date >= rule.periodStart && ev.date <= rule.periodEnd)
+                .filter(ev => {
+                    if (ev.date < rule.periodStart || ev.date > rule.periodEnd) return false;
+                    if (rule.startTime === '') return true;
+                    if (ev.startTime === '') return true;
+                    return ev.startTime < rule.endTime && ev.endTime > rule.startTime;
+                })
                 .map(ev => ev.date)
         );
 
