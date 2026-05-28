@@ -530,7 +530,7 @@
 
     <!-- MODAL: CLIENTE -->
     <div class="modal-overlay" id="modal-client">
-        <div class="modal glass" style="max-width: 600px;">
+        <div class="modal glass" style="max-width: 620px;">
             <div class="modal-header">
                 <h3 id="modal-client-title">Novo Cliente</h3>
                 <div style="display: flex; gap: 8px; align-items: center;">
@@ -540,6 +540,15 @@
                     <button class="close-modal" onclick="app.closeModal('modal-client')"><i data-lucide="x"></i></button>
                 </div>
             </div>
+            <!-- Tabs do modal de cliente -->
+            <div class="modal-tabs" id="modal-client-tabs">
+                <button type="button" class="modal-tab active" id="tab-btn-dados" onclick="app.switchClientModalTab('dados')">Dados</button>
+                <button type="button" class="modal-tab" id="tab-btn-scheduling" onclick="app.switchClientModalTab('scheduling')">
+                    <i data-lucide="calendar-clock" style="width:14px;height:14px;"></i> Agendamento
+                </button>
+            </div>
+            <!-- Painel: Dados -->
+            <div id="tab-client-dados">
             <form id="form-client">
                 <input type="hidden" id="client-id" value="">
 
@@ -621,6 +630,16 @@
                 <button type="submit" class="btn btn-primary" style="width: 100%; justify-content: center;">Salvar
                     Cliente</button>
             </form>
+            </div><!-- /tab-client-dados -->
+            <!-- Painel: Agendamento -->
+            <div id="tab-client-scheduling" style="display:none; padding: 0 24px 24px;">
+                <div id="client-scheduling-rules-list" style="min-height: 80px;">
+                    <!-- preenchido via JS -->
+                </div>
+                <button type="button" class="btn btn-primary" id="btn-new-scheduling-rule" onclick="app.openNewSchedulingRule()" style="margin-top: 12px; width: 100%; justify-content: center;">
+                    <i data-lucide="plus"></i> Nova Regra de Agendamento
+                </button>
+            </div>
         </div>
     </div>
 
@@ -1568,9 +1587,129 @@
         </div>
     </div>
 
+    <!-- MODAL: REGRA DE AGENDAMENTO -->
+    <div class="modal-overlay" id="modal-scheduling-rule">
+        <div class="modal glass" style="max-width: 580px;">
+            <div class="modal-header">
+                <h3 id="modal-rule-title">Nova Regra de Agendamento</h3>
+                <button class="close-modal" onclick="app.closeModal('modal-scheduling-rule')"><i data-lucide="x"></i></button>
+            </div>
+            <form id="form-scheduling-rule">
+                <input type="hidden" id="rule-id">
+                <input type="hidden" id="rule-client-id">
+
+                <div style="display: flex; gap: 16px;">
+                    <div class="form-group" style="flex: 2;">
+                        <label class="form-label">Título do evento *</label>
+                        <input type="text" id="rule-title" class="form-control" placeholder="Ex: Atendimento mensal" required>
+                    </div>
+                    <div class="form-group" style="flex: 1;">
+                        <label class="form-label">Tipo</label>
+                        <select id="rule-event-type" class="form-control">
+                            <option value="meeting">Meeting</option>
+                            <option value="followup">Follow-up</option>
+                            <option value="other">Outro</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">Dias da semana *</label>
+                    <div class="rule-days-grid">
+                        <label class="rule-day-btn"><input type="checkbox" name="rule-dow" value="1"><span>Seg</span></label>
+                        <label class="rule-day-btn"><input type="checkbox" name="rule-dow" value="2"><span>Ter</span></label>
+                        <label class="rule-day-btn"><input type="checkbox" name="rule-dow" value="3"><span>Qua</span></label>
+                        <label class="rule-day-btn"><input type="checkbox" name="rule-dow" value="4"><span>Qui</span></label>
+                        <label class="rule-day-btn"><input type="checkbox" name="rule-dow" value="5"><span>Sex</span></label>
+                        <label class="rule-day-btn"><input type="checkbox" name="rule-dow" value="6"><span>Sáb</span></label>
+                        <label class="rule-day-btn"><input type="checkbox" name="rule-dow" value="0"><span>Dom</span></label>
+                    </div>
+                </div>
+
+                <div style="display: flex; gap: 16px;">
+                    <div class="form-group" style="flex: 1;">
+                        <label class="form-label">Hora início *</label>
+                        <input type="time" id="rule-start-time" class="form-control" required>
+                    </div>
+                    <div class="form-group" style="flex: 1;">
+                        <label class="form-label">Hora fim *</label>
+                        <input type="time" id="rule-end-time" class="form-control" required>
+                    </div>
+                    <div class="form-group" style="flex: 1.5;">
+                        <label class="form-label">Frequência</label>
+                        <select id="rule-frequency" class="form-control">
+                            <option value="weekly">Semanal</option>
+                            <option value="biweekly">Quinzenal</option>
+                            <option value="monthly_date">Mensal (dias do mês)</option>
+                            <option value="monthly_weekday">Mensal (1ª/2ª semana)</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div style="display: flex; gap: 16px;">
+                    <div class="form-group" style="flex: 1;">
+                        <label class="form-label">Data início *</label>
+                        <input type="date" id="rule-period-start" class="form-control" required>
+                    </div>
+                    <div class="form-group" style="flex: 1;">
+                        <label class="form-label">Data fim *</label>
+                        <input type="date" id="rule-period-end" class="form-control" required>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">Localização</label>
+                    <input type="text" id="rule-location" class="form-control" placeholder="Ex: Online, Sala de reunião...">
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">Participantes (e-mails separados por vírgula)</label>
+                    <input type="text" id="rule-attendees" class="form-control" placeholder="fulano@email.com, sicrano@email.com">
+                </div>
+
+                <div id="rule-meet-row" style="display: none; align-items: center; gap: 10px; margin-bottom: 16px;">
+                    <input type="checkbox" id="rule-generate-meet" style="width:auto; accent-color: var(--primary-color);">
+                    <label for="rule-generate-meet" style="cursor: pointer; margin: 0; font-size: 0.875rem;">Gerar link do Google Meet para cada evento</label>
+                </div>
+
+                <div style="display: flex; gap: 12px; justify-content: space-between;">
+                    <button type="button" id="btn-delete-scheduling-rule" class="btn btn-danger" style="display:none;" onclick="app.handleDeleteSchedulingRule()">
+                        <i data-lucide="trash-2"></i> Excluir
+                    </button>
+                    <div style="display: flex; gap: 12px; margin-left: auto;">
+                        <button type="button" class="btn btn-secondary" onclick="app.closeModal('modal-scheduling-rule')">Cancelar</button>
+                        <button type="submit" class="btn btn-primary">Salvar Regra</button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- MODAL: PREVIEW DE GERAÇÃO DE AGENDA -->
+    <div class="modal-overlay" id="modal-schedule-preview" style="align-items: flex-start; padding: 40px 16px; overflow-y: auto;">
+        <div class="modal glass" style="max-width: 560px; max-height: none;">
+            <div class="modal-header" style="flex-shrink: 0;">
+                <div>
+                    <h3>Confirmar Geração</h3>
+                    <p class="text-muted" id="preview-subtitle" style="font-size: 0.85rem; margin: 2px 0 0;"></p>
+                </div>
+                <button class="close-modal" onclick="app.closeModal('modal-schedule-preview')"><i data-lucide="x"></i></button>
+            </div>
+            <div id="preview-content" style="padding: 0 24px 8px; overflow-y: auto; max-height: 60vh;">
+                <!-- preenchido via JS -->
+            </div>
+            <div style="padding: 12px 24px 24px; display: flex; gap: 12px; border-top: 1px solid rgba(255,255,255,0.06);">
+                <button type="button" class="btn btn-secondary" onclick="app.closeModal('modal-schedule-preview')" style="flex: 1; justify-content: center;">Cancelar</button>
+                <button type="button" id="btn-confirm-schedule" class="btn btn-primary" onclick="app.confirmScheduleGeneration()" style="flex: 1; justify-content: center;">
+                    <i data-lucide="calendar-check"></i> <span id="btn-confirm-label">Confirmar</span>
+                </button>
+            </div>
+        </div>
+    </div>
+
     <script src="js/calendar.js?v=21"></script>
-    <script src="js/store.js?v=23.1"></script>
-    <script src="js/app.js?v=23.1"></script>
+    <script src="js/store.js?v=25"></script>
+    <script src="js/app.js?v=25"></script>
 </body>
 
 </html>

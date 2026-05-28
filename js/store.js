@@ -728,6 +728,91 @@ class TSPStore {
         const { error } = await this.db.from('training_clients').insert(rows);
         if (error) throw error;
     }
+
+    // ── REGRAS DE AGENDAMENTO ─────────────────────────────────────
+
+    _rule(r) {
+        return {
+            id: r.id,
+            clientId: r.client_id,
+            title: r.title,
+            eventType: r.event_type || 'meeting',
+            daysOfWeek: Array.isArray(r.days_of_week) ? r.days_of_week : [],
+            startTime: r.start_time || '',
+            endTime: r.end_time || '',
+            frequency: r.frequency || 'weekly',
+            periodStart: r.period_start || '',
+            periodEnd: r.period_end || '',
+            location: r.location || '',
+            attendees: r.attendees || '',
+            generateMeet: !!r.generate_meet,
+            isActive: r.is_active !== false,
+            lastGeneratedUntil: r.last_generated_until || null,
+            createdAt: r.created_at,
+        };
+    }
+
+    async getSchedulingRules(clientId) {
+        const { data, error } = await this.db.from('scheduling_rules')
+            .select('*')
+            .eq('user_id', this.userId)
+            .eq('client_id', clientId)
+            .order('created_at');
+        if (error) throw error;
+        return (data || []).map(r => this._rule(r));
+    }
+
+    async addSchedulingRule({ clientId, title, eventType, daysOfWeek, startTime, endTime, frequency, periodStart, periodEnd, location, attendees, generateMeet }) {
+        const { data, error } = await this.db.from('scheduling_rules').insert({
+            user_id: this.userId,
+            client_id: clientId,
+            title: title || 'Atendimento',
+            event_type: eventType || 'meeting',
+            days_of_week: daysOfWeek || [],
+            start_time: startTime || '',
+            end_time: endTime || '',
+            frequency: frequency || 'weekly',
+            period_start: periodStart,
+            period_end: periodEnd,
+            location: location || '',
+            attendees: attendees || '',
+            generate_meet: !!generateMeet,
+            is_active: true,
+        }).select().single();
+        if (error) throw error;
+        return this._rule(data);
+    }
+
+    async updateSchedulingRule(id, { title, eventType, daysOfWeek, startTime, endTime, frequency, periodStart, periodEnd, location, attendees, generateMeet }) {
+        const { data, error } = await this.db.from('scheduling_rules').update({
+            title: title || 'Atendimento',
+            event_type: eventType || 'meeting',
+            days_of_week: daysOfWeek || [],
+            start_time: startTime || '',
+            end_time: endTime || '',
+            frequency: frequency || 'weekly',
+            period_start: periodStart,
+            period_end: periodEnd,
+            location: location || '',
+            attendees: attendees || '',
+            generate_meet: !!generateMeet,
+        }).eq('id', id).eq('user_id', this.userId).select().single();
+        if (error) throw error;
+        return this._rule(data);
+    }
+
+    async deleteSchedulingRule(id) {
+        const { error } = await this.db.from('scheduling_rules').delete()
+            .eq('id', id).eq('user_id', this.userId);
+        if (error) throw error;
+    }
+
+    async updateRuleLastGenerated(id, date) {
+        const { error } = await this.db.from('scheduling_rules').update({
+            last_generated_until: date
+        }).eq('id', id).eq('user_id', this.userId);
+        if (error) throw error;
+    }
 }
 
 window.store = new TSPStore();

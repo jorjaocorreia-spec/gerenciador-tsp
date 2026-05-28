@@ -84,6 +84,9 @@ class AppController {
         this._draggedCard      = null;
         this._dragPlaceholder  = null;
         this._draggingFromStatus = null;
+        // Agendamento automático
+        this._pendingPreviewEvents = [];
+        this._pendingPreviewRuleId = null;
         this.init();
     }
 
@@ -102,6 +105,7 @@ class AppController {
         // Configurar Formulários
         document.getElementById('form-client').addEventListener('submit', this.handleClientSubmit.bind(this));
         document.getElementById('form-record').addEventListener('submit', this.handleRecordSubmit.bind(this));
+        document.getElementById('form-scheduling-rule').addEventListener('submit', this.handleSchedulingRuleSubmit.bind(this));
         document.getElementById('form-task-time').addEventListener('submit', this.handleTaskTimeSubmit.bind(this));
         document.getElementById('form-agenda-event').addEventListener('submit', this.handleAgendaSubmit.bind(this));
 
@@ -293,6 +297,12 @@ class AppController {
             document.getElementById('form-client').reset();
             document.getElementById('client-id').value = '';
             document.getElementById('modal-client-title').innerText = 'Novo Cliente';
+            this.switchClientModalTab('dados');
+        }
+        if (modalId === 'modal-scheduling-rule') {
+            document.getElementById('form-scheduling-rule').reset();
+            document.getElementById('rule-id').value = '';
+            document.getElementById('btn-delete-scheduling-rule').style.display = 'none';
         }
         if (modalId === 'modal-task') {
             this._modalTaskId    = null;
@@ -4446,6 +4456,352 @@ class AppController {
         const els = ['training-filter-category', 'training-filter-status', 'training-filter-client'];
         els.forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
         this.renderTrainings();
+    }
+
+    // ===================================
+    // AGENDAMENTO AUTOMÁTICO (Fase 25)
+    // ===================================
+
+    switchClientModalTab(tab) {
+        const dados = document.getElementById('tab-client-dados');
+        const sched = document.getElementById('tab-client-scheduling');
+        const btnDados = document.getElementById('tab-btn-dados');
+        const btnSched = document.getElementById('tab-btn-scheduling');
+        if (!dados || !sched) return;
+        if (tab === 'scheduling') {
+            dados.style.display = 'none';
+            sched.style.display = 'block';
+            btnDados.classList.remove('active');
+            btnSched.classList.add('active');
+            const clientId = document.getElementById('client-id').value;
+            if (clientId) this._renderClientSchedulingTab(clientId);
+            else {
+                document.getElementById('client-scheduling-rules-list').innerHTML =
+                    '<p class="text-muted" style="text-align:center;padding:20px 0;">Salve o cliente primeiro para gerenciar regras de agendamento.</p>';
+            }
+        } else {
+            dados.style.display = '';
+            sched.style.display = 'none';
+            btnDados.classList.add('active');
+            btnSched.classList.remove('active');
+        }
+        lucide.createIcons();
+    }
+
+    async _renderClientSchedulingTab(clientId) {
+        const container = document.getElementById('client-scheduling-rules-list');
+        container.innerHTML = `<div style="padding:16px 0;">${spinnerHtml}</div>`;
+        try {
+            const rules = await store.getSchedulingRules(clientId);
+            if (rules.length === 0) {
+                container.innerHTML = '<p class="text-muted" style="text-align:center;padding:20px 0;">Nenhuma regra cadastrada. Clique em "Nova Regra" para começar.</p>';
+                return;
+            }
+            const freqLabel = { weekly: 'Semanal', biweekly: 'Quinzenal', monthly_date: 'Mensal (data)', monthly_weekday: 'Mensal (semana)' };
+            const dayNames = ['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'];
+            container.innerHTML = rules.map(r => {
+                const days = (r.daysOfWeek || []).map(d => dayNames[d]).join(', ') || '—';
+                const period = `${r.periodStart} → ${r.periodEnd}`;
+                const genLabel = r.lastGeneratedUntil ? `Gerado até ${r.lastGeneratedUntil}` : 'Não gerado ainda';
+                return `<div class="scheduling-rule-card">
+                    <div class="sr-card-info">
+                        <strong>${escapeHtml(r.title)}</strong>
+                        <span class="text-muted" style="font-size:0.8rem;">${days} · ${r.startTime}–${r.endTime}</span>
+                        <span class="text-muted" style="font-size:0.8rem;">${freqLabel[r.frequency] || r.frequency} · ${period}</span>
+                        <span style="font-size:0.75rem; color: var(--primary-color);">${genLabel}</span>
+                    </div>
+                    <div class="sr-card-actions">
+                        <button class="btn btn-secondary" onclick='app._openEditSchedulingRule(${JSON.stringify(r)})' style="padding:5px 10px;font-size:0.8rem;">
+                            <i data-lucide="edit-2" style="width:14px;height:14px;"></i>
+                        </button>
+                        <button class="btn btn-primary" onclick='app.generateSchedulingRule("${r.id}")' style="padding:5px 10px;font-size:0.8rem;" title="Gerar eventos na agenda">
+                            <i data-lucide="zap" style="width:14px;height:14px;"></i>
+                        </button>
+                    </div>
+                </div>`;
+            }).join('');
+        } catch (err) {
+            container.innerHTML = `<p class="text-muted" style="color:var(--danger-color);padding:12px 0;">Erro ao carregar regras: ${escapeHtml(err.message)}</p>`;
+        }
+        lucide.createIcons();
+    }
+
+    openNewSchedulingRule() {
+        const clientId = document.getElementById('client-id').value;
+        if (!clientId) { Toast.show('Salve o cliente antes de criar regras.', 'error'); return; }
+        document.getElementById('modal-rule-title').textContent = 'Nova Regra de Agendamento';
+        document.getElementById('rule-id').value = '';
+        document.getElementById('rule-client-id').value = clientId;
+        document.getElementById('btn-delete-scheduling-rule').style.display = 'none';
+        document.querySelectorAll('input[name="rule-dow"]').forEach(cb => cb.checked = false);
+        document.getElementById('rule-period-start').valueAsDate = new Date();
+        // Exibir row do Meet somente se Google Calendar sync está ativo
+        const hasSyncActive = document.getElementById('agenda-sync-google')?.checked;
+        document.getElementById('rule-meet-row').style.display = hasSyncActive ? 'flex' : 'none';
+        this.openModal('modal-scheduling-rule');
+    }
+
+    _openEditSchedulingRule(rule) {
+        document.getElementById('modal-rule-title').textContent = 'Editar Regra de Agendamento';
+        document.getElementById('rule-id').value = rule.id;
+        document.getElementById('rule-client-id').value = rule.clientId;
+        document.getElementById('rule-title').value = rule.title;
+        document.getElementById('rule-event-type').value = rule.eventType;
+        document.getElementById('rule-start-time').value = rule.startTime;
+        document.getElementById('rule-end-time').value = rule.endTime;
+        document.getElementById('rule-frequency').value = rule.frequency;
+        document.getElementById('rule-period-start').value = rule.periodStart;
+        document.getElementById('rule-period-end').value = rule.periodEnd;
+        document.getElementById('rule-location').value = rule.location;
+        document.getElementById('rule-attendees').value = rule.attendees;
+        document.getElementById('rule-generate-meet').checked = rule.generateMeet;
+        document.querySelectorAll('input[name="rule-dow"]').forEach(cb => {
+            cb.checked = rule.daysOfWeek.includes(parseInt(cb.value));
+        });
+        const hasSyncActive = document.getElementById('agenda-sync-google')?.checked;
+        document.getElementById('rule-meet-row').style.display = hasSyncActive ? 'flex' : 'none';
+        document.getElementById('btn-delete-scheduling-rule').style.display = 'flex';
+        this.openModal('modal-scheduling-rule');
+    }
+
+    async handleSchedulingRuleSubmit(e) {
+        e.preventDefault();
+        const id = document.getElementById('rule-id').value;
+        const clientId = document.getElementById('rule-client-id').value;
+        const daysOfWeek = Array.from(document.querySelectorAll('input[name="rule-dow"]:checked'))
+            .map(cb => parseInt(cb.value));
+        if (daysOfWeek.length === 0) {
+            Toast.show('Selecione pelo menos um dia da semana.', 'error');
+            return;
+        }
+        const ruleData = {
+            clientId,
+            title: document.getElementById('rule-title').value,
+            eventType: document.getElementById('rule-event-type').value,
+            daysOfWeek,
+            startTime: document.getElementById('rule-start-time').value,
+            endTime: document.getElementById('rule-end-time').value,
+            frequency: document.getElementById('rule-frequency').value,
+            periodStart: document.getElementById('rule-period-start').value,
+            periodEnd: document.getElementById('rule-period-end').value,
+            location: document.getElementById('rule-location').value,
+            attendees: document.getElementById('rule-attendees').value,
+            generateMeet: document.getElementById('rule-generate-meet').checked,
+        };
+        if (ruleData.periodEnd < ruleData.periodStart) {
+            Toast.show('A data fim deve ser após a data início.', 'error');
+            return;
+        }
+        const btn = e.target.querySelector('[type="submit"]');
+        btn.disabled = true;
+        try {
+            if (id) await store.updateSchedulingRule(id, ruleData);
+            else await store.addSchedulingRule(ruleData);
+            this.closeModal('modal-scheduling-rule');
+            await this._renderClientSchedulingTab(clientId);
+            Toast.show(id ? 'Regra atualizada.' : 'Regra criada.', 'success');
+        } catch (err) {
+            Toast.show('Erro ao salvar regra: ' + err.message, 'error');
+        } finally {
+            btn.disabled = false;
+        }
+    }
+
+    async handleDeleteSchedulingRule() {
+        const id = document.getElementById('rule-id').value;
+        const clientId = document.getElementById('rule-client-id').value;
+        if (!id) return;
+        if (!confirm('Excluir esta regra de agendamento?\n\nOs eventos já gerados na agenda NÃO serão removidos.')) return;
+        try {
+            await store.deleteSchedulingRule(id);
+            this.closeModal('modal-scheduling-rule');
+            await this._renderClientSchedulingTab(clientId);
+            Toast.show('Regra excluída.', 'success');
+        } catch (err) {
+            Toast.show('Erro ao excluir: ' + err.message, 'error');
+        }
+    }
+
+    // Calcula todas as ocorrências de uma regra no período
+    _calcOccurrences(rule) {
+        const occurrences = [];
+        const start = new Date(rule.periodStart + 'T00:00:00');
+        const end   = new Date(rule.periodEnd   + 'T00:00:00');
+        const fromDate = rule.lastGeneratedUntil
+            ? new Date(new Date(rule.lastGeneratedUntil + 'T00:00:00').getTime() + 86400000) // dia seguinte
+            : start;
+
+        if (fromDate > end) return occurrences; // já gerado tudo
+
+        const dows = new Set(rule.daysOfWeek);
+        const cur = new Date(fromDate);
+
+        // Para monthly_weekday: descobrir qual semana do mês cada dia pertence
+        const getWeekOfMonth = (d) => Math.ceil(d.getDate() / 7);
+
+        // Para monthly_date: os dias do mês (ex: [1, 15])
+        // Para biweekly: controlar paridade de semana a partir do início
+        const getWeekNum = (d) => {
+            const oneJan = new Date(d.getFullYear(), 0, 1);
+            return Math.ceil(((d - oneJan) / 86400000 + oneJan.getDay() + 1) / 7);
+        };
+        const startWeekNum = getWeekNum(start);
+
+        while (cur <= end) {
+            const dow = cur.getDay(); // 0=Dom…6=Sáb
+            const iso = cur.toISOString().split('T')[0];
+
+            if (dows.has(dow)) {
+                let include = false;
+                if (rule.frequency === 'weekly') {
+                    include = true;
+                } else if (rule.frequency === 'biweekly') {
+                    const diff = getWeekNum(cur) - startWeekNum;
+                    include = diff % 2 === 0;
+                } else if (rule.frequency === 'monthly_date') {
+                    // Ocorre somente na primeira semana do mês (compatível com days_of_week)
+                    include = getWeekOfMonth(cur) === 1;
+                } else if (rule.frequency === 'monthly_weekday') {
+                    // Ocorre somente na segunda semana do mês
+                    include = getWeekOfMonth(cur) === 2;
+                }
+                if (include) occurrences.push(iso);
+            }
+            cur.setDate(cur.getDate() + 1);
+        }
+        return occurrences;
+    }
+
+    async generateSchedulingRule(ruleId) {
+        // Busca a regra pelo ID do cliente atual (que está na tab)
+        const clientId = document.getElementById('client-id').value;
+        let rule;
+        try {
+            const rules = await store.getSchedulingRules(clientId);
+            rule = rules.find(r => r.id === ruleId);
+        } catch (err) {
+            Toast.show('Erro ao carregar regra: ' + err.message, 'error');
+            return;
+        }
+        if (!rule) { Toast.show('Regra não encontrada.', 'error'); return; }
+
+        const occurrences = this._calcOccurrences(rule);
+        if (occurrences.length === 0) {
+            Toast.show('Nenhuma ocorrência nova para gerar neste período.', 'info');
+            return;
+        }
+
+        // Verificar conflitos com eventos existentes
+        let existingEvents = [];
+        try {
+            existingEvents = await store.getAgendaEvents();
+        } catch (_) {}
+        const conflictSet = new Set(
+            existingEvents
+                .filter(ev => ev.startTime === rule.startTime && ev.date >= rule.periodStart && ev.date <= rule.periodEnd)
+                .map(ev => ev.date)
+        );
+
+        // Montar preview
+        this._pendingPreviewEvents = occurrences.map(date => ({
+            date,
+            startTime: rule.startTime,
+            endTime: rule.endTime,
+            title: rule.title,
+            type: rule.eventType,
+            clientId: rule.clientId,
+            location: rule.location,
+            attendees: rule.attendees,
+            generateMeet: rule.generateMeet,
+            hasConflict: conflictSet.has(date),
+        }));
+        this._pendingPreviewRuleId = ruleId;
+
+        // Render preview modal
+        const total = this._pendingPreviewEvents.length;
+        const conflicts = this._pendingPreviewEvents.filter(e => e.hasConflict).length;
+        document.getElementById('preview-subtitle').textContent =
+            `${total} evento(s) a criar ${conflicts > 0 ? `· ⚠ ${conflicts} com conflito (serão criados mesmo assim)` : ''}`;
+        document.getElementById('btn-confirm-label').textContent = `Confirmar (${total})`;
+
+        const dayNamesLong = ['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'];
+        const formatDate = (iso) => {
+            const [y,m,d] = iso.split('-');
+            const dt = new Date(parseInt(y), parseInt(m)-1, parseInt(d));
+            return `${dayNamesLong[dt.getDay()]}, ${d}/${m}/${y}`;
+        };
+
+        document.getElementById('preview-content').innerHTML = `
+            <div style="margin: 12px 0; display: flex; flex-direction: column; gap: 6px;">
+                ${this._pendingPreviewEvents.map(ev => `
+                    <div class="preview-event-row ${ev.hasConflict ? 'preview-event-conflict' : ''}">
+                        <i data-lucide="${ev.hasConflict ? 'alert-triangle' : 'check'}" style="width:14px;height:14px;flex-shrink:0;"></i>
+                        <span>${formatDate(ev.date)}</span>
+                        <span class="text-muted" style="font-size:0.8rem;">${ev.startTime}–${ev.endTime}</span>
+                        ${ev.hasConflict ? '<span style="font-size:0.75rem;color:var(--warning-color);">conflito</span>' : ''}
+                    </div>
+                `).join('')}
+            </div>`;
+        lucide.createIcons();
+        this.openModal('modal-schedule-preview');
+    }
+
+    async confirmScheduleGeneration() {
+        const btn = document.getElementById('btn-confirm-schedule');
+        btn.disabled = true;
+        const events = this._pendingPreviewEvents;
+        const ruleId = this._pendingPreviewRuleId;
+
+        let created = 0, failed = 0;
+        try {
+            for (const ev of events) {
+                try {
+                    const savedEvent = await store.addAgendaEvent({
+                        clientId: ev.clientId,
+                        title: ev.title,
+                        type: ev.type,
+                        date: ev.date,
+                        dateEnd: ev.date,
+                        startTime: ev.startTime,
+                        endTime: ev.endTime,
+                        location: ev.location,
+                        attendees: ev.attendees,
+                        description: '',
+                    });
+                    // Tentar push ao Google Calendar se ativo
+                    if (typeof calendarAPI !== 'undefined' && calendarAPI.isSignedIn && calendarAPI.isSignedIn()) {
+                        try {
+                            const result = await calendarAPI.createGoogleEvent(savedEvent);
+                            if (result) {
+                                await store.updateAgendaEvent({
+                                    ...savedEvent,
+                                    calendarEventId: result.id,
+                                    meetLink: result.meetLink || '',
+                                });
+                            }
+                        } catch (_) {} // Falha no Google não bloqueia
+                    }
+                    created++;
+                } catch (_) { failed++; }
+            }
+            // Atualizar last_generated_until
+            const lastDate = events[events.length - 1].date;
+            await store.updateRuleLastGenerated(ruleId, lastDate);
+
+            this.closeModal('modal-schedule-preview');
+            const clientId = document.getElementById('client-id').value;
+            await this._renderClientSchedulingTab(clientId);
+            const msg = failed > 0
+                ? `${created} evento(s) criado(s), ${failed} falha(s).`
+                : `${created} evento(s) criado(s) com sucesso!`;
+            Toast.show(msg, failed > 0 ? 'info' : 'success');
+        } catch (err) {
+            Toast.show('Erro ao gerar agenda: ' + err.message, 'error');
+        } finally {
+            btn.disabled = false;
+            this._pendingPreviewEvents = [];
+            this._pendingPreviewRuleId = null;
+        }
     }
 
     async handleCalendarSettingsSave(e) {

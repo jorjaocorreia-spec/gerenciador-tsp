@@ -1941,3 +1941,113 @@ kbd {
 .btn-icon-sm:hover { opacity: 1; }
 .btn-icon-sm svg { width: 15px; height: 15px; }
 .btn-danger-sm:hover { color: #f87171; }
+
+/* ── Agendamento Automático (Fase 25) ──────────────────────── */
+
+/* Tabs do modal de cliente */
+.modal-tabs {
+    display: flex;
+    gap: 0;
+    border-bottom: 1px solid rgba(255,255,255,0.08);
+    margin: 0 -24px 0;
+    padding: 0 24px;
+}
+.modal-tab {
+    background: none;
+    border: none;
+    border-bottom: 2px solid transparent;
+    color: var(--text-secondary);
+    cursor: pointer;
+    font-size: 0.875rem;
+    font-weight: 500;
+    padding: 10px 16px;
+    margin-bottom: -1px;
+    transition: color 0.15s, border-color 0.15s;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+.modal-tab:hover { color: var(--text-primary); }
+.modal-tab.active {
+    color: var(--primary);
+    border-bottom-color: var(--primary);
+}
+
+/* Cards de regra de agendamento */
+.scheduling-rule-card {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 12px 14px;
+    background: var(--bg-glass);
+    border: 1px solid rgba(255,255,255,0.07);
+    border-radius: 10px;
+    margin-bottom: 8px;
+    transition: border-color 0.15s;
+}
+.scheduling-rule-card:hover { border-color: rgba(255,255,255,0.14); }
+.sr-card-info {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+}
+.sr-card-actions {
+    display: flex;
+    gap: 6px;
+    flex-shrink: 0;
+}
+
+/* Grid de dias da semana no modal de regra */
+.rule-days-grid {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+}
+.rule-day-btn {
+    display: inline-flex;
+    cursor: pointer;
+    -webkit-user-select: none;
+    user-select: none;
+}
+.rule-day-btn input[type="checkbox"] { display: none; }
+.rule-day-btn span {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 42px;
+    height: 36px;
+    border-radius: 8px;
+    border: 1px solid rgba(255,255,255,0.12);
+    font-size: 0.8rem;
+    font-weight: 500;
+    color: var(--text-secondary);
+    background: rgba(255,255,255,0.04);
+    transition: all 0.15s;
+}
+.rule-day-btn input:checked + span {
+    background: var(--primary);
+    border-color: var(--primary);
+    color: #fff;
+}
+.rule-day-btn:hover span {
+    border-color: var(--primary);
+    color: var(--text-primary);
+}
+
+/* Linhas do preview de geração */
+.preview-event-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 7px 10px;
+    border-radius: 7px;
+    font-size: 0.875rem;
+    background: rgba(255,255,255,0.03);
+}
+.preview-event-conflict {
+    background: rgba(234,179,8,0.08);
+    border: 1px solid rgba(234,179,8,0.18);
+}
+--warning-color: #eab308;
