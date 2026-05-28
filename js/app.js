@@ -271,6 +271,11 @@ class AppController {
                 this._renderChecklist();
             }
         }
+        if (modalId === 'modal-record') {
+            if (!document.getElementById('record-id').value) {
+                document.getElementById('record-date').valueAsDate = new Date();
+            }
+        }
         if (modalId === 'modal-agenda-event') {
             this.updateAgendaTaskSelect();
             if (!document.getElementById('agenda-id').value) {
@@ -318,6 +323,13 @@ class AppController {
         if (modalId === 'modal-training') {
             this.trainingAttachments = [];
             this.trainingLinks = [];
+        }
+        if (modalId === 'modal-record') {
+            document.getElementById('form-record').reset();
+            document.getElementById('record-id').value = '';
+            document.getElementById('record-date').valueAsDate = new Date();
+            document.getElementById('record-calculated').value = '';
+            document.getElementById('record-calculated').dataset.minutes = 0;
         }
         if (modalId === 'modal-task-time') {
             document.getElementById('form-task-time').reset();
