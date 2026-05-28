@@ -87,6 +87,9 @@ class AppController {
         // Agendamento automático
         this._pendingPreviewEvents = [];
         this._pendingPreviewRuleId = null;
+        this._pendingPreviewRule = null;
+        this._pendingPreviewClient = null;
+        this._pendingPreviewConflictSet = new Set();
         // Sync Google Calendar automático
         this._lastGoogleSync = 0;
         this._googleSyncInterval = null;
@@ -4793,12 +4796,15 @@ class AppController {
     }
 
     async generateSchedulingRule(ruleId) {
-        // Busca a regra pelo ID do cliente atual (que está na tab)
         const clientId = document.getElementById('client-id').value;
-        let rule;
+        let rule, client;
         try {
-            const rules = await store.getSchedulingRules(clientId);
+            const [rules, clients] = await Promise.all([
+                store.getSchedulingRules(clientId),
+                store.getClients(),
+            ]);
             rule = rules.find(r => r.id === ruleId);
+            client = clients.find(c => c.id === clientId);
         } catch (err) {
             Toast.show('Erro ao carregar regra: ' + err.message, 'error');
             return;
@@ -4811,18 +4817,18 @@ class AppController {
             return;
         }
 
-        // Verificar conflitos com eventos existentes
         let existingEvents = [];
-        try {
-            existingEvents = await store.getAgendaEvents();
-        } catch (_) {}
+        try { existingEvents = await store.getAgendaEvents(); } catch (_) {}
         const conflictSet = new Set(
             existingEvents
                 .filter(ev => ev.startTime === rule.startTime && ev.date >= rule.periodStart && ev.date <= rule.periodEnd)
                 .map(ev => ev.date)
         );
 
-        // Montar preview
+        this._pendingPreviewRule = rule;
+        this._pendingPreviewClient = client || null;
+        this._pendingPreviewConflictSet = conflictSet;
+        this._pendingPreviewRuleId = ruleId;
         this._pendingPreviewEvents = occurrences.map(date => ({
             date,
             startTime: rule.startTime,
@@ -4836,35 +4842,254 @@ class AppController {
             generateMeet: rule.generateMeet,
             hasConflict: conflictSet.has(date),
         }));
-        this._pendingPreviewRuleId = ruleId;
 
-        // Render preview modal
-        const total = this._pendingPreviewEvents.length;
-        const conflicts = this._pendingPreviewEvents.filter(e => e.hasConflict).length;
+        this._renderPreviewContent();
+        this.openModal('modal-schedule-preview');
+    }
+
+    _renderPreviewContent() {
+        const rule   = this._pendingPreviewRule;
+        const client = this._pendingPreviewClient;
+        const events = this._pendingPreviewEvents;
+
+        const total     = events.length;
+        const conflicts = events.filter(e => e.hasConflict).length;
         document.getElementById('preview-subtitle').textContent =
-            `${total} evento(s) a criar ${conflicts > 0 ? `· ⚠ ${conflicts} com conflito (serão criados mesmo assim)` : ''}`;
+            `${total} evento(s) a criar${conflicts > 0 ? ` · ⚠ ${conflicts} com conflito (serão criados mesmo assim)` : ''}`;
         document.getElementById('btn-confirm-label').textContent = `Confirmar (${total})`;
 
-        const dayNamesLong = ['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'];
-        const formatDate = (iso) => {
+        const dayNames = ['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'];
+        const fmtDate  = (iso) => {
             const [y,m,d] = iso.split('-');
             const dt = new Date(parseInt(y), parseInt(m)-1, parseInt(d));
-            return `${dayNamesLong[dt.getDay()]}, ${d}/${m}/${y}`;
+            return `${dayNames[dt.getDay()]}, ${d}/${m}/${y}`;
+        };
+        const fmtH = (min) => {
+            const h = Math.floor(min / 60), m = min % 60;
+            return m > 0 ? `${h}h${String(m).padStart(2,'0')}` : `${h}h`;
         };
 
-        document.getElementById('preview-content').innerHTML = `
-            <div style="margin: 12px 0; display: flex; flex-direction: column; gap: 6px;">
-                ${this._pendingPreviewEvents.map(ev => `
-                    <div class="preview-event-row ${ev.hasConflict ? 'preview-event-conflict' : ''}">
-                        <i data-lucide="${ev.hasConflict ? 'alert-triangle' : 'check'}" style="width:14px;height:14px;flex-shrink:0;"></i>
-                        <span>${formatDate(ev.date)}</span>
-                        <span class="text-muted" style="font-size:0.8rem;">${ev.startTime === '' ? 'Dia inteiro' : `${ev.startTime}–${ev.endTime}`}</span>
-                        ${ev.hasConflict ? '<span style="font-size:0.75rem;color:var(--warning-color);">conflito</span>' : ''}
-                    </div>
-                `).join('')}
+        // ── Painel de horas ──────────────────────────────────────────
+        const isAllDay        = rule.startTime === '';
+        const sessionMinutes  = isAllDay ? 0 : this.calcDuration(rule.startTime, rule.endTime).minutes;
+        const targetMonthlyMin = (client?.hoursTotal || 0) * 60;
+        let hoursPanel = '';
+
+        if (isAllDay) {
+            hoursPanel = `<div class="preview-hours-panel preview-hours-allday">
+                <i data-lucide="info" style="width:13px;height:13px;flex-shrink:0;"></i>
+                Eventos dia inteiro — cálculo de horas não aplicável
             </div>`;
+        } else if (targetMonthlyMin <= 0) {
+            hoursPanel = `<div class="preview-hours-panel preview-hours-allday">
+                <i data-lucide="info" style="width:13px;height:13px;flex-shrink:0;"></i>
+                Cliente sem cota mensal configurada — configure "Horas contratadas" no cadastro do cliente
+            </div>`;
+        } else {
+            const byMonth = {};
+            for (const ev of events) {
+                const ym = ev.date.slice(0, 7);
+                byMonth[ym] = (byMonth[ym] || 0) + 1;
+            }
+            const months = Object.keys(byMonth).sort();
+            const mNames = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
+            const [sy, sm_] = rule.periodStart.split('-').map(Number);
+            const [ey, em_] = rule.periodEnd.split('-').map(Number);
+            const monthsInPeriod = Math.max(1, (ey - sy) * 12 + (em_ - sm_) + 1);
+            const totalTargetMin   = targetMonthlyMin * monthsInPeriod;
+            const totalScheduledMin = events.length * sessionMinutes;
+            const totalDelta       = totalScheduledMin - totalTargetMin;
+
+            const badgeClass = (d) => d === 0 ? 'preview-badge-ok' : d < 0 ? 'preview-badge-under' : 'preview-badge-over';
+            const deltaLabel = (d) => {
+                if (Math.abs(d) < 1) return '✓ meta atingida';
+                return (d > 0 ? '+' : '−') + fmtH(Math.abs(d)) + (d < 0 ? ' faltando' : ' a mais');
+            };
+
+            let tableHtml = '';
+            if (months.length > 1) {
+                const rows = months.map(ym => {
+                    const [y, m] = ym.split('-').map(Number);
+                    const cnt = byMonth[ym];
+                    const sched = cnt * sessionMinutes;
+                    const delta = sched - targetMonthlyMin;
+                    return `<tr>
+                        <td>${mNames[m-1]}/${y}</td>
+                        <td style="text-align:center;">${cnt}</td>
+                        <td style="text-align:center;">${fmtH(sched)}</td>
+                        <td style="text-align:center;">${fmtH(targetMonthlyMin)}</td>
+                        <td><span class="preview-badge ${badgeClass(delta)}">${deltaLabel(delta)}</span></td>
+                    </tr>`;
+                }).join('');
+                tableHtml = `<table class="preview-hours-table">
+                    <thead><tr><th>Mês</th><th>Sessões</th><th>Agendado</th><th>Meta</th><th>Status</th></tr></thead>
+                    <tbody>${rows}</tbody>
+                </table>`;
+            }
+
+            hoursPanel = `<div class="preview-hours-panel">
+                <div class="preview-hours-header">
+                    <i data-lucide="bar-chart-2" style="width:13px;height:13px;flex-shrink:0;"></i>
+                    <strong style="font-size:0.85rem;">Resumo de Horas</strong>
+                    <span style="margin-left:auto; display:flex; align-items:center; gap:6px; font-size:0.82rem;">
+                        <span style="color:var(--text-muted);">${fmtH(totalScheduledMin)} / ${fmtH(totalTargetMin)}</span>
+                        <span class="preview-badge ${badgeClass(totalDelta)}">${deltaLabel(totalDelta)}</span>
+                    </span>
+                </div>
+                ${tableHtml}
+            </div>`;
+        }
+
+        // ── Lista de eventos ─────────────────────────────────────────
+        const eventsList = `<div style="margin: 4px 0; display:flex; flex-direction:column; gap:4px;">
+            ${events.map((ev, idx) => `
+                <div class="preview-event-row ${ev.hasConflict ? 'preview-event-conflict' : ''} ${ev.isExtra ? 'preview-event-extra' : ''}">
+                    <i data-lucide="${ev.hasConflict ? 'alert-triangle' : ev.isExtra ? 'plus-circle' : 'check'}" style="width:13px;height:13px;flex-shrink:0;"></i>
+                    <span style="flex:1;">${fmtDate(ev.date)}</span>
+                    <span class="text-muted" style="font-size:0.78rem;">${ev.startTime === '' ? 'Dia inteiro' : `${ev.startTime}–${ev.endTime}`}</span>
+                    ${ev.hasConflict ? '<span style="font-size:0.72rem;color:var(--warning-color);">conflito</span>' : ''}
+                    ${ev.isExtra ? '<span style="font-size:0.7rem;color:var(--primary);opacity:0.85;">extra</span>' : ''}
+                    <button type="button" class="preview-remove-btn" onclick="app._previewRemoveEvent(${idx})" title="Remover este evento">
+                        <i data-lucide="x" style="width:11px;height:11px;"></i>
+                    </button>
+                </div>
+            `).join('')}
+        </div>`;
+
+        // ── Ações: sugestão automática + adição manual ───────────────
+        let suggestBtn = '';
+        if (!isAllDay && sessionMinutes > 0 && targetMonthlyMin > 0) {
+            const [sy2, sm2] = rule.periodStart.split('-').map(Number);
+            const [ey2, em2] = rule.periodEnd.split('-').map(Number);
+            const mip = Math.max(1, (ey2 - sy2) * 12 + (em2 - sm2) + 1);
+            const deficit = targetMonthlyMin * mip - events.length * sessionMinutes;
+            if (deficit > 0) {
+                const needed = Math.ceil(deficit / sessionMinutes);
+                suggestBtn = `<button type="button" class="btn btn-secondary preview-suggest-btn" onclick="app._previewSuggestExtras()">
+                    <i data-lucide="wand-2" style="width:14px;height:14px;"></i>
+                    Sugerir ${needed} sessão(ões) extra(s) para atingir a meta
+                </button>`;
+            }
+        }
+
+        const manualTimeFields = (!isAllDay) ? `
+            <input type="time" id="preview-manual-start" class="form-control" value="${rule.startTime}" style="width:88px;font-size:0.82rem;padding:5px 7px;">
+            <span style="color:var(--text-muted);font-size:0.82rem;">–</span>
+            <input type="time" id="preview-manual-end" class="form-control" value="${rule.endTime}" style="width:88px;font-size:0.82rem;padding:5px 7px;">` : '';
+
+        const actionsHtml = `<div class="preview-actions">
+            ${suggestBtn}
+            <div class="preview-manual-add">
+                <span class="preview-manual-label">+ Adicionar data específica</span>
+                <div style="display:flex;gap:6px;align-items:center;margin-top:6px;flex-wrap:wrap;">
+                    <input type="date" id="preview-manual-date" class="form-control" style="flex:1;min-width:130px;font-size:0.82rem;padding:5px 7px;">
+                    ${manualTimeFields}
+                    <button type="button" class="btn btn-primary" style="padding:5px 14px;font-size:0.82rem;" onclick="app._previewAddManual()">Adicionar</button>
+                </div>
+            </div>
+        </div>`;
+
+        document.getElementById('preview-content').innerHTML = hoursPanel + eventsList + actionsHtml;
         lucide.createIcons();
-        this.openModal('modal-schedule-preview');
+    }
+
+    _previewRemoveEvent(idx) {
+        this._pendingPreviewEvents.splice(idx, 1);
+        this._renderPreviewContent();
+    }
+
+    _previewSuggestExtras() {
+        const rule   = this._pendingPreviewRule;
+        const client = this._pendingPreviewClient;
+        const events = this._pendingPreviewEvents;
+
+        const sessionMinutes   = this.calcDuration(rule.startTime, rule.endTime).minutes;
+        const targetMonthlyMin = (client?.hoursTotal || 0) * 60;
+        if (sessionMinutes <= 0 || targetMonthlyMin <= 0) return;
+
+        const [sy, sm_] = rule.periodStart.split('-').map(Number);
+        const [ey, em_] = rule.periodEnd.split('-').map(Number);
+        const mip       = Math.max(1, (ey - sy) * 12 + (em_ - sm_) + 1);
+        const deficit   = targetMonthlyMin * mip - events.length * sessionMinutes;
+        if (deficit <= 0) { Toast.show('Meta já atingida!', 'success'); return; }
+
+        const needed    = Math.ceil(deficit / sessionMinutes);
+        const existing  = new Set(events.map(e => e.date));
+        const conflicts = this._pendingPreviewConflictSet;
+        const dows      = new Set(rule.daysOfWeek);
+
+        // Começa do dia seguinte ao último evento já previsto (ou do periodStart)
+        const lastDate = events.length > 0
+            ? events.reduce((max, e) => e.date > max ? e.date : max, events[0].date)
+            : rule.periodStart;
+        const cur = new Date(lastDate + 'T00:00:00');
+        cur.setDate(cur.getDate() + 1);
+
+        const suggestions = [];
+        let guard = 400;
+        while (suggestions.length < needed && guard-- > 0) {
+            const iso = cur.toISOString().split('T')[0];
+            const dow = cur.getDay();
+            if ((dows.size === 0 || dows.has(dow)) && !existing.has(iso)) {
+                suggestions.push(iso);
+                existing.add(iso);
+            }
+            cur.setDate(cur.getDate() + 1);
+        }
+
+        for (const date of suggestions) {
+            this._pendingPreviewEvents.push({
+                date,
+                startTime: rule.startTime,
+                endTime: rule.endTime,
+                title: rule.title,
+                type: rule.eventType,
+                description: rule.description || '',
+                clientId: rule.clientId,
+                location: rule.location,
+                attendees: rule.attendees,
+                generateMeet: rule.generateMeet,
+                hasConflict: conflicts.has(date),
+                isExtra: true,
+            });
+        }
+
+        this._pendingPreviewEvents.sort((a, b) => a.date.localeCompare(b.date));
+        this._renderPreviewContent();
+    }
+
+    _previewAddManual() {
+        const rule      = this._pendingPreviewRule;
+        const dateInput = document.getElementById('preview-manual-date');
+        const date      = dateInput?.value;
+        if (!date) { Toast.show('Selecione uma data.', 'error'); return; }
+
+        const isAllDay   = rule.startTime === '';
+        const startTime  = isAllDay ? '' : (document.getElementById('preview-manual-start')?.value || rule.startTime);
+        const endTime    = isAllDay ? '' : (document.getElementById('preview-manual-end')?.value || rule.endTime);
+
+        if (this._pendingPreviewEvents.some(e => e.date === date && e.startTime === startTime)) {
+            Toast.show('Já existe um evento nesta data e horário.', 'error');
+            return;
+        }
+
+        this._pendingPreviewEvents.push({
+            date,
+            startTime,
+            endTime,
+            title: rule.title,
+            type: rule.eventType,
+            description: rule.description || '',
+            clientId: rule.clientId,
+            location: rule.location,
+            attendees: rule.attendees,
+            generateMeet: rule.generateMeet,
+            hasConflict: this._pendingPreviewConflictSet.has(date),
+            isExtra: true,
+        });
+
+        this._pendingPreviewEvents.sort((a, b) => a.date.localeCompare(b.date));
+        this._renderPreviewContent();
     }
 
     async confirmScheduleGeneration() {

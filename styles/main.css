@@ -2050,4 +2050,94 @@ kbd {
     background: rgba(234,179,8,0.08);
     border: 1px solid rgba(234,179,8,0.18);
 }
+.preview-event-extra {
+    background: rgba(124,58,237,0.07);
+    border: 1px solid rgba(124,58,237,0.18);
+}
+.preview-remove-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-left: auto;
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: var(--text-muted);
+    opacity: 0.5;
+    padding: 2px;
+    border-radius: 4px;
+    transition: opacity 0.15s, color 0.15s;
+}
+.preview-remove-btn:hover { opacity: 1; color: #ef4444; }
+
+/* Painel de resumo de horas */
+.preview-hours-panel {
+    margin: 12px 0 6px;
+    padding: 10px 12px;
+    border-radius: 8px;
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.07);
+    font-size: 0.83rem;
+}
+.preview-hours-allday {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    color: var(--text-muted);
+}
+.preview-hours-header {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+}
+.preview-hours-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 8px;
+    font-size: 0.8rem;
+}
+.preview-hours-table th {
+    text-align: left;
+    color: var(--text-muted);
+    font-weight: 500;
+    padding: 3px 4px;
+    border-bottom: 1px solid rgba(255,255,255,0.07);
+}
+.preview-hours-table td { padding: 4px 4px; }
+.preview-badge {
+    display: inline-block;
+    padding: 2px 7px;
+    border-radius: 20px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    white-space: nowrap;
+}
+.preview-badge-ok    { background: rgba(34,197,94,0.15);  color: #4ade80; }
+.preview-badge-under { background: rgba(239,68,68,0.13);  color: #f87171; }
+.preview-badge-over  { background: rgba(234,179,8,0.13);  color: #facc15; }
+
+/* Área de ações do preview */
+.preview-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 8px 0 4px;
+    border-top: 1px solid rgba(255,255,255,0.06);
+    margin-top: 8px;
+}
+.preview-suggest-btn {
+    width: 100%;
+    justify-content: center;
+    font-size: 0.83rem;
+}
+.preview-manual-add {
+    padding: 8px 10px;
+    border-radius: 7px;
+    background: rgba(255,255,255,0.03);
+    border: 1px dashed rgba(255,255,255,0.1);
+}
+.preview-manual-label {
+    font-size: 0.82rem;
+    color: var(--text-muted);
+}
 --warning-color: #eab308;
