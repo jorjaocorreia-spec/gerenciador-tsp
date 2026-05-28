@@ -4961,12 +4961,15 @@ class AppController {
         // ── Lista de eventos ─────────────────────────────────────────
         const eventsList = `<div style="margin: 4px 0; display:flex; flex-direction:column; gap:4px;">
             ${events.map((ev, idx) => `
-                <div class="preview-event-row ${ev.hasConflict ? 'preview-event-conflict' : ''} ${ev.isExtra ? 'preview-event-extra' : ''}">
+                <div class="preview-event-row ${ev.hasConflict ? 'preview-event-conflict' : ''} ${ev.isExtra ? 'preview-event-extra' : ''}" data-preview-idx="${idx}">
                     <i data-lucide="${ev.hasConflict ? 'alert-triangle' : ev.isExtra ? 'plus-circle' : 'check'}" style="width:13px;height:13px;flex-shrink:0;"></i>
-                    <span style="flex:1;">${fmtDate(ev.date)}</span>
+                    <span class="preview-date-text" style="flex:1;">${fmtDate(ev.date)}</span>
                     <span class="text-muted" style="font-size:0.78rem;">${ev.startTime === '' ? 'Dia inteiro' : `${ev.startTime}–${ev.endTime}`}</span>
                     ${ev.hasConflict ? '<span style="font-size:0.72rem;color:var(--warning-color);">conflito</span>' : ''}
                     ${ev.isExtra ? '<span style="font-size:0.7rem;color:var(--primary);opacity:0.85;">extra</span>' : ''}
+                    <button type="button" class="preview-edit-date-btn" onclick="app._previewStartEditDate(${idx})" title="Alterar data">
+                        <i data-lucide="pencil" style="width:11px;height:11px;"></i>
+                    </button>
                     <button type="button" class="preview-remove-btn" onclick="app._previewRemoveEvent(${idx})" title="Remover este evento">
                         <i data-lucide="x" style="width:11px;height:11px;"></i>
                     </button>
@@ -5013,6 +5016,42 @@ class AppController {
 
     _previewRemoveEvent(idx) {
         this._pendingPreviewEvents.splice(idx, 1);
+        this._renderPreviewContent();
+    }
+
+    _previewStartEditDate(idx) {
+        const row = document.querySelector(`[data-preview-idx="${idx}"]`);
+        if (!row) return;
+        const dateSpan = row.querySelector('.preview-date-text');
+        const editBtn  = row.querySelector('.preview-edit-date-btn');
+        const ev = this._pendingPreviewEvents[idx];
+
+        const input = document.createElement('input');
+        input.type = 'date';
+        input.value = ev.date;
+        input.className = 'form-control';
+        input.style.cssText = 'width:140px;font-size:0.82rem;padding:3px 6px;flex:1;';
+
+        let changed = false;
+        input.addEventListener('change', () => {
+            changed = true;
+            this._previewEditEventDate(idx, input.value);
+        });
+        input.addEventListener('blur', () => {
+            if (!changed) this._renderPreviewContent();
+        });
+
+        dateSpan.replaceWith(input);
+        editBtn?.remove();
+        input.focus();
+    }
+
+    _previewEditEventDate(idx, newDate) {
+        if (!newDate) return;
+        const ev = this._pendingPreviewEvents[idx];
+        ev.date = newDate;
+        ev.hasConflict = this._pendingPreviewConflictSet.has(newDate);
+        this._pendingPreviewEvents.sort((a, b) => a.date.localeCompare(b.date));
         this._renderPreviewContent();
     }
 
