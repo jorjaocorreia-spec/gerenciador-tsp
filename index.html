@@ -625,16 +625,16 @@
     </div>
 
     <!-- MODAL: SALDO DE HORAS -->
-    <div class="modal-overlay" id="modal-saldo">
-        <div class="modal glass" style="max-width: 720px;">
-            <div class="modal-header">
+    <div class="modal-overlay" id="modal-saldo" style="align-items: flex-start; padding: 40px 16px; overflow-y: auto;">
+        <div class="modal glass" style="max-width: 720px; max-height: none; display: flex; flex-direction: column;">
+            <div class="modal-header" style="flex-shrink: 0;">
                 <div>
                     <h3>Posição de Horas</h3>
                     <p class="text-muted" id="saldo-subtitle" style="font-size: 0.85rem; margin: 2px 0 0;"></p>
                 </div>
                 <button class="close-modal" onclick="app.closeModal('modal-saldo')"><i data-lucide="x"></i></button>
             </div>
-            <div id="saldo-content" style="padding: 8px 0;">
+            <div id="saldo-content" style="padding: 8px 0; overflow-y: auto;">
                 <!-- preenchido dinamicamente -->
             </div>
         </div>
