@@ -3070,6 +3070,27 @@ class AppController {
             }
         }
 
+        // 3. Remove eventos locais que foram deletados no Google (dentro da janela de ±30 dias)
+        const googleIdSet = new Set(googleEvents.map(g => g.id));
+        const syncWindowStart = new Date();
+        syncWindowStart.setDate(syncWindowStart.getDate() - 30);
+        const syncWindowEnd = new Date();
+        syncWindowEnd.setDate(syncWindowEnd.getDate() + 30);
+        const windowStartStr = syncWindowStart.toISOString().split('T')[0];
+        const windowEndStr = syncWindowEnd.toISOString().split('T')[0];
+
+        for (const le of localEvents) {
+            if (!le.calendarEventId) continue; // Nunca foi ao Google, não apagar
+            if (le.date < windowStartStr || le.date > windowEndStr) continue; // Fora da janela, não tocar
+            if (googleIdSet.has(le.calendarEventId)) continue; // Ainda existe no Google, ok
+            // Evento foi deletado no Google — remover localmente
+            try {
+                await store.deleteAgendaEvent(le.id);
+            } catch (err) {
+                console.error('Erro ao remover evento deletado no Google:', le.title, err);
+            }
+        }
+
         if (syncErrors > 0) throw new Error(`${syncErrors} evento(s) falharam na sincronização`);
     }
 
