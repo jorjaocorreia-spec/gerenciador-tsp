@@ -235,8 +235,6 @@ class AppController {
             this._renderTrainingAttachmentPreviews();
         });
 
-        // Renderizar Views
-        this.renderAll();
     }
 
     // ===================================
