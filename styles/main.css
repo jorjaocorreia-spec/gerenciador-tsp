@@ -2254,13 +2254,15 @@ kbd {
 .pmc-dot-conflict {
     background: var(--warning-color);
 }
-/* quando dia tem pending e conflict, shifta os dois dots */
-.pmc-cell .pmc-dot-pending + .pmc-dot-conflict,
-.pmc-cell .pmc-dot-conflict + .pmc-dot-pending {
-    left: calc(50% + 4px);
+.pmc-dot-existing {
+    background: rgba(255,255,255,0.35);
 }
-.pmc-cell .pmc-dot-pending:first-of-type:not(:only-of-type) {
+/* dois pontos lado a lado */
+.pmc-cell .pmc-dot:first-of-type:not(:only-of-type) {
     left: calc(50% - 4px);
+}
+.pmc-cell .pmc-dot:last-of-type:not(:only-of-type) {
+    left: calc(50% + 4px);
 }
 .preview-mini-cal-footer {
     display: flex;

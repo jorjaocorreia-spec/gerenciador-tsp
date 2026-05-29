@@ -4871,17 +4871,15 @@ class AppController {
         );
         const clientNameMap = new Map(clients.map(c => [c.id, c.name]));
         const existingByDate = new Map();
-        existingEvents
-            .filter(ev => ev.date >= rule.periodStart && ev.date <= rule.periodEnd)
-            .forEach(ev => {
-                if (!existingByDate.has(ev.date)) existingByDate.set(ev.date, []);
-                existingByDate.get(ev.date).push({
-                    title: ev.title,
-                    startTime: ev.startTime,
-                    endTime: ev.endTime,
-                    clientName: clientNameMap.get(ev.clientId) || '',
-                });
+        existingEvents.forEach(ev => {
+            if (!existingByDate.has(ev.date)) existingByDate.set(ev.date, []);
+            existingByDate.get(ev.date).push({
+                title: ev.title,
+                startTime: ev.startTime,
+                endTime: ev.endTime,
+                clientName: clientNameMap.get(ev.clientId) || '',
             });
+        });
         this._pendingPreviewExistingByDate = existingByDate;
         this._pendingPreviewRuleId = ruleId;
         const [py, pm] = rule.periodStart.split('-').map(Number);
@@ -5108,8 +5106,10 @@ class AppController {
 
             let dots = '';
             if (!isSelected) {
+                const hasExisting = existingByDate.has(iso);
                 if (isPending && isConflict) dots += `<span class="pmc-dot pmc-dot-conflict"></span>`;
                 else if (isPending)          dots += `<span class="pmc-dot pmc-dot-pending"></span>`;
+                if (hasExisting)             dots += `<span class="pmc-dot pmc-dot-existing"></span>`;
             }
 
             const dayEvs = existingByDate.get(iso) || [];
@@ -5135,7 +5135,8 @@ class AppController {
             : `<span class="pmc-selected-label pmc-selected-empty">Nenhuma data selecionada</span>`;
 
         const legendHtml = `<div class="preview-mini-cal-legend">
-            <span><span class="pmc-dot pmc-dot-pending" style="position:static;display:inline-block;vertical-align:middle;margin-right:3px;"></span>Agendado</span>
+            <span><span class="pmc-dot pmc-dot-existing" style="position:static;display:inline-block;vertical-align:middle;margin-right:3px;"></span>Compromisso</span>
+            <span><span class="pmc-dot pmc-dot-pending" style="position:static;display:inline-block;vertical-align:middle;margin-right:3px;"></span>Novo</span>
             <span><span class="pmc-dot pmc-dot-conflict" style="position:static;display:inline-block;vertical-align:middle;margin-right:3px;"></span>Conflito</span>
         </div>`;
 
