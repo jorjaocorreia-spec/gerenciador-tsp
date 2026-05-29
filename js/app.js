@@ -4827,12 +4827,13 @@ class AppController {
 
     async generateSchedulingRule(ruleId) {
         const clientId = document.getElementById('client-id').value;
-        let rule, client;
+        let rule, client, clients;
         try {
-            const [rules, clients] = await Promise.all([
+            const [rules, fetchedClients] = await Promise.all([
                 store.getSchedulingRules(clientId),
                 store.getClients(),
             ]);
+            clients = fetchedClients;
             rule = rules.find(r => r.id === ruleId);
             client = clients.find(c => c.id === clientId);
         } catch (err) {
