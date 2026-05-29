@@ -214,10 +214,19 @@ class AppController {
             }
         });
 
-        // Seleção de arquivos de imagem via input — tarefa
+        // Seleção de arquivos via input — tarefa (imagens comprimidas; outros tipos lidos como base64)
         document.getElementById('task-attachments')?.addEventListener('change', async (e) => {
             for (const file of e.target.files) {
-                const data = await compressImageFile(file);
+                let data;
+                if (file.type.startsWith('image/')) {
+                    data = await compressImageFile(file);
+                } else {
+                    data = await new Promise(res => {
+                        const r = new FileReader();
+                        r.onload = ev => res(ev.target.result);
+                        r.readAsDataURL(file);
+                    });
+                }
                 this.taskAttachments.push({ name: file.name, data });
             }
             e.target.value = '';
@@ -715,12 +724,21 @@ class AppController {
         const hint = document.getElementById('task-attach-hint');
         if (!container) return;
         if (hint) hint.style.display = this.taskAttachments.length ? 'none' : '';
-        container.innerHTML = this.taskAttachments.map((att, i) => `
-            <div class="attach-thumb">
-                <img src="${att.data}" alt="${escapeHtml(att.name)}" onclick="app._openAttachmentLightbox(${i})" title="${escapeHtml(att.name)}">
-                <button type="button" class="attach-remove" onclick="app.removeTaskAttachment(${i})" title="Remover">×</button>
-            </div>
-        `).join('');
+        container.innerHTML = this.taskAttachments.map((att, i) => {
+            const isImage = att.data && att.data.startsWith('data:image/');
+            if (isImage) {
+                return `<div class="attach-thumb">
+                    <img src="${att.data}" alt="${escapeHtml(att.name)}" onclick="app._openAttachmentLightbox(${i})" title="${escapeHtml(att.name)}">
+                    <button type="button" class="attach-remove" onclick="app.removeTaskAttachment(${i})" title="Remover">×</button>
+                </div>`;
+            }
+            return `<div class="attach-thumb attach-thumb-file" onclick="app._openAttachmentLightbox(${i})" title="${escapeHtml(att.name)}">
+                <i data-lucide="file-text" style="width:26px;height:26px;opacity:.75;pointer-events:none;"></i>
+                <span class="attach-thumb-fname">${escapeHtml(att.name)}</span>
+                <button type="button" class="attach-remove" onclick="event.stopPropagation();app.removeTaskAttachment(${i})" title="Remover">×</button>
+            </div>`;
+        }).join('');
+        lucide.createIcons();
     }
 
     _renderTaskComments() {
@@ -803,6 +821,13 @@ class AppController {
     _openAttachmentLightbox(index) {
         const att = this.taskAttachments[index];
         if (!att) return;
+        if (!att.data.startsWith('data:image/')) {
+            const a = document.createElement('a');
+            a.href = att.data;
+            a.download = att.name;
+            a.click();
+            return;
+        }
         const overlay = document.createElement('div');
         overlay.style.cssText = 'position:fixed;inset:0;z-index:99999;background:rgba(0,0,0,0.88);display:flex;align-items:center;justify-content:center;cursor:zoom-out;';
         const img = document.createElement('img');
