@@ -5108,8 +5108,8 @@ class AppController {
 
             let dots = '';
             if (!isSelected) {
-                if (isPending)  dots += `<span class="pmc-dot pmc-dot-pending"></span>`;
-                if (isConflict) dots += `<span class="pmc-dot pmc-dot-conflict"></span>`;
+                if (isPending && isConflict) dots += `<span class="pmc-dot pmc-dot-conflict"></span>`;
+                else if (isPending)          dots += `<span class="pmc-dot pmc-dot-pending"></span>`;
             }
 
             const dayEvs = existingByDate.get(iso) || [];
