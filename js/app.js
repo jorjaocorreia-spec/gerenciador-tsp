@@ -5080,7 +5080,7 @@ class AppController {
             const isToday     = iso === todayIso;
             const isSelected  = iso === selected;
             const isPending   = pendingSet.has(iso);
-            const isConflict  = existingDates.has(iso);
+            const isConflict  = conflictSet.has(iso);
 
             const classes = [
                 'pmc-cell',
