@@ -3913,7 +3913,12 @@ class AppController {
         }
 
         try {
-            const items = await store.getApontamentos(this.aptCurrentDate);
+            const [items, clients] = await Promise.all([
+                store.getApontamentos(this.aptCurrentDate),
+                store.getClients()
+            ]);
+            const projToClient = {};
+            clients.forEach(c => { if (c.projectNum) projToClient[c.projectNum.trim()] = c.name; });
             container.innerHTML = '';
 
             if (items.length === 0) {
@@ -3944,7 +3949,7 @@ class AppController {
                 row.className = 'apt-row';
                 row.innerHTML = `
                     <span class="apt-horario">${escapeHtml(item.startTime)} – ${escapeHtml(item.endTime)}</span>
-                    <span class="apt-proj">${escapeHtml(item.projectNum)}</span>
+                    <span class="apt-proj" title="${escapeHtml(projToClient[item.projectNum?.trim()] || '')}">${escapeHtml(item.projectNum)}${projToClient[item.projectNum?.trim()] ? `<span class="apt-proj-name">${escapeHtml(projToClient[item.projectNum.trim()])}</span>` : ''}</span>
                     <span class="apt-desc">${escapeHtml(item.description)}</span>
                     <span class="apt-dur">${dur.label}</span>
                     <span class="apt-actions">
