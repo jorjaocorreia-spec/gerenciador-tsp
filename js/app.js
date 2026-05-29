@@ -91,6 +91,7 @@ class AppController {
         this._pendingPreviewClient = null;
         this._pendingPreviewConflictSet = new Set();
         this._pendingPreviewExistingDates = new Set();
+        this._pendingPreviewExistingByDate = new Map();
         // Mini-calendário do preview de agendamento
         this._miniCalYear     = new Date().getFullYear();
         this._miniCalMonth    = new Date().getMonth();
@@ -4867,6 +4868,20 @@ class AppController {
                 .filter(ev => ev.date >= rule.periodStart && ev.date <= rule.periodEnd)
                 .map(ev => ev.date)
         );
+        const clientNameMap = new Map(clients.map(c => [c.id, c.name]));
+        const existingByDate = new Map();
+        existingEvents
+            .filter(ev => ev.date >= rule.periodStart && ev.date <= rule.periodEnd)
+            .forEach(ev => {
+                if (!existingByDate.has(ev.date)) existingByDate.set(ev.date, []);
+                existingByDate.get(ev.date).push({
+                    title: ev.title,
+                    startTime: ev.startTime,
+                    endTime: ev.endTime,
+                    clientName: clientNameMap.get(ev.clientId) || '',
+                });
+            });
+        this._pendingPreviewExistingByDate = existingByDate;
         this._pendingPreviewRuleId = ruleId;
         const [py, pm] = rule.periodStart.split('-').map(Number);
         this._miniCalYear     = py;
@@ -5053,6 +5068,7 @@ class AppController {
         const pendingSet      = new Set(this._pendingPreviewEvents.map(e => e.date));
         const conflictSet     = this._pendingPreviewConflictSet;
         const existingDates   = this._pendingPreviewExistingDates;
+        const existingByDate  = this._pendingPreviewExistingByDate || new Map();
         const todayIso    = new Date().toISOString().split('T')[0];
         const selected    = this._miniCalSelected;
 
@@ -5095,7 +5111,16 @@ class AppController {
                 if (isConflict) dots += `<span class="pmc-dot pmc-dot-conflict"></span>`;
             }
 
-            cellsHtml += `<div class="${classes}" onclick="app._miniCalSelectDate('${iso}')" title="${iso}">${cursor.getDate()}${dots}</div>`;
+            const dayEvs = existingByDate.get(iso) || [];
+            let cellTitle = iso;
+            if (dayEvs.length > 0) {
+                cellTitle = dayEvs.map(ev => {
+                    const time = ev.startTime === '' ? 'Dia inteiro' : `${ev.startTime}–${ev.endTime}`;
+                    const client = ev.clientName || ev.title;
+                    return `${time} · ${client}`;
+                }).join('\n');
+            }
+            cellsHtml += `<div class="${classes}" onclick="app._miniCalSelectDate('${iso}')" title="${cellTitle.replace(/"/g, '&quot;')}">${cursor.getDate()}${dots}</div>`;
             cursor.setDate(cursor.getDate() + 1);
         }
 
