@@ -2840,7 +2840,14 @@ class AppController {
             const iso = cursor.toISOString().split('T')[0];
             const isCurrentMonth = cursor.getMonth() === month;
             const isToday = iso === todayIso;
-            const dayEvents = events.filter(e => e.date <= iso && (e.dateEnd || e.date) >= iso);
+            const dayEvents = events
+                .filter(e => e.date <= iso && (e.dateEnd || e.date) >= iso)
+                .sort((a, b) => {
+                    if (!a.startTime && !b.startTime) return 0;
+                    if (!a.startTime) return -1;
+                    if (!b.startTime) return 1;
+                    return a.startTime.localeCompare(b.startTime);
+                });
 
             let eventsHtml = '';
             dayEvents.forEach(ev => {
