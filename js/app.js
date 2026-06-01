@@ -107,6 +107,9 @@ class AppController {
         // Guard para evitar renderAll() concorrente
         this._renderAllRunning = false;
         this._renderAllPending = false;
+        // OTOBO
+        this._otoboConfig = null;
+        this._currentTicket = null;
         this.init();
     }
 
@@ -393,6 +396,9 @@ class AppController {
         if (modalId === 'modal-manage-columns') {
             this._manageCols = [];
             this._manageColsOriginal = [];
+        }
+        if (modalId === 'modal-chamado') {
+            this._currentTicket = null;
         }
     }
 
@@ -1443,7 +1449,8 @@ class AppController {
                 this.renderAgenda(),
                 this.renderApontamentos(),
                 this.renderImplementations(),
-                this.renderTrainings()
+                this.renderTrainings(),
+                this.renderChamados()
             ]);
             lucide.createIcons();
         } finally {
@@ -5829,6 +5836,344 @@ class AppController {
             lucide.createIcons();
         }
     }
+
+    // ===================================
+    // CHAMADOS (OTOBO)
+    // ===================================
+
+    async renderChamados() {
+        if (this.currentView !== 'chamados') return;
+        const content = document.getElementById('chamados-content');
+        if (!content) return;
+        content.innerHTML = spinnerHtml;
+
+        if (!this._otoboConfig) {
+            this._otoboConfig = await store.getOtoboConfig().catch(() => null);
+        }
+        if (!this._otoboConfig || !this._otoboConfig.url) {
+            content.innerHTML = `
+                <div class="empty-state">
+                    <i data-lucide="headphones" style="width:48px;height:48px;color:var(--text-muted);"></i>
+                    <h3>OTOBO não configurado</h3>
+                    <p>Configure as credenciais do OTOBO para visualizar seus chamados.</p>
+                    <button class="btn btn-primary" onclick="app.openOtoboConfigModal()">Configurar OTOBO</button>
+                </div>`;
+            lucide.createIcons();
+            return;
+        }
+
+        document.getElementById('btn-sync-chamados').style.display = '';
+
+        try {
+            const [tickets, clients] = await Promise.all([store.getTickets(), store.getClients()]);
+            if (tickets.length === 0) {
+                content.innerHTML = `
+                    <div class="empty-state">
+                        <i data-lucide="inbox" style="width:48px;height:48px;color:var(--text-muted);"></i>
+                        <h3>Nenhum chamado em aberto</h3>
+                        <p>Clique em Sincronizar para buscar os chamados do OTOBO.</p>
+                    </div>`;
+                lucide.createIcons();
+                return;
+            }
+            this._renderChamadosCards(tickets, clients, content);
+        } catch (err) {
+            content.innerHTML = `<div class="empty-state"><p>Erro ao carregar chamados: ${escapeHtml(err.message)}</p></div>`;
+        }
+        lucide.createIcons();
+    }
+
+    _renderChamadosCards(tickets, clients, container) {
+        const clientMap = new Map(clients.map(c => [c.id, c]));
+
+        // Agrupar por cliente vinculado
+        const byClient = new Map();
+        const unlinked = [];
+        for (const t of tickets) {
+            if (t.linkedClientId && clientMap.has(t.linkedClientId)) {
+                if (!byClient.has(t.linkedClientId)) byClient.set(t.linkedClientId, []);
+                byClient.get(t.linkedClientId).push(t);
+            } else {
+                unlinked.push(t);
+            }
+        }
+
+        let html = '';
+        for (const [cid, cts] of byClient) {
+            const client = clientMap.get(cid);
+            html += `<div class="ticket-client-section">
+                <h3>${escapeHtml(client.name)}</h3>
+                <div class="ticket-grid">${cts.map(t => this._ticketCardHtml(t)).join('')}</div>
+            </div>`;
+        }
+        if (unlinked.length > 0) {
+            html += `<div class="ticket-client-section">
+                <h3>Sem cliente vinculado</h3>
+                <div class="ticket-grid">${unlinked.map(t => this._ticketCardHtml(t)).join('')}</div>
+            </div>`;
+        }
+        container.innerHTML = html;
+
+        container.querySelectorAll('.ticket-card').forEach(card => {
+            card.addEventListener('click', () => {
+                const ticket = tickets.find(t => t.ticketId === card.dataset.ticketId);
+                if (ticket) this.openChamadoModal(ticket);
+            });
+        });
+    }
+
+    _ticketCardHtml(t) {
+        const statusClass = this._ticketStatusClass(t.status);
+        const priorityClass = this._ticketPriorityClass(t.priority);
+        const updatedAgo = this._relativeDate(t.updatedAtOtobo);
+        const queueHtml = t.queue ? `<span class="ticket-meta-item"><i data-lucide="layers" style="width:11px;height:11px;"></i>${escapeHtml(t.queue)}</span>` : '';
+        const ownerHtml = t.owner ? `<span class="ticket-meta-item"><i data-lucide="user" style="width:11px;height:11px;"></i>${escapeHtml(t.owner)}</span>` : '';
+        return `<div class="ticket-card" data-ticket-id="${escapeHtml(t.ticketId)}">
+            <div class="ticket-card-header">
+                <span class="ticket-number">#${escapeHtml(t.ticketNumber || t.ticketId)}</span>
+            </div>
+            <div class="ticket-card-title">${escapeHtml(t.title)}</div>
+            <div class="ticket-card-badges">
+                <span class="ticket-badge ${statusClass}">${escapeHtml(t.status)}</span>
+                <span class="ticket-badge ${priorityClass}">${escapeHtml(t.priority)}</span>
+            </div>
+            <div class="ticket-card-meta">
+                ${queueHtml}
+                ${ownerHtml}
+                ${updatedAgo ? `<span class="ticket-meta-item"><i data-lucide="clock" style="width:11px;height:11px;"></i>${updatedAgo}</span>` : ''}
+            </div>
+        </div>`;
+    }
+
+    _ticketStatusClass(status) {
+        const s = (status || '').toLowerCase();
+        if (s === 'new' || s === 'novo') return 'ticket-status-new';
+        if (s === 'open' || s === 'aberto' || s === 'in treatment' || s === 'em atendimento') return 'ticket-status-open';
+        if (s.includes('pending') || s.includes('aguardando')) return 'ticket-status-pending';
+        return 'ticket-status-other';
+    }
+
+    _ticketPriorityClass(priority) {
+        const p = (priority || '').toLowerCase().replace(/\s+/g, '-');
+        if (p.includes('5') || p.includes('urgent') || p.includes('very-high')) return 'ticket-priority-5-urgent';
+        if (p.includes('4') || p.includes('high') || p.includes('alta')) return 'ticket-priority-4-high';
+        if (p.includes('3') || p.includes('normal') || p.includes('média') || p.includes('media')) return 'ticket-priority-3-normal';
+        if (p.includes('2') || p.includes('low') || p.includes('baixa')) return 'ticket-priority-2-low';
+        if (p.includes('1') || p.includes('very-low') || p.includes('muito-baixa')) return 'ticket-priority-1-very-low';
+        return 'ticket-priority-3-normal';
+    }
+
+    _relativeDate(isoStr) {
+        if (!isoStr) return '';
+        const d = new Date(isoStr);
+        if (isNaN(d)) return '';
+        const diffMs = Date.now() - d.getTime();
+        const diffDays = Math.floor(diffMs / 86400000);
+        if (diffDays === 0) return 'hoje';
+        if (diffDays === 1) return 'ontem';
+        if (diffDays < 30) return `há ${diffDays} dias`;
+        const diffMonths = Math.floor(diffDays / 30);
+        return `há ${diffMonths} ${diffMonths === 1 ? 'mês' : 'meses'}`;
+    }
+
+    async syncChamados() {
+        const btn = document.getElementById('btn-sync-chamados');
+        if (btn) btn.disabled = true;
+        Toast.show('Sincronizando com OTOBO...', 'info', 2000);
+        try {
+            const config = this._otoboConfig;
+            const otoboTickets = await this._fetchTicketsFromOtobo(config);
+            const clients = await store.getClients();
+            const rows = this._mapTicketsToRows(otoboTickets, clients);
+            const ticketIds = rows.map(r => r.ticket_id);
+            await store.upsertTickets(rows);
+            await store.deleteTicketsNotIn(ticketIds);
+            const now = new Date().toLocaleString('pt-BR');
+            const info = document.getElementById('chamados-sync-info');
+            if (info) { info.textContent = `Última sync: ${now}`; info.style.display = ''; }
+            await this.renderChamados();
+            Toast.show(`${rows.length} chamado(s) sincronizado(s)!`, 'success');
+        } catch (err) {
+            Toast.show(`Erro na sincronização: ${err.message}`, 'error', 6000);
+        } finally {
+            if (btn) btn.disabled = false;
+        }
+    }
+
+    async _fetchTicketsFromOtobo(config) {
+        const url = config.url.replace(/\/$/, '');
+        const creds = { UserLogin: config.username, Password: config.password };
+        const headers = { 'Content-Type': 'application/json' };
+
+        // TicketSearch — todos os não fechados
+        const searchRes = await fetch(
+            `${url}/otobo/nph-genericinterface.pl/Webservice/GenericTicketConnectorREST/Ticket/Search`,
+            { method: 'POST', headers, body: JSON.stringify({ ...creds, StateType: ['new', 'open', 'pending reminder', 'pending auto', 'in treatment'] }) }
+        );
+        if (!searchRes.ok) {
+            if (searchRes.status === 0 || searchRes.type === 'opaque') {
+                throw new Error('CORS bloqueado. Peça ao administrador do OTOBO para configurar Access-Control-Allow-Origin.');
+            }
+            throw new Error(`OTOBO retornou ${searchRes.status}: ${searchRes.statusText}`);
+        }
+        const searchData = await searchRes.json();
+        const ticketIds = searchData.TicketID || [];
+        if (ticketIds.length === 0) return [];
+
+        // TicketGet em lotes de 10
+        const results = [];
+        for (let i = 0; i < ticketIds.length; i += 10) {
+            const batch = ticketIds.slice(i, i + 10);
+            const getRes = await fetch(
+                `${url}/otobo/nph-genericinterface.pl/Webservice/GenericTicketConnectorREST/Ticket/${batch.join(',')}?UserLogin=${encodeURIComponent(config.username)}&Password=${encodeURIComponent(config.password)}`,
+                { headers }
+            );
+            if (getRes.ok) {
+                const d = await getRes.json();
+                results.push(...(d.Ticket || []));
+            }
+        }
+        return results;
+    }
+
+    _mapTicketsToRows(otoboTickets, clients) {
+        const normalize = s => (s || '').toLowerCase().trim();
+        return otoboTickets.map(t => {
+            const customerNorm = normalize(t.CustomerUserID || t.CustomerID || '');
+            const linked = clients.find(c => {
+                const cn = normalize(c.name);
+                return cn === customerNorm || cn.includes(customerNorm) || customerNorm.includes(cn);
+            });
+            return {
+                user_id: store.userId,
+                ticket_id: String(t.TicketID),
+                ticket_number: t.TicketNumber || '',
+                title: t.Title || '',
+                status: t.State || '',
+                priority: t.Priority || '',
+                queue: t.Queue || '',
+                customer_name: t.CustomerUserID || t.CustomerID || '',
+                owner: t.Owner || '',
+                created_at_otobo: t.Created || null,
+                updated_at_otobo: t.Changed || null,
+                raw_data: t,
+                linked_client_id: linked ? linked.id : null,
+                synced_at: new Date().toISOString()
+            };
+        });
+    }
+
+    openOtoboConfigModal() {
+        const cfg = this._otoboConfig;
+        document.getElementById('otobo-url').value = cfg?.url || '';
+        document.getElementById('otobo-username').value = cfg?.username || '';
+        document.getElementById('otobo-password').value = cfg?.password || '';
+        this.openModal('modal-otobo-config');
+    }
+
+    async saveOtoboConfig() {
+        const url = document.getElementById('otobo-url').value.trim();
+        const username = document.getElementById('otobo-username').value.trim();
+        const password = document.getElementById('otobo-password').value;
+        if (!url || !username || !password) {
+            Toast.show('Preencha todos os campos.', 'error');
+            return;
+        }
+        try {
+            await store.saveOtoboConfig(url, username, password);
+            this._otoboConfig = { url, username, password };
+            Toast.show('Configurações salvas!', 'success');
+            this.closeModal('modal-otobo-config');
+            await this.renderChamados();
+        } catch (err) {
+            Toast.show('Erro ao salvar: ' + err.message, 'error');
+        }
+    }
+
+    async openChamadoModal(ticket) {
+        this._currentTicket = ticket;
+        document.getElementById('chamado-modal-title').textContent = `#${ticket.ticketNumber || ticket.ticketId} — ${ticket.title}`;
+
+        const linkEl = document.getElementById('chamado-otobo-link');
+        if (this._otoboConfig?.url) {
+            const base = this._otoboConfig.url.replace(/\/$/, '');
+            linkEl.href = `${base}/otobo/index.pl?Action=AgentTicketZoom;TicketID=${ticket.ticketId}`;
+            linkEl.style.display = '';
+        } else {
+            linkEl.style.display = 'none';
+        }
+
+        // Sidebar
+        document.getElementById('chamado-sidebar-info').innerHTML = `
+            <div class="chamado-sidebar-row">
+                <span class="chamado-sidebar-label">Status</span>
+                <span class="chamado-sidebar-value"><span class="ticket-badge ${this._ticketStatusClass(ticket.status)}">${escapeHtml(ticket.status)}</span></span>
+            </div>
+            <div class="chamado-sidebar-row">
+                <span class="chamado-sidebar-label">Prioridade</span>
+                <span class="chamado-sidebar-value"><span class="ticket-badge ${this._ticketPriorityClass(ticket.priority)}">${escapeHtml(ticket.priority)}</span></span>
+            </div>
+            <div class="chamado-sidebar-row">
+                <span class="chamado-sidebar-label">Fila</span>
+                <span class="chamado-sidebar-value">${escapeHtml(ticket.queue || '—')}</span>
+            </div>
+            <div class="chamado-sidebar-row">
+                <span class="chamado-sidebar-label">Responsável</span>
+                <span class="chamado-sidebar-value">${escapeHtml(ticket.owner || '—')}</span>
+            </div>
+            <div class="chamado-sidebar-row">
+                <span class="chamado-sidebar-label">Cliente OTOBO</span>
+                <span class="chamado-sidebar-value">${escapeHtml(ticket.customerName || '—')}</span>
+            </div>
+            <div class="chamado-sidebar-row">
+                <span class="chamado-sidebar-label">Aberto em</span>
+                <span class="chamado-sidebar-value">${ticket.createdAtOtobo ? new Date(ticket.createdAtOtobo).toLocaleString('pt-BR') : '—'}</span>
+            </div>
+            <div class="chamado-sidebar-row">
+                <span class="chamado-sidebar-label">Atualizado</span>
+                <span class="chamado-sidebar-value">${ticket.updatedAtOtobo ? new Date(ticket.updatedAtOtobo).toLocaleString('pt-BR') : '—'}</span>
+            </div>
+        `;
+        lucide.createIcons();
+
+        // Artigos (carregados on-demand)
+        const artContainer = document.getElementById('chamado-articles-content');
+        artContainer.innerHTML = spinnerHtml;
+        this.openModal('modal-chamado');
+
+        try {
+            const articles = await this._fetchTicketArticles(ticket.ticketId);
+            if (!articles.length) {
+                artContainer.innerHTML = '<p class="text-muted" style="padding:16px 0;">Nenhuma mensagem encontrada.</p>';
+                return;
+            }
+            artContainer.innerHTML = articles.map(a => `
+                <div class="chamado-article">
+                    <div class="chamado-article-header">
+                        <span class="chamado-article-from">${escapeHtml(a.From || a.SenderType || '—')}</span>
+                        <span class="chamado-article-date">${a.Created ? new Date(a.Created).toLocaleString('pt-BR') : ''}</span>
+                    </div>
+                    <div class="chamado-article-body">${escapeHtml(a.Body || '')}</div>
+                </div>
+            `).join('');
+        } catch (err) {
+            // Se falhar, mostra os dados do cache (raw_data pode ter artigos)
+            artContainer.innerHTML = `<p class="text-muted" style="padding:16px 0;">Não foi possível carregar as mensagens: ${escapeHtml(err.message)}</p>`;
+        }
+    }
+
+    async _fetchTicketArticles(ticketId) {
+        if (!this._otoboConfig?.url) return [];
+        const url = this._otoboConfig.url.replace(/\/$/, '');
+        const res = await fetch(
+            `${url}/otobo/nph-genericinterface.pl/Webservice/GenericTicketConnectorREST/Ticket/${ticketId}?UserLogin=${encodeURIComponent(this._otoboConfig.username)}&Password=${encodeURIComponent(this._otoboConfig.password)}&AllArticles=1`,
+            { headers: { 'Content-Type': 'application/json' } }
+        );
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+        const ticket = (data.Ticket || [])[0];
+        return ticket?.Article || [];
+    }
 }
 
 // Iniciar a aplicação quando DOM estiver pronto
@@ -5861,6 +6206,8 @@ document.addEventListener('DOMContentLoaded', async () => {
                 window.app._googleSyncInterval = null;
             }
             window.app._lastGoogleSync = 0;
+            window.app._otoboConfig = null;
+            window.app._currentTicket = null;
         }
         await Auth.signOut();
     });

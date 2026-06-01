@@ -2425,3 +2425,144 @@ kbd {
     text-align: right;
     white-space: nowrap;
 }
+
+/* ── Chamados (OTOBO) ────────────────────────────────────── */
+.ticket-client-section {
+    margin-bottom: 28px;
+}
+.ticket-client-section h3 {
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    margin-bottom: 12px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid rgba(255,255,255,0.07);
+}
+.ticket-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 14px;
+}
+.ticket-card {
+    background: var(--bg-glass);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 10px;
+    padding: 16px;
+    cursor: pointer;
+    transition: border-color 0.18s, background 0.18s;
+}
+.ticket-card:hover {
+    border-color: var(--primary-color);
+    background: rgba(255,255,255,0.05);
+}
+.ticket-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 8px;
+    margin-bottom: 8px;
+}
+.ticket-number {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    font-weight: 500;
+}
+.ticket-card-title {
+    font-size: 0.9rem;
+    font-weight: 600;
+    line-height: 1.3;
+    margin-bottom: 10px;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+.ticket-card-badges {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-bottom: 10px;
+}
+.ticket-badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 0.7rem;
+    font-weight: 600;
+}
+.ticket-status-new      { background: rgba(99,179,237,0.15); color: #63b3ed; }
+.ticket-status-open     { background: rgba(72,187,120,0.15); color: #68d391; }
+.ticket-status-pending  { background: rgba(246,173,85,0.15); color: #f6ad55; }
+.ticket-status-other    { background: rgba(160,174,192,0.12); color: #a0aec0; }
+.ticket-priority-5-urgent { background: rgba(252,129,129,0.15); color: #fc8181; }
+.ticket-priority-4-high   { background: rgba(246,173,85,0.15); color: #f6ad55; }
+.ticket-priority-3-normal { background: rgba(160,174,192,0.12); color: #a0aec0; }
+.ticket-priority-2-low    { background: rgba(72,187,120,0.15); color: #68d391; }
+.ticket-priority-1-very-low { background: rgba(160,174,192,0.08); color: #718096; }
+.ticket-card-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px 16px;
+    font-size: 0.73rem;
+    color: var(--text-muted);
+}
+.ticket-meta-item {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+/* Modal de detalhe do chamado */
+.chamado-article {
+    border: 1px solid rgba(255,255,255,0.07);
+    border-radius: 8px;
+    margin-bottom: 12px;
+    overflow: hidden;
+}
+.chamado-article-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px 14px;
+    background: rgba(255,255,255,0.04);
+    font-size: 0.8rem;
+    gap: 8px;
+}
+.chamado-article-from {
+    font-weight: 600;
+    color: var(--text-main);
+}
+.chamado-article-date {
+    color: var(--text-muted);
+    white-space: nowrap;
+}
+.chamado-article-body {
+    padding: 12px 14px;
+    font-size: 0.83rem;
+    line-height: 1.55;
+    color: var(--text-main);
+    white-space: pre-wrap;
+    word-break: break-word;
+    max-height: 200px;
+    overflow-y: auto;
+}
+.chamado-sidebar-row {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    margin-bottom: 14px;
+}
+.chamado-sidebar-label {
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--text-muted);
+    font-weight: 600;
+}
+.chamado-sidebar-value {
+    font-size: 0.85rem;
+    color: var(--text-main);
+}

@@ -99,6 +99,9 @@
             <li class="nav-item" data-view="trainings" title="Treinamentos">
                 <i data-lucide="graduation-cap"></i><span class="nav-label">Treinamentos</span>
             </li>
+            <li class="nav-item" data-view="chamados" title="Chamados">
+                <i data-lucide="headphones"></i><span class="nav-label">Chamados</span>
+            </li>
         </ul>
         <div class="sidebar-bottom">
             <p class="text-muted sidebar-section-label">SISTEMA</p>
@@ -540,6 +543,28 @@
             </div>
 
             <div id="trainings-container"></div>
+        </section>
+
+        <!-- VIEW: CHAMADOS -->
+        <section class="view-section" id="view-chamados">
+            <div class="header-actions">
+                <div>
+                    <h1>Chamados</h1>
+                    <p class="text-muted">Tickets em aberto — OTOBO</p>
+                </div>
+                <div style="display:flex; gap:10px; align-items:center;">
+                    <span id="chamados-sync-info" style="display:none; font-size:0.8rem; color:var(--text-muted);"></span>
+                    <button class="btn btn-secondary" onclick="app.openOtoboConfigModal()">
+                        <i data-lucide="settings-2" style="width:16px;height:16px;"></i>
+                        <span class="nav-label">Configurar OTOBO</span>
+                    </button>
+                    <button class="btn btn-primary" id="btn-sync-chamados" onclick="app.syncChamados()" style="display:none;">
+                        <i data-lucide="refresh-cw" style="width:16px;height:16px;"></i>
+                        <span class="nav-label">Sincronizar</span>
+                    </button>
+                </div>
+            </div>
+            <div id="chamados-content"></div>
         </section>
 
     </main>
@@ -1809,6 +1834,62 @@
                 <button type="button" id="btn-confirm-schedule" class="btn btn-primary" onclick="app.confirmScheduleGeneration()" style="flex: 1; justify-content: center;">
                     <i data-lucide="calendar-check"></i> <span id="btn-confirm-label">Confirmar</span>
                 </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL: CONFIGURAÇÃO OTOBO -->
+    <div class="modal-overlay" id="modal-otobo-config" style="display:none;">
+        <div class="modal glass" style="max-width:480px;">
+            <div class="modal-header">
+                <h3>Configurar OTOBO</h3>
+                <button class="close-modal" onclick="app.closeModal('modal-otobo-config')"><i data-lucide="x"></i></button>
+            </div>
+            <div style="padding:24px; display:flex; flex-direction:column; gap:16px;">
+                <div class="form-group" style="margin-bottom:0;">
+                    <label class="form-label">URL do OTOBO</label>
+                    <input type="url" id="otobo-url" class="form-control" placeholder="https://helpdesk.empresa.com">
+                </div>
+                <div class="form-group" style="margin-bottom:0;">
+                    <label class="form-label">Usuário</label>
+                    <input type="text" id="otobo-username" class="form-control" placeholder="seu.usuario">
+                </div>
+                <div class="form-group" style="margin-bottom:0;">
+                    <label class="form-label">Senha</label>
+                    <input type="password" id="otobo-password" class="form-control" placeholder="••••••••">
+                </div>
+                <p style="font-size:0.8rem; color:var(--text-muted); margin:0;">
+                    As credenciais são armazenadas de forma segura e isoladas por usuário.
+                </p>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="app.closeModal('modal-otobo-config')">Cancelar</button>
+                <button class="btn btn-primary" onclick="app.saveOtoboConfig()">Salvar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL: DETALHE DO CHAMADO -->
+    <div class="modal-overlay" id="modal-chamado" style="display:none;">
+        <div class="modal glass modal-task-two-panel" style="max-width:860px; max-height:90vh;">
+            <div class="modal-header">
+                <h3 id="chamado-modal-title">Chamado</h3>
+                <div style="display:flex; gap:8px; align-items:center;">
+                    <a id="chamado-otobo-link" href="#" target="_blank" rel="noopener" class="btn btn-secondary" style="font-size:0.8rem; padding:6px 12px; display:none;">
+                        <i data-lucide="external-link" style="width:14px;height:14px;"></i> Abrir no OTOBO
+                    </a>
+                    <button class="close-modal" onclick="app.closeModal('modal-chamado')"><i data-lucide="x"></i></button>
+                </div>
+            </div>
+            <div class="modal-task-body">
+                <div class="modal-task-content" style="overflow-y:auto;">
+                    <div id="chamado-articles-content">
+                        <div class="spinner-wrap"><div class="spinner"></div></div>
+                    </div>
+                </div>
+                <div class="modal-task-sidebar">
+                    <div id="chamado-sidebar-info"></div>
+                </div>
             </div>
         </div>
     </div>

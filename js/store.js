@@ -927,6 +927,62 @@ class TSPStore {
         }).eq('id', id).eq('user_id', this.userId);
         if (error) throw error;
     }
+
+    // ── OTOBO CONFIG ──────────────────────────────────────────────
+
+    _otoboConfig(r) {
+        return { url: r.url || '', username: r.username || '', password: r.password || '', updatedAt: r.updated_at };
+    }
+
+    async getOtoboConfig() {
+        const { data, error } = await this.db.from('otobo_config')
+            .select('*').eq('user_id', this.userId).maybeSingle();
+        if (error) throw error;
+        return data ? this._otoboConfig(data) : null;
+    }
+
+    async saveOtoboConfig(url, username, password) {
+        const { error } = await this.db.from('otobo_config').upsert({
+            user_id: this.userId, url, username, password, updated_at: new Date().toISOString()
+        }, { onConflict: 'user_id' });
+        if (error) throw error;
+    }
+
+    // ── TICKETS (cache OTOBO) ─────────────────────────────────────
+
+    _ticket(r) {
+        return {
+            id: r.id, ticketId: r.ticket_id, ticketNumber: r.ticket_number,
+            title: r.title, status: r.status, priority: r.priority,
+            queue: r.queue, customerName: r.customer_name, owner: r.owner,
+            createdAtOtobo: r.created_at_otobo, updatedAtOtobo: r.updated_at_otobo,
+            rawData: r.raw_data || {}, linkedClientId: r.linked_client_id || null,
+            syncedAt: r.synced_at
+        };
+    }
+
+    async getTickets() {
+        const { data, error } = await this.db.from('tickets').select('*')
+            .eq('user_id', this.userId).order('updated_at_otobo', { ascending: false });
+        if (error) throw error;
+        return (data || []).map(r => this._ticket(r));
+    }
+
+    async upsertTickets(ticketRows) {
+        const { error } = await this.db.from('tickets').upsert(ticketRows, { onConflict: 'user_id,ticket_id' });
+        if (error) throw error;
+    }
+
+    async deleteTicketsNotIn(ticketIds) {
+        if (ticketIds.length === 0) {
+            const { error } = await this.db.from('tickets').delete().eq('user_id', this.userId);
+            if (error) throw error;
+            return;
+        }
+        const { error } = await this.db.from('tickets').delete()
+            .eq('user_id', this.userId).not('ticket_id', 'in', `(${ticketIds.map(id => `'${id}'`).join(',')})`);
+        if (error) throw error;
+    }
 }
 
 window.store = new TSPStore();
