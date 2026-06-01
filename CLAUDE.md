@@ -304,7 +304,7 @@ O `docker-entrypoint.sh` injeta essas vars em `js/config.js` via `envsubst` na i
 - Comissão do consultor = 43% do valor pago pelo cliente (`clientPays * 0.43`)
 - Duração do atendimento calculada a partir de `startTime` e `endTime`
 - Barras de progresso baseadas em `minutes / (hoursTotal * 60)`
-- **`isOverLimit` (badge "Estourado") usa apenas o mês atual** — `getBatchStats()` e `getClientStats()` filtram os records pelo mês corrente antes de calcular `isOverLimit`; o percentual/progresso continua acumulado. Nunca comparar o total histórico com `hoursTotal` para esse badge.
+- **Todos os stats do dashboard/clientes usam apenas o mês atual** — `getBatchStats()` passa `recordsByClientMonth` (filtrado por `YYYY-MM`) ao `_computeClientStats()`; `getClientStats()` filtra `allRecords` pelo mês relevante antes de computar. `hoursUsed`, `percentage`, `hoursRemaining` e `isOverLimit` reiniciam todo mês. Nunca passar `recordsByClient` (acumulado) para `_computeClientStats` no contexto do dashboard.
 
 ---
 

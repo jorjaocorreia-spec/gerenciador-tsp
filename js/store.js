@@ -376,7 +376,7 @@ class TSPStore {
         const allRecords = await this.getRecordsByClient(clientId);
         const currentMonth = new Date().toISOString().slice(0, 7);
         const filterMonth = yearMonth || currentMonth;
-        const records = yearMonth ? allRecords.filter(r => r.date.startsWith(yearMonth)) : allRecords;
+        const records = allRecords.filter(r => r.date.startsWith(yearMonth || currentMonth));
         const monthRecords = allRecords.filter(r => r.date.startsWith(filterMonth));
 
         let doneIds = new Set(['done']);
@@ -456,13 +456,9 @@ class TSPStore {
 
         const clients = (clientsRes.data || []).map(r => this._client(r));
 
-        // recordsByClient: todos os records (para hoursUsed/progresso acumulado)
-        // recordsByClientMonth: apenas mês atual (para isOverLimit)
-        const recordsByClient = {};
+        // recordsByClientMonth: apenas mês atual — cota mensal reinicia todo mês
         const recordsByClientMonth = {};
         (recordsRes.data || []).forEach(r => {
-            if (!recordsByClient[r.client_id]) recordsByClient[r.client_id] = [];
-            recordsByClient[r.client_id].push({ minutes: parseInt(r.minutes) || 0 });
             if (r.date && r.date.startsWith(currentMonth)) {
                 if (!recordsByClientMonth[r.client_id]) recordsByClientMonth[r.client_id] = [];
                 recordsByClientMonth[r.client_id].push({ minutes: parseInt(r.minutes) || 0 });
@@ -488,15 +484,10 @@ class TSPStore {
         return clients.map(client => {
             const stat = this._computeClientStats(
                 client,
-                recordsByClient[client.id] || [],
+                recordsByClientMonth[client.id] || [],
                 tasksByClient[client.id] || [],
                 columnsByClient[client.id] || []
             );
-            // isOverLimit usa apenas o mês atual (controle mensal)
-            const monthMinutes = (recordsByClientMonth[client.id] || []).reduce((a, r) => a + r.minutes, 0);
-            const monthHours = monthMinutes / 60;
-            const monthProjected = monthHours + stat.tasksEstimatedHours;
-            stat.isOverLimit = client.hoursTotal > 0 && monthProjected > client.hoursTotal;
             return stat;
         });
     }
