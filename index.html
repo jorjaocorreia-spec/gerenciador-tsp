@@ -686,13 +686,13 @@
                 </div>
                 <button class="close-modal" onclick="app.closeModal('modal-agenda-report')"><i data-lucide="x"></i></button>
             </div>
-            <div style="padding: 16px 24px; border-bottom: 1px solid rgba(255,255,255,0.08); flex-shrink: 0;">
+            <div style="padding: 16px 24px; border-bottom: 1px solid rgba(255,255,255,0.08); flex-shrink: 0; display: flex; flex-direction: column; gap: 10px;">
                 <input type="hidden" id="report-client-id">
+                <div class="form-group" style="margin-bottom: 0;">
+                    <label>Cliente</label>
+                    <select id="report-client-select" class="form-control" onchange="app._onReportClientChange()"></select>
+                </div>
                 <div style="display: flex; gap: 12px; align-items: flex-end;">
-                    <div class="form-group" style="flex: 2; min-width: 0; margin-bottom: 0;">
-                        <label>Cliente</label>
-                        <select id="report-client-select" class="form-control" onchange="app._onReportClientChange()"></select>
-                    </div>
                     <div class="form-group" style="flex: 1; margin-bottom: 0;">
                         <label>Data início</label>
                         <input type="date" id="report-date-start" class="form-control">
