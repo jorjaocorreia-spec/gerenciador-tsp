@@ -304,6 +304,7 @@ O `docker-entrypoint.sh` injeta essas vars em `js/config.js` via `envsubst` na i
 - Comissão do consultor = 43% do valor pago pelo cliente (`clientPays * 0.43`)
 - Duração do atendimento calculada a partir de `startTime` e `endTime`
 - Barras de progresso baseadas em `minutes / (hoursTotal * 60)`
+- **`isOverLimit` (badge "Estourado") usa apenas o mês atual** — `getBatchStats()` e `getClientStats()` filtram os records pelo mês corrente antes de calcular `isOverLimit`; o percentual/progresso continua acumulado. Nunca comparar o total histórico com `hoursTotal` para esse badge.
 
 ---
 
