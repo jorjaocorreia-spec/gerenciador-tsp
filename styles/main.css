@@ -2313,3 +2313,91 @@ kbd {
     align-items: center;
     gap: 4px;
 }
+
+/* ── Relatório de Agenda ─────────────────────────────────── */
+.report-summary {
+    font-size: 0.82rem;
+    color: var(--text-muted);
+    margin-bottom: 12px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid rgba(255,255,255,0.07);
+}
+.report-events-list {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+.report-event-row {
+    display: grid;
+    grid-template-columns: 90px 110px 1fr 52px;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 12px;
+    background: rgba(255,255,255,0.04);
+    border-radius: 8px;
+    border: 1px solid rgba(255,255,255,0.06);
+    transition: border-color 0.15s;
+}
+.report-event-row:hover { border-color: rgba(255,255,255,0.12); }
+.report-event-date {
+    font-size: 0.82rem;
+    font-weight: 600;
+    white-space: nowrap;
+}
+.report-day-name {
+    font-weight: 400;
+    color: var(--text-muted);
+    font-size: 0.75rem;
+}
+.report-event-time {
+    font-size: 0.78rem;
+    color: var(--text-muted);
+    white-space: nowrap;
+}
+.report-event-info {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+    min-width: 0;
+}
+.report-event-title {
+    font-size: 0.85rem;
+    font-weight: 500;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 280px;
+}
+.report-event-type {
+    font-size: 0.72rem;
+    color: var(--text-muted);
+    background: rgba(255,255,255,0.07);
+    padding: 1px 6px;
+    border-radius: 4px;
+    white-space: nowrap;
+}
+.report-meet-link {
+    font-size: 0.75rem;
+    color: var(--primary-color);
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    text-decoration: none;
+    white-space: nowrap;
+}
+.report-meet-link:hover { text-decoration: underline; }
+.report-location {
+    font-size: 0.73rem;
+    color: var(--text-muted);
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+}
+.report-event-dur {
+    font-size: 0.78rem;
+    color: var(--primary-color);
+    font-weight: 500;
+    text-align: right;
+    white-space: nowrap;
+}

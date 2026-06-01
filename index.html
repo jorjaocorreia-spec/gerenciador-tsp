@@ -322,6 +322,9 @@
                     <button class="btn btn-secondary" onclick="app.openAgendaHelp()" title="Como funciona a integração com Google Calendar" style="font-weight:600; min-width:36px;">
                         <i data-lucide="help-circle"></i>
                     </button>
+                    <button class="btn btn-secondary" id="btn-agenda-report" onclick="app.openAgendaReportModal()" title="Gerar relatório de agenda por cliente">
+                        <i data-lucide="file-text"></i> Relatório
+                    </button>
                     <button class="btn btn-secondary active-mode" id="btn-agenda-schedule"
                         onclick="app.switchAgendaMode('schedule')">Programação</button>
                     <button class="btn btn-secondary" id="btn-agenda-monthly"
@@ -546,6 +549,9 @@
                 <button type="button" class="modal-tab" id="tab-btn-scheduling" onclick="app.switchClientModalTab('scheduling')">
                     <i data-lucide="calendar-clock" style="width:14px;height:14px;"></i> Agendamento
                 </button>
+                <button type="button" class="modal-tab" id="tab-btn-report" onclick="app.switchClientModalTab('report')">
+                    <i data-lucide="file-text" style="width:14px;height:14px;"></i> Relatório
+                </button>
             </div>
             <!-- Painel: Dados -->
             <div id="tab-client-dados">
@@ -631,6 +637,33 @@
                     Cliente</button>
             </form>
             </div><!-- /tab-client-dados -->
+            <!-- Painel: Relatório -->
+            <div id="tab-client-report" style="display:none; padding: 16px 24px 24px;">
+                <div style="display: flex; gap: 12px; align-items: flex-end; margin-bottom: 16px;">
+                    <div class="form-group" style="flex: 1; margin-bottom: 0;">
+                        <label>Data início</label>
+                        <input type="date" id="report-date-start-inline" class="form-control">
+                    </div>
+                    <div class="form-group" style="flex: 1; margin-bottom: 0;">
+                        <label>Data fim</label>
+                        <input type="date" id="report-date-end-inline" class="form-control">
+                    </div>
+                    <button type="button" class="btn btn-secondary" onclick="app.fetchAgendaReportEvents('inline')" style="flex-shrink: 0;">
+                        <i data-lucide="search"></i> Buscar
+                    </button>
+                </div>
+                <div id="report-preview-inline">
+                    <p class="text-muted" style="text-align:center;padding:24px 0;">Selecione o período e clique em Buscar.</p>
+                </div>
+                <div id="report-actions-inline" style="display:none; margin-top: 16px; display: flex; gap: 12px; justify-content: flex-end;">
+                    <button type="button" class="btn btn-secondary" id="btn-report-copy-inline" onclick="app.generateAgendaReportText('inline')">
+                        <i data-lucide="clipboard"></i> Copiar texto
+                    </button>
+                    <button type="button" class="btn btn-primary" id="btn-report-pdf-inline" onclick="app.generateAgendaReportPdf('inline')">
+                        <i data-lucide="download"></i> Baixar PDF
+                    </button>
+                </div>
+            </div>
             <!-- Painel: Agendamento -->
             <div id="tab-client-scheduling" style="display:none; padding: 0 24px 24px;">
                 <div id="client-scheduling-rules-list" style="min-height: 80px;">
@@ -638,6 +671,50 @@
                 </div>
                 <button type="button" class="btn btn-primary" id="btn-new-scheduling-rule" onclick="app.openNewSchedulingRule()" style="margin-top: 12px; width: 100%; justify-content: center;">
                     <i data-lucide="plus"></i> Nova Regra de Agendamento
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL: RELATÓRIO DE AGENDA -->
+    <div class="modal-overlay" id="modal-agenda-report">
+        <div class="modal glass" style="max-width: 680px; max-height: 90vh; display: flex; flex-direction: column;">
+            <div class="modal-header" style="flex-shrink: 0;">
+                <div>
+                    <h3>Relatório de Agenda</h3>
+                    <p class="text-muted" id="report-client-label" style="font-size: 0.85rem; margin: 2px 0 0;"></p>
+                </div>
+                <button class="close-modal" onclick="app.closeModal('modal-agenda-report')"><i data-lucide="x"></i></button>
+            </div>
+            <div style="padding: 16px 24px; border-bottom: 1px solid rgba(255,255,255,0.08); flex-shrink: 0;">
+                <input type="hidden" id="report-client-id">
+                <div style="display: flex; gap: 12px; align-items: flex-end;">
+                    <div class="form-group" style="flex: 1; margin-bottom: 0;">
+                        <label>Cliente</label>
+                        <select id="report-client-select" class="form-control" onchange="app._onReportClientChange()"></select>
+                    </div>
+                    <div class="form-group" style="flex: 1; margin-bottom: 0;">
+                        <label>Data início</label>
+                        <input type="date" id="report-date-start" class="form-control">
+                    </div>
+                    <div class="form-group" style="flex: 1; margin-bottom: 0;">
+                        <label>Data fim</label>
+                        <input type="date" id="report-date-end" class="form-control">
+                    </div>
+                    <button type="button" class="btn btn-secondary" onclick="app.fetchAgendaReportEvents('modal')" style="flex-shrink: 0;">
+                        <i data-lucide="search"></i> Buscar
+                    </button>
+                </div>
+            </div>
+            <div id="report-preview-modal" style="flex: 1; overflow-y: auto; padding: 16px 24px; min-height: 120px;">
+                <p class="text-muted" style="text-align:center;padding:32px 0;">Selecione o cliente e o período, depois clique em Buscar.</p>
+            </div>
+            <div style="padding: 16px 24px; border-top: 1px solid rgba(255,255,255,0.08); display: flex; gap: 12px; justify-content: flex-end; flex-shrink: 0;">
+                <button type="button" class="btn btn-secondary" id="btn-report-copy-modal" onclick="app.generateAgendaReportText('modal')" style="display:none;">
+                    <i data-lucide="clipboard"></i> Copiar texto
+                </button>
+                <button type="button" class="btn btn-primary" id="btn-report-pdf-modal" onclick="app.generateAgendaReportPdf('modal')" style="display:none;">
+                    <i data-lucide="download"></i> Baixar PDF
                 </button>
             </div>
         </div>

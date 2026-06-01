@@ -356,6 +356,17 @@ class TSPStore {
         return data.map(r => this._event(r));
     }
 
+    async getAgendaEventsByClientAndRange(clientId, startDate, endDate) {
+        const { data, error } = await this.db.from('agenda_events').select('*')
+            .eq('user_id', this.userId)
+            .eq('client_id', clientId)
+            .lte('date', endDate)
+            .or(`date_end.gte.${startDate},and(date_end.is.null,date.gte.${startDate})`)
+            .order('date');
+        if (error) throw error;
+        return data.map(r => this._event(r));
+    }
+
     // ── ESTATÍSTICAS ──────────────────────────────────────────────
 
     async getClientStats(clientId, yearMonth = null) {

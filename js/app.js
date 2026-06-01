@@ -99,6 +99,9 @@ class AppController {
         // Sync Google Calendar automático
         this._lastGoogleSync = 0;
         this._googleSyncInterval = null;
+        // Relatório de agenda
+        this._reportEvents = [];
+        this._reportClient = null;
         // Guard para evitar renderAll() concorrente
         this._renderAllRunning = false;
         this._renderAllPending = false;
@@ -4627,13 +4630,19 @@ class AppController {
     switchClientModalTab(tab) {
         const dados = document.getElementById('tab-client-dados');
         const sched = document.getElementById('tab-client-scheduling');
+        const rep   = document.getElementById('tab-client-report');
         const btnDados = document.getElementById('tab-btn-dados');
         const btnSched = document.getElementById('tab-btn-scheduling');
+        const btnRep   = document.getElementById('tab-btn-report');
         if (!dados || !sched) return;
+
+        dados.style.display = 'none';
+        sched.style.display = 'none';
+        if (rep) rep.style.display = 'none';
+        [btnDados, btnSched, btnRep].forEach(b => b && b.classList.remove('active'));
+
         if (tab === 'scheduling') {
-            dados.style.display = 'none';
             sched.style.display = 'block';
-            btnDados.classList.remove('active');
             btnSched.classList.add('active');
             const clientId = document.getElementById('client-id').value;
             if (clientId) this._renderClientSchedulingTab(clientId);
@@ -4641,11 +4650,24 @@ class AppController {
                 document.getElementById('client-scheduling-rules-list').innerHTML =
                     '<p class="text-muted" style="text-align:center;padding:20px 0;">Salve o cliente primeiro para gerenciar regras de agendamento.</p>';
             }
+        } else if (tab === 'report') {
+            if (rep) rep.style.display = 'block';
+            if (btnRep) btnRep.classList.add('active');
+            const clientId = document.getElementById('client-id').value;
+            if (clientId) {
+                // Pré-preenche período com o mês corrente
+                const today = new Date();
+                const first = new Date(today.getFullYear(), today.getMonth(), 1).toISOString().split('T')[0];
+                const last  = new Date(today.getFullYear(), today.getMonth() + 1, 0).toISOString().split('T')[0];
+                const startEl = document.getElementById('report-date-start-inline');
+                const endEl   = document.getElementById('report-date-end-inline');
+                if (startEl && !startEl.value) startEl.value = first;
+                if (endEl   && !endEl.value)   endEl.value   = last;
+                this._reportInlineClientId = clientId;
+            }
         } else {
             dados.style.display = '';
-            sched.style.display = 'none';
             btnDados.classList.add('active');
-            btnSched.classList.remove('active');
         }
         lucide.createIcons();
     }
@@ -5409,6 +5431,285 @@ class AppController {
             this._pendingPreviewEvents = [];
             this._pendingPreviewRuleId = null;
         }
+    }
+
+    // ===================================
+    // RELATÓRIO DE AGENDA (Fase 27)
+    // ===================================
+
+    async openAgendaReportModal(clientId) {
+        const today = new Date();
+        const first = new Date(today.getFullYear(), today.getMonth(), 1).toISOString().split('T')[0];
+        const last  = new Date(today.getFullYear(), today.getMonth() + 1, 0).toISOString().split('T')[0];
+
+        document.getElementById('report-date-start').value = first;
+        document.getElementById('report-date-end').value   = last;
+        document.getElementById('btn-report-pdf-modal').style.display   = 'none';
+        document.getElementById('btn-report-copy-modal').style.display  = 'none';
+        document.getElementById('report-preview-modal').innerHTML =
+            '<p class="text-muted" style="text-align:center;padding:32px 0;">Selecione o cliente e o período, depois clique em Buscar.</p>';
+
+        // Popula o select de clientes
+        const sel = document.getElementById('report-client-select');
+        sel.innerHTML = '<option value="">— Selecione um cliente —</option>';
+        try {
+            const clients = (await store.getClients()).filter(c => c.status === 'active');
+            clients.sort((a, b) => a.name.localeCompare(b.name));
+            clients.forEach(c => {
+                const opt = document.createElement('option');
+                opt.value = c.id;
+                opt.textContent = c.name + (c.projectNum ? ` (${c.projectNum})` : '');
+                sel.appendChild(opt);
+            });
+        } catch (_) {}
+
+        if (clientId) {
+            sel.value = clientId;
+            this._onReportClientChange();
+        }
+
+        this._reportEvents = [];
+        this._reportClient = null;
+        this.openModal('modal-agenda-report');
+    }
+
+    _onReportClientChange() {
+        const sel = document.getElementById('report-client-select');
+        const label = document.getElementById('report-client-label');
+        const opt = sel.options[sel.selectedIndex];
+        label.textContent = opt && opt.value ? opt.textContent : '';
+        document.getElementById('btn-report-pdf-modal').style.display  = 'none';
+        document.getElementById('btn-report-copy-modal').style.display = 'none';
+        document.getElementById('report-preview-modal').innerHTML =
+            '<p class="text-muted" style="text-align:center;padding:32px 0;">Clique em Buscar para carregar os eventos.</p>';
+        this._reportEvents = [];
+        this._reportClient = null;
+    }
+
+    _reportGetContext(source) {
+        if (source === 'inline') {
+            return {
+                clientId:  this._reportInlineClientId || '',
+                startDate: document.getElementById('report-date-start-inline')?.value || '',
+                endDate:   document.getElementById('report-date-end-inline')?.value || '',
+                preview:   document.getElementById('report-preview-inline'),
+                pdfBtn:    document.getElementById('btn-report-pdf-inline'),
+                copyBtn:   document.getElementById('btn-report-copy-inline'),
+            };
+        }
+        return {
+            clientId:  document.getElementById('report-client-select')?.value || '',
+            startDate: document.getElementById('report-date-start')?.value || '',
+            endDate:   document.getElementById('report-date-end')?.value || '',
+            preview:   document.getElementById('report-preview-modal'),
+            pdfBtn:    document.getElementById('btn-report-pdf-modal'),
+            copyBtn:   document.getElementById('btn-report-copy-modal'),
+        };
+    }
+
+    async fetchAgendaReportEvents(source) {
+        const ctx = this._reportGetContext(source);
+        if (!ctx.clientId)  { Toast.show('Selecione um cliente.', 'error'); return; }
+        if (!ctx.startDate || !ctx.endDate) { Toast.show('Selecione o período completo.', 'error'); return; }
+        if (ctx.startDate > ctx.endDate)    { Toast.show('Data início deve ser anterior à data fim.', 'error'); return; }
+
+        ctx.preview.innerHTML = `<div style="padding:24px 0;">${spinnerHtml}</div>`;
+        if (ctx.pdfBtn)  ctx.pdfBtn.style.display  = 'none';
+        if (ctx.copyBtn) ctx.copyBtn.style.display  = 'none';
+
+        try {
+            const [events, client] = await Promise.all([
+                store.getAgendaEventsByClientAndRange(ctx.clientId, ctx.startDate, ctx.endDate),
+                store.getClient(ctx.clientId)
+            ]);
+
+            this._reportEvents = events;
+            this._reportClient = client;
+
+            if (source === 'modal') {
+                const label = document.getElementById('report-client-label');
+                if (label && client) label.textContent = client.name + (client.projectNum ? ` · Proj. ${client.projectNum}` : '');
+            }
+
+            if (events.length === 0) {
+                ctx.preview.innerHTML = '<p class="text-muted" style="text-align:center;padding:32px 0;">Nenhum evento encontrado neste período.</p>';
+                return;
+            }
+
+            ctx.preview.innerHTML = this._buildReportPreviewHtml(events);
+            lucide.createIcons();
+            if (ctx.pdfBtn)  ctx.pdfBtn.style.display  = 'inline-flex';
+            if (ctx.copyBtn) ctx.copyBtn.style.display  = 'inline-flex';
+        } catch (err) {
+            ctx.preview.innerHTML = '<p class="text-muted" style="text-align:center;padding:24px 0;">Erro ao buscar eventos.</p>';
+            Toast.show('Erro ao buscar agenda: ' + err.message, 'error');
+        }
+    }
+
+    _buildReportPreviewHtml(events) {
+        const typeLabels = { meeting: 'Reunião', consulting: 'Consultoria', task: 'Tarefa', reminder: 'Lembrete' };
+        const dayNames   = ['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'];
+        let totalMinutes = 0;
+
+        const rows = events.map(ev => {
+            const [y, m, d] = ev.date.split('-');
+            const dateObj = new Date(ev.date + 'T12:00:00');
+            const dateStr = `${d}/${m}/${y}`;
+            const dayStr  = dayNames[dateObj.getDay()];
+            const allDay  = !ev.startTime;
+            const timeStr = allDay ? 'Dia inteiro' : `${ev.startTime} – ${ev.endTime || '...'}`;
+            let dur = '';
+            if (!allDay && ev.startTime && ev.endTime) {
+                const [sh, sm] = ev.startTime.split(':').map(Number);
+                const [eh, em] = ev.endTime.split(':').map(Number);
+                const mins = (eh * 60 + em) - (sh * 60 + sm);
+                if (mins > 0) {
+                    totalMinutes += mins;
+                    dur = mins >= 60
+                        ? `${Math.floor(mins/60)}h${mins % 60 > 0 ? (mins%60)+'min' : ''}`
+                        : `${mins}min`;
+                }
+            }
+            const type = typeLabels[ev.type] || ev.type;
+            const meetHtml = ev.meetLink
+                ? `<a href="${ev.meetLink}" target="_blank" class="report-meet-link"><i data-lucide="video" style="width:12px;height:12px;"></i> Meet</a>`
+                : '';
+            const locHtml = ev.location
+                ? `<span class="report-location"><i data-lucide="map-pin" style="width:11px;height:11px;"></i> ${escapeHtml(ev.location)}</span>`
+                : '';
+            return `<div class="report-event-row">
+                <div class="report-event-date">${dateStr} <span class="report-day-name">${dayStr}</span></div>
+                <div class="report-event-time">${escapeHtml(timeStr)}</div>
+                <div class="report-event-info">
+                    <span class="report-event-title">${escapeHtml(ev.title)}</span>
+                    <span class="report-event-type">${type}</span>
+                    ${meetHtml}${locHtml}
+                </div>
+                <div class="report-event-dur">${dur}</div>
+            </div>`;
+        }).join('');
+
+        const totalH = Math.floor(totalMinutes / 60);
+        const totalM = totalMinutes % 60;
+        const totalStr = totalMinutes > 0
+            ? ` · ${totalH > 0 ? totalH+'h' : ''}${totalM > 0 ? totalM+'min' : ''}`
+            : '';
+
+        return `<div class="report-summary">${events.length} evento${events.length !== 1 ? 's' : ''}${totalStr}</div>
+                <div class="report-events-list">${rows}</div>`;
+    }
+
+    generateAgendaReportPdf(source) {
+        const events = this._reportEvents;
+        const client = this._reportClient;
+        const ctx    = this._reportGetContext(source);
+        if (!events || events.length === 0) { Toast.show('Nenhum dado para exportar.', 'info'); return; }
+
+        const { jsPDF } = window.jspdf;
+        const doc = new jsPDF();
+        const fmtDate = d => d ? d.split('-').reverse().join('/') : '';
+        const typeLabels = { meeting: 'Reunião', consulting: 'Consultoria', task: 'Tarefa', reminder: 'Lembrete' };
+        const dayNames   = ['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'];
+
+        doc.setFontSize(16);
+        doc.text('Relatório de Agenda', 14, 18);
+        doc.setFontSize(10);
+        doc.text(`Cliente: ${client?.name || ''}${client?.projectNum ? ' · Proj. ' + client.projectNum : ''}`, 14, 26);
+        doc.text(`Período: ${fmtDate(ctx.startDate)} a ${fmtDate(ctx.endDate)}`, 14, 32);
+
+        let totalMinutes = 0;
+        const rows = events.map(ev => {
+            const [y, m, d] = ev.date.split('-');
+            const dateObj = new Date(ev.date + 'T12:00:00');
+            const dateStr = `${d}/${m}/${y} ${dayNames[dateObj.getDay()]}`;
+            const allDay  = !ev.startTime;
+            const timeStr = allDay ? 'Dia inteiro' : `${ev.startTime} – ${ev.endTime || '...'}`;
+            let dur = '';
+            if (!allDay && ev.startTime && ev.endTime) {
+                const [sh, sm] = ev.startTime.split(':').map(Number);
+                const [eh, em] = ev.endTime.split(':').map(Number);
+                const mins = (eh * 60 + em) - (sh * 60 + sm);
+                if (mins > 0) {
+                    totalMinutes += mins;
+                    dur = mins >= 60
+                        ? `${Math.floor(mins/60)}h${mins%60 > 0 ? (mins%60)+'min' : ''}`
+                        : `${mins}min`;
+                }
+            }
+            return [dateStr, timeStr, ev.title, typeLabels[ev.type] || ev.type, ev.location || '', dur];
+        });
+
+        doc.autoTable({
+            startY: 38,
+            head: [['Data', 'Horário', 'Título', 'Tipo', 'Local', 'Duração']],
+            body: rows,
+            styles: { fontSize: 8 },
+            headStyles: { fillColor: [79, 70, 229] },
+            columnStyles: { 2: { cellWidth: 45 } },
+        });
+
+        const finalY = doc.lastAutoTable.finalY || 100;
+        const totalH = Math.floor(totalMinutes / 60);
+        const totalM = totalMinutes % 60;
+        if (totalMinutes > 0) {
+            doc.setFontSize(9);
+            doc.text(
+                `Total: ${events.length} evento${events.length !== 1 ? 's' : ''} · ${totalH > 0 ? totalH+'h' : ''}${totalM > 0 ? totalM+'min' : ''}`,
+                14, finalY + 8
+            );
+        }
+
+        const safeName = (client?.name || 'agenda').replace(/[^a-z0-9]/gi, '_').toLowerCase();
+        doc.save(`agenda_${safeName}_${ctx.startDate}_${ctx.endDate}.pdf`);
+    }
+
+    generateAgendaReportText(source) {
+        const events = this._reportEvents;
+        const client = this._reportClient;
+        const ctx    = this._reportGetContext(source);
+        if (!events || events.length === 0) { Toast.show('Nenhum dado para copiar.', 'info'); return; }
+
+        const fmtDate    = d => d ? d.split('-').reverse().join('/') : '';
+        const dayNames   = ['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'];
+        const typeLabels = { meeting: 'Reunião', consulting: 'Consultoria', task: 'Tarefa', reminder: 'Lembrete' };
+
+        let totalMinutes = 0;
+        const lines = [
+            `Agenda — ${client?.name || ''}${client?.projectNum ? ' (Proj. ' + client.projectNum + ')' : ''}`,
+            `Período: ${fmtDate(ctx.startDate)} a ${fmtDate(ctx.endDate)}`,
+            '',
+        ];
+
+        events.forEach(ev => {
+            const [y, m, d] = ev.date.split('-');
+            const dateObj = new Date(ev.date + 'T12:00:00');
+            const dateStr = `${d}/${m} (${dayNames[dateObj.getDay()]})`;
+            const allDay  = !ev.startTime;
+            const timeStr = allDay ? 'Dia inteiro' : `${ev.startTime} às ${ev.endTime || '...'}`;
+            let durPart = '';
+            if (!allDay && ev.startTime && ev.endTime) {
+                const [sh, sm] = ev.startTime.split(':').map(Number);
+                const [eh, em] = ev.endTime.split(':').map(Number);
+                const mins = (eh * 60 + em) - (sh * 60 + sm);
+                if (mins > 0) {
+                    totalMinutes += mins;
+                    durPart = ` — ${mins >= 60 ? Math.floor(mins/60)+'h'+(mins%60>0?(mins%60)+'min':'') : mins+'min'}`;
+                }
+            }
+            lines.push(`• ${dateStr} — ${timeStr} — ${ev.title} (${typeLabels[ev.type] || ev.type})${durPart}`);
+            if (ev.meetLink)  lines.push(`  Link Meet: ${ev.meetLink}`);
+            if (ev.location)  lines.push(`  Local: ${ev.location}`);
+        });
+
+        if (totalMinutes > 0) {
+            const totalH = Math.floor(totalMinutes / 60);
+            const totalM = totalMinutes % 60;
+            lines.push('', `Total: ${events.length} evento${events.length!==1?'s':''} | ${totalH>0?totalH+'h':''}${totalM>0?totalM+'min':''}`);
+        }
+
+        navigator.clipboard.writeText(lines.join('\n'))
+            .then(() => Toast.show('Texto copiado para a área de transferência!', 'success'))
+            .catch(() => Toast.show('Erro ao copiar texto.', 'error'));
     }
 
     async handleCalendarSettingsSave(e) {
