@@ -6000,25 +6000,35 @@ class AppController {
         }
     }
 
-    async _fetchTicketsFromOtobo(config) {
-        const url = config.url.replace(/\/$/, '');
-        const creds = { UserLogin: config.username, Password: config.password };
-        const headers = { 'Content-Type': 'application/json' };
+    async _otoboProxyFetch(action, params = {}) {
+        const { data: { session } } = await window.supabaseClient.auth.getSession();
+        if (!session) throw new Error('Sessão expirada. Faça login novamente.');
+        const res = await fetch(
+            'https://klimkamnydfnzqetqlqm.supabase.co/functions/v1/otobo-proxy',
+            {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${session.access_token}`
+                },
+                body: JSON.stringify({
+                    action,
+                    otoboUrl: this._otoboConfig.url,
+                    username: this._otoboConfig.username,
+                    password: this._otoboConfig.password,
+                    ...params
+                })
+            }
+        );
+        if (!res.ok) {
+            const err = await res.json().catch(() => ({}));
+            throw new Error(err.error || `Proxy retornou ${res.status}`);
+        }
+        return res.json();
+    }
 
-        // TicketSearch — todos os não fechados
-        let searchRes;
-        try {
-            searchRes = await fetch(
-                `${url}/otobo/nph-genericinterface.pl/Webservice/GenericTicketConnectorREST/Ticket/Search`,
-                { method: 'POST', headers, body: JSON.stringify({ ...creds, StateType: ['new', 'open', 'pending reminder', 'pending auto', 'in treatment'] }) }
-            );
-        } catch (networkErr) {
-            throw new Error('Não foi possível conectar ao OTOBO. Verifique se o servidor está acessível e se o CORS está configurado para permitir requisições deste domínio (Access-Control-Allow-Origin).');
-        }
-        if (!searchRes.ok) {
-            throw new Error(`OTOBO retornou ${searchRes.status}: ${searchRes.statusText}`);
-        }
-        const searchData = await searchRes.json();
+    async _fetchTicketsFromOtobo(config) {
+        const searchData = await this._otoboProxyFetch('search');
         const ticketIds = searchData.TicketID || [];
         if (ticketIds.length === 0) return [];
 
@@ -6026,14 +6036,10 @@ class AppController {
         const results = [];
         for (let i = 0; i < ticketIds.length; i += 10) {
             const batch = ticketIds.slice(i, i + 10);
-            const getRes = await fetch(
-                `${url}/otobo/nph-genericinterface.pl/Webservice/GenericTicketConnectorREST/Ticket/${batch.join(',')}?UserLogin=${encodeURIComponent(config.username)}&Password=${encodeURIComponent(config.password)}`,
-                { headers }
-            );
-            if (getRes.ok) {
-                const d = await getRes.json();
+            try {
+                const d = await this._otoboProxyFetch('get', { ticketIds: batch });
                 results.push(...(d.Ticket || []));
-            }
+            } catch (e) { /* falha em um lote não impede os demais */ }
         }
         return results;
     }
@@ -6166,13 +6172,7 @@ class AppController {
 
     async _fetchTicketArticles(ticketId) {
         if (!this._otoboConfig?.url) return [];
-        const url = this._otoboConfig.url.replace(/\/$/, '');
-        const res = await fetch(
-            `${url}/otobo/nph-genericinterface.pl/Webservice/GenericTicketConnectorREST/Ticket/${ticketId}?UserLogin=${encodeURIComponent(this._otoboConfig.username)}&Password=${encodeURIComponent(this._otoboConfig.password)}&AllArticles=1`,
-            { headers: { 'Content-Type': 'application/json' } }
-        );
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        const data = await res.json();
+        const data = await this._otoboProxyFetch('articles', { ticketId });
         const ticket = (data.Ticket || [])[0];
         return ticket?.Article || [];
     }
