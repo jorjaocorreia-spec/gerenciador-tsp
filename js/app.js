@@ -6006,14 +6006,16 @@ class AppController {
         const headers = { 'Content-Type': 'application/json' };
 
         // TicketSearch — todos os não fechados
-        const searchRes = await fetch(
-            `${url}/otobo/nph-genericinterface.pl/Webservice/GenericTicketConnectorREST/Ticket/Search`,
-            { method: 'POST', headers, body: JSON.stringify({ ...creds, StateType: ['new', 'open', 'pending reminder', 'pending auto', 'in treatment'] }) }
-        );
+        let searchRes;
+        try {
+            searchRes = await fetch(
+                `${url}/otobo/nph-genericinterface.pl/Webservice/GenericTicketConnectorREST/Ticket/Search`,
+                { method: 'POST', headers, body: JSON.stringify({ ...creds, StateType: ['new', 'open', 'pending reminder', 'pending auto', 'in treatment'] }) }
+            );
+        } catch (networkErr) {
+            throw new Error('Não foi possível conectar ao OTOBO. Verifique se o servidor está acessível e se o CORS está configurado para permitir requisições deste domínio (Access-Control-Allow-Origin).');
+        }
         if (!searchRes.ok) {
-            if (searchRes.status === 0 || searchRes.type === 'opaque') {
-                throw new Error('CORS bloqueado. Peça ao administrador do OTOBO para configurar Access-Control-Allow-Origin.');
-            }
             throw new Error(`OTOBO retornou ${searchRes.status}: ${searchRes.statusText}`);
         }
         const searchData = await searchRes.json();
