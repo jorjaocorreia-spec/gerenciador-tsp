@@ -373,8 +373,11 @@ class TSPStore {
         const client = await this.getClient(clientId);
         if (!client) return null;
 
-        let records = await this.getRecordsByClient(clientId);
-        if (yearMonth) records = records.filter(r => r.date.startsWith(yearMonth));
+        const allRecords = await this.getRecordsByClient(clientId);
+        const currentMonth = new Date().toISOString().slice(0, 7);
+        const filterMonth = yearMonth || currentMonth;
+        const records = yearMonth ? allRecords.filter(r => r.date.startsWith(yearMonth)) : allRecords;
+        const monthRecords = allRecords.filter(r => r.date.startsWith(filterMonth));
 
         let doneIds = new Set(['done']);
         try {
@@ -390,6 +393,10 @@ class TSPStore {
         const projectedHours = hoursUsed + tasksEstimatedHours;
         const percentage = client.hoursTotal > 0 ? (totalUsedWithTasks / client.hoursTotal) * 100 : 0;
 
+        // isOverLimit usa apenas o mês atual (controle mensal)
+        const monthMinutes = monthRecords.reduce((acc, r) => acc + r.minutes, 0);
+        const monthProjected = (monthMinutes / 60) + tasksEstimatedHours;
+
         return {
             client,
             hoursTotal: client.hoursTotal,
@@ -400,7 +407,7 @@ class TSPStore {
             tasksSpentHours: parseFloat(tasksSpentHours.toFixed(2)),
             hoursRemaining: parseFloat((Math.max(0, client.hoursTotal - totalUsedWithTasks)).toFixed(2)),
             percentage: Math.min(100, Math.round(percentage)),
-            isOverLimit: projectedHours > client.hoursTotal
+            isOverLimit: client.hoursTotal > 0 && monthProjected > client.hoursTotal
         };
     }
 
@@ -436,9 +443,10 @@ class TSPStore {
     // 4 queries para todos os clientes — substitui N×4 queries do loop de getClientStats
     async getBatchStats() {
         const uid = this.userId;
+        const currentMonth = new Date().toISOString().slice(0, 7); // YYYY-MM
         const [clientsRes, recordsRes, tasksRes, columnsRes] = await Promise.all([
             this.db.from('clients').select('*').eq('user_id', uid).order('created_at'),
-            this.db.from('records').select('client_id, minutes').eq('user_id', uid),
+            this.db.from('records').select('client_id, minutes, date').eq('user_id', uid),
             this.db.from('tasks').select('id, client_id, status, estimated_minutes, spent_minutes').eq('user_id', uid),
             this.db.from('kanban_columns').select('*').eq('user_id', uid)
         ]);
@@ -448,10 +456,17 @@ class TSPStore {
 
         const clients = (clientsRes.data || []).map(r => this._client(r));
 
+        // recordsByClient: todos os records (para hoursUsed/progresso acumulado)
+        // recordsByClientMonth: apenas mês atual (para isOverLimit)
         const recordsByClient = {};
+        const recordsByClientMonth = {};
         (recordsRes.data || []).forEach(r => {
             if (!recordsByClient[r.client_id]) recordsByClient[r.client_id] = [];
             recordsByClient[r.client_id].push({ minutes: parseInt(r.minutes) || 0 });
+            if (r.date && r.date.startsWith(currentMonth)) {
+                if (!recordsByClientMonth[r.client_id]) recordsByClientMonth[r.client_id] = [];
+                recordsByClientMonth[r.client_id].push({ minutes: parseInt(r.minutes) || 0 });
+            }
         });
 
         const tasksByClient = {};
@@ -470,14 +485,20 @@ class TSPStore {
             columnsByClient[c.client_id].push(this._column(c));
         });
 
-        return clients.map(client =>
-            this._computeClientStats(
+        return clients.map(client => {
+            const stat = this._computeClientStats(
                 client,
                 recordsByClient[client.id] || [],
                 tasksByClient[client.id] || [],
                 columnsByClient[client.id] || []
-            )
-        );
+            );
+            // isOverLimit usa apenas o mês atual (controle mensal)
+            const monthMinutes = (recordsByClientMonth[client.id] || []).reduce((a, r) => a + r.minutes, 0);
+            const monthHours = monthMinutes / 60;
+            const monthProjected = monthHours + stat.tasksEstimatedHours;
+            stat.isOverLimit = client.hoursTotal > 0 && monthProjected > client.hoursTotal;
+            return stat;
+        });
     }
 
     async getAllStats() {
