@@ -102,6 +102,8 @@ class AppController {
         // Relatório de agenda
         this._reportEvents = [];
         this._reportClient = null;
+        // Navegação de mês no Dashboard
+        this._dashboardMonth = new Date().toISOString().slice(0, 7); // YYYY-MM
         // Guard para evitar renderAll() concorrente
         this._renderAllRunning = false;
         this._renderAllPending = false;
@@ -1453,9 +1455,45 @@ class AppController {
         }
     }
 
+    _formatDashboardMonth(yyyyMM) {
+        const [y, m] = yyyyMM.split('-').map(Number);
+        const names = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+        return `${names[m - 1]}/${y}`;
+    }
+
+    dashNavMonth(delta) {
+        const [y, m] = this._dashboardMonth.split('-').map(Number);
+        const d = new Date(y, m - 1 + delta, 1);
+        const newMonth = d.toISOString().slice(0, 7);
+        const currentMonth = new Date().toISOString().slice(0, 7);
+        if (newMonth > currentMonth) return;
+        this._dashboardMonth = newMonth;
+        this.renderDashboard();
+    }
+
+    dashGoToCurrentMonth() {
+        this._dashboardMonth = new Date().toISOString().slice(0, 7);
+        this.renderDashboard();
+    }
+
     async renderDashboard(preloadedClients, batchStats) {
         const container = document.getElementById('dashboard-container');
         container.innerHTML = spinnerHtml;
+
+        const currentMonth = new Date().toISOString().slice(0, 7);
+        const isCurrentMonth = this._dashboardMonth === currentMonth;
+
+        // Atualiza controles de navegação de mês
+        const monthLabel = document.getElementById('dash-month-label');
+        const btnNext = document.getElementById('btn-dash-next-month');
+        const btnCurrentMonth = document.getElementById('btn-dash-current-month');
+        const subtitle = document.getElementById('dash-subtitle');
+        if (monthLabel) monthLabel.textContent = this._formatDashboardMonth(this._dashboardMonth);
+        if (btnNext) btnNext.disabled = isCurrentMonth;
+        if (btnCurrentMonth) btnCurrentMonth.style.display = isCurrentMonth ? 'none' : '';
+        if (subtitle) subtitle.textContent = isCurrentMonth
+            ? 'Acompanhe o consumo de horas dos seus contratos.'
+            : `Histórico — ${this._formatDashboardMonth(this._dashboardMonth)}`;
 
         let showActive = true;
         let showFinished = false;
@@ -1465,23 +1503,19 @@ class AppController {
         if (filterActiveEl) showActive = filterActiveEl.checked;
         if (filterFinishedEl) showFinished = filterFinishedEl.checked;
 
+        const filterStats = (allStats) => allStats.filter(s => {
+            const status = s.client.status || 'active';
+            if (status === 'active' && showActive) return true;
+            if (status === 'finished' && showFinished) return true;
+            return false;
+        });
+
         let stats;
-        if (batchStats) {
-            stats = batchStats.filter(s => {
-                const status = s.client.status || 'active';
-                if (status === 'active' && showActive) return true;
-                if (status === 'finished' && showFinished) return true;
-                return false;
-            });
+        if (batchStats && isCurrentMonth) {
+            stats = filterStats(batchStats);
         } else {
-            const allClients = preloadedClients || await store.getClients();
-            const clients = allClients.filter(c => {
-                const status = c.status || 'active';
-                if (status === 'active' && showActive) return true;
-                if (status === 'finished' && showFinished) return true;
-                return false;
-            });
-            stats = await Promise.all(clients.map(c => store.getClientStats(c.id)));
+            const allBatchStats = await store.getBatchStats(this._dashboardMonth);
+            stats = filterStats(allBatchStats);
         }
         stats = stats.filter(s => s !== null);
 
@@ -5759,6 +5793,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             window.app.selectedClient = null;
             window.app.selectedMonth = null;
             window.app.currentView = 'dashboard';
+            window.app._dashboardMonth = new Date().toISOString().slice(0, 7);
             window.app.agendaCurrentDate = new Date();
             window.app.pendingPdfRecords = [];
             window.app.pendingPdfWarnings = [];

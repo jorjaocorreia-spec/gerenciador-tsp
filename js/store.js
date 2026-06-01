@@ -441,9 +441,9 @@ class TSPStore {
     }
 
     // 4 queries para todos os clientes — substitui N×4 queries do loop de getClientStats
-    async getBatchStats() {
+    async getBatchStats(month) {
         const uid = this.userId;
-        const currentMonth = new Date().toISOString().slice(0, 7); // YYYY-MM
+        const targetMonth = month || new Date().toISOString().slice(0, 7); // YYYY-MM
         const [clientsRes, recordsRes, tasksRes, columnsRes] = await Promise.all([
             this.db.from('clients').select('*').eq('user_id', uid).order('created_at'),
             this.db.from('records').select('client_id, minutes, date').eq('user_id', uid),
@@ -456,10 +456,10 @@ class TSPStore {
 
         const clients = (clientsRes.data || []).map(r => this._client(r));
 
-        // recordsByClientMonth: apenas mês atual — cota mensal reinicia todo mês
+        // recordsByClientMonth: apenas o mês alvo — cota mensal reinicia todo mês
         const recordsByClientMonth = {};
         (recordsRes.data || []).forEach(r => {
-            if (r.date && r.date.startsWith(currentMonth)) {
+            if (r.date && r.date.startsWith(targetMonth)) {
                 if (!recordsByClientMonth[r.client_id]) recordsByClientMonth[r.client_id] = [];
                 recordsByClientMonth[r.client_id].push({ minutes: parseInt(r.minutes) || 0 });
             }
