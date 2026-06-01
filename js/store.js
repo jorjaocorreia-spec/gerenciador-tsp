@@ -133,6 +133,18 @@ class TSPStore {
         return data.map(r => this._record(r));
     }
 
+    async getRecordsByDateRange(startDate, endDate, clientIds = []) {
+        let query = this.db.from('records')
+            .select('id, client_id, date, start_time, end_time')
+            .eq('user_id', this.userId)
+            .gte('date', startDate)
+            .lte('date', endDate);
+        if (clientIds.length > 0) query = query.in('client_id', clientIds);
+        const { data, error } = await query;
+        if (error) throw error;
+        return (data || []).map(r => this._record(r));
+    }
+
     async addRecord(clientId, date, startTime, endTime, minutes, description) {
         const { data, error } = await this.db.from('records').insert({
             user_id: this.userId, client_id: clientId, date,

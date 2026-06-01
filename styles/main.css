@@ -1639,6 +1639,30 @@ body.money-hidden .money-value {
 }
 
 /* =========================================
+   PDF Import — linhas duplicadas
+   ========================================= */
+.pdf-row-duplicate {
+  opacity: 0.55;
+}
+.pdf-row-duplicate td {
+  color: var(--text-muted);
+  text-decoration: line-through;
+  text-decoration-color: var(--text-muted);
+}
+.pdf-dup-badge {
+  display: inline-block;
+  font-size: 0.65rem;
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: var(--warning-color);
+  color: #000;
+  font-weight: 600;
+  vertical-align: middle;
+  margin-left: 4px;
+  text-decoration: none;
+}
+
+/* =========================================
    Toast Notifications
    ========================================= */
 #toast-container {

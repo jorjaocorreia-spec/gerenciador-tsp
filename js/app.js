@@ -3570,6 +3570,28 @@ class AppController {
             statusInput.value = `Múltiplos Clientes Identificados (${uniqueClientIds.size})`;
         }
 
+        // Detecta duplicatas via query bulk por intervalo de datas
+        const resolvedDates = this.pendingPdfRecords.map(r => r.date).filter(Boolean).sort();
+        const resolvedClientIds = [...new Set(
+            this.pendingPdfRecords.map(r => r.matchedClientId).filter(Boolean)
+        )];
+        let existingSet = new Set();
+        if (resolvedDates.length > 0 && resolvedClientIds.length > 0) {
+            try {
+                const existingRecords = await store.getRecordsByDateRange(
+                    resolvedDates[0], resolvedDates[resolvedDates.length - 1], resolvedClientIds
+                );
+                existingSet = new Set(
+                    existingRecords.map(r => `${r.clientId}|${r.date}|${r.startTime}|${r.endTime}`)
+                );
+            } catch(e) { /* falha silenciosa — segue sem detecção */ }
+        }
+        for (const r of this.pendingPdfRecords) {
+            const key = `${r.matchedClientId}|${r.date}|${r.startTime}|${r.endTime}`;
+            r._isDuplicate = !!(r.matchedClientId && existingSet.has(key));
+        }
+        const dupCount = this.pendingPdfRecords.filter(r => r._isDuplicate).length;
+
         const warningsEl = document.getElementById('pdf-warnings');
         const warnings = this.pendingPdfWarnings || [];
         if (warnings.length > 0) {
@@ -3578,6 +3600,25 @@ class AppController {
         } else {
             warningsEl.style.display = 'none';
             warningsEl.innerHTML = '';
+        }
+
+        let dupWarningsEl = document.getElementById('pdf-dup-warnings');
+        if (!dupWarningsEl) {
+            dupWarningsEl = document.createElement('div');
+            dupWarningsEl.id = 'pdf-dup-warnings';
+            dupWarningsEl.style.cssText = 'margin-top:10px; padding:10px 14px; border-radius:8px; background:rgba(234,179,8,0.1); border:1px solid rgba(234,179,8,0.35); color:var(--warning-color,#eab308); font-size:0.85rem; line-height:1.5;';
+            warningsEl.insertAdjacentElement('afterend', dupWarningsEl);
+        }
+        if (dupCount > 0) {
+            const dupList = this.pendingPdfRecords
+                .filter(r => r._isDuplicate)
+                .map(r => `<li>${r.dateStrBrazil} — ${r.matchedClientName} (${r.startTime}–${r.endTime})</li>`)
+                .join('');
+            dupWarningsEl.innerHTML = `<strong>⚠ ${dupCount} registro(s) já foram lançados anteriormente e serão ignorados:</strong><ul style="margin:6px 0 0 16px;padding:0;">${dupList}</ul>`;
+            dupWarningsEl.style.display = 'block';
+        } else {
+            dupWarningsEl.style.display = 'none';
+            dupWarningsEl.innerHTML = '';
         }
 
         document.getElementById('modal-import-pdf').classList.add('active');
@@ -3590,14 +3631,26 @@ class AppController {
             const warnIcon = r._warningMsg
                 ? `<span title="${r._warningMsg.replace(/"/g, '&quot;')}" style="margin-left:4px;color:var(--warning-color,#f59e0b);cursor:help;">⚠</span>`
                 : '';
-            tr.innerHTML = `
-                <td style="font-size: 0.9rem;">${r.dateStrBrazil}</td>
-                <td style="font-size: 0.9rem; font-weight: 500; color: var(--primary-color);">${r.matchedClientName}${r.autoCreated ? ' <span style="font-size:0.75rem;background:var(--primary-color);color:#fff;border-radius:4px;padding:1px 5px;">Novo</span>' : ''}</td>
-                <td style="font-size: 0.9rem;">${r.startTime} - ${r.endTime}</td>
-                <td style="font-size: 0.9rem;">${Math.floor(r.minutes / 60)}h${String(r.minutes % 60).padStart(2,'0')}min${warnIcon}</td>
-                <td><textarea class="form-control" id="pdf-desc-${idx}" style="font-size: 0.85rem; padding: 4px; width: 100%; min-width: 250px; resize: vertical;" rows="3" spellcheck="true">${r.description}</textarea></td>
-                <td style="text-align: center;"><input type="checkbox" id="pdf-check-${idx}" checked style="width: 18px; height: 18px; cursor: pointer;"></td>
-            `;
+            if (r._isDuplicate) {
+                tr.className = 'pdf-row-duplicate';
+                tr.innerHTML = `
+                    <td style="font-size: 0.9rem;">${r.dateStrBrazil}</td>
+                    <td style="font-size: 0.9rem;">${r.matchedClientName} <span class="pdf-dup-badge">Já lançado</span></td>
+                    <td style="font-size: 0.9rem;">${r.startTime} - ${r.endTime}</td>
+                    <td style="font-size: 0.9rem;">${Math.floor(r.minutes / 60)}h${String(r.minutes % 60).padStart(2,'0')}min</td>
+                    <td style="font-size:0.85rem;color:var(--text-muted);">${r.description}</td>
+                    <td style="text-align: center;"><input type="checkbox" id="pdf-check-${idx}" disabled style="width: 18px; height: 18px; opacity: 0.4; cursor: not-allowed;"></td>
+                `;
+            } else {
+                tr.innerHTML = `
+                    <td style="font-size: 0.9rem;">${r.dateStrBrazil}</td>
+                    <td style="font-size: 0.9rem; font-weight: 500; color: var(--primary-color);">${r.matchedClientName}${r.autoCreated ? ' <span style="font-size:0.75rem;background:var(--primary-color);color:#fff;border-radius:4px;padding:1px 5px;">Novo</span>' : ''}</td>
+                    <td style="font-size: 0.9rem;">${r.startTime} - ${r.endTime}</td>
+                    <td style="font-size: 0.9rem;">${Math.floor(r.minutes / 60)}h${String(r.minutes % 60).padStart(2,'0')}min${warnIcon}</td>
+                    <td><textarea class="form-control" id="pdf-desc-${idx}" style="font-size: 0.85rem; padding: 4px; width: 100%; min-width: 250px; resize: vertical;" rows="3" spellcheck="true">${r.description}</textarea></td>
+                    <td style="text-align: center;"><input type="checkbox" id="pdf-check-${idx}" checked style="width: 18px; height: 18px; cursor: pointer;"></td>
+                `;
+            }
             tbody.appendChild(tr);
         });
     }
@@ -3657,12 +3710,17 @@ class AppController {
         }
 
         let importedCount = 0;
+        let skippedCount = 0;
         const setProgress = (n) => {
             confirmBtn.innerHTML = `<span style="display:inline-flex;align-items:center;gap:8px;"><div class="spinner" style="width:14px;height:14px;border-width:2px;flex-shrink:0;"></div>Importando ${n} de ${total}...</span>`;
         };
         setProgress(0);
 
         for (const [idx, r] of this.pendingPdfRecords.entries()) {
+            if (r._isDuplicate) {
+                skippedCount++;
+                continue;
+            }
             const isChecked = document.getElementById(`pdf-check-${idx}`).checked;
             if (isChecked && r.matchedClientId) {
                 const desc = document.getElementById(`pdf-desc-${idx}`).value;
@@ -3672,7 +3730,8 @@ class AppController {
             }
         }
 
-        Toast.show(`${importedCount} atendimento(s) importado(s) com sucesso!`, 'success');
+        const skipMsg = skippedCount > 0 ? ` ${skippedCount} já existiam e foram ignorados.` : '';
+        Toast.show(`${importedCount} atendimento(s) importado(s) com sucesso!${skipMsg}`, 'success', skippedCount > 0 ? 6000 : 3000);
         this.closeModal('modal-import-pdf');
         this.pendingPdfRecords = [];
         this.pendingPdfWarnings = [];
