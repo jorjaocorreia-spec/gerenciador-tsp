@@ -143,6 +143,7 @@ const GoogleCalendarAPI = {
 
             const seen = new Set();
             let allEvents = [];
+            let fetchSuccessCount = 0;
             for (const calId of calendarIds) {
                 try {
                     const response = await gapi.client.calendar.events.list({
@@ -157,9 +158,15 @@ const GoogleCalendarAPI = {
                     for (const ev of (response.result.items || [])) {
                         if (!seen.has(ev.id)) { seen.add(ev.id); allEvents.push(ev); }
                     }
+                    fetchSuccessCount++;
                 } catch (err) {
                     console.warn(`Falha ao buscar eventos do calendário ${calId}:`, err);
                 }
+            }
+            // Se todos os calendários falharam, aborta para não deletar eventos locais via passo 3
+            if (fetchSuccessCount === 0) {
+                console.error('Todos os calendários falharam; sync abortado para preservar dados locais.');
+                return null;
             }
             return allEvents;
         } catch (err) {
