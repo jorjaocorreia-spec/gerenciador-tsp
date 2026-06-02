@@ -49,7 +49,7 @@ serve(async (req) => {
 
     if (action === "search") {
       data = await fetchJson(
-        `${base}/otobo/nph-genericinterface.pl/Webservice/GenericTicketConnectorREST/Ticket/Search`,
+        `${base}/otobo/nph-genericinterface.pl/Webservice/ProgramaGestorTSP_jorge/Ticket/Search`,
         {
           method: "POST",
           headers: jsonHeaders,
@@ -63,13 +63,13 @@ serve(async (req) => {
     } else if (action === "get") {
       const ids = (ticketIds as string[]).join(",");
       data = await fetchJson(
-        `${base}/otobo/nph-genericinterface.pl/Webservice/GenericTicketConnectorREST/Ticket/${ids}?UserLogin=${encodeURIComponent(username)}&Password=${encodeURIComponent(password)}`,
+        `${base}/otobo/nph-genericinterface.pl/Webservice/ProgramaGestorTSP_jorge/Ticket/${ids}?UserLogin=${encodeURIComponent(username)}&Password=${encodeURIComponent(password)}`,
         { headers: jsonHeaders }
       );
 
     } else if (action === "articles") {
       data = await fetchJson(
-        `${base}/otobo/nph-genericinterface.pl/Webservice/GenericTicketConnectorREST/Ticket/${ticketId}?UserLogin=${encodeURIComponent(username)}&Password=${encodeURIComponent(password)}&AllArticles=1`,
+        `${base}/otobo/nph-genericinterface.pl/Webservice/ProgramaGestorTSP_jorge/Ticket/${ticketId}?UserLogin=${encodeURIComponent(username)}&Password=${encodeURIComponent(password)}&AllArticles=1`,
         { headers: jsonHeaders }
       );
 
