@@ -566,25 +566,48 @@
             </div>
             <div class="chamados-filters" id="chamados-filters" style="display:none;">
                 <input type="text" id="filter-chamado-search" class="form-control" placeholder="Nº ou título...">
-                <select id="filter-chamado-status" class="form-control">
-                    <option value="">Todos os status</option>
-                </select>
-                <select id="filter-chamado-priority" class="form-control">
-                    <option value="">Todas prioridades</option>
-                </select>
-                <select id="filter-chamado-queue" class="form-control">
-                    <option value="">Todas as filas</option>
-                </select>
-                <select id="filter-chamado-owner" class="form-control">
-                    <option value="">Todos os proprietários</option>
-                </select>
-                <select id="filter-chamado-type" class="form-control">
-                    <option value="">Todos os tipos</option>
-                </select>
-                <select id="filter-chamado-client" class="form-control">
-                    <option value="">Todos os clientes</option>
-                    <option value="__unlinked__">Sem cliente vinculado</option>
-                </select>
+                <div class="mf-wrap" id="mf-status" data-placeholder="Todos os status">
+                    <button type="button" class="mf-btn" onclick="app._toggleMf('mf-status')">
+                        <span class="mf-label">Todos os status</span>
+                        <i data-lucide="chevron-down" style="width:13px;height:13px;flex-shrink:0;"></i>
+                    </button>
+                    <div class="mf-dropdown"></div>
+                </div>
+                <div class="mf-wrap" id="mf-priority" data-placeholder="Todas prioridades">
+                    <button type="button" class="mf-btn" onclick="app._toggleMf('mf-priority')">
+                        <span class="mf-label">Todas prioridades</span>
+                        <i data-lucide="chevron-down" style="width:13px;height:13px;flex-shrink:0;"></i>
+                    </button>
+                    <div class="mf-dropdown"></div>
+                </div>
+                <div class="mf-wrap" id="mf-queue" data-placeholder="Todas as filas">
+                    <button type="button" class="mf-btn" onclick="app._toggleMf('mf-queue')">
+                        <span class="mf-label">Todas as filas</span>
+                        <i data-lucide="chevron-down" style="width:13px;height:13px;flex-shrink:0;"></i>
+                    </button>
+                    <div class="mf-dropdown"></div>
+                </div>
+                <div class="mf-wrap" id="mf-owner" data-placeholder="Todos os proprietários">
+                    <button type="button" class="mf-btn" onclick="app._toggleMf('mf-owner')">
+                        <span class="mf-label">Todos os proprietários</span>
+                        <i data-lucide="chevron-down" style="width:13px;height:13px;flex-shrink:0;"></i>
+                    </button>
+                    <div class="mf-dropdown"></div>
+                </div>
+                <div class="mf-wrap" id="mf-type" data-placeholder="Todos os tipos">
+                    <button type="button" class="mf-btn" onclick="app._toggleMf('mf-type')">
+                        <span class="mf-label">Todos os tipos</span>
+                        <i data-lucide="chevron-down" style="width:13px;height:13px;flex-shrink:0;"></i>
+                    </button>
+                    <div class="mf-dropdown"></div>
+                </div>
+                <div class="mf-wrap" id="mf-client" data-placeholder="Todos os clientes">
+                    <button type="button" class="mf-btn" onclick="app._toggleMf('mf-client')">
+                        <span class="mf-label">Todos os clientes</span>
+                        <i data-lucide="chevron-down" style="width:13px;height:13px;flex-shrink:0;"></i>
+                    </button>
+                    <div class="mf-dropdown"></div>
+                </div>
                 <button class="btn btn-secondary" onclick="app.clearChamadoFilters()" title="Limpar filtros">
                     <i data-lucide="x" style="width:14px;height:14px;"></i> Limpar
                 </button>

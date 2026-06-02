@@ -5972,11 +5972,90 @@ class AppController {
                 searchTimer = setTimeout(() => this._rerenderChamadosWithFilters(), 300);
             });
         }
-        ['filter-chamado-status','filter-chamado-priority','filter-chamado-queue',
-         'filter-chamado-owner','filter-chamado-type','filter-chamado-client'].forEach(id => {
-            const el = document.getElementById(id);
-            if (el) el.addEventListener('change', () => this._rerenderChamadosWithFilters());
+        document.addEventListener('click', e => {
+            if (!e.target.closest('.mf-wrap')) {
+                document.querySelectorAll('.mf-dropdown.mf-drop-open').forEach(d => d.classList.remove('mf-drop-open'));
+                document.querySelectorAll('.mf-wrap.mf-open').forEach(w => w.classList.remove('mf-open'));
+            }
         });
+    }
+
+    _toggleMf(wrapId) {
+        const wrap = document.getElementById(wrapId);
+        const drop = wrap?.querySelector('.mf-dropdown');
+        if (!drop) return;
+        const isOpen = drop.classList.contains('mf-drop-open');
+        document.querySelectorAll('.mf-dropdown.mf-drop-open').forEach(d => d.classList.remove('mf-drop-open'));
+        document.querySelectorAll('.mf-wrap.mf-open').forEach(w => w.classList.remove('mf-open'));
+        if (!isOpen) {
+            drop.classList.add('mf-drop-open');
+            wrap.classList.add('mf-open');
+        }
+    }
+
+    _getMfValues(wrapId) {
+        const wrap = document.getElementById(wrapId);
+        if (!wrap) return [];
+        return [...wrap.querySelectorAll('.mf-dropdown input:checked')].map(cb => cb.value);
+    }
+
+    _updateMfLabel(wrapId) {
+        const wrap = document.getElementById(wrapId);
+        if (!wrap) return;
+        const placeholder = wrap.dataset.placeholder || '';
+        const selected = this._getMfValues(wrapId);
+        const label = wrap.querySelector('.mf-label');
+        if (!label) return;
+        if (selected.length === 0) {
+            label.textContent = placeholder;
+            wrap.classList.remove('mf-active');
+        } else if (selected.length === 1) {
+            const cb = wrap.querySelector(`.mf-dropdown input[value="${selected[0].replace(/"/g, '\\"')}"]`);
+            label.textContent = cb?.nextElementSibling?.textContent || selected[0];
+            wrap.classList.add('mf-active');
+        } else {
+            label.textContent = `${selected.length} selecionados`;
+            wrap.classList.add('mf-active');
+        }
+    }
+
+    _buildMfOptions(wrapId, items) {
+        const wrap = document.getElementById(wrapId);
+        if (!wrap) return;
+        const drop = wrap.querySelector('.mf-dropdown');
+        if (!drop) return;
+        const prevSelected = this._getMfValues(wrapId);
+        drop.innerHTML = '';
+        for (const item of items) {
+            const val = typeof item === 'string' ? item : item.value;
+            const lbl = typeof item === 'string' ? item : item.label;
+            const safeId = `${wrapId}-cb-${val.replace(/[^a-zA-Z0-9]/g, '_')}`;
+            const div = document.createElement('div');
+            div.className = 'mf-item';
+            const cb = document.createElement('input');
+            cb.type = 'checkbox';
+            cb.value = val;
+            cb.id = safeId;
+            if (prevSelected.includes(val)) cb.checked = true;
+            cb.addEventListener('change', () => {
+                this._updateMfLabel(wrapId);
+                this._rerenderChamadosWithFilters();
+            });
+            const lbEl = document.createElement('label');
+            lbEl.htmlFor = safeId;
+            lbEl.textContent = lbl;
+            div.appendChild(cb);
+            div.appendChild(lbEl);
+            drop.appendChild(div);
+        }
+        this._updateMfLabel(wrapId);
+    }
+
+    _clearMf(wrapId) {
+        const wrap = document.getElementById(wrapId);
+        if (!wrap) return;
+        wrap.querySelectorAll('.mf-dropdown input').forEach(cb => { cb.checked = false; });
+        this._updateMfLabel(wrapId);
     }
 
     _rerenderChamadosWithFilters() {
@@ -5994,12 +6073,12 @@ class AppController {
 
     _applyTicketFilters(tickets, clients) {
         const search = (document.getElementById('filter-chamado-search')?.value || '').toLowerCase().trim();
-        const filterStatus   = document.getElementById('filter-chamado-status')?.value   || '';
-        const filterPriority = document.getElementById('filter-chamado-priority')?.value || '';
-        const filterQueue    = document.getElementById('filter-chamado-queue')?.value    || '';
-        const filterOwner    = document.getElementById('filter-chamado-owner')?.value    || '';
-        const filterType     = document.getElementById('filter-chamado-type')?.value     || '';
-        const filterClient   = document.getElementById('filter-chamado-client')?.value   || '';
+        const filterStatus   = this._getMfValues('mf-status');
+        const filterPriority = this._getMfValues('mf-priority');
+        const filterQueue    = this._getMfValues('mf-queue');
+        const filterOwner    = this._getMfValues('mf-owner');
+        const filterType     = this._getMfValues('mf-type');
+        const filterClient   = this._getMfValues('mf-client');
 
         return tickets.filter(t => {
             if (search) {
@@ -6007,59 +6086,44 @@ class AppController {
                 const title = (t.title || '').toLowerCase();
                 if (!num.includes(search) && !title.includes(search)) return false;
             }
-            if (filterStatus   && t.status     !== filterStatus)   return false;
-            if (filterPriority && t.priority   !== filterPriority) return false;
-            if (filterQueue    && t.queue      !== filterQueue)     return false;
-            if (filterOwner    && t.owner      !== filterOwner)     return false;
-            if (filterType     && t.ticketType !== filterType)      return false;
-            if (filterClient === '__unlinked__' && t.linkedClientId)  return false;
-            if (filterClient && filterClient !== '__unlinked__' && t.linkedClientId !== filterClient) return false;
+            if (filterStatus.length   && !filterStatus.includes(t.status))     return false;
+            if (filterPriority.length && !filterPriority.includes(t.priority)) return false;
+            if (filterQueue.length    && !filterQueue.includes(t.queue))       return false;
+            if (filterOwner.length    && !filterOwner.includes(t.owner))       return false;
+            if (filterType.length     && !filterType.includes(t.ticketType))   return false;
+            if (filterClient.length) {
+                const hasUnlinked = filterClient.includes('__unlinked__');
+                const specificIds = filterClient.filter(v => v !== '__unlinked__');
+                if (hasUnlinked && specificIds.length) {
+                    if (t.linkedClientId && !specificIds.includes(t.linkedClientId)) return false;
+                } else if (hasUnlinked) {
+                    if (t.linkedClientId) return false;
+                } else {
+                    if (!specificIds.includes(t.linkedClientId)) return false;
+                }
+            }
             return true;
         });
     }
 
     _populateChamadoFilterDropdowns(tickets, clients) {
-        const setOptions = (selectId, values) => {
-            const sel = document.getElementById(selectId);
-            if (!sel) return;
-            const current = sel.value;
-            while (sel.options.length > 1) sel.remove(1);
-            for (const v of values) {
-                const opt = document.createElement('option');
-                opt.value = v; opt.textContent = v;
-                sel.appendChild(opt);
-            }
-            if ([...sel.options].some(o => o.value === current)) sel.value = current;
-        };
-
         const unique = key => [...new Set(tickets.map(t => t[key]).filter(Boolean))].sort();
-        setOptions('filter-chamado-status',   unique('status'));
-        setOptions('filter-chamado-priority', unique('priority'));
-        setOptions('filter-chamado-queue',    unique('queue'));
-        setOptions('filter-chamado-owner',    unique('owner'));
-        setOptions('filter-chamado-type',     unique('ticketType'));
+        this._buildMfOptions('mf-status',   unique('status'));
+        this._buildMfOptions('mf-priority', unique('priority'));
+        this._buildMfOptions('mf-queue',    unique('queue'));
+        this._buildMfOptions('mf-owner',    unique('owner'));
+        this._buildMfOptions('mf-type',     unique('ticketType'));
 
-        // Dropdown de cliente: mantém as 2 primeiras opções fixas (all + unlinked)
-        const clientSel = document.getElementById('filter-chamado-client');
-        if (clientSel) {
-            const current = clientSel.value;
-            while (clientSel.options.length > 2) clientSel.remove(2);
-            const linkedIds = new Set(tickets.map(t => t.linkedClientId).filter(Boolean));
-            for (const c of clients.filter(c => linkedIds.has(c.id))) {
-                const opt = document.createElement('option');
-                opt.value = c.id; opt.textContent = c.name;
-                clientSel.appendChild(opt);
-            }
-            if ([...clientSel.options].some(o => o.value === current)) clientSel.value = current;
-        }
+        const linkedIds = new Set(tickets.map(t => t.linkedClientId).filter(Boolean));
+        const clientItems = [
+            { value: '__unlinked__', label: 'Sem cliente vinculado' },
+            ...clients.filter(c => linkedIds.has(c.id)).map(c => ({ value: c.id, label: c.name }))
+        ];
+        this._buildMfOptions('mf-client', clientItems);
     }
 
     clearChamadoFilters() {
-        ['filter-chamado-status','filter-chamado-priority','filter-chamado-queue',
-         'filter-chamado-owner','filter-chamado-type','filter-chamado-client'].forEach(id => {
-            const el = document.getElementById(id);
-            if (el) el.value = '';
-        });
+        ['mf-status','mf-priority','mf-queue','mf-owner','mf-type','mf-client'].forEach(id => this._clearMf(id));
         const search = document.getElementById('filter-chamado-search');
         if (search) search.value = '';
         this._rerenderChamadosWithFilters();

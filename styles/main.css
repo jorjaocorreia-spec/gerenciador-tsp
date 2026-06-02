@@ -2601,6 +2601,100 @@ kbd {
 .chamados-filters select.form-control {
     min-width: 140px;
 }
+
+/* Multi-filter dropdown (filtros de seleção múltipla dos Chamados) */
+.mf-wrap {
+    position: relative;
+    min-width: 140px;
+}
+.mf-btn {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 6px;
+    width: 100%;
+    height: 36px;
+    padding: 0 10px;
+    background: rgba(15, 23, 42, 0.5);
+    border: 1px solid var(--surface-border);
+    border-radius: 8px;
+    color: var(--text-main);
+    font-family: inherit;
+    font-size: 0.82rem;
+    cursor: pointer;
+    transition: var(--transition);
+    text-align: left;
+    white-space: nowrap;
+    overflow: hidden;
+}
+.mf-btn:hover {
+    border-color: var(--primary-color);
+}
+.mf-wrap.mf-open .mf-btn {
+    border-color: var(--primary-color);
+    outline: none;
+}
+.mf-wrap.mf-active .mf-btn {
+    border-color: var(--primary-color);
+    color: var(--primary-color);
+}
+.mf-wrap.mf-open .mf-btn i {
+    transform: rotate(180deg);
+}
+.mf-btn i {
+    transition: transform 0.2s ease;
+}
+.mf-label {
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.mf-dropdown {
+    display: none;
+    position: absolute;
+    top: calc(100% + 4px);
+    left: 0;
+    min-width: 100%;
+    max-height: 220px;
+    overflow-y: auto;
+    background: var(--bg-glass, #1e293b);
+    border: 1px solid var(--surface-border);
+    border-radius: 8px;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+    z-index: 200;
+    padding: 4px 0;
+}
+.mf-dropdown.mf-drop-open {
+    display: block;
+}
+.mf-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 7px 12px;
+    cursor: pointer;
+    transition: background 0.15s;
+}
+.mf-item:hover {
+    background: rgba(255,255,255,0.06);
+}
+.mf-item input[type=checkbox] {
+    accent-color: var(--primary-color);
+    width: 14px;
+    height: 14px;
+    flex-shrink: 0;
+    cursor: pointer;
+}
+.mf-item label {
+    flex: 1;
+    font-size: 0.82rem;
+    color: var(--text-main);
+    cursor: pointer;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
 .ticket-type-badge {
     background: rgba(159,122,234,0.15);
     color: #9f7aea;
