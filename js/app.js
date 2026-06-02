@@ -6309,10 +6309,10 @@ class AppController {
         const normalize = s => (s || '').toLowerCase().trim();
         return otoboTickets.map(t => {
             const customerNorm = normalize(t.CustomerUserID || t.CustomerID || '');
-            const linked = clients.find(c => {
+            const linked = customerNorm ? clients.find(c => {
                 const cn = normalize(c.name);
                 return cn === customerNorm || cn.includes(customerNorm) || customerNorm.includes(cn);
-            });
+            }) : null;
             return {
                 user_id: store.userId,
                 ticket_id: String(t.TicketID),
