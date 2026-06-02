@@ -6318,15 +6318,29 @@ class AppController {
         console.log(`[OTOBO] Total: ${results.length} ticket(s) obtido(s), ${totalDenied} negado(s)`);
 
         // Filtragem local por proprietário: garante que só os tickets do usuário configurado
-        // são salvos, mesmo que o OTOBO ignore o filtro OwnerLogin/Owners na busca
+        // são salvos, mesmo que o OTOBO ignore o filtro OwnerLogin/Owners na busca.
+        // Compara Owner e Responsible do OTOBO contra ownerLogin configurado (case-insensitive).
+        // Usa includes bilateral para cobrir: login "jorge.henrique" vs "Jorge.Henrique" vs
+        // nome completo "Jorge Henrique Correia" (substitui ponto por espaço para comparação).
         const ownerFilter = (syncFilters.ownerLogin || '').toLowerCase().trim();
         if (ownerFilter) {
+            const ownerFilterNorm = ownerFilter.replace(/\./g, ' ');
+            const matchOwner = (field) => {
+                if (!field) return false;
+                const f = field.toLowerCase().trim();
+                const fNorm = f.replace(/\./g, ' ');
+                return f === ownerFilter || fNorm === ownerFilterNorm ||
+                       f.includes(ownerFilter) || ownerFilter.includes(f) ||
+                       fNorm.includes(ownerFilterNorm) || ownerFilterNorm.includes(fNorm);
+            };
             const antes = results.length;
-            const filtered = results.filter(t =>
-                (t.Owner || '').toLowerCase() === ownerFilter ||
-                (t.Responsible || '').toLowerCase() === ownerFilter
-            );
+            const filtered = results.filter(t => matchOwner(t.Owner) || matchOwner(t.Responsible));
             console.log(`[OTOBO] Filtro de proprietário "${ownerFilter}": ${antes} → ${filtered.length} ticket(s)`);
+            if (filtered.length === 0 && antes > 0) {
+                // Amostrar owners únicos para diagnóstico
+                const owners = [...new Set(results.slice(0, 20).map(t => t.Owner || t.Responsible || '(vazio)'))];
+                console.warn(`[OTOBO] Nenhum ticket correspondeu ao filtro. Owners encontrados:`, owners);
+            }
             return { tickets: filtered, foundIds: ticketIds.length, denied: totalDenied };
         }
 
