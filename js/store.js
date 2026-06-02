@@ -297,6 +297,13 @@ class TSPStore {
         if (error) throw error;
     }
 
+    async removeCompletionActivity(taskId) {
+        const { data } = await this.db.from('tasks').select('comments').eq('id', taskId).eq('user_id', this.userId).single();
+        const comments = (Array.isArray(data?.comments) ? data.comments : [])
+            .filter(c => c.type !== 'completed' && c.type !== 'uncompleted');
+        await this.db.from('tasks').update({ comments }).eq('id', taskId).eq('user_id', this.userId);
+    }
+
     async addTaskComment(taskId, text) {
         const { data } = await this.db.from('tasks').select('comments').eq('id', taskId).eq('user_id', this.userId).single();
         const comments = Array.isArray(data?.comments) ? data.comments : [];

@@ -928,7 +928,11 @@ class AppController {
     async toggleTaskComplete(id, completed) {
         try {
             const { completedAt } = await store.toggleTaskComplete(id, completed);
-            await store.logTaskActivity(id, completed ? 'completed' : 'uncompleted', { completedAt });
+            if (completed) {
+                await store.logTaskActivity(id, 'completed', { completedAt });
+            } else {
+                await store.removeCompletionActivity(id);
+            }
             await this.renderAll();
         } catch (err) {
             Toast.show('Erro ao atualizar tarefa: ' + err.message, 'error');
