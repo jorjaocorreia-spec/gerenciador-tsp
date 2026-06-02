@@ -6336,7 +6336,7 @@ class AppController {
                 queue: t.Queue || '',
                 ticket_type: t.Type || '',
                 customer_name: t.CustomerUserID || t.CustomerID || '',
-                owner: t.Owner || '',
+                owner: t.Owner || t.Responsible || '',
                 created_at_otobo: t.Created || null,
                 updated_at_otobo: t.Changed || null,
                 raw_data: t,

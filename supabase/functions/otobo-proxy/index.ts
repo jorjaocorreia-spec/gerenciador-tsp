@@ -54,7 +54,7 @@ serve(async (req) => {
         ...creds,
         SortBy: "Changed",
         OrderBy: "Down",
-        Limit: (typeof sf.limit === "number" && sf.limit > 0) ? sf.limit : 100,
+        Limit: (typeof sf.limit === "number" && sf.limit > 0) ? sf.limit : 500,
       };
       // Só adiciona filtros se o array não estiver vazio (array vazio = retorna 0 resultados no OTOBO)
       if (Array.isArray(sf.queues) && sf.queues.length > 0) searchBody.Queues = sf.queues;
