@@ -1002,7 +1002,7 @@ class TSPStore {
             return;
         }
         const { error } = await this.db.from('tickets').delete()
-            .eq('user_id', this.userId).not('ticket_id', 'in', `(${ticketIds.map(id => `'${id}'`).join(',')})`);
+            .eq('user_id', this.userId).not('ticket_id', 'in', `(${ticketIds.join(',')})`);
         if (error) throw error;
     }
 }

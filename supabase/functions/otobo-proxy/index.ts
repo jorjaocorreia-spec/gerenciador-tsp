@@ -44,32 +44,51 @@ serve(async (req) => {
     const base = (otoboUrl || "").replace(/\/$/, "");
     const creds = { UserLogin: username, Password: password };
     const jsonHeaders = { "Content-Type": "application/json" };
+    const authQuery = `UserLogin=${encodeURIComponent(username)}&Password=${encodeURIComponent(password)}`;
 
     let data: unknown;
 
     if (action === "search") {
       data = await fetchJson(
-        `${base}/otobo/nph-genericinterface.pl/Webservice/ProgramaGestorTSP_jorge/Ticket/Search`,
+        `${base}/otobo/nph-genericinterface.pl/Webservice/ProgramaGestorTSP_jorge/Ticket`,
         {
           method: "POST",
           headers: jsonHeaders,
-          body: JSON.stringify({
-            ...creds,
-            StateType: ["new", "open", "pending reminder", "pending auto", "in treatment"],
-          }),
+          body: JSON.stringify({ ...creds, SortBy: "Changed", OrderBy: "Down", Limit: 100 }),
         }
       );
 
     } else if (action === "get") {
-      const ids = (ticketIds as string[]).join(",");
-      data = await fetchJson(
-        `${base}/otobo/nph-genericinterface.pl/Webservice/ProgramaGestorTSP_jorge/Ticket/${ids}?UserLogin=${encodeURIComponent(username)}&Password=${encodeURIComponent(password)}`,
-        { headers: jsonHeaders }
-      );
+      // Busca individual para pular tickets com AccessDenied
+      const ids = ticketIds as string[];
+      const tickets: unknown[] = [];
+      let denied = 0;
+
+      for (const id of ids) {
+        try {
+          const res = await fetchJson(
+            `${base}/otobo/nph-genericinterface.pl/Webservice/ProgramaGestorTSP_jorge/Ticket/${id}?${authQuery}`,
+            { headers: jsonHeaders }
+          ) as Record<string, unknown>;
+
+          if (res?.Error) {
+            denied++;
+            continue;
+          }
+          // Resposta pode ser { Ticket: [...] } ou { Ticket: {} }
+          const t = res?.Ticket;
+          if (Array.isArray(t)) tickets.push(...t);
+          else if (t) tickets.push(t);
+        } catch {
+          denied++;
+        }
+      }
+
+      data = { Ticket: tickets, _denied: denied };
 
     } else if (action === "articles") {
       data = await fetchJson(
-        `${base}/otobo/nph-genericinterface.pl/Webservice/ProgramaGestorTSP_jorge/Ticket/${ticketId}?UserLogin=${encodeURIComponent(username)}&Password=${encodeURIComponent(password)}&AllArticles=1`,
+        `${base}/otobo/nph-genericinterface.pl/Webservice/ProgramaGestorTSP_jorge/Ticket/${ticketId}?${authQuery}&AllArticles=1`,
         { headers: jsonHeaders }
       );
 
