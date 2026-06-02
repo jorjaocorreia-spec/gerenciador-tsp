@@ -2355,16 +2355,10 @@ class AppController {
             badgesHtml += `<span class="kb-badge kb-badge-completed"><i data-lucide="check-circle" style="width:10px;height:10px"></i> Concluída</span>`;
         }
 
-        // Botão de conclusão (canto superior esquerdo, estilo Trello)
         const completeTitle = task.completed ? 'Marcar como incompleta' : 'Marcar como concluída';
-        const completeBtnHtml = `<button type="button" class="kb-complete-btn${task.completed ? ' kb-complete-btn--done' : ''}"
-            onclick="event.stopPropagation();app.toggleTaskComplete('${task.id}', ${!task.completed})"
-            title="${completeTitle}">
-            <i data-lucide="${task.completed ? 'check-circle-2' : 'circle'}" style="width:16px;height:16px"></i>
-        </button>`;
+        const completeIcon = task.completed ? 'check-circle-2' : 'circle';
 
         card.innerHTML = `
-            ${completeBtnHtml}
             ${coverHtml}
             ${labelsHtml}
             <p class="kb-card-title">${escapeHtml(task.title)}</p>
@@ -2372,6 +2366,11 @@ class AppController {
             <div class="kb-card-footer">
                 <span class="kb-card-client">${clientName}</span>
                 <div class="kb-card-actions">
+                    <button type="button" class="kb-action-btn kb-complete-btn${task.completed ? ' kb-complete-btn--done' : ''}"
+                        onclick="event.stopPropagation();app.toggleTaskComplete('${task.id}', ${!task.completed})"
+                        title="${completeTitle}">
+                        <i data-lucide="${completeIcon}" style="width:12px;height:12px"></i>
+                    </button>
                     <button type="button" class="kb-action-btn" onclick="event.stopPropagation();app.handleEditTask('${task.id}')" title="Editar">
                         <i data-lucide="pencil" style="width:12px;height:12px"></i>
                     </button>

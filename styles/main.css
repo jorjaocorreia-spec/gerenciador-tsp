@@ -734,34 +734,11 @@ h4 {
 .kb-badge-due-overdue     { background: rgba(255, 107, 107, 0.2);  color: #ff6b6b; }
 .kb-badge-completed       { background: rgba(81, 207, 102, 0.18);  color: #51cf66; }
 
-/* Botão de conclusão do card (canto superior esquerdo, estilo Trello) */
-.kb-complete-btn {
-  position: absolute;
-  top: 6px;
-  left: 6px;
-  z-index: 2;
-  background: rgba(0, 0, 0, 0.45);
-  border: none;
-  border-radius: 50%;
-  width: 24px;
-  height: 24px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  color: rgba(255, 255, 255, 0.5);
-  opacity: 0;
-  transition: opacity 0.15s, color 0.15s, background 0.15s;
-  padding: 0;
-}
-.kb-card:hover .kb-complete-btn { opacity: 1; }
-.kb-complete-btn:hover { color: #51cf66; background: rgba(0, 0, 0, 0.65); }
-.kb-complete-btn--done {
-  opacity: 1;
-  color: #51cf66;
-  background: rgba(81, 207, 102, 0.2);
-}
-.kb-complete-btn--done:hover { color: rgba(255,255,255,0.6); background: rgba(0,0,0,0.55); }
+/* Botão de conclusão do card (no footer, à esquerda do lápis) */
+.kb-complete-btn { color: var(--text-secondary); }
+.kb-complete-btn:hover { color: #51cf66 !important; background: rgba(81, 207, 102, 0.12) !important; }
+.kb-complete-btn--done { color: #51cf66 !important; opacity: 1 !important; }
+.kb-complete-btn--done:hover { color: #34a85a !important; }
 
 /* Atividade de conclusão na seção de comentários */
 .task-activity-completed { color: #51cf66 !important; }
