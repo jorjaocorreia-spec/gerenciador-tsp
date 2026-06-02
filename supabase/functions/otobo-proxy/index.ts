@@ -60,7 +60,14 @@ serve(async (req) => {
       if (Array.isArray(sf.queues) && sf.queues.length > 0) searchBody.Queues = sf.queues;
       if (Array.isArray(sf.states) && sf.states.length > 0) searchBody.States = sf.states;
       if (Array.isArray(sf.types) && sf.types.length > 0) searchBody.Types = sf.types;
-      if (typeof sf.ownerLogin === "string" && sf.ownerLogin.trim()) searchBody.OwnerLogin = sf.ownerLogin.trim();
+      if (typeof sf.ownerLogin === "string" && sf.ownerLogin.trim()) {
+        const login = sf.ownerLogin.trim();
+        // Enviar nos dois formatos para máxima compatibilidade com versões do OTOBO
+        searchBody.Owners = [login];
+        searchBody.OwnerLogin = login;
+        // Quando filtrando por proprietário, buscar todos os tickets (sem limite por recência)
+        searchBody.Limit = 10000;
+      }
 
       data = await fetchJson(
         `${base}/otobo/nph-genericinterface.pl/Webservice/ProgramaGestorTSP_jorge/Ticket`,

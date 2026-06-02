@@ -6316,6 +6316,20 @@ class AppController {
             }
         }
         console.log(`[OTOBO] Total: ${results.length} ticket(s) obtido(s), ${totalDenied} negado(s)`);
+
+        // Filtragem local por proprietário: garante que só os tickets do usuário configurado
+        // são salvos, mesmo que o OTOBO ignore o filtro OwnerLogin/Owners na busca
+        const ownerFilter = (syncFilters.ownerLogin || '').toLowerCase().trim();
+        if (ownerFilter) {
+            const antes = results.length;
+            const filtered = results.filter(t =>
+                (t.Owner || '').toLowerCase() === ownerFilter ||
+                (t.Responsible || '').toLowerCase() === ownerFilter
+            );
+            console.log(`[OTOBO] Filtro de proprietário "${ownerFilter}": ${antes} → ${filtered.length} ticket(s)`);
+            return { tickets: filtered, foundIds: ticketIds.length, denied: totalDenied };
+        }
+
         return { tickets: results, foundIds: ticketIds.length, denied: totalDenied };
     }
 
