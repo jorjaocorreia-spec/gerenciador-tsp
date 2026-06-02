@@ -112,6 +112,9 @@ class AppController {
         // OTOBO
         this._otoboConfig = null;
         this._currentTicket = null;
+        this._cachedChamadosTickets = null;
+        this._cachedChamadosClients = null;
+        this._chamadoFiltersAttached = false;
         this.init();
     }
 
@@ -5911,6 +5914,7 @@ class AppController {
             this._otoboConfig = await store.getOtoboConfig().catch(() => null);
         }
         if (!this._otoboConfig || !this._otoboConfig.url) {
+            document.getElementById('chamados-filters').style.display = 'none';
             content.innerHTML = `
                 <div class="empty-state">
                     <i data-lucide="headphones" style="width:48px;height:48px;color:var(--text-muted);"></i>
@@ -5926,7 +5930,11 @@ class AppController {
 
         try {
             const [tickets, clients] = await Promise.all([store.getTickets(), store.getClients()]);
+            this._cachedChamadosTickets = tickets;
+            this._cachedChamadosClients = clients;
+
             if (tickets.length === 0) {
+                document.getElementById('chamados-filters').style.display = 'none';
                 content.innerHTML = `
                     <div class="empty-state">
                         <i data-lucide="inbox" style="width:48px;height:48px;color:var(--text-muted);"></i>
@@ -5936,11 +5944,136 @@ class AppController {
                 lucide.createIcons();
                 return;
             }
-            this._renderChamadosCards(tickets, clients, content);
+
+            document.getElementById('chamados-filters').style.display = '';
+            this._populateChamadoFilterDropdowns(tickets, clients);
+            this._attachChamadoFilterListeners();
+
+            const filtered = this._applyTicketFilters(tickets, clients);
+            if (filtered.length === 0) {
+                content.innerHTML = `<div class="empty-state"><p>Nenhum chamado corresponde aos filtros selecionados.</p></div>`;
+            } else {
+                this._renderChamadosCards(filtered, clients, content);
+            }
         } catch (err) {
             content.innerHTML = `<div class="empty-state"><p>Erro ao carregar chamados: ${escapeHtml(err.message)}</p></div>`;
         }
         lucide.createIcons();
+    }
+
+    _attachChamadoFilterListeners() {
+        if (this._chamadoFiltersAttached) return;
+        this._chamadoFiltersAttached = true;
+        let searchTimer;
+        const searchEl = document.getElementById('filter-chamado-search');
+        if (searchEl) {
+            searchEl.addEventListener('input', () => {
+                clearTimeout(searchTimer);
+                searchTimer = setTimeout(() => this._rerenderChamadosWithFilters(), 300);
+            });
+        }
+        ['filter-chamado-status','filter-chamado-priority','filter-chamado-queue',
+         'filter-chamado-owner','filter-chamado-type','filter-chamado-client'].forEach(id => {
+            const el = document.getElementById(id);
+            if (el) el.addEventListener('change', () => this._rerenderChamadosWithFilters());
+        });
+    }
+
+    _rerenderChamadosWithFilters() {
+        if (!this._cachedChamadosTickets || !this._cachedChamadosClients) return;
+        const content = document.getElementById('chamados-content');
+        if (!content) return;
+        const filtered = this._applyTicketFilters(this._cachedChamadosTickets, this._cachedChamadosClients);
+        if (filtered.length === 0) {
+            content.innerHTML = `<div class="empty-state"><p>Nenhum chamado corresponde aos filtros selecionados.</p></div>`;
+        } else {
+            this._renderChamadosCards(filtered, this._cachedChamadosClients, content);
+        }
+        lucide.createIcons();
+    }
+
+    _applyTicketFilters(tickets, clients) {
+        const search = (document.getElementById('filter-chamado-search')?.value || '').toLowerCase().trim();
+        const filterStatus   = document.getElementById('filter-chamado-status')?.value   || '';
+        const filterPriority = document.getElementById('filter-chamado-priority')?.value || '';
+        const filterQueue    = document.getElementById('filter-chamado-queue')?.value    || '';
+        const filterOwner    = document.getElementById('filter-chamado-owner')?.value    || '';
+        const filterType     = document.getElementById('filter-chamado-type')?.value     || '';
+        const filterClient   = document.getElementById('filter-chamado-client')?.value   || '';
+
+        return tickets.filter(t => {
+            if (search) {
+                const num = (t.ticketNumber || t.ticketId || '').toLowerCase();
+                const title = (t.title || '').toLowerCase();
+                if (!num.includes(search) && !title.includes(search)) return false;
+            }
+            if (filterStatus   && t.status     !== filterStatus)   return false;
+            if (filterPriority && t.priority   !== filterPriority) return false;
+            if (filterQueue    && t.queue      !== filterQueue)     return false;
+            if (filterOwner    && t.owner      !== filterOwner)     return false;
+            if (filterType     && t.ticketType !== filterType)      return false;
+            if (filterClient === '__unlinked__' && t.linkedClientId)  return false;
+            if (filterClient && filterClient !== '__unlinked__' && t.linkedClientId !== filterClient) return false;
+            return true;
+        });
+    }
+
+    _populateChamadoFilterDropdowns(tickets, clients) {
+        const setOptions = (selectId, values) => {
+            const sel = document.getElementById(selectId);
+            if (!sel) return;
+            const current = sel.value;
+            while (sel.options.length > 1) sel.remove(1);
+            for (const v of values) {
+                const opt = document.createElement('option');
+                opt.value = v; opt.textContent = v;
+                sel.appendChild(opt);
+            }
+            if ([...sel.options].some(o => o.value === current)) sel.value = current;
+        };
+
+        const unique = key => [...new Set(tickets.map(t => t[key]).filter(Boolean))].sort();
+        setOptions('filter-chamado-status',   unique('status'));
+        setOptions('filter-chamado-priority', unique('priority'));
+        setOptions('filter-chamado-queue',    unique('queue'));
+        setOptions('filter-chamado-owner',    unique('owner'));
+        setOptions('filter-chamado-type',     unique('ticketType'));
+
+        // Dropdown de cliente: mantém as 2 primeiras opções fixas (all + unlinked)
+        const clientSel = document.getElementById('filter-chamado-client');
+        if (clientSel) {
+            const current = clientSel.value;
+            while (clientSel.options.length > 2) clientSel.remove(2);
+            const linkedIds = new Set(tickets.map(t => t.linkedClientId).filter(Boolean));
+            for (const c of clients.filter(c => linkedIds.has(c.id))) {
+                const opt = document.createElement('option');
+                opt.value = c.id; opt.textContent = c.name;
+                clientSel.appendChild(opt);
+            }
+            if ([...clientSel.options].some(o => o.value === current)) clientSel.value = current;
+        }
+    }
+
+    clearChamadoFilters() {
+        ['filter-chamado-status','filter-chamado-priority','filter-chamado-queue',
+         'filter-chamado-owner','filter-chamado-type','filter-chamado-client'].forEach(id => {
+            const el = document.getElementById(id);
+            if (el) el.value = '';
+        });
+        const search = document.getElementById('filter-chamado-search');
+        if (search) search.value = '';
+        this._rerenderChamadosWithFilters();
+    }
+
+    switchOtoboTab(tab) {
+        const tabMap = { conexao: 'otobo-tab-conexao', sync: 'otobo-tab-sync' };
+        for (const [key, id] of Object.entries(tabMap)) {
+            const el = document.getElementById(id);
+            if (el) el.style.display = key === tab ? 'flex' : 'none';
+        }
+        document.querySelectorAll('#modal-otobo-config .modal-tab').forEach(btn => {
+            btn.classList.toggle('active', btn.dataset.tab === tabMap[tab]);
+        });
     }
 
     _renderChamadosCards(tickets, clients, container) {
@@ -5986,6 +6119,7 @@ class AppController {
         const statusClass = this._ticketStatusClass(t.status);
         const priorityClass = this._ticketPriorityClass(t.priority);
         const updatedAgo = this._relativeDate(t.updatedAtOtobo);
+        const typeHtml = t.ticketType ? `<span class="ticket-badge ticket-type-badge">${escapeHtml(t.ticketType)}</span>` : '';
         const queueHtml = t.queue ? `<span class="ticket-meta-item"><i data-lucide="layers" style="width:11px;height:11px;"></i>${escapeHtml(t.queue)}</span>` : '';
         const ownerHtml = t.owner ? `<span class="ticket-meta-item"><i data-lucide="user" style="width:11px;height:11px;"></i>${escapeHtml(t.owner)}</span>` : '';
         return `<div class="ticket-card" data-ticket-id="${escapeHtml(t.ticketId)}">
@@ -5996,6 +6130,7 @@ class AppController {
             <div class="ticket-card-badges">
                 <span class="ticket-badge ${statusClass}">${escapeHtml(t.status)}</span>
                 <span class="ticket-badge ${priorityClass}">${escapeHtml(t.priority)}</span>
+                ${typeHtml}
             </div>
             <div class="ticket-card-meta">
                 ${queueHtml}
@@ -6051,6 +6186,7 @@ class AppController {
             const now = new Date().toLocaleString('pt-BR');
             const info = document.getElementById('chamados-sync-info');
             if (info) { info.textContent = `Última sync: ${now}`; info.style.display = ''; }
+            this._cachedChamadosTickets = null;
             await this.renderChamados();
             Toast.show(`${rows.length} chamado(s) sincronizado(s)!`, 'success');
         } catch (err) {
@@ -6088,7 +6224,8 @@ class AppController {
     }
 
     async _fetchTicketsFromOtobo(config) {
-        const searchData = await this._otoboProxyFetch('search');
+        const syncFilters = this._otoboConfig?.syncFilters || {};
+        const searchData = await this._otoboProxyFetch('search', { syncFilters });
         const ticketIds = searchData.TicketID || [];
         if (ticketIds.length === 0) return [];
 
@@ -6120,6 +6257,7 @@ class AppController {
                 status: t.State || '',
                 priority: t.Priority || '',
                 queue: t.Queue || '',
+                ticket_type: t.Type || '',
                 customer_name: t.CustomerUserID || t.CustomerID || '',
                 owner: t.Owner || '',
                 created_at_otobo: t.Created || null,
@@ -6136,6 +6274,13 @@ class AppController {
         document.getElementById('otobo-url').value = cfg?.url || '';
         document.getElementById('otobo-username').value = cfg?.username || '';
         document.getElementById('otobo-password').value = cfg?.password || '';
+        const sf = cfg?.syncFilters || {};
+        document.getElementById('sync-filter-queues').value  = (sf.queues  || []).join('\n');
+        document.getElementById('sync-filter-states').value  = (sf.states  || []).join('\n');
+        document.getElementById('sync-filter-types').value   = (sf.types   || []).join('\n');
+        document.getElementById('sync-filter-owner').value   = sf.ownerLogin || '';
+        document.getElementById('sync-filter-limit').value   = sf.limit || 100;
+        this.switchOtoboTab('conexao');
         this.openModal('modal-otobo-config');
     }
 
@@ -6144,12 +6289,22 @@ class AppController {
         const username = document.getElementById('otobo-username').value.trim();
         const password = document.getElementById('otobo-password').value;
         if (!url || !username || !password) {
-            Toast.show('Preencha todos os campos.', 'error');
+            Toast.show('Preencha todos os campos na aba Conexão.', 'error');
+            this.switchOtoboTab('conexao');
             return;
         }
+        const parseLines = id => document.getElementById(id).value
+            .split('\n').map(s => s.trim()).filter(Boolean);
+        const syncFilters = {
+            queues:     parseLines('sync-filter-queues'),
+            states:     parseLines('sync-filter-states'),
+            types:      parseLines('sync-filter-types'),
+            ownerLogin: document.getElementById('sync-filter-owner').value.trim(),
+            limit:      parseInt(document.getElementById('sync-filter-limit').value) || 100
+        };
         try {
-            await store.saveOtoboConfig(url, username, password);
-            this._otoboConfig = { url, username, password };
+            await store.saveOtoboConfig(url, username, password, syncFilters);
+            this._otoboConfig = { url, username, password, syncFilters };
             Toast.show('Configurações salvas!', 'success');
             this.closeModal('modal-otobo-config');
             await this.renderChamados();
@@ -6189,6 +6344,11 @@ class AppController {
                 <span class="chamado-sidebar-label">Responsável</span>
                 <span class="chamado-sidebar-value">${escapeHtml(ticket.owner || '—')}</span>
             </div>
+            ${ticket.ticketType ? `
+            <div class="chamado-sidebar-row">
+                <span class="chamado-sidebar-label">Tipo</span>
+                <span class="chamado-sidebar-value">${escapeHtml(ticket.ticketType)}</span>
+            </div>` : ''}
             <div class="chamado-sidebar-row">
                 <span class="chamado-sidebar-label">Cliente OTOBO</span>
                 <span class="chamado-sidebar-value">${escapeHtml(ticket.customerName || '—')}</span>
@@ -6270,6 +6430,9 @@ document.addEventListener('DOMContentLoaded', async () => {
             window.app._lastGoogleSync = 0;
             window.app._otoboConfig = null;
             window.app._currentTicket = null;
+            window.app._cachedChamadosTickets = null;
+            window.app._cachedChamadosClients = null;
+            window.app._chamadoFiltersAttached = false;
         }
         await Auth.signOut();
     });

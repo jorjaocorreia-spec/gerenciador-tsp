@@ -2577,3 +2577,31 @@ kbd {
     font-size: 0.85rem;
     color: var(--text-main);
 }
+
+/* Barra de filtros locais da view Chamados */
+.chamados-filters {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+    padding: 12px 0 16px;
+    border-bottom: 1px solid rgba(255,255,255,0.07);
+    margin-bottom: 20px;
+}
+.chamados-filters .form-control {
+    height: 36px;
+    padding: 6px 10px;
+    font-size: 0.82rem;
+}
+.chamados-filters #filter-chamado-search {
+    flex: 1;
+    min-width: 160px;
+    max-width: 280px;
+}
+.chamados-filters select.form-control {
+    min-width: 140px;
+}
+.ticket-type-badge {
+    background: rgba(159,122,234,0.15);
+    color: #9f7aea;
+}

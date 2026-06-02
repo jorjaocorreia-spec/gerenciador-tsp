@@ -40,7 +40,7 @@ serve(async (req) => {
       return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers: corsHeaders });
     }
 
-    const { action, otoboUrl, username, password, ticketIds, ticketId } = await req.json();
+    const { action, otoboUrl, username, password, ticketIds, ticketId, syncFilters } = await req.json();
     const base = (otoboUrl || "").replace(/\/$/, "");
     const creds = { UserLogin: username, Password: password };
     const jsonHeaders = { "Content-Type": "application/json" };
@@ -49,12 +49,25 @@ serve(async (req) => {
     let data: unknown;
 
     if (action === "search") {
+      const sf = (syncFilters || {}) as Record<string, unknown>;
+      const searchBody: Record<string, unknown> = {
+        ...creds,
+        SortBy: "Changed",
+        OrderBy: "Down",
+        Limit: (typeof sf.limit === "number" && sf.limit > 0) ? sf.limit : 100,
+      };
+      // Só adiciona filtros se o array não estiver vazio (array vazio = retorna 0 resultados no OTOBO)
+      if (Array.isArray(sf.queues) && sf.queues.length > 0) searchBody.Queues = sf.queues;
+      if (Array.isArray(sf.states) && sf.states.length > 0) searchBody.States = sf.states;
+      if (Array.isArray(sf.types) && sf.types.length > 0) searchBody.Types = sf.types;
+      if (typeof sf.ownerLogin === "string" && sf.ownerLogin.trim()) searchBody.OwnerLogin = sf.ownerLogin.trim();
+
       data = await fetchJson(
         `${base}/otobo/nph-genericinterface.pl/Webservice/ProgramaGestorTSP_jorge/Ticket`,
         {
           method: "POST",
           headers: jsonHeaders,
-          body: JSON.stringify({ ...creds, SortBy: "Changed", OrderBy: "Down", Limit: 100 }),
+          body: JSON.stringify(searchBody),
         }
       );
 

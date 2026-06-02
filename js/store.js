@@ -953,7 +953,10 @@ class TSPStore {
     // ── OTOBO CONFIG ──────────────────────────────────────────────
 
     _otoboConfig(r) {
-        return { url: r.url || '', username: r.username || '', password: r.password || '', updatedAt: r.updated_at };
+        return {
+            url: r.url || '', username: r.username || '', password: r.password || '',
+            syncFilters: r.sync_filters || {}, updatedAt: r.updated_at
+        };
     }
 
     async getOtoboConfig() {
@@ -963,9 +966,10 @@ class TSPStore {
         return data ? this._otoboConfig(data) : null;
     }
 
-    async saveOtoboConfig(url, username, password) {
+    async saveOtoboConfig(url, username, password, syncFilters = {}) {
         const { error } = await this.db.from('otobo_config').upsert({
-            user_id: this.userId, url, username, password, updated_at: new Date().toISOString()
+            user_id: this.userId, url, username, password,
+            sync_filters: syncFilters, updated_at: new Date().toISOString()
         }, { onConflict: 'user_id' });
         if (error) throw error;
     }
@@ -976,7 +980,7 @@ class TSPStore {
         return {
             id: r.id, ticketId: r.ticket_id, ticketNumber: r.ticket_number,
             title: r.title, status: r.status, priority: r.priority,
-            queue: r.queue, customerName: r.customer_name, owner: r.owner,
+            queue: r.queue, ticketType: r.ticket_type || '', customerName: r.customer_name, owner: r.owner,
             createdAtOtobo: r.created_at_otobo, updatedAtOtobo: r.updated_at_otobo,
             rawData: r.raw_data || {}, linkedClientId: r.linked_client_id || null,
             syncedAt: r.synced_at
