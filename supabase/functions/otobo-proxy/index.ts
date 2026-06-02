@@ -7,6 +7,18 @@ const corsHeaders = {
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
+async function fetchJson(url: string, options: RequestInit): Promise<unknown> {
+  const res = await fetch(url, options);
+  const text = await res.text();
+  if (!text) throw new Error(`OTOBO retornou resposta vazia (HTTP ${res.status})`);
+  try {
+    return JSON.parse(text);
+  } catch {
+    const preview = text.substring(0, 200).replace(/\n/g, " ");
+    throw new Error(`OTOBO retornou resposta não-JSON (HTTP ${res.status}): ${preview}`);
+  }
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
@@ -31,38 +43,35 @@ serve(async (req) => {
     const { action, otoboUrl, username, password, ticketIds, ticketId } = await req.json();
     const base = (otoboUrl || "").replace(/\/$/, "");
     const creds = { UserLogin: username, Password: password };
-    const headers = { "Content-Type": "application/json" };
+    const jsonHeaders = { "Content-Type": "application/json" };
 
     let data: unknown;
 
     if (action === "search") {
-      const res = await fetch(
+      data = await fetchJson(
         `${base}/otobo/nph-genericinterface.pl/Webservice/GenericTicketConnectorREST/Ticket/Search`,
         {
           method: "POST",
-          headers,
+          headers: jsonHeaders,
           body: JSON.stringify({
             ...creds,
             StateType: ["new", "open", "pending reminder", "pending auto", "in treatment"],
           }),
         }
       );
-      data = await res.json();
 
     } else if (action === "get") {
       const ids = (ticketIds as string[]).join(",");
-      const res = await fetch(
+      data = await fetchJson(
         `${base}/otobo/nph-genericinterface.pl/Webservice/GenericTicketConnectorREST/Ticket/${ids}?UserLogin=${encodeURIComponent(username)}&Password=${encodeURIComponent(password)}`,
-        { headers }
+        { headers: jsonHeaders }
       );
-      data = await res.json();
 
     } else if (action === "articles") {
-      const res = await fetch(
+      data = await fetchJson(
         `${base}/otobo/nph-genericinterface.pl/Webservice/GenericTicketConnectorREST/Ticket/${ticketId}?UserLogin=${encodeURIComponent(username)}&Password=${encodeURIComponent(password)}&AllArticles=1`,
-        { headers }
+        { headers: jsonHeaders }
       );
-      data = await res.json();
 
     } else {
       return new Response(JSON.stringify({ error: "Invalid action" }), { status: 400, headers: corsHeaders });
