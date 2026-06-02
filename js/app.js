@@ -73,7 +73,9 @@ class AppController {
         this._modalStatus    = 'new';
         this._modalLabels    = [];
         this._modalChecklist = [];
-        this._modalCoverColor = null;
+        this._modalCoverColor  = null;
+        this._modalCompleted   = false;
+        this._modalCompletedAt = null;
         this._modalComments  = [];
         // Colunas Kanban do cliente atual
         this._currentColumns     = [];
@@ -345,7 +347,9 @@ class AppController {
             this._modalStatus    = 'new';
             this._modalLabels    = [];
             this._modalChecklist = [];
-            this._modalCoverColor = null;
+            this._modalCoverColor  = null;
+            this._modalCompleted   = false;
+            this._modalCompletedAt = null;
             this._modalComments  = [];
             document.getElementById('modal-task-comments-section').style.display = 'none';
             document.getElementById('modal-task-comments-list').innerHTML = '';
@@ -639,7 +643,9 @@ class AppController {
             labels: this._modalLabels || [],
             checklist: this._modalChecklist || [],
             coverColor: this._modalCoverColor || null,
-            attachments: this.taskAttachments
+            attachments: this.taskAttachments,
+            completed: this._modalCompleted || false,
+            completedAt: this._modalCompletedAt || null
         };
 
         const btn = document.querySelector('#form-task [type="submit"]');
@@ -703,7 +709,9 @@ class AppController {
         this._modalStatus    = t.status || this._currentColumns[0]?.id || 'new';
         this._modalLabels    = t.labels ? [...t.labels] : [];
         this._modalChecklist = t.checklist ? [...t.checklist] : [];
-        this._modalCoverColor = t.coverColor || null;
+        this._modalCoverColor  = t.coverColor || null;
+        this._modalCompleted   = t.completed || false;
+        this._modalCompletedAt = t.completedAt || null;
 
         document.getElementById('task-id').value = t.id;
         document.getElementById('task-title').value = t.title;
@@ -2570,7 +2578,11 @@ class AppController {
                 document.getElementById('modal-agenda-title').innerText = id ? 'Agendamento atualizado' : 'Agendamento criado';
                 navigator.clipboard.writeText(eventData.meetLink).catch(() => {});
                 Toast.show('Agendamento salvo! Link Meet gerado e copiado.', 'success');
+                // Desabilita o botão permanentemente para evitar duplo-envio
+                btn.innerText = 'Salvo ✓';
+                btn.disabled = true;
                 this.renderAgenda();
+                return;
             } else {
                 this.closeModal('modal-agenda-event');
                 await this.renderAgenda();
