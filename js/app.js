@@ -6312,9 +6312,12 @@ class AppController {
         return otoboTickets.map(t => {
             const customerId = normalize(t.CustomerID || '');
             const customerUserNorm = normalize(t.CustomerUserID || t.CustomerID || '');
-            // Prioridade 1: match exato por otobo_customer_id cadastrado no cliente
+            // Prioridade 1: match exato por otobo_customer_id (suporta múltiplos separados por vírgula)
             let linked = customerId
-                ? clients.find(c => c.otoboCustomerId && normalize(c.otoboCustomerId) === customerId)
+                ? clients.find(c => {
+                    if (!c.otoboCustomerId) return false;
+                    return c.otoboCustomerId.split(',').map(s => normalize(s)).includes(customerId);
+                })
                 : null;
             // Prioridade 2: fallback fuzzy por nome
             if (!linked) {
