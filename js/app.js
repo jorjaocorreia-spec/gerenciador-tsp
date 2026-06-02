@@ -6243,7 +6243,7 @@ class AppController {
         Toast.show('Sincronizando com OTOBO...', 'info', 2000);
         try {
             const config = this._otoboConfig;
-            const otoboTickets = await this._fetchTicketsFromOtobo(config);
+            const { tickets: otoboTickets, foundIds, denied } = await this._fetchTicketsFromOtobo(config);
             const clients = await store.getClients();
             const rows = this._mapTicketsToRows(otoboTickets, clients);
             const ticketIds = rows.map(r => r.ticket_id);
@@ -6254,7 +6254,10 @@ class AppController {
             if (info) { info.textContent = `Última sync: ${now}`; info.style.display = ''; }
             this._cachedChamadosTickets = null;
             await this.renderChamados();
-            Toast.show(`${rows.length} chamado(s) sincronizado(s)!`, 'success');
+            let msg = `${rows.length} chamado(s) sincronizado(s)!`;
+            if (denied > 0) msg += ` (${foundIds} encontrados no OTOBO, ${denied} sem acesso)`;
+            else if (foundIds > rows.length) msg += ` (${foundIds} encontrados no OTOBO)`;
+            Toast.show(msg, 'success', denied > 0 ? 8000 : 4000);
         } catch (err) {
             Toast.show(`Erro na sincronização: ${err.message}`, 'error', 6000);
         } finally {
@@ -6292,19 +6295,28 @@ class AppController {
     async _fetchTicketsFromOtobo(config) {
         const syncFilters = this._otoboConfig?.syncFilters || {};
         const searchData = await this._otoboProxyFetch('search', { syncFilters });
-        const ticketIds = searchData.TicketID || [];
-        if (ticketIds.length === 0) return [];
+        const ticketIds = Array.isArray(searchData.TicketID)
+            ? searchData.TicketID
+            : (searchData.TicketID ? [searchData.TicketID] : []);
+        console.log(`[OTOBO] Busca retornou ${ticketIds.length} ID(s)`);
+        if (ticketIds.length === 0) return { tickets: [], foundIds: 0, denied: 0 };
 
         // TicketGet em lotes de 10
         const results = [];
+        let totalDenied = 0;
         for (let i = 0; i < ticketIds.length; i += 10) {
             const batch = ticketIds.slice(i, i + 10);
             try {
                 const d = await this._otoboProxyFetch('get', { ticketIds: batch });
                 results.push(...(d.Ticket || []));
-            } catch (e) { /* falha em um lote não impede os demais */ }
+                totalDenied += d._denied || 0;
+                console.log(`[OTOBO] Lote ${Math.floor(i/10)+1}: ${(d.Ticket||[]).length} buscado(s), ${d._denied||0} negado(s)`);
+            } catch (e) {
+                console.warn(`[OTOBO] Lote ${Math.floor(i/10)+1} falhou:`, e.message);
+            }
         }
-        return results;
+        console.log(`[OTOBO] Total: ${results.length} ticket(s) obtido(s), ${totalDenied} negado(s)`);
+        return { tickets: results, foundIds: ticketIds.length, denied: totalDenied };
     }
 
     _mapTicketsToRows(otoboTickets, clients) {
