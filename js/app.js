@@ -3179,12 +3179,23 @@ class AppController {
                     attendees: (gEv.attendees || []).map(a => a.email).join(', ')
                 };
 
-                if (match) {
-                    mappedData.id = match.id;
-                    mappedData.type = match.type; // Preserva o tipo customizado do TSP
-                    mappedData.clientId = match.clientId;
-                    mappedData.relatedTaskId = match.relatedTaskId;
-                    if (!mappedData.meetLink) mappedData.meetLink = match.meetLink || '';
+                // Fallback: se não achou por calendarEventId, tenta por título+data+hora
+                // para evitar criar duplicatas sem clientId quando o ID perdeu sincronismo
+                const fuzzyMatch = !match
+                    ? localEvents.find(le =>
+                        !le.calendarEventId &&
+                        le.title === mappedData.title &&
+                        le.date === mappedData.date &&
+                        le.startTime === mappedData.startTime)
+                    : null;
+                const effective = match || fuzzyMatch;
+
+                if (effective) {
+                    mappedData.id = effective.id;
+                    mappedData.type = effective.type; // Preserva o tipo customizado do TSP
+                    mappedData.clientId = effective.clientId;
+                    mappedData.relatedTaskId = effective.relatedTaskId;
+                    if (!mappedData.meetLink) mappedData.meetLink = effective.meetLink || '';
                     await store.updateAgendaEvent(mappedData);
                 } else {
                     await store.addAgendaEvent(mappedData);
