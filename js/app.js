@@ -801,6 +801,18 @@ class AppController {
                     <span>${escapeHtml(label)} registrados${escapeHtml(desc)}</span>
                     <span style="margin-left:auto;white-space:nowrap">${dateStr}</span>
                 </div>`;
+            } else if (entry.type === 'completed') {
+                return `<div class="task-activity-item task-activity-completed">
+                    <i data-lucide="check-circle-2" style="width:13px;height:13px;flex-shrink:0"></i>
+                    <span>Tarefa concluída</span>
+                    <span style="margin-left:auto;white-space:nowrap">${dateStr}</span>
+                </div>`;
+            } else if (entry.type === 'uncompleted') {
+                return `<div class="task-activity-item">
+                    <i data-lucide="circle" style="width:13px;height:13px;flex-shrink:0"></i>
+                    <span>Marcada como incompleta</span>
+                    <span style="margin-left:auto;white-space:nowrap">${dateStr}</span>
+                </div>`;
             }
             return '';
         }).join('');
@@ -910,6 +922,16 @@ class AppController {
             } catch (err) {
                 Toast.show('Erro ao excluir tarefa: ' + err.message, 'error');
             }
+        }
+    }
+
+    async toggleTaskComplete(id, completed) {
+        try {
+            const { completedAt } = await store.toggleTaskComplete(id, completed);
+            await store.logTaskActivity(id, completed ? 'completed' : 'uncompleted', { completedAt });
+            await this.renderAll();
+        } catch (err) {
+            Toast.show('Erro ao atualizar tarefa: ' + err.message, 'error');
         }
     }
 
@@ -2329,8 +2351,20 @@ class AppController {
         if (task.estimatedMinutes > 0 || task.spentMinutes > 0) {
             badgesHtml += `<span class="kb-badge"><i data-lucide="clock-3" style="width:10px;height:10px"></i> ${task.spentMinutes}/${task.estimatedMinutes}m</span>`;
         }
+        if (task.completed) {
+            badgesHtml += `<span class="kb-badge kb-badge-completed"><i data-lucide="check-circle" style="width:10px;height:10px"></i> Concluída</span>`;
+        }
+
+        // Botão de conclusão (canto superior esquerdo, estilo Trello)
+        const completeTitle = task.completed ? 'Marcar como incompleta' : 'Marcar como concluída';
+        const completeBtnHtml = `<button type="button" class="kb-complete-btn${task.completed ? ' kb-complete-btn--done' : ''}"
+            onclick="event.stopPropagation();app.toggleTaskComplete('${task.id}', ${!task.completed})"
+            title="${completeTitle}">
+            <i data-lucide="${task.completed ? 'check-circle-2' : 'circle'}" style="width:16px;height:16px"></i>
+        </button>`;
 
         card.innerHTML = `
+            ${completeBtnHtml}
             ${coverHtml}
             ${labelsHtml}
             <p class="kb-card-title">${escapeHtml(task.title)}</p>

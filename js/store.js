@@ -35,6 +35,8 @@ class TSPStore {
             spentMinutes: parseInt(r.spent_minutes) || 0,
             attachments: Array.isArray(r.attachments) ? r.attachments : [],
             comments: Array.isArray(r.comments) ? r.comments : [],
+            completed: r.completed || false,
+            completedAt: r.completed_at || null,
             createdAt: r.created_at, updatedAt: r.updated_at };
     }
 
@@ -229,10 +231,23 @@ class TSPStore {
             cover_color: taskData.coverColor || null,
             updated_at: new Date().toISOString(),
             attachments: taskData.attachments || [],
+            completed: taskData.completed || false,
+            completed_at: taskData.completedAt || null,
             ...(taskData.comments !== undefined && { comments: taskData.comments })
         }).eq('id', taskData.id).eq('user_id', this.userId).select().single();
         if (error) throw error;
         return this._task(data);
+    }
+
+    async toggleTaskComplete(taskId, completed) {
+        const completedAt = completed ? new Date().toISOString() : null;
+        const { data, error } = await this.db.from('tasks').update({
+            completed,
+            completed_at: completedAt,
+            updated_at: new Date().toISOString()
+        }).eq('id', taskId).eq('user_id', this.userId).select().single();
+        if (error) throw error;
+        return { task: this._task(data), completedAt };
     }
 
     async reorderTasks(updates) {
