@@ -423,6 +423,7 @@ class AppController {
         const consultantBonus = document.getElementById('consultant-bonus').value;
         const notes = document.getElementById('client-notes').value;
         const status = document.getElementById('client-status').value;
+        const otoboCustomerId = document.getElementById('client-otobo-id').value.trim();
         const initialBalanceH = document.getElementById('client-initial-balance').value;
         const balanceStartDate = document.getElementById('client-balance-start').value;
         const btn = e.target.querySelector('[type="submit"]');
@@ -440,9 +441,9 @@ class AppController {
         btn.disabled = true;
         try {
             if (id) {
-                await store.updateClient(id, name, hours, csName, projectNum, clientPays, consultantBonus, notes, status, initialBalanceMinutes, balanceStartDate || null);
+                await store.updateClient(id, name, hours, csName, projectNum, clientPays, consultantBonus, notes, status, initialBalanceMinutes, balanceStartDate || null, otoboCustomerId || null);
             } else {
-                await store.addClient(name, hours, csName, projectNum, clientPays, consultantBonus, notes, status, initialBalanceMinutes, balanceStartDate || null);
+                await store.addClient(name, hours, csName, projectNum, clientPays, consultantBonus, notes, status, initialBalanceMinutes, balanceStartDate || null, otoboCustomerId || null);
             }
             e.target.reset();
             document.getElementById('client-id').value = '';
@@ -1722,6 +1723,7 @@ class AppController {
         document.getElementById('consultant-bonus').value = client.consultantBonus || '';
         document.getElementById('client-notes').value = client.notes || '';
         document.getElementById('client-status').value = client.status || 'active';
+        document.getElementById('client-otobo-id').value = client.otoboCustomerId || '';
         document.getElementById('client-initial-balance').value =
             client.initialBalanceMinutes ? (client.initialBalanceMinutes / 60) : '';
         document.getElementById('client-balance-start').value = client.balanceStartDate || '';
@@ -6308,11 +6310,19 @@ class AppController {
     _mapTicketsToRows(otoboTickets, clients) {
         const normalize = s => (s || '').toLowerCase().trim();
         return otoboTickets.map(t => {
-            const customerNorm = normalize(t.CustomerUserID || t.CustomerID || '');
-            const linked = customerNorm ? clients.find(c => {
-                const cn = normalize(c.name);
-                return cn === customerNorm || cn.includes(customerNorm) || customerNorm.includes(cn);
-            }) : null;
+            const customerId = normalize(t.CustomerID || '');
+            const customerUserNorm = normalize(t.CustomerUserID || t.CustomerID || '');
+            // Prioridade 1: match exato por otobo_customer_id cadastrado no cliente
+            let linked = customerId
+                ? clients.find(c => c.otoboCustomerId && normalize(c.otoboCustomerId) === customerId)
+                : null;
+            // Prioridade 2: fallback fuzzy por nome
+            if (!linked) {
+                linked = customerUserNorm ? clients.find(c => {
+                    const cn = normalize(c.name);
+                    return cn === customerUserNorm || cn.includes(customerUserNorm) || customerUserNorm.includes(cn);
+                }) : null;
+            }
             return {
                 user_id: store.userId,
                 ticket_id: String(t.TicketID),

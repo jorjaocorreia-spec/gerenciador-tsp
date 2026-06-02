@@ -12,6 +12,7 @@ class TSPStore {
             notes: r.notes || '', status: r.status || 'active',
             initialBalanceMinutes: parseInt(r.initial_balance_minutes) || 0,
             balanceStartDate: r.balance_start_date || null,
+            otoboCustomerId: r.otobo_customer_id || '',
             createdAt: r.created_at };
     }
 
@@ -80,7 +81,7 @@ class TSPStore {
         return this._client(data);
     }
 
-    async addClient(name, hoursTotal, csName, projectNum, clientPays, consultantBonus, notes, status, initialBalanceMinutes, balanceStartDate) {
+    async addClient(name, hoursTotal, csName, projectNum, clientPays, consultantBonus, notes, status, initialBalanceMinutes, balanceStartDate, otoboCustomerId) {
         const { data, error } = await this.db.from('clients').insert({
             user_id: this.userId, name,
             hours_total: parseFloat(hoursTotal) || 0, cs_name: csName || '',
@@ -88,20 +89,22 @@ class TSPStore {
             consultant_bonus: parseFloat(consultantBonus) || 0,
             notes: notes || '', status: status || 'active',
             initial_balance_minutes: parseInt(initialBalanceMinutes) || 0,
-            balance_start_date: balanceStartDate || null
+            balance_start_date: balanceStartDate || null,
+            otobo_customer_id: otoboCustomerId || null
         }).select().single();
         if (error) throw error;
         return this._client(data);
     }
 
-    async updateClient(id, name, hoursTotal, csName, projectNum, clientPays, consultantBonus, notes, status, initialBalanceMinutes, balanceStartDate) {
+    async updateClient(id, name, hoursTotal, csName, projectNum, clientPays, consultantBonus, notes, status, initialBalanceMinutes, balanceStartDate, otoboCustomerId) {
         const { data, error } = await this.db.from('clients').update({
             name, hours_total: parseFloat(hoursTotal) || 0, cs_name: csName || '',
             project_num: projectNum || '', client_pays: parseFloat(clientPays) || 0,
             consultant_bonus: parseFloat(consultantBonus) || 0,
             notes: notes || '', status: status || 'active',
             initial_balance_minutes: parseInt(initialBalanceMinutes) || 0,
-            balance_start_date: balanceStartDate || null
+            balance_start_date: balanceStartDate || null,
+            otobo_customer_id: otoboCustomerId || null
         }).eq('id', id).select().single();
         if (error) throw error;
         return this._client(data);
