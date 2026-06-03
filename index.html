@@ -119,6 +119,10 @@
                 <i data-lucide="sparkles"></i><span class="nav-label"> IA</span>
             </button>
 
+            <button class="btn btn-secondary" id="btn-whatsapp-config" style="width:100%; margin-bottom:8px;" onclick="app.openWhatsappConfig()" title="WhatsApp Bot">
+                <i data-lucide="message-circle"></i><span class="nav-label"> WhatsApp</span>
+            </button>
+
             <div class="sidebar-user">
                 <p id="user-email-display" class="text-muted nav-label" style="font-size:0.75rem; margin-bottom:8px; word-break:break-all;"></p>
                 <button class="btn btn-secondary" id="btn-logout" style="width:100%;" title="Sair">
@@ -1537,8 +1541,15 @@
                     <datalist id="apt-project-list"></datalist>
                 </div>
                 <div class="form-group">
-                    <label>Descrição</label>
-                    <textarea id="apt-description" class="form-control" rows="3" placeholder="O que foi feito..." spellcheck="true"></textarea>
+                    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;">
+                        <label style="margin-bottom:0;">Descrição</label>
+                        <button type="button" id="btn-ai-improve-apt" class="btn btn-ghost btn-sm"
+                            style="display:none;gap:4px;padding:2px 8px;font-size:11px;color:#a78bfa;border-color:rgba(167,139,250,0.3);"
+                            onclick="app.improveAptDescription()">
+                            <i data-lucide="sparkles" style="width:13px;height:13px;"></i> Melhorar com IA
+                        </button>
+                    </div>
+                    <textarea id="apt-description" class="form-control" rows="3" placeholder="O que foi feito..." spellcheck="true" oninput="app.onAptDescInput()"></textarea>
                 </div>
                 <div style="display: flex; gap: 12px; margin-top: 8px;">
                     <button type="button" class="btn btn-secondary" style="flex: 1; justify-content: center;" onclick="app.closeModal('modal-apontamento')">Cancelar</button>
@@ -1961,6 +1972,51 @@
         </div>
     </div>
 
+    <!-- MODAL: CONFIGURAÇÃO WHATSAPP BOT -->
+    <div class="modal-overlay" id="modal-whatsapp-config">
+        <div class="modal glass" style="max-width:480px;">
+            <div class="modal-header">
+                <h3>WhatsApp Bot</h3>
+                <button class="close-modal" onclick="app.closeModal('modal-whatsapp-config')"><i data-lucide="x"></i></button>
+            </div>
+            <div style="padding:24px; display:flex; flex-direction:column; gap:20px;">
+                <div class="form-group" style="margin-bottom:0;">
+                    <label class="form-label">Seu número de WhatsApp</label>
+                    <input type="tel" id="whatsapp-number" class="form-control" placeholder="5541999999999"
+                        style="font-size:1rem; letter-spacing:0.5px;">
+                    <p style="font-size:0.78rem; color:var(--text-muted); margin-top:6px;">
+                        Formato: código do país + DDD + número (sem espaços ou hífens).<br>
+                        Exemplo: <code style="background:var(--bg-tertiary); padding:1px 5px; border-radius:3px;">5541999887766</code>
+                    </p>
+                </div>
+
+                <div style="background:var(--bg-tertiary); border-radius:10px; padding:16px;">
+                    <p style="font-weight:600; margin-bottom:10px; font-size:0.875rem;">
+                        <i data-lucide="terminal" style="width:14px;height:14px; vertical-align:middle;"></i>
+                        Comandos disponíveis
+                    </p>
+                    <div style="display:flex; flex-direction:column; gap:8px; font-size:0.82rem; color:var(--text-muted);">
+                        <div><code style="color:var(--primary-color);">horas</code> — consumo de horas por cliente no mês atual</div>
+                        <div><code style="color:var(--primary-color);">horas cliente X</code> — filtra um cliente específico</div>
+                        <div><code style="color:var(--primary-color);">agenda</code> — eventos dos próximos 7 dias</div>
+                        <div><code style="color:var(--primary-color);">ajuda</code> — lista todos os comandos</div>
+                    </div>
+                </div>
+
+                <div style="background:rgba(99,102,241,0.08); border:1px solid rgba(99,102,241,0.25); border-radius:8px; padding:12px; font-size:0.8rem; color:var(--text-muted);">
+                    <strong style="color:var(--primary-color);">Como funciona:</strong> ao enviar uma mensagem para o número do bot, ele identifica você pelo número cadastrado aqui e acessa apenas os seus dados.
+                </div>
+            </div>
+            <div class="modal-footer" style="gap:8px;">
+                <button class="btn btn-secondary" id="btn-test-whatsapp" onclick="app.sendTestWhatsapp()" style="margin-right:auto;">
+                    <i data-lucide="send" style="width:15px;height:15px;"></i> Enviar teste
+                </button>
+                <button class="btn btn-secondary" onclick="app.closeModal('modal-whatsapp-config')">Cancelar</button>
+                <button class="btn btn-primary" onclick="app.saveWhatsappConfig()">Salvar</button>
+            </div>
+        </div>
+    </div>
+
     <!-- MODAL: DETALHE DO CHAMADO -->
     <div class="modal-overlay" id="modal-chamado">
         <div class="modal glass modal-task-two-panel" style="max-width:860px; max-height:90vh;">
@@ -2053,7 +2109,7 @@
     <script src="js/calendar.js?v=21"></script>
     <script src="js/store.js?v=25"></script>
     <script src="js/ai.js?v=1"></script>
-    <script src="js/app.js?v=27"></script>
+    <script src="js/app.js?v=28"></script>
 </body>
 
 </html>

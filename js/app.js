@@ -4194,6 +4194,7 @@ class AppController {
         document.getElementById('apt-duration').textContent = '--';
         await this.populateAptProjectList();
         this.openModal('modal-apontamento');
+        setTimeout(() => this.onAptDescInput(), 50);
     }
 
     async openEditApontamento(id) {
@@ -4210,6 +4211,7 @@ class AppController {
         document.getElementById('apt-duration').textContent = this.calcDuration(item.startTime, item.endTime).label;
         await this.populateAptProjectList();
         this.openModal('modal-apontamento');
+        setTimeout(() => this.onAptDescInput(), 50);
     }
 
     async handleApontamentoSubmit(e) {
@@ -6108,6 +6110,47 @@ class AppController {
         }
     }
 
+    onAptDescInput() {
+        const btn = document.getElementById('btn-ai-improve-apt');
+        if (!btn) return;
+        const hasText = document.getElementById('apt-description').value.trim().length > 10;
+        btn.style.display = (aiClient.isConfigured && hasText) ? 'inline-flex' : 'none';
+    }
+
+    async improveAptDescription() {
+        const descEl = document.getElementById('apt-description');
+        const raw = descEl.value.trim();
+        if (!raw) return;
+        if (!aiClient.isConfigured) { Toast.show('Configure a IA primeiro (botão ✨ na sidebar).', 'error'); return; }
+
+        const btn = document.getElementById('btn-ai-improve-apt');
+        const origHtml = btn.innerHTML;
+        btn.disabled = true;
+        btn.innerHTML = '<div class="spinner" style="width:12px;height:12px;"></div> Melhorando...';
+
+        try {
+            const projectNum = document.getElementById('apt-project').value.trim();
+            const durationLabel = document.getElementById('apt-duration').textContent || '';
+
+            // Tenta encontrar o nome do cliente pelo número do projeto
+            const clients = await store.getClients().catch(() => []);
+            const client = clients.find(c => c.projectNum === projectNum);
+            const clientName = client?.name || '';
+
+            const improved = await aiClient.improveAtendimentoDescription(raw, clientName, projectNum, durationLabel);
+            descEl.value = improved;
+            descEl.style.transition = 'background 0.4s';
+            descEl.style.background = 'rgba(139,92,246,0.08)';
+            setTimeout(() => { descEl.style.background = ''; }, 1200);
+            Toast.show('Descrição melhorada!', 'success', 2500);
+        } catch (err) {
+            Toast.show('Erro na IA: ' + err.message, 'error');
+        } finally {
+            btn.disabled = false;
+            btn.innerHTML = origHtml;
+        }
+    }
+
     // ===================================
     // CHAMADOS (OTOBO)
     // ===================================
@@ -6643,6 +6686,70 @@ class AppController {
         }
     }
 
+    // ─── WhatsApp Bot ───────────────────────────────────────────────────────
+
+    async openWhatsappConfig() {
+        try {
+            const profile = await store.getWhatsappProfile();
+            document.getElementById('whatsapp-number').value = profile?.whatsappNumber || '';
+        } catch (_) {
+            document.getElementById('whatsapp-number').value = '';
+        }
+        this.openModal('modal-whatsapp-config');
+    }
+
+    async saveWhatsappConfig() {
+        const number = document.getElementById('whatsapp-number').value.replace(/\D/g, '');
+        if (number && (number.length < 10 || number.length > 15)) {
+            Toast.show('Número inválido. Use formato internacional (ex: 5541999887766)', 'error');
+            return;
+        }
+        try {
+            await store.saveWhatsappProfile(number);
+            Toast.show('Número salvo com sucesso!', 'success');
+            this.closeModal('modal-whatsapp-config');
+        } catch (err) {
+            Toast.show('Erro ao salvar: ' + err.message, 'error');
+        }
+    }
+
+    async sendTestWhatsapp() {
+        const number = document.getElementById('whatsapp-number').value.replace(/\D/g, '');
+        if (!number) {
+            Toast.show('Salve um número antes de enviar o teste.', 'error');
+            return;
+        }
+        const btn = document.getElementById('btn-test-whatsapp');
+        btn.disabled = true;
+        btn.innerHTML = `<i data-lucide="loader-2" style="width:15px;height:15px;"></i> Enviando...`;
+        lucide.createIcons();
+        try {
+            const session = await window.supabaseClient.auth.getSession();
+            const token = session?.data?.session?.access_token;
+            if (!token) throw new Error('Sessão expirada');
+            const supabaseUrl = window.TSP_CONFIG?.SUPABASE_URL || '';
+            const res = await fetch(`${supabaseUrl}/functions/v1/whatsapp-bot`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`,
+                },
+                body: JSON.stringify({ action: 'welcome' }),
+            });
+            if (!res.ok) {
+                const err = await res.json().catch(() => ({}));
+                throw new Error(err.error || `HTTP ${res.status}`);
+            }
+            Toast.show('Mensagem de teste enviada! Verifique seu WhatsApp.', 'success');
+        } catch (err) {
+            Toast.show('Erro ao enviar teste: ' + err.message, 'error');
+        } finally {
+            btn.disabled = false;
+            btn.innerHTML = `<i data-lucide="send" style="width:15px;height:15px;"></i> Enviar teste`;
+            lucide.createIcons();
+        }
+    }
+
     async openChamadoModal(ticket) {
         this._currentTicket = ticket;
         document.getElementById('chamado-modal-title').textContent = `#${ticket.ticketNumber || ticket.ticketId} — ${ticket.title}`;
@@ -6763,6 +6870,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             window.app._cachedChamadosTickets = null;
             window.app._cachedChamadosClients = null;
             window.app._chamadoFiltersAttached = false;
+            window.app._whatsappProfile = null;
         }
         if (window.aiClient) aiClient.reset();
         await Auth.signOut();
