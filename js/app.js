@@ -7146,42 +7146,6 @@ class AppController {
         }
     }
 
-    async sendTestWhatsapp() {
-        const number = document.getElementById('whatsapp-number').value.replace(/\D/g, '');
-        if (!number) {
-            Toast.show('Salve um número antes de enviar o teste.', 'error');
-            return;
-        }
-        const btn = document.getElementById('btn-test-whatsapp');
-        btn.disabled = true;
-        btn.innerHTML = `<i data-lucide="loader-2" style="width:15px;height:15px;"></i> Enviando...`;
-        lucide.createIcons();
-        try {
-            const session = await window.supabaseClient.auth.getSession();
-            const token = session?.data?.session?.access_token;
-            if (!token) throw new Error('Sessão expirada');
-            const supabaseUrl = window.TSP_CONFIG?.SUPABASE_URL || '';
-            const res = await fetch(`${supabaseUrl}/functions/v1/whatsapp-bot`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${token}`,
-                },
-                body: JSON.stringify({ action: 'welcome' }),
-            });
-            if (!res.ok) {
-                const err = await res.json().catch(() => ({}));
-                throw new Error(err.error || `HTTP ${res.status}`);
-            }
-            Toast.show('Mensagem de teste enviada! Verifique seu WhatsApp.', 'success');
-        } catch (err) {
-            Toast.show('Erro ao enviar teste: ' + err.message, 'error');
-        } finally {
-            btn.disabled = false;
-            btn.innerHTML = `<i data-lucide="send" style="width:15px;height:15px;"></i> Enviar teste`;
-            lucide.createIcons();
-        }
-    }
 
     async openChamadoModal(ticket) {
         this._currentTicket = ticket;
