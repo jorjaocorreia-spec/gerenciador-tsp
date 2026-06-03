@@ -962,6 +962,22 @@ class TSPStore {
         };
     }
 
+    async getWhatsappProfile() {
+        const { data, error } = await this.db.from('user_profiles')
+            .select('whatsapp_number').eq('user_id', this.userId).maybeSingle();
+        if (error) throw error;
+        return data ? { whatsappNumber: data.whatsapp_number || '' } : null;
+    }
+
+    async saveWhatsappProfile(whatsappNumber) {
+        const { error } = await this.db.from('user_profiles').upsert({
+            user_id: this.userId,
+            whatsapp_number: whatsappNumber || null,
+            updated_at: new Date().toISOString()
+        }, { onConflict: 'user_id' });
+        if (error) throw error;
+    }
+
     async getOtoboConfig() {
         const { data, error } = await this.db.from('otobo_config')
             .select('*').eq('user_id', this.userId).maybeSingle();
