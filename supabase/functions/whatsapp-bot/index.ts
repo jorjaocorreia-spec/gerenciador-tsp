@@ -246,7 +246,8 @@ async function findUserByPhone(phone: string): Promise<string | null> {
   // Gera variantes do número (com/sem 55, com/sem 9° dígito)
   const phoneAlt = phone.startsWith("55") && phone.length >= 12 ? phone.slice(2) : null;
   const phoneAlt9 = phoneAlt && phoneAlt.length === 10 ? phoneAlt.slice(0, 2) + "9" + phoneAlt.slice(2) : null;
-  const variants = [phone, phoneAlt, phoneAlt9].filter(Boolean) as string[];
+  const phoneAlt9With55 = phoneAlt9 ? "55" + phoneAlt9 : null; // ex: 554599910111 → 5545999910111
+  const variants = [phone, phoneAlt, phoneAlt9, phoneAlt9With55].filter(Boolean) as string[];
   const orFilter = variants.map((v) => `whatsapp_number.eq.${v}`).join(",");
 
   const { data, error } = await db

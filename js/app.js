@@ -7127,6 +7127,20 @@ class AppController {
             await store.saveWhatsappProfile(number);
             Toast.show('Número salvo com sucesso!', 'success');
             this.closeModal('modal-whatsapp-config');
+            if (number) {
+                try {
+                    const session = await window.supabaseClient.auth.getSession();
+                    const token = session?.data?.session?.access_token;
+                    if (token) {
+                        const supabaseUrl = window.TSP_CONFIG?.SUPABASE_URL || '';
+                        await fetch(`${supabaseUrl}/functions/v1/whatsapp-bot`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                            body: JSON.stringify({ action: 'welcome' }),
+                        });
+                    }
+                } catch (_) { /* silencioso — número já foi salvo */ }
+            }
         } catch (err) {
             Toast.show('Erro ao salvar: ' + err.message, 'error');
         }
