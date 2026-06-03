@@ -2980,12 +2980,17 @@ class AppController {
         }
 
         const allDayWeekSection = hasAnyAllDay
-            ? `<div class="agenda-allday-row agenda-allday-week"><div class="agenda-allday-label">Dia inteiro</div><div class="agenda-allday-events" style="display:grid; grid-template-columns: repeat(7, 1fr); gap:4px;">${allDayRowHtml}</div></div>`
+            ? `<div class="agenda-allday-week-grid" style="grid-template-columns: repeat(7, 1fr);">${allDayRowHtml}</div>`
+            : '';
+
+        const allDayTimeLabel = hasAnyAllDay
+            ? `<div class="agenda-allday-time-slot">DIA INTEIRO</div>`
             : '';
 
         container.innerHTML = `
             <div class="agenda-grid">
                 <div class="agenda-time-column">
+                    ${allDayTimeLabel}
                     ${this.generateTimeSlots()}
                 </div>
                 <div class="agenda-content-column">

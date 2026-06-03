@@ -1366,6 +1366,28 @@ h4 {
   min-height: 8px;
 }
 
+/* Weekly all-day grid — spans full content column width, no label offset */
+.agenda-allday-week-grid {
+  display: grid;
+  gap: 4px;
+  padding: 4px 0 6px;
+  border-bottom: 1px solid var(--surface-border);
+  margin-bottom: 4px;
+}
+
+/* "DIA INTEIRO" label inside the time column for weekly view */
+.agenda-allday-time-slot {
+  font-size: 0.6rem;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  text-align: right;
+  padding: 6px 8px 6px;
+  border-bottom: 1px solid var(--surface-border);
+  white-space: nowrap;
+  overflow: hidden;
+}
+
 .allday-event-banner {
   display: flex;
   align-items: center;
