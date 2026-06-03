@@ -6215,6 +6215,68 @@ class AppController {
         Toast.show(`${suggestions.length} itens adicionados ao checklist!`, 'success');
     }
 
+    toggleAgendaAssistant() {
+        const panel = document.getElementById('agenda-ai-assistant');
+        if (!panel) return;
+        if (!aiClient.isConfigured) {
+            Toast.show('Configure a IA primeiro (botão ✨ na sidebar).', 'error');
+            return;
+        }
+        const visible = panel.style.display !== 'none';
+        panel.style.display = visible ? 'none' : 'block';
+        if (!visible) {
+            lucide.createIcons();
+            setTimeout(() => document.getElementById('agenda-ai-input')?.focus(), 100);
+        }
+    }
+
+    async interpretAgendaEvent() {
+        if (!aiClient.isConfigured) { Toast.show('Configure a IA primeiro.', 'error'); return; }
+        const input = document.getElementById('agenda-ai-input');
+        const text = input?.value.trim();
+        if (!text) { Toast.show('Digite a descrição do evento.', 'error'); return; }
+
+        const btn = document.getElementById('btn-interpret-agenda');
+        const origHtml = btn.innerHTML;
+        btn.disabled = true;
+        btn.innerHTML = '<div class="spinner" style="width:14px;height:14px;"></div> Interpretando...';
+
+        try {
+            const today = new Date().toISOString().split('T')[0];
+            const ev = await aiClient.parseAgendaNaturalLanguage(text, today);
+
+            const date = ev.date || today;
+            this.openNewAgendaEvent(date);
+
+            // Pre-fill todos os campos retornados pela IA
+            if (ev.title)       document.getElementById('agenda-title').value = ev.title;
+            if (ev.type)        document.getElementById('agenda-type').value = ev.type;
+            if (ev.dateEnd)     document.getElementById('agenda-date-end').value = ev.dateEnd;
+            if (ev.description) document.getElementById('agenda-desc').value = ev.description;
+            if (ev.location)    document.getElementById('agenda-location').value = ev.location;
+
+            if (ev.allDay) {
+                this.toggleAllDayAgenda(true);
+            } else {
+                this.toggleAllDayAgenda(false);
+                if (ev.startTime) document.getElementById('agenda-start').value = ev.startTime;
+                if (ev.endTime)   document.getElementById('agenda-end').value   = ev.endTime;
+            }
+
+            // Oculta o painel após interpretar com sucesso
+            document.getElementById('agenda-ai-assistant').style.display = 'none';
+            input.value = '';
+
+            Toast.show('Formulário pré-preenchido! Revise e salve.', 'success', 3000);
+        } catch (err) {
+            Toast.show('Erro ao interpretar: ' + err.message, 'error');
+        } finally {
+            btn.disabled = false;
+            btn.innerHTML = origHtml;
+            lucide.createIcons();
+        }
+    }
+
     async generateAgendaReportNarrative(source) {
         if (!aiClient.isConfigured) { Toast.show('Configure a IA primeiro (botão ✨ na sidebar).', 'error'); return; }
         const events = this._reportEvents;

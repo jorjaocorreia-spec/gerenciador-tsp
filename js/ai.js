@@ -126,6 +126,39 @@ Reescreva a descrição de forma técnica e profissional.`;
         return this.complete(system, user);
     }
 
+    async parseAgendaNaturalLanguage(text, todayDate) {
+        const dayNames = ['domingo','segunda-feira','terça-feira','quarta-feira','quinta-feira','sexta-feira','sábado'];
+        const todayObj = new Date(todayDate + 'T12:00:00');
+        const todayDayName = dayNames[todayObj.getDay()];
+
+        const system = `Você é um assistente que interpreta descrições de eventos em linguagem natural e retorna JSON estruturado.
+Hoje é ${todayDate} (${todayDayName}).
+Interprete o texto e retorne APENAS um objeto JSON com estes campos:
+{
+  "title": "título do evento",
+  "type": "meeting|consulting|task|reminder",
+  "date": "YYYY-MM-DD",
+  "dateEnd": "YYYY-MM-DD",
+  "startTime": "HH:MM",
+  "endTime": "HH:MM",
+  "allDay": false,
+  "location": "",
+  "description": ""
+}
+Regras:
+- type: meeting = reunião/meeting/alinhamento, consulting = consultoria/atendimento/suporte, task = tarefa/trabalho/bloco, reminder = lembrete/aviso
+- Se horário não mencionado: startTime="" endTime="" allDay=true
+- Se só início informado sem duração: endTime = startTime + 1h
+- Se duração mencionada: calcule endTime a partir do startTime
+- dateEnd igual a date por padrão; só diferente se evento multi-dia
+- Datas relativas (hoje, amanhã, próxima sexta etc.) baseadas em hoje = ${todayDate}
+- Responda APENAS com o JSON puro, sem markdown, sem \`\`\`, sem explicações`;
+
+        const raw = await this.complete(system, `Texto: ${text}`);
+        const cleaned = raw.trim().replace(/^```json?\s*/i, '').replace(/```\s*$/i, '').trim();
+        return JSON.parse(cleaned);
+    }
+
     async generateAgendaReportNarrative(clientName, events, startDate, endDate) {
         const system = `Você é um consultor de TI escrevendo um relatório mensal para um cliente.
 Escreva um texto profissional e amigável resumindo os atendimentos do período.

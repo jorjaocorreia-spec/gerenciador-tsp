@@ -346,6 +346,11 @@
                     <button class="btn btn-secondary" onclick="app.openAgendaHelp()" title="Como funciona a integração com Google Calendar" style="font-weight:600; min-width:36px;">
                         <i data-lucide="help-circle"></i>
                     </button>
+                    <button class="btn btn-ghost btn-sm" id="btn-agenda-ai-assistant" onclick="app.toggleAgendaAssistant()"
+                        style="gap:4px;color:#a78bfa;border-color:rgba(167,139,250,0.3);padding:6px 12px;font-size:13px;"
+                        title="Criar evento com linguagem natural">
+                        <i data-lucide="sparkles" style="width:14px;height:14px;"></i> Assistente
+                    </button>
                     <button class="btn btn-secondary" id="btn-agenda-report" onclick="app.openAgendaReportModal()" title="Gerar relatório de agenda por cliente">
                         <i data-lucide="file-text"></i> Relatório
                     </button>
@@ -361,6 +366,25 @@
                         <i data-lucide="plus"></i> Novo Agendamento
                     </button>
                 </div>
+            </div>
+
+            <!-- Assistente de IA para linguagem natural -->
+            <div id="agenda-ai-assistant" style="display:none; margin-bottom: 16px; padding: 14px 18px; border-radius: 12px; background: rgba(139,92,246,0.06); border: 1px solid rgba(167,139,250,0.25);">
+                <div style="display:flex;align-items:center;gap:6px;margin-bottom:10px;">
+                    <i data-lucide="sparkles" style="width:14px;height:14px;color:#a78bfa;"></i>
+                    <span style="font-size:13px;font-weight:600;color:#a78bfa;">Assistente de Agendamento</span>
+                    <span style="font-size:12px;color:var(--text-muted);margin-left:2px;">— descreva o evento em linguagem natural</span>
+                </div>
+                <div style="display:flex;gap:10px;align-items:flex-start;">
+                    <textarea id="agenda-ai-input" class="form-control" rows="2"
+                        style="flex:1;font-size:13px;resize:none;"
+                        placeholder="Ex: Reunião de alinhamento com Cascavel amanhã às 14h por 2 horas&#10;Ex: Consultoria sexta-feira das 9h às 12h, presencial em São Paulo"
+                        onkeydown="if(event.key==='Enter'&&event.ctrlKey){event.preventDefault();app.interpretAgendaEvent();}"></textarea>
+                    <button type="button" class="btn btn-primary" style="flex-shrink:0;gap:6px;" onclick="app.interpretAgendaEvent()" id="btn-interpret-agenda">
+                        <i data-lucide="wand-2" style="width:14px;height:14px;"></i> Interpretar
+                    </button>
+                </div>
+                <p style="font-size:11px;color:var(--text-muted);margin:6px 0 0;">Ctrl+Enter para interpretar · A IA pré-preenche o formulário — revise antes de salvar</p>
             </div>
 
             <!-- Controls (Current date/week display and navigation) -->
@@ -2160,7 +2184,7 @@
     <script src="js/calendar.js?v=21"></script>
     <script src="js/store.js?v=25"></script>
     <script src="js/ai.js?v=1"></script>
-    <script src="js/app.js?v=31"></script>
+    <script src="js/app.js?v=32"></script>
 </body>
 
 </html>
