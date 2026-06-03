@@ -610,6 +610,8 @@ class AppController {
         document.getElementById('record-calculated').dataset.minutes = r.minutes;
 
         this.openModal('modal-record');
+        // Exibe botão IA se já há descrição e IA configurada
+        setTimeout(() => this.onRecordDescInput(), 50);
     }
 
     async handleViewRecord(id) {
@@ -6059,6 +6061,50 @@ class AppController {
         } else {
             btn.style.borderColor = '';
             btn.style.color = '';
+        }
+    }
+
+    // ===================================
+    // FEATURES DE IA
+    // ===================================
+
+    onRecordDescInput() {
+        const btn = document.getElementById('btn-ai-improve-record');
+        if (!btn) return;
+        const hasText = document.getElementById('record-desc').value.trim().length > 10;
+        btn.style.display = (aiClient.isConfigured && hasText) ? 'inline-flex' : 'none';
+    }
+
+    async improveRecordDescription() {
+        const descEl = document.getElementById('record-desc');
+        const raw = descEl.value.trim();
+        if (!raw) return;
+        if (!aiClient.isConfigured) { Toast.show('Configure a IA primeiro (botão ✨ na sidebar).', 'error'); return; }
+
+        const btn = document.getElementById('btn-ai-improve-record');
+        const origHtml = btn.innerHTML;
+        btn.disabled = true;
+        btn.innerHTML = '<div class="spinner" style="width:12px;height:12px;"></div> Melhorando...';
+
+        try {
+            const clientId = document.getElementById('record-client').value;
+            const clients = await store.getClients().catch(() => []);
+            const client = clients.find(c => c.id === clientId);
+            const clientName = client?.name || '';
+            const projectNum = client?.projectNum || '';
+            const durationLabel = document.getElementById('record-calculated').value || '';
+
+            const improved = await aiClient.improveAtendimentoDescription(raw, clientName, projectNum, durationLabel);
+            descEl.value = improved;
+            descEl.style.transition = 'background 0.4s';
+            descEl.style.background = 'rgba(139,92,246,0.08)';
+            setTimeout(() => { descEl.style.background = ''; }, 1200);
+            Toast.show('Descrição melhorada!', 'success', 2500);
+        } catch (err) {
+            Toast.show('Erro na IA: ' + err.message, 'error');
+        } finally {
+            btn.disabled = false;
+            btn.innerHTML = origHtml;
         }
     }
 

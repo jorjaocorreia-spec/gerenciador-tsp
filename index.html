@@ -874,9 +874,14 @@
                         readonly placeholder="Preencha os horários acima...">
                 </div>
                 <div class="form-group">
-                    <label>Descrição do que foi feito</label>
+                    <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:6px;">
+                        <label style="margin:0;">Descrição do que foi feito</label>
+                        <button type="button" id="btn-ai-improve-record" onclick="app.improveRecordDescription()" class="btn btn-ghost" style="font-size:0.78rem; padding:3px 10px; color:var(--primary-color); border:1px solid rgba(139,92,246,0.35); display:none;">
+                            <i data-lucide="sparkles" style="width:13px;height:13px;"></i> Melhorar com IA
+                        </button>
+                    </div>
                     <textarea id="record-desc" class="form-control" rows="3" placeholder="Detalhes da atividade..."
-                        required spellcheck="true"></textarea>
+                        required spellcheck="true" oninput="app.onRecordDescInput()"></textarea>
                 </div>
                 <button type="submit" class="btn btn-primary" style="width: 100%; justify-content: center;">Salvar
                     Atendimento</button>
