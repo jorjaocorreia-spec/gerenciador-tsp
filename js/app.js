@@ -3199,6 +3199,11 @@ class AppController {
 
         const localEvents = await store.getAgendaEvents();
         let syncErrors = 0;
+        // Rastreia eventos locais resolvidos via fuzzy match no Passo 1.
+        // localEvents é capturado antes do Passo 1, então eventos matchados via fuzzy
+        // ainda aparecem com calendarEventId=null no array — o Passo 2 os empurraria
+        // de novo ao Google criando uma duplicata sem clientId.
+        const processedLocalIds = new Set();
 
         // 1. O que tem no Google que não temos (ou foi atualizado lá)
         for (const gEv of googleEvents) {
@@ -3268,6 +3273,7 @@ class AppController {
                     mappedData.clientId = effective.clientId;
                     mappedData.relatedTaskId = effective.relatedTaskId;
                     if (!mappedData.meetLink) mappedData.meetLink = effective.meetLink || '';
+                    processedLocalIds.add(effective.id); // Marca como processado — evita duplicata no Passo 2
                     await store.updateAgendaEvent(mappedData);
                 } else {
                     await store.addAgendaEvent(mappedData);
@@ -3281,6 +3287,7 @@ class AppController {
         // 2. Empurra eventos locais que NUNCA foram enviados ao Google (sem calendarEventId)
         for (const le of localEvents) {
             if (le.calendarEventId) continue; // Já existe no Google (mesmo que fora da janela atual)
+            if (processedLocalIds.has(le.id)) continue; // Já resolvido via fuzzy match no Passo 1
             try {
                 const result = await calendarAPI.createGoogleEvent(le);
                 if (result) {
