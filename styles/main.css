@@ -1219,6 +1219,26 @@ h4 {
   border-radius: 8px;
 }
 
+/* Weekly view: flat 2-col grid — CSS equalizes row heights, aligning time labels with events */
+.agenda-week-grid {
+  display: grid;
+  grid-template-columns: 60px 1fr;
+  background: rgba(15, 23, 42, 0.4);
+  border: 1px solid var(--surface-border);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.agenda-week-header-spacer {
+  border-right: 1px solid var(--surface-border);
+}
+
+/* No bottom margin on day headers inside the flat weekly grid (rows handle spacing) */
+.agenda-week-grid .agenda-days-row {
+  margin-bottom: 0;
+  padding-bottom: 8px;
+}
+
 .agenda-time-column {
   border-right: 1px solid var(--surface-border);
   display: flex;
@@ -1370,22 +1390,27 @@ h4 {
 .agenda-allday-week-grid {
   display: grid;
   gap: 4px;
-  padding: 4px 0 6px;
+  padding: 4px 4px 6px;
+  border-top: 1px solid var(--surface-border);
   border-bottom: 1px solid var(--surface-border);
-  margin-bottom: 4px;
 }
 
-/* "DIA INTEIRO" label inside the time column for weekly view */
+/* "DIA INTEIRO" label in the time column (left side of weekly all-day row) */
 .agenda-allday-time-slot {
   font-size: 0.6rem;
   color: var(--text-muted);
   text-transform: uppercase;
   letter-spacing: 0.04em;
   text-align: right;
-  padding: 6px 8px 6px;
+  padding: 4px 6px;
+  border-right: 1px solid var(--surface-border);
+  border-top: 1px solid var(--surface-border);
   border-bottom: 1px solid var(--surface-border);
   white-space: nowrap;
   overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
 }
 
 .allday-event-banner {

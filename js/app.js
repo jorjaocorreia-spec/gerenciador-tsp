@@ -2979,29 +2979,24 @@ class AppController {
             `;
         }
 
-        const allDayWeekSection = hasAnyAllDay
-            ? `<div class="agenda-allday-week-grid" style="grid-template-columns: repeat(7, 1fr);">${allDayRowHtml}</div>`
-            : '';
-
-        const allDayTimeLabel = hasAnyAllDay
-            ? `<div class="agenda-allday-time-slot">DIA INTEIRO</div>`
-            : '';
-
+        // Flat 2-column CSS grid: each pair of siblings forms a row whose height
+        // is equalized by the browser, so time slots align with event blocks.
         container.innerHTML = `
-            <div class="agenda-grid">
+            <div class="agenda-week-grid">
+                <div class="agenda-week-header-spacer"></div>
+                <div class="agenda-days-row" style="grid-template-columns: repeat(7, 1fr);">
+                    ${headersHtml}
+                </div>
+                ${hasAnyAllDay ? `
+                    <div class="agenda-allday-time-slot">DIA INTEIRO</div>
+                    <div class="agenda-allday-week-grid" style="grid-template-columns: repeat(7, 1fr);">${allDayRowHtml}</div>
+                ` : ''}
                 <div class="agenda-time-column">
-                    ${allDayTimeLabel}
                     ${this.generateTimeSlots()}
                 </div>
-                <div class="agenda-content-column">
-                    <div class="agenda-days-row" style="grid-template-columns: repeat(7, 1fr);">
-                        ${headersHtml}
-                    </div>
-                    ${allDayWeekSection}
-                    <div class="events-container" style="display: grid; grid-template-columns: repeat(7, 1fr); gap: 8px;">
-                        <div class="agenda-grid-lines"></div>
-                        ${columnsHtml}
-                    </div>
+                <div class="events-container" style="display: grid; grid-template-columns: repeat(7, 1fr); gap: 8px;">
+                    <div class="agenda-grid-lines"></div>
+                    ${columnsHtml}
                 </div>
             </div>
         `;
