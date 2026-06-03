@@ -4048,7 +4048,8 @@ class AppController {
 
     _autoResizeTextarea(el) {
         el.style.height = 'auto';
-        el.style.height = Math.max(120, el.scrollHeight) + 'px';
+        const maxH = parseInt(el.style.maxHeight) || 340;
+        el.style.height = Math.min(maxH, Math.max(120, el.scrollHeight)) + 'px';
     }
 
     _updateDescLinks(text) {
