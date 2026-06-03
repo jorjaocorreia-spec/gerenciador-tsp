@@ -1863,7 +1863,9 @@ class AppController {
         const startMonth = start.getMonth();
         const monthsCount = Math.max(1, (nowYear - startYear) * 12 + (nowMonth - startMonth) + 1);
 
-        const totalContractedMinutes = monthsCount * client.hoursTotal * 60;
+        // Só meses já completos são "cobrados" — o mês corrente ainda está em andamento
+        const completedMonths = Math.max(0, monthsCount - 1);
+        const totalContractedMinutes = completedMonths * client.hoursTotal * 60;
         const totalAppliedMinutes = clientRecords
             .filter(r => r.date >= client.balanceStartDate)
             .reduce((s, r) => s + r.minutes, 0);
