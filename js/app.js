@@ -1631,9 +1631,9 @@ class AppController {
                         </div>
                         <div style="display: flex; justify-content: space-between; font-size: 0.85rem; margin-top: 8px;">
                             <span class="text-muted">${b.totalAppliedH.toFixed(1)}h aplicadas</span>
-                            <span class="text-muted">${b.totalContractedH.toFixed(0)}h contratadas</span>
+                            <span class="text-muted">${client.hoursTotal}h mensais contratadas</span>
                         </div>
-                        <div style="font-size: 0.78rem; color: var(--text-muted); margin-top: 4px;">Desde ${startLabel} · ${b.monthsCount} ${b.monthsCount === 1 ? 'mês' : 'meses'}</div>
+                        <div style="font-size: 0.78rem; color: var(--text-muted); margin-top: 4px;">Controle na plataforma desde ${startLabel} · ${b.monthsCount} ${b.monthsCount === 1 ? 'mês' : 'meses'}</div>
                     `;
                 } else {
                     // Sem balanceStartDate: exibe total histórico sem cálculo de saldo
