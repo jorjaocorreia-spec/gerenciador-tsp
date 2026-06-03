@@ -755,13 +755,31 @@
                 <div id="report-preview-inline">
                     <p class="text-muted" style="text-align:center;padding:24px 0;">Selecione o período e clique em Buscar.</p>
                 </div>
-                <div id="report-actions-inline" style="display:none; margin-top: 16px; display: flex; gap: 12px; justify-content: flex-end;">
+                <div id="report-actions-inline" style="display:none; margin-top: 16px; display: flex; gap: 12px; justify-content: flex-end; flex-wrap: wrap;">
+                    <button type="button" class="btn btn-ghost btn-sm" id="btn-report-ai-inline" onclick="app.generateAgendaReportNarrative('inline')"
+                        style="display:none;gap:4px;color:#a78bfa;border-color:rgba(167,139,250,0.3);">
+                        <i data-lucide="sparkles" style="width:13px;height:13px;"></i> Narrativa com IA
+                    </button>
                     <button type="button" class="btn btn-secondary" id="btn-report-copy-inline" onclick="app.generateAgendaReportText('inline')">
                         <i data-lucide="clipboard"></i> Copiar texto
                     </button>
                     <button type="button" class="btn btn-primary" id="btn-report-pdf-inline" onclick="app.generateAgendaReportPdf('inline')">
                         <i data-lucide="download"></i> Baixar PDF
                     </button>
+                </div>
+                <div id="report-ai-panel-inline" style="display:none; margin-top: 12px; padding: 10px 12px; border-radius: 8px; background: rgba(139,92,246,0.06); border: 1px solid rgba(167,139,250,0.2);">
+                    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
+                        <span style="font-size:11px;font-weight:600;color:#a78bfa;text-transform:uppercase;letter-spacing:.5px;">
+                            <i data-lucide="sparkles" style="width:11px;height:11px;display:inline-block;vertical-align:middle;margin-right:3px;"></i>
+                            Narrativa gerada pela IA
+                        </span>
+                        <button type="button" class="btn btn-ghost btn-sm" style="font-size:11px;padding:2px 8px;color:#a78bfa;border-color:rgba(167,139,250,0.3);"
+                            onclick="app._copyReportNarrative('inline')">
+                            <i data-lucide="clipboard" style="width:12px;height:12px;"></i> Copiar
+                        </button>
+                    </div>
+                    <textarea id="report-ai-text-inline" class="form-control" rows="6" spellcheck="true"
+                        style="font-size:13px;line-height:1.5;resize:vertical;"></textarea>
                 </div>
             </div>
             <!-- Painel: Agendamento -->
@@ -809,7 +827,25 @@
             <div id="report-preview-modal" style="flex: 1; overflow-y: auto; padding: 16px 24px; min-height: 120px;">
                 <p class="text-muted" style="text-align:center;padding:32px 0;">Selecione o cliente e o período, depois clique em Buscar.</p>
             </div>
+            <div id="report-ai-panel-modal" style="display:none; padding: 0 24px 12px; flex-shrink: 0; border-top: 1px solid rgba(167,139,250,0.2); background: rgba(139,92,246,0.04);">
+                <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 0 6px;">
+                    <span style="font-size:11px;font-weight:600;color:#a78bfa;text-transform:uppercase;letter-spacing:.5px;">
+                        <i data-lucide="sparkles" style="width:11px;height:11px;display:inline-block;vertical-align:middle;margin-right:3px;"></i>
+                        Narrativa gerada pela IA
+                    </span>
+                    <button type="button" class="btn btn-ghost btn-sm" style="font-size:11px;padding:2px 8px;color:#a78bfa;border-color:rgba(167,139,250,0.3);"
+                        onclick="app._copyReportNarrative('modal')">
+                        <i data-lucide="clipboard" style="width:12px;height:12px;"></i> Copiar
+                    </button>
+                </div>
+                <textarea id="report-ai-text-modal" class="form-control" rows="6" spellcheck="true"
+                    style="font-size:13px;line-height:1.5;resize:vertical;"></textarea>
+            </div>
             <div style="padding: 16px 24px; border-top: 1px solid rgba(255,255,255,0.08); display: flex; gap: 12px; justify-content: flex-end; flex-shrink: 0;">
+                <button type="button" class="btn btn-ghost btn-sm" id="btn-report-ai-modal" onclick="app.generateAgendaReportNarrative('modal')"
+                    style="display:none;gap:4px;color:#a78bfa;border-color:rgba(167,139,250,0.3);">
+                    <i data-lucide="sparkles" style="width:13px;height:13px;"></i> Narrativa com IA
+                </button>
                 <button type="button" class="btn btn-secondary" id="btn-report-copy-modal" onclick="app.generateAgendaReportText('modal')" style="display:none;">
                     <i data-lucide="clipboard"></i> Copiar texto
                 </button>
@@ -2124,7 +2160,7 @@
     <script src="js/calendar.js?v=21"></script>
     <script src="js/store.js?v=25"></script>
     <script src="js/ai.js?v=1"></script>
-    <script src="js/app.js?v=30"></script>
+    <script src="js/app.js?v=31"></script>
 </body>
 
 </html>

@@ -5663,6 +5663,10 @@ class AppController {
         label.textContent = opt && opt.value ? opt.textContent : '';
         document.getElementById('btn-report-pdf-modal').style.display  = 'none';
         document.getElementById('btn-report-copy-modal').style.display = 'none';
+        const aiBtnReset = document.getElementById('btn-report-ai-modal');
+        const aiPanelReset = document.getElementById('report-ai-panel-modal');
+        if (aiBtnReset) aiBtnReset.style.display = 'none';
+        if (aiPanelReset) { aiPanelReset.style.display = 'none'; const ta = document.getElementById('report-ai-text-modal'); if (ta) ta.value = ''; }
         document.getElementById('report-preview-modal').innerHTML =
             '<p class="text-muted" style="text-align:center;padding:32px 0;">Clique em Buscar para carregar os eventos.</p>';
         this._reportEvents = [];
@@ -5672,21 +5676,27 @@ class AppController {
     _reportGetContext(source) {
         if (source === 'inline') {
             return {
-                clientId:  this._reportInlineClientId || '',
-                startDate: document.getElementById('report-date-start-inline')?.value || '',
-                endDate:   document.getElementById('report-date-end-inline')?.value || '',
-                preview:   document.getElementById('report-preview-inline'),
-                pdfBtn:    document.getElementById('btn-report-pdf-inline'),
-                copyBtn:   document.getElementById('btn-report-copy-inline'),
+                clientId:    this._reportInlineClientId || '',
+                startDate:   document.getElementById('report-date-start-inline')?.value || '',
+                endDate:     document.getElementById('report-date-end-inline')?.value || '',
+                preview:     document.getElementById('report-preview-inline'),
+                pdfBtn:      document.getElementById('btn-report-pdf-inline'),
+                copyBtn:     document.getElementById('btn-report-copy-inline'),
+                aiBtn:       document.getElementById('btn-report-ai-inline'),
+                aiPanel:     document.getElementById('report-ai-panel-inline'),
+                aiTextarea:  document.getElementById('report-ai-text-inline'),
             };
         }
         return {
-            clientId:  document.getElementById('report-client-select')?.value || '',
-            startDate: document.getElementById('report-date-start')?.value || '',
-            endDate:   document.getElementById('report-date-end')?.value || '',
-            preview:   document.getElementById('report-preview-modal'),
-            pdfBtn:    document.getElementById('btn-report-pdf-modal'),
-            copyBtn:   document.getElementById('btn-report-copy-modal'),
+            clientId:    document.getElementById('report-client-select')?.value || '',
+            startDate:   document.getElementById('report-date-start')?.value || '',
+            endDate:     document.getElementById('report-date-end')?.value || '',
+            preview:     document.getElementById('report-preview-modal'),
+            pdfBtn:      document.getElementById('btn-report-pdf-modal'),
+            copyBtn:     document.getElementById('btn-report-copy-modal'),
+            aiBtn:       document.getElementById('btn-report-ai-modal'),
+            aiPanel:     document.getElementById('report-ai-panel-modal'),
+            aiTextarea:  document.getElementById('report-ai-text-modal'),
         };
     }
 
@@ -5697,8 +5707,10 @@ class AppController {
         if (ctx.startDate > ctx.endDate)    { Toast.show('Data início deve ser anterior à data fim.', 'error'); return; }
 
         ctx.preview.innerHTML = `<div style="padding:24px 0;">${spinnerHtml}</div>`;
-        if (ctx.pdfBtn)  ctx.pdfBtn.style.display  = 'none';
-        if (ctx.copyBtn) ctx.copyBtn.style.display  = 'none';
+        if (ctx.pdfBtn)   ctx.pdfBtn.style.display   = 'none';
+        if (ctx.copyBtn)  ctx.copyBtn.style.display   = 'none';
+        if (ctx.aiBtn)    ctx.aiBtn.style.display     = 'none';
+        if (ctx.aiPanel)  { ctx.aiPanel.style.display = 'none'; if (ctx.aiTextarea) ctx.aiTextarea.value = ''; }
 
         try {
             const [events, client] = await Promise.all([
@@ -5723,6 +5735,7 @@ class AppController {
             lucide.createIcons();
             if (ctx.pdfBtn)  ctx.pdfBtn.style.display  = 'inline-flex';
             if (ctx.copyBtn) ctx.copyBtn.style.display  = 'inline-flex';
+            if (ctx.aiBtn && aiClient.isConfigured) ctx.aiBtn.style.display = 'inline-flex';
         } catch (err) {
             ctx.preview.innerHTML = '<p class="text-muted" style="text-align:center;padding:24px 0;">Erro ao buscar eventos.</p>';
             Toast.show('Erro ao buscar agenda: ' + err.message, 'error');
@@ -6200,6 +6213,58 @@ class AppController {
         const panel = document.getElementById('ai-task-suggestions');
         if (panel) { panel.style.display = 'none'; panel.innerHTML = ''; }
         Toast.show(`${suggestions.length} itens adicionados ao checklist!`, 'success');
+    }
+
+    async generateAgendaReportNarrative(source) {
+        if (!aiClient.isConfigured) { Toast.show('Configure a IA primeiro (botão ✨ na sidebar).', 'error'); return; }
+        const events = this._reportEvents;
+        const client = this._reportClient;
+        if (!events || events.length === 0) { Toast.show('Busque os eventos primeiro.', 'info'); return; }
+
+        const ctx = this._reportGetContext(source);
+        const btn = ctx.aiBtn;
+        if (!btn) return;
+
+        const origHtml = btn.innerHTML;
+        btn.disabled = true;
+        btn.innerHTML = '<div class="spinner" style="width:12px;height:12px;"></div> Gerando...';
+        if (ctx.aiPanel) ctx.aiPanel.style.display = 'none';
+
+        try {
+            const narrative = await aiClient.generateAgendaReportNarrative(
+                client?.name || '',
+                events,
+                ctx.startDate,
+                ctx.endDate
+            );
+
+            if (ctx.aiTextarea) {
+                ctx.aiTextarea.value = narrative;
+                ctx.aiPanel.style.display = 'block';
+                ctx.aiTextarea.focus();
+                ctx.aiTextarea.select();
+                lucide.createIcons();
+            }
+            Toast.show('Narrativa gerada! Revise e copie o texto.', 'success', 3000);
+        } catch (err) {
+            Toast.show('Erro na IA: ' + err.message, 'error');
+        } finally {
+            btn.disabled = false;
+            btn.innerHTML = origHtml;
+            lucide.createIcons();
+        }
+    }
+
+    async _copyReportNarrative(source) {
+        const id = source === 'inline' ? 'report-ai-text-inline' : 'report-ai-text-modal';
+        const text = document.getElementById(id)?.value?.trim();
+        if (!text) return;
+        try {
+            await navigator.clipboard.writeText(text);
+            Toast.show('Narrativa copiada!', 'success', 2000);
+        } catch {
+            Toast.show('Selecione o texto manualmente e use Ctrl+C.', 'info');
+        }
     }
 
     onImplDescInput() {
