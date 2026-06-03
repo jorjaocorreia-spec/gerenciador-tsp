@@ -126,6 +126,29 @@ Reescreva a descrição de forma técnica e profissional.`;
         return this.complete(system, user);
     }
 
+    async generateDashboardInsights(clientStats, monthLabel) {
+        const system = `Você é um consultor de TI analisando a carteira de clientes de um profissional de consultoria SAP.
+Analise os dados de consumo de horas do mês e forneça uma análise inteligente e prática.
+Seja direto, use linguagem profissional mas acessível.
+Estruture a resposta em 3 seções curtas:
+1. Visão Geral — saúde geral da carteira (2-3 frases)
+2. Atenção Necessária — clientes que precisam de ação imediata (limite excedido, projeção crítica)
+3. Oportunidades — clientes com horas subutilizadas ou potencial de expansão
+Responda APENAS com o texto das 3 seções, sem bullet points excessivos, sem markdown, sem cabeçalhos com #.
+Use "→" para separar o nome do cliente da observação. Máximo 200 palavras.`;
+
+        const lines = clientStats.map(s =>
+            `${s.client.name}${s.client.projectNum ? ` (Proj.${s.client.projectNum})` : ''}: ` +
+            `${s.hoursUsed}h usadas / ${s.hoursTotal}h contratadas (${s.percentage}%) | ` +
+            `Projeção: ${s.projectedHours}h | Tarefas abertas: ${s.tasksEstimatedHours}h estimadas | ` +
+            `Status: ${s.isOverLimit ? 'ACIMA DO LIMITE' : s.percentage >= 80 ? 'ATENÇÃO' : s.percentage <= 20 ? 'SUBUTILIZADO' : 'NORMAL'}`
+        ).join('\n');
+
+        const user = `Mês de referência: ${monthLabel}\nTotal de clientes ativos: ${clientStats.length}\n\nDados por cliente:\n${lines}`;
+
+        return this.complete(system, user);
+    }
+
     async parseAgendaNaturalLanguage(text, todayDate) {
         const dayNames = ['domingo','segunda-feira','terça-feira','quarta-feira','quinta-feira','sexta-feira','sábado'];
         const todayObj = new Date(todayDate + 'T12:00:00');

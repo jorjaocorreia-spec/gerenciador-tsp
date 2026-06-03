@@ -142,6 +142,13 @@
                     <h1>Visão Geral do TSP</h1>
                     <p class="text-muted" id="dash-subtitle">Acompanhe o consumo de horas dos seus contratos.</p>
                 </div>
+                <div>
+                    <button id="btn-dash-insights" class="btn btn-ghost btn-sm" onclick="app.generateDashboardInsights()"
+                        style="gap:4px;color:#a78bfa;border-color:rgba(167,139,250,0.3);padding:6px 14px;font-size:13px;"
+                        title="Análise inteligente dos contratos do mês">
+                        <i data-lucide="sparkles" style="width:14px;height:14px;"></i> Insights
+                    </button>
+                </div>
             </div>
 
             <!-- Filtro do Dashboard -->
@@ -168,6 +175,19 @@
                         Mês atual
                     </button>
                 </div>
+            </div>
+
+            <!-- Painel de insights de IA -->
+            <div id="dashboard-ai-insights" style="display:none; margin-bottom:20px; padding:16px 20px; border-radius:12px; background:rgba(139,92,246,0.06); border:1px solid rgba(167,139,250,0.25);">
+                <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px;">
+                    <div style="display:flex;align-items:center;gap:6px;">
+                        <i data-lucide="sparkles" style="width:14px;height:14px;color:#a78bfa;flex-shrink:0;"></i>
+                        <span style="font-size:13px;font-weight:600;color:#a78bfa;" id="dash-insights-title">Análise Inteligente</span>
+                    </div>
+                    <button onclick="document.getElementById('dashboard-ai-insights').style.display='none'"
+                        class="btn btn-ghost btn-sm" style="padding:2px 8px;font-size:11px;flex-shrink:0;">✕ Fechar</button>
+                </div>
+                <div id="dashboard-ai-insights-content" style="font-size:13px;line-height:1.7;color:var(--text-secondary);white-space:pre-wrap;"></div>
             </div>
 
             <div class="dashboard-grid" id="dashboard-container">
@@ -2184,7 +2204,7 @@
     <script src="js/calendar.js?v=21"></script>
     <script src="js/store.js?v=25"></script>
     <script src="js/ai.js?v=1"></script>
-    <script src="js/app.js?v=32"></script>
+    <script src="js/app.js?v=33"></script>
 </body>
 
 </html>

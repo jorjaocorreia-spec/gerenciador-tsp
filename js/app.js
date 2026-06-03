@@ -6215,6 +6215,54 @@ class AppController {
         Toast.show(`${suggestions.length} itens adicionados ao checklist!`, 'success');
     }
 
+    async generateDashboardInsights() {
+        if (!aiClient.isConfigured) { Toast.show('Configure a IA primeiro (botão ✨ na sidebar).', 'error'); return; }
+
+        const btn = document.getElementById('btn-dash-insights');
+        const panel = document.getElementById('dashboard-ai-insights');
+        const content = document.getElementById('dashboard-ai-insights-content');
+        const title = document.getElementById('dash-insights-title');
+        if (!btn || !panel || !content) return;
+
+        const origHtml = btn.innerHTML;
+        btn.disabled = true;
+        btn.innerHTML = '<div class="spinner" style="width:14px;height:14px;"></div> Analisando...';
+
+        // Mostra painel com spinner enquanto carrega
+        content.innerHTML = `<div style="padding:8px 0;">${spinnerHtml}</div>`;
+        panel.style.display = 'block';
+
+        try {
+            const allStats = await store.getBatchStats(this._dashboardMonth);
+            const showActive   = document.getElementById('dash-filter-active')?.checked ?? true;
+            const showFinished = document.getElementById('dash-filter-finished')?.checked ?? false;
+            const stats = allStats.filter(s => {
+                const status = s.client.status || 'active';
+                return (status === 'active' && showActive) || (status === 'finished' && showFinished);
+            }).filter(Boolean);
+
+            if (stats.length === 0) {
+                content.textContent = 'Nenhum cliente visível para analisar. Ative os filtros de status acima.';
+                return;
+            }
+
+            const monthLabel = this._formatDashboardMonth(this._dashboardMonth);
+            if (title) title.textContent = `Análise Inteligente — ${monthLabel}`;
+
+            const narrative = await aiClient.generateDashboardInsights(stats, monthLabel);
+            content.textContent = narrative;
+            lucide.createIcons();
+            Toast.show('Insights gerados!', 'success', 2000);
+        } catch (err) {
+            content.textContent = 'Erro ao gerar análise: ' + err.message;
+            Toast.show('Erro na IA: ' + err.message, 'error');
+        } finally {
+            btn.disabled = false;
+            btn.innerHTML = origHtml;
+            lucide.createIcons();
+        }
+    }
+
     toggleAgendaAssistant() {
         const panel = document.getElementById('agenda-ai-assistant');
         if (!panel) return;
