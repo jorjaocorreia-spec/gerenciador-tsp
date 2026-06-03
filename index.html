@@ -1615,8 +1615,15 @@
                     </div>
 
                     <div class="form-group" style="grid-column: 1 / -1;">
-                        <label class="form-label">Descrição</label>
-                        <textarea id="impl-description" class="form-control" rows="3" placeholder="O que este recurso faz, qual problema resolve..." spellcheck="true"></textarea>
+                        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;">
+                            <label class="form-label" style="margin-bottom:0;">Descrição</label>
+                            <button type="button" id="btn-ai-improve-impl" class="btn btn-ghost btn-sm"
+                                style="display:none;gap:4px;padding:2px 8px;font-size:11px;color:#a78bfa;border-color:rgba(167,139,250,0.3);"
+                                onclick="app.improveImplDescription()">
+                                <i data-lucide="sparkles" style="width:13px;height:13px;"></i> Melhorar com IA
+                            </button>
+                        </div>
+                        <textarea id="impl-description" class="form-control" rows="3" placeholder="O que este recurso faz, qual problema resolve..." spellcheck="true" oninput="app.onImplDescInput()"></textarea>
                     </div>
 
                     <div class="form-group" style="grid-column: 1 / -1;">
@@ -2117,7 +2124,7 @@
     <script src="js/calendar.js?v=21"></script>
     <script src="js/store.js?v=25"></script>
     <script src="js/ai.js?v=1"></script>
-    <script src="js/app.js?v=29"></script>
+    <script src="js/app.js?v=30"></script>
 </body>
 
 </html>

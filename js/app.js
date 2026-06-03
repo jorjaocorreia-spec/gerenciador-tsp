@@ -4434,6 +4434,7 @@ class AppController {
         this._renderImplAttachmentPreviews();
         await this._populateImplClientCheckboxes(impl.clientIds);
         this.openModal('modal-implementation');
+        setTimeout(() => this.onImplDescInput(), 50);
     }
 
     async handleImplementationSubmit(e) {
@@ -6199,6 +6200,44 @@ class AppController {
         const panel = document.getElementById('ai-task-suggestions');
         if (panel) { panel.style.display = 'none'; panel.innerHTML = ''; }
         Toast.show(`${suggestions.length} itens adicionados ao checklist!`, 'success');
+    }
+
+    onImplDescInput() {
+        const btn = document.getElementById('btn-ai-improve-impl');
+        if (!btn) return;
+        const hasText = document.getElementById('impl-description').value.trim().length > 10;
+        btn.style.display = (aiClient.isConfigured && hasText) ? 'inline-flex' : 'none';
+    }
+
+    async improveImplDescription() {
+        const descEl = document.getElementById('impl-description');
+        const raw = descEl.value.trim();
+        if (!raw) return;
+        if (!aiClient.isConfigured) { Toast.show('Configure a IA primeiro (botão ✨ na sidebar).', 'error'); return; }
+
+        const btn = document.getElementById('btn-ai-improve-impl');
+        const origHtml = btn.innerHTML;
+        btn.disabled = true;
+        btn.innerHTML = '<div class="spinner" style="width:12px;height:12px;"></div> Melhorando...';
+
+        try {
+            const title = document.getElementById('impl-name').value.trim();
+            const type = document.getElementById('impl-type').value;
+            const codeSnippet = document.getElementById('impl-code').value.trim();
+
+            const improved = await aiClient.improveImplementationDescription(title, type, raw, codeSnippet);
+            descEl.value = improved;
+            descEl.style.transition = 'background 0.4s';
+            descEl.style.background = 'rgba(139,92,246,0.08)';
+            setTimeout(() => { descEl.style.background = ''; }, 1200);
+            Toast.show('Descrição melhorada!', 'success', 2500);
+        } catch (err) {
+            Toast.show('Erro na IA: ' + err.message, 'error');
+        } finally {
+            btn.disabled = false;
+            btn.innerHTML = origHtml;
+            lucide.createIcons();
+        }
     }
 
     onAptDescInput() {
