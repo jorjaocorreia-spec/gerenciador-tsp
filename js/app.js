@@ -137,9 +137,10 @@ class AppController {
         document.getElementById('form-task-time').addEventListener('submit', this.handleTaskTimeSubmit.bind(this));
         document.getElementById('form-agenda-event').addEventListener('submit', this.handleAgendaSubmit.bind(this));
 
-        // Links clicáveis na descrição do agendamento
+        // Links clicáveis na descrição do agendamento + auto-resize
         document.getElementById('agenda-desc').addEventListener('input', (e) => {
             this._updateDescLinks(e.target.value);
+            this._autoResizeTextarea(e.target);
         });
 
         // Mostrar/ocultar opção de Meet conforme sync Google
@@ -2660,8 +2661,10 @@ class AppController {
         document.getElementById('modal-agenda-title').innerText = 'Editar Agendamento';
         document.getElementById('agenda-id').value = ev.id;
         document.getElementById('agenda-title').value = ev.title;
-        document.getElementById('agenda-desc').value = ev.description;
+        const agendaDescEl = document.getElementById('agenda-desc');
+        agendaDescEl.value = ev.description;
         this._updateDescLinks(ev.description);
+        setTimeout(() => this._autoResizeTextarea(agendaDescEl), 0);
         document.getElementById('agenda-type').value = ev.type;
         document.getElementById('agenda-client').value = ev.clientId || '';
         this.updateAgendaTaskSelect();
@@ -4041,6 +4044,11 @@ class AppController {
             statusEl.innerHTML = '';
             Toast.show('Erro ao carregar configurações: ' + err.message, 'error');
         }
+    }
+
+    _autoResizeTextarea(el) {
+        el.style.height = 'auto';
+        el.style.height = Math.max(120, el.scrollHeight) + 'px';
     }
 
     _updateDescLinks(text) {
