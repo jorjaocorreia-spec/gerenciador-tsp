@@ -1012,6 +1012,31 @@ class TSPStore {
             .eq('user_id', this.userId).not('ticket_id', 'in', `(${ticketIds.join(',')})`);
         if (error) throw error;
     }
+
+    // ── CONFIGURAÇÃO DE IA ────────────────────────────────────────
+
+    async getAIConfig() {
+        const { data } = await this.db.from('user_ai_config')
+            .select('provider, api_key, model')
+            .eq('user_id', this.userId)
+            .single();
+        if (!data) return null;
+        return { provider: data.provider, apiKey: data.api_key, model: data.model };
+    }
+
+    async saveAIConfig(provider, apiKey, model) {
+        const { error } = await this.db.from('user_ai_config').upsert({
+            user_id: this.userId, provider, api_key: apiKey, model,
+            updated_at: new Date().toISOString()
+        }, { onConflict: 'user_id' });
+        if (error) throw error;
+    }
+
+    async deleteAIConfig() {
+        const { error } = await this.db.from('user_ai_config')
+            .delete().eq('user_id', this.userId);
+        if (error) throw error;
+    }
 }
 
 window.store = new TSPStore();

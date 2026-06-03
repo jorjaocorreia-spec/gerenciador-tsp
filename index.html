@@ -115,6 +115,10 @@
                 <i data-lucide="database"></i><span class="nav-label"> Migrar Dados Locais</span>
             </button>
 
+            <button class="btn btn-secondary" id="btn-ai-config" style="width:100%; margin-bottom:8px;" onclick="app.openAIConfig()" title="Configurações de IA">
+                <i data-lucide="sparkles"></i><span class="nav-label"> IA</span>
+            </button>
+
             <div class="sidebar-user">
                 <p id="user-email-display" class="text-muted nav-label" style="font-size:0.75rem; margin-bottom:8px; word-break:break-all;"></p>
                 <button class="btn btn-secondary" id="btn-logout" style="width:100%;" title="Sair">
@@ -1977,9 +1981,74 @@
         </div>
     </div>
 
+    <!-- MODAL: CONFIGURAÇÕES DE IA -->
+    <div class="modal-overlay" id="modal-ai-config">
+        <div class="modal glass" style="max-width: 480px;">
+            <div class="modal-header">
+                <div>
+                    <h3 style="display:flex;align-items:center;gap:8px;">
+                        <i data-lucide="sparkles" style="width:20px;height:20px;color:var(--primary-color);"></i>
+                        Configurações de IA
+                    </h3>
+                    <p class="text-muted" style="font-size:0.85rem;margin-top:2px;">Configure sua chave de API para usar recursos de inteligência artificial.</p>
+                </div>
+                <button class="close-modal" onclick="app.closeModal('modal-ai-config')"><i data-lucide="x"></i></button>
+            </div>
+            <form id="form-ai-config" style="padding: 0 24px 24px;">
+
+                <!-- Status atual -->
+                <div id="ai-config-status" style="display:none; padding:10px 14px; border-radius:8px; margin-bottom:16px; font-size:0.85rem; display:flex; align-items:center; gap:8px;"></div>
+
+                <div class="form-group">
+                    <label class="form-label">Provedor de IA</label>
+                    <select id="ai-provider" class="form-control" onchange="app.onAIProviderChange()" required>
+                        <option value="openai">OpenAI (ChatGPT)</option>
+                        <option value="anthropic">Anthropic (Claude)</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">Modelo</label>
+                    <select id="ai-model" class="form-control" required>
+                        <option value="gpt-4o-mini">GPT-4o Mini (rápido e econômico)</option>
+                        <option value="gpt-4o">GPT-4o (mais capaz)</option>
+                        <option value="gpt-4-turbo">GPT-4 Turbo</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">API Key</label>
+                    <div style="position:relative;">
+                        <input type="password" id="ai-api-key" class="form-control" placeholder="sk-..." autocomplete="off" style="padding-right: 42px;">
+                        <button type="button" onclick="app.toggleAIKeyVisibility()" style="position:absolute;right:10px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;color:var(--text-muted);padding:4px;" title="Mostrar/ocultar chave">
+                            <i data-lucide="eye" id="icon-ai-key-toggle" style="width:16px;height:16px;"></i>
+                        </button>
+                    </div>
+                    <p class="text-muted" style="font-size:0.78rem;margin-top:4px;" id="ai-key-hint">Sua chave OpenAI começa com <code>sk-</code>. Encontre em platform.openai.com → API Keys.</p>
+                </div>
+
+                <div style="display:flex; gap:10px; margin-top:8px;">
+                    <button type="button" id="btn-ai-test" class="btn btn-secondary" onclick="app.testAIConnection()" style="flex:1; justify-content:center;">
+                        <i data-lucide="zap" style="width:16px;height:16px;"></i> Testar
+                    </button>
+                    <button type="submit" class="btn btn-primary" style="flex:2; justify-content:center;">
+                        <i data-lucide="save" style="width:16px;height:16px;"></i> Salvar
+                    </button>
+                </div>
+
+                <div style="margin-top:12px; padding-top:12px; border-top:1px solid rgba(255,255,255,0.06); display:flex; justify-content:flex-end;">
+                    <button type="button" class="btn btn-ghost" id="btn-ai-remove" onclick="app.removeAIConfig()" style="font-size:0.82rem; color:var(--danger-color); display:none;">
+                        <i data-lucide="trash-2" style="width:14px;height:14px;"></i> Remover configuração
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
     <script src="js/calendar.js?v=21"></script>
     <script src="js/store.js?v=25"></script>
-    <script src="js/app.js?v=26"></script>
+    <script src="js/ai.js?v=1"></script>
+    <script src="js/app.js?v=27"></script>
 </body>
 
 </html>

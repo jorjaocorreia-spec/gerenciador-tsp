@@ -183,6 +183,9 @@ class AppController {
             ?.addEventListener('submit', (e) => this.handleImplementationSubmit(e));
         document.getElementById('form-training')
             ?.addEventListener('submit', (e) => this.handleTrainingSubmit(e));
+
+        document.getElementById('form-ai-config')
+            ?.addEventListener('submit', (e) => this.handleAIConfigSubmit(e));
         ['apt-start', 'apt-end'].forEach(id => {
             document.getElementById(id)?.addEventListener('change', () => this.updateAptDuration());
         });
@@ -1459,6 +1462,8 @@ class AppController {
         if (settings && settings.googleClientId && settings.googleApiKey) {
             await calendarAPI.configure(settings.googleClientId, settings.googleApiKey);
         }
+        // Carrega config de IA em background (não bloqueia o render)
+        aiClient.loadConfig().then(() => this._updateAIStatusBadge());
         await this.renderAll();
     }
 
@@ -5903,6 +5908,161 @@ class AppController {
     }
 
     // ===================================
+    // CONFIGURAÇÕES DE IA
+    // ===================================
+
+    async openAIConfig() {
+        const config = await store.getAIConfig().catch(() => null);
+        const provider = config?.provider || 'openai';
+        document.getElementById('ai-provider').value = provider;
+        document.getElementById('ai-api-key').value = config?.apiKey ? '••••••••••••••••' : '';
+        this.onAIProviderChange(provider);
+        if (config?.model) document.getElementById('ai-model').value = config.model;
+
+        const removeBtn = document.getElementById('btn-ai-remove');
+        removeBtn.style.display = config?.apiKey ? 'inline-flex' : 'none';
+
+        const statusEl = document.getElementById('ai-config-status');
+        if (config?.apiKey) {
+            statusEl.style.display = 'flex';
+            statusEl.style.background = 'rgba(16,185,129,0.12)';
+            statusEl.style.border = '1px solid rgba(16,185,129,0.3)';
+            statusEl.innerHTML = `<i data-lucide="check-circle" style="width:16px;height:16px;color:var(--success-color);flex-shrink:0;"></i> IA configurada com <strong>${provider === 'openai' ? 'OpenAI' : 'Anthropic (Claude)'}</strong>`;
+        } else {
+            statusEl.style.display = 'none';
+        }
+        this.openModal('modal-ai-config');
+        lucide.createIcons();
+    }
+
+    onAIProviderChange(provider) {
+        const sel = provider || document.getElementById('ai-provider').value;
+        const modelSelect = document.getElementById('ai-model');
+        const hint = document.getElementById('ai-key-hint');
+        const currentModel = modelSelect.value;
+
+        const openaiModels = [
+            { value: 'gpt-4o-mini', label: 'GPT-4o Mini (rápido e econômico)' },
+            { value: 'gpt-4o', label: 'GPT-4o (mais capaz)' },
+            { value: 'gpt-4-turbo', label: 'GPT-4 Turbo' },
+        ];
+        const anthropicModels = [
+            { value: 'claude-haiku-4-5-20251001', label: 'Claude Haiku (rápido e econômico)' },
+            { value: 'claude-sonnet-4-6', label: 'Claude Sonnet (equilibrado)' },
+            { value: 'claude-opus-4-8', label: 'Claude Opus (mais capaz)' },
+        ];
+
+        const models = sel === 'anthropic' ? anthropicModels : openaiModels;
+        modelSelect.innerHTML = models.map(m => `<option value="${m.value}">${m.label}</option>`).join('');
+        if (models.find(m => m.value === currentModel)) modelSelect.value = currentModel;
+
+        if (sel === 'anthropic') {
+            hint.innerHTML = 'Sua chave Anthropic começa com <code>sk-ant-</code>. Encontre em console.anthropic.com → API Keys.';
+        } else {
+            hint.innerHTML = 'Sua chave OpenAI começa com <code>sk-</code>. Encontre em platform.openai.com → API Keys.';
+        }
+    }
+
+    toggleAIKeyVisibility() {
+        const input = document.getElementById('ai-api-key');
+        const icon = document.getElementById('icon-ai-key-toggle');
+        if (input.type === 'password') {
+            input.type = 'text';
+            icon.setAttribute('data-lucide', 'eye-off');
+        } else {
+            input.type = 'password';
+            icon.setAttribute('data-lucide', 'eye');
+        }
+        lucide.createIcons();
+    }
+
+    async handleAIConfigSubmit(e) {
+        e.preventDefault();
+        const provider = document.getElementById('ai-provider').value;
+        const apiKey = document.getElementById('ai-api-key').value.trim();
+        const model = document.getElementById('ai-model').value;
+
+        if (!apiKey || apiKey.startsWith('•')) {
+            Toast.show('Insira uma API key válida.', 'error');
+            return;
+        }
+
+        const btn = e.target.querySelector('button[type="submit"]');
+        const orig = btn.innerHTML;
+        btn.disabled = true;
+        btn.innerHTML = '<div class="spinner" style="width:16px;height:16px;"></div> Salvando...';
+
+        try {
+            await store.saveAIConfig(provider, apiKey, model);
+            await aiClient.loadConfig();
+            this._updateAIStatusBadge();
+            Toast.show('Configuração de IA salva com sucesso!', 'success');
+            this.closeModal('modal-ai-config');
+        } catch (err) {
+            Toast.show('Erro ao salvar: ' + err.message, 'error');
+        } finally {
+            btn.disabled = false;
+            btn.innerHTML = orig;
+        }
+    }
+
+    async testAIConnection() {
+        const provider = document.getElementById('ai-provider').value;
+        const apiKey = document.getElementById('ai-api-key').value.trim();
+        const model = document.getElementById('ai-model').value;
+
+        if (!apiKey || apiKey.startsWith('•')) {
+            Toast.show('Salve a configuração antes de testar.', 'error');
+            return;
+        }
+
+        const btn = document.getElementById('btn-ai-test');
+        const orig = btn.innerHTML;
+        btn.disabled = true;
+        btn.innerHTML = '<div class="spinner" style="width:14px;height:14px;"></div> Testando...';
+
+        try {
+            // Salva temporariamente para testar via proxy
+            await store.saveAIConfig(provider, apiKey, model);
+            await aiClient.loadConfig();
+            const resp = await aiClient.testConnection();
+            if (resp) {
+                Toast.show('Conexão OK! IA respondeu com sucesso.', 'success');
+            }
+        } catch (err) {
+            Toast.show('Falha no teste: ' + err.message, 'error');
+        } finally {
+            btn.disabled = false;
+            btn.innerHTML = orig;
+        }
+    }
+
+    async removeAIConfig() {
+        if (!confirm('Remover configuração de IA? Os recursos de IA ficarão indisponíveis.')) return;
+        try {
+            await store.deleteAIConfig();
+            aiClient.reset();
+            this._updateAIStatusBadge();
+            Toast.show('Configuração de IA removida.', 'info');
+            this.closeModal('modal-ai-config');
+        } catch (err) {
+            Toast.show('Erro ao remover: ' + err.message, 'error');
+        }
+    }
+
+    _updateAIStatusBadge() {
+        const btn = document.getElementById('btn-ai-config');
+        if (!btn) return;
+        if (aiClient.isConfigured) {
+            btn.style.borderColor = 'rgba(139,92,246,0.5)';
+            btn.style.color = 'var(--primary-color)';
+        } else {
+            btn.style.borderColor = '';
+            btn.style.color = '';
+        }
+    }
+
+    // ===================================
     // CHAMADOS (OTOBO)
     // ===================================
 
@@ -6558,6 +6718,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             window.app._cachedChamadosClients = null;
             window.app._chamadoFiltersAttached = false;
         }
+        if (window.aiClient) aiClient.reset();
         await Auth.signOut();
     });
 });
