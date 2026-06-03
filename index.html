@@ -162,6 +162,10 @@
                     <input type="checkbox" id="dash-filter-finished" onchange="app.renderDashboard()" style="width: 18px; height: 18px; cursor: pointer;">
                     <label for="dash-filter-finished" style="margin: 0; cursor: pointer;">Finalizados</label>
                 </div>
+                <div style="display: flex; gap: 8px; align-items: center;">
+                    <input type="checkbox" id="dash-filter-total" onchange="app.renderDashboard()" style="width: 18px; height: 18px; cursor: pointer; accent-color: #a855f7;">
+                    <label for="dash-filter-total" style="margin: 0; cursor: pointer; color: #a855f7; font-weight: 500;">Totalizar Horas</label>
+                </div>
                 <!-- Navegação de mês -->
                 <div id="dash-month-nav" style="margin-left: auto; display: flex; align-items: center; gap: 6px;">
                     <button id="btn-dash-prev-month" onclick="app.dashNavMonth(-1)" class="btn btn-ghost" style="padding: 6px 10px;" title="Mês anterior">

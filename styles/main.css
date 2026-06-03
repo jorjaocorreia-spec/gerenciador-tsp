@@ -1970,6 +1970,10 @@ kbd {
     font-size: 0.9rem;
     opacity: .8;
 }
+#apt-start::-webkit-calendar-picker-indicator,
+#apt-end::-webkit-calendar-picker-indicator {
+    display: none;
+}
 .apt-duration-display {
     display: inline-block;
     padding: 6px 12px;
