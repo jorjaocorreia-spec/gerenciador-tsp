@@ -1029,12 +1029,20 @@
                             <h4 class="modal-task-section-label">
                                 <i data-lucide="check-square" style="width:14px;height:14px"></i> Checklist
                             </h4>
-                            <span class="modal-checklist-progress" id="modal-checklist-progress"></span>
+                            <div style="display:flex;align-items:center;gap:8px;">
+                                <span class="modal-checklist-progress" id="modal-checklist-progress"></span>
+                                <button type="button" id="btn-ai-suggest-steps" class="btn btn-ghost btn-sm"
+                                    style="display:none;gap:4px;padding:2px 8px;font-size:11px;color:#a78bfa;border-color:rgba(167,139,250,0.3);"
+                                    onclick="app.suggestTaskAINextSteps()">
+                                    <i data-lucide="sparkles" style="width:13px;height:13px;"></i> Sugerir com IA
+                                </button>
+                            </div>
                         </div>
                         <div class="modal-checklist-bar" id="modal-checklist-bar-wrap" style="display:none">
                             <div class="modal-checklist-bar-fill" id="modal-checklist-bar-fill" style="width:0%"></div>
                         </div>
                         <div id="modal-checklist-items"></div>
+                        <div id="ai-task-suggestions" style="display:none;"></div>
                         <div class="modal-checklist-add">
                             <input type="text" id="modal-checklist-new-item" class="form-control"
                                    placeholder="Adicionar item..."
@@ -2109,7 +2117,7 @@
     <script src="js/calendar.js?v=21"></script>
     <script src="js/store.js?v=25"></script>
     <script src="js/ai.js?v=1"></script>
-    <script src="js/app.js?v=28"></script>
+    <script src="js/app.js?v=29"></script>
 </body>
 
 </html>

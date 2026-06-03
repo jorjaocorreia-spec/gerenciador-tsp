@@ -369,6 +369,10 @@ class AppController {
             document.getElementById('btn-delete-task').style.display = 'none';
             document.getElementById('btn-add-time-task').style.display = 'none';
             document.getElementById('modal-task-cover').style.display = 'none';
+            const suggestPanel = document.getElementById('ai-task-suggestions');
+            if (suggestPanel) { suggestPanel.style.display = 'none'; suggestPanel.innerHTML = ''; }
+            const suggestBtnClose = document.getElementById('btn-ai-suggest-steps');
+            if (suggestBtnClose) suggestBtnClose.style.display = 'none';
             this.taskAttachments = [];
             this._renderTaskAttachmentPreviews();
         }
@@ -736,6 +740,8 @@ class AppController {
         document.getElementById('btn-delete-task').style.display = 'flex';
         document.getElementById('btn-add-time-task').style.display = 'flex';
         document.getElementById('modal-task-comments-section').style.display = 'flex';
+        const suggestBtn = document.getElementById('btn-ai-suggest-steps');
+        if (suggestBtn) suggestBtn.style.display = aiClient.isConfigured ? 'inline-flex' : 'none';
 
         this._syncModalColumnButtons();
         this._syncModalCover();
@@ -1106,6 +1112,8 @@ class AppController {
         document.getElementById('task-estimated-minutes').value = '';
         document.getElementById('btn-delete-task').style.display = 'none';
         document.getElementById('btn-add-time-task').style.display = 'none';
+        const suggestBtnNew = document.getElementById('btn-ai-suggest-steps');
+        if (suggestBtnNew) suggestBtnNew.style.display = 'none';
         this.taskAttachments = [];
         this._syncModalColumnButtons();
         this._syncModalCover();
@@ -6108,6 +6116,89 @@ class AppController {
             btn.disabled = false;
             btn.innerHTML = origHtml;
         }
+    }
+
+    async suggestTaskAINextSteps() {
+        if (!aiClient.isConfigured) { Toast.show('Configure a IA primeiro (botão ✨ na sidebar).', 'error'); return; }
+
+        const btn = document.getElementById('btn-ai-suggest-steps');
+        const panel = document.getElementById('ai-task-suggestions');
+        if (!btn || !panel) return;
+
+        const origHtml = btn.innerHTML;
+        btn.disabled = true;
+        btn.innerHTML = '<div class="spinner" style="width:12px;height:12px;"></div> Pensando...';
+        panel.style.display = 'none';
+
+        try {
+            const title = document.getElementById('task-title').value.trim();
+            const description = document.getElementById('task-description').value.trim();
+            const checklist = this._modalChecklist || [];
+            const comments = (this._modalComments || []).slice(0, 8);
+
+            const suggestions = await aiClient.suggestTaskNextSteps(title, description, checklist, comments);
+            if (!suggestions || suggestions.length === 0) {
+                Toast.show('A IA não retornou sugestões. Tente adicionar mais detalhes à tarefa.', 'error'); return;
+            }
+
+            this._aiTaskSuggestions = suggestions;
+            panel.innerHTML = `
+                <div style="margin-top:8px;padding:10px;border-radius:8px;background:rgba(139,92,246,0.06);border:1px solid rgba(139,92,246,0.2);">
+                    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+                        <span style="font-size:11px;font-weight:600;color:#a78bfa;text-transform:uppercase;letter-spacing:.5px;">
+                            <i data-lucide="sparkles" style="width:11px;height:11px;display:inline-block;vertical-align:middle;margin-right:3px;"></i>
+                            Sugestões da IA
+                        </span>
+                        <button type="button" class="btn btn-ghost btn-sm" style="font-size:11px;padding:2px 8px;color:#a78bfa;border-color:rgba(167,139,250,0.3);"
+                            onclick="app._addAllAISuggestions()">Adicionar todos</button>
+                    </div>
+                    <div id="ai-suggestions-list">
+                        ${suggestions.map((s, i) => `
+                            <div id="ai-sug-${i}" style="display:flex;align-items:flex-start;gap:6px;padding:4px 0;border-bottom:1px solid rgba(255,255,255,0.05);">
+                                <span style="flex:1;font-size:12px;color:var(--text-secondary);line-height:1.4;">${escapeHtml(s)}</span>
+                                <button type="button" class="btn btn-ghost btn-sm" style="flex-shrink:0;padding:2px 6px;font-size:11px;color:#a78bfa;"
+                                    onclick="app._addAISuggestion(${i})">
+                                    <i data-lucide="plus" style="width:11px;height:11px;"></i>
+                                </button>
+                            </div>
+                        `).join('')}
+                    </div>
+                </div>`;
+            panel.style.display = 'block';
+            lucide.createIcons();
+        } catch (err) {
+            Toast.show('Erro na IA: ' + err.message, 'error');
+        } finally {
+            btn.disabled = false;
+            btn.innerHTML = origHtml;
+            lucide.createIcons();
+        }
+    }
+
+    _addAISuggestion(idx) {
+        const text = this._aiTaskSuggestions?.[idx];
+        if (!text) return;
+        this._modalChecklist.push({ id: 'cl-' + Date.now() + '-' + idx, text, done: false });
+        this._renderChecklist();
+        // Risca a sugestão para indicar que foi adicionada
+        const row = document.getElementById('ai-sug-' + idx);
+        if (row) {
+            row.style.opacity = '0.4';
+            row.querySelector('button').disabled = true;
+        }
+        Toast.show('Item adicionado ao checklist!', 'success', 1800);
+    }
+
+    _addAllAISuggestions() {
+        const suggestions = this._aiTaskSuggestions || [];
+        if (suggestions.length === 0) return;
+        suggestions.forEach((text, idx) => {
+            this._modalChecklist.push({ id: 'cl-' + Date.now() + '-' + idx, text, done: false });
+        });
+        this._renderChecklist();
+        const panel = document.getElementById('ai-task-suggestions');
+        if (panel) { panel.style.display = 'none'; panel.innerHTML = ''; }
+        Toast.show(`${suggestions.length} itens adicionados ao checklist!`, 'success');
     }
 
     onAptDescInput() {
