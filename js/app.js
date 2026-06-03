@@ -6248,7 +6248,14 @@ class AppController {
             const rows = this._mapTicketsToRows(otoboTickets, clients);
             const ticketIds = rows.map(r => r.ticket_id);
             await store.upsertTickets(rows);
-            await store.deleteTicketsNotIn(ticketIds);
+            // Quando filtrando por proprietário, não deletar o cache — o sync traz apenas
+            // uma janela recente (500 mais modificados) e tickets antigos do usuário que
+            // não caíram nessa janela devem permanecer no banco.
+            // Sem filtro de owner: deletar normalmente tickets que saíram do OTOBO.
+            const ownerFilter = (this._otoboConfig?.syncFilters?.ownerLogin || '').trim();
+            if (!ownerFilter) {
+                await store.deleteTicketsNotIn(ticketIds);
+            }
             const now = new Date().toLocaleString('pt-BR');
             const info = document.getElementById('chamados-sync-info');
             if (info) { info.textContent = `Última sync: ${now}`; info.style.display = ''; }

@@ -65,11 +65,6 @@ serve(async (req) => {
         // Enviar nos dois formatos para máxima compatibilidade com versões do OTOBO
         searchBody.Owners = [login];
         searchBody.OwnerLogin = login;
-        // Quando filtrando por proprietário: buscar TODOS os tickets sem ordenação por data
-        // (sem SortBy/OrderBy, o OTOBO retorna por TicketID crescente — inclui tickets antigos)
-        delete searchBody.SortBy;
-        delete searchBody.OrderBy;
-        searchBody.Limit = 10000;
       }
 
       data = await fetchJson(
