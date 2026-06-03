@@ -1552,17 +1552,26 @@ class AppController {
         if (monthLabel) monthLabel.textContent = this._formatDashboardMonth(this._dashboardMonth);
         if (btnNext) btnNext.disabled = isCurrentMonth;
         if (btnCurrentMonth) btnCurrentMonth.style.display = isCurrentMonth ? 'none' : '';
-        if (subtitle) subtitle.textContent = isCurrentMonth
-            ? 'Acompanhe o consumo de horas dos seus contratos.'
-            : `Histórico — ${this._formatDashboardMonth(this._dashboardMonth)}`;
 
         let showActive = true;
         let showFinished = false;
+        let showTotal = false;
 
         const filterActiveEl = document.getElementById('dash-filter-active');
         const filterFinishedEl = document.getElementById('dash-filter-finished');
+        const filterTotalEl = document.getElementById('dash-filter-total');
         if (filterActiveEl) showActive = filterActiveEl.checked;
         if (filterFinishedEl) showFinished = filterFinishedEl.checked;
+        if (filterTotalEl) showTotal = filterTotalEl.checked;
+
+        // Ocultar/exibir navegação de mês no modo totalizar; atualizar subtitle
+        const monthNav = document.getElementById('dash-month-nav');
+        if (monthNav) monthNav.style.display = showTotal ? 'none' : '';
+        if (subtitle) subtitle.textContent = showTotal
+            ? 'Totalização de horas acumuladas desde o início do controle.'
+            : (isCurrentMonth
+                ? 'Acompanhe o consumo de horas dos seus contratos.'
+                : `Histórico — ${this._formatDashboardMonth(this._dashboardMonth)}`);
 
         const filterStats = (allStats) => allStats.filter(s => {
             const status = s.client.status || 'active';
@@ -1571,6 +1580,81 @@ class AppController {
             return false;
         });
 
+        // ── Modo Totalizar Horas ──────────────────────────────────────────
+        if (showTotal) {
+            let allBatchStats;
+            if (batchStats && isCurrentMonth) {
+                allBatchStats = batchStats;
+            } else {
+                allBatchStats = await store.getBatchStats(this._dashboardMonth);
+            }
+            const filteredStats = filterStats(allBatchStats).filter(s => s !== null);
+
+            container.innerHTML = '';
+            if (filteredStats.length === 0) {
+                container.innerHTML = `
+                    <div style="grid-column: 1 / -1; text-align: center; padding: 40px;" class="glass">
+                        <p class="text-muted">Nenhum cliente cadastrado ainda.</p>
+                    </div>
+                `;
+                return;
+            }
+
+            const allRecords = await store.getRecords();
+
+            filteredStats.forEach(stat => {
+                const client = stat.client;
+                const b = this._calcClientBalance(client, allRecords);
+
+                const card = document.createElement('div');
+                card.className = 'stat-card glass';
+                card.style.cursor = 'pointer';
+                if (client.projectNum) card.title = `Projeto: ${client.projectNum}`;
+                card.onclick = () => app.openClientDashboard(client.id);
+
+                if (b.hasTracking) {
+                    const balanceColor = b.balanceH >= 0 ? '#4ade80' : '#f87171';
+                    const balanceSign = b.balanceH >= 0 ? '+' : '';
+                    const pct = b.totalContractedH > 0
+                        ? Math.min(100, Math.round((b.totalAppliedH / b.totalContractedH) * 100))
+                        : 0;
+                    const isCritical = b.totalAppliedH > b.totalContractedH ? 'over-limit' : '';
+                    const startLabel = new Date(client.balanceStartDate + 'T00:00:00')
+                        .toLocaleDateString('pt-BR', { month: '2-digit', year: 'numeric' });
+                    card.innerHTML = `
+                        <div class="stat-header">
+                            <span class="client-name">${escapeHtml(client.name)}</span>
+                            <span style="font-weight: 700; color: ${balanceColor}; font-size: 1.05rem;">${balanceSign}${b.balanceH.toFixed(1)}h</span>
+                        </div>
+                        <div class="progress-container">
+                            <div class="progress-bar ${isCritical}" style="width: ${pct}%; background: linear-gradient(90deg, #a855f7, #7c3aed);"></div>
+                        </div>
+                        <div style="display: flex; justify-content: space-between; font-size: 0.85rem; margin-top: 8px;">
+                            <span class="text-muted">${b.totalAppliedH.toFixed(1)}h aplicadas</span>
+                            <span class="text-muted">${b.totalContractedH.toFixed(0)}h contratadas</span>
+                        </div>
+                        <div style="font-size: 0.78rem; color: var(--text-muted); margin-top: 4px;">Desde ${startLabel} · ${b.monthsCount} ${b.monthsCount === 1 ? 'mês' : 'meses'}</div>
+                    `;
+                } else {
+                    // Sem balanceStartDate: exibe total histórico sem cálculo de saldo
+                    const totalApplied = allRecords
+                        .filter(r => r.clientId === client.id)
+                        .reduce((s, r) => s + r.minutes, 0) / 60;
+                    card.innerHTML = `
+                        <div class="stat-header">
+                            <span class="client-name">${escapeHtml(client.name)}</span>
+                            <span class="text-muted" style="font-size: 0.82rem;">sem controle</span>
+                        </div>
+                        <div style="border-top: 1px solid rgba(255,255,255,0.06); margin: 10px 0;"></div>
+                        <div style="font-size: 0.85rem; color: var(--text-muted);">${totalApplied.toFixed(1)}h aplicadas (total histórico)</div>
+                    `;
+                }
+                container.appendChild(card);
+            });
+            return;
+        }
+
+        // ── Modo normal (mês) ─────────────────────────────────────────────
         let stats;
         if (batchStats && isCurrentMonth) {
             stats = filterStats(batchStats);
