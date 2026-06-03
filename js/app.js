@@ -3199,11 +3199,13 @@ class AppController {
 
         const localEvents = await store.getAgendaEvents();
         let syncErrors = 0;
-        // Rastreia eventos locais resolvidos via fuzzy match no Passo 1.
-        // localEvents é capturado antes do Passo 1, então eventos matchados via fuzzy
-        // ainda aparecem com calendarEventId=null no array — o Passo 2 os empurraria
-        // de novo ao Google criando uma duplicata sem clientId.
+        // Rastreia eventos locais resolvidos no Passo 1 (por ID exato ou fuzzy match).
+        // Impede que o Passo 2 empurre de volta ao Google eventos já tratados.
         const processedLocalIds = new Set();
+        // Rastreia combinações título+data+hora já resolvidas no Passo 1.
+        // Impede que eventos duplicados no Google (mesmo título/data/hora, IDs diferentes —
+        // criados pelo bug antigo) sejam importados como novos eventos locais sem clientId.
+        const resolvedGoogleKeys = new Set();
 
         // 1. O que tem no Google que não temos (ou foi atualizado lá)
         for (const gEv of googleEvents) {
@@ -3256,6 +3258,14 @@ class AppController {
                     attendees: (gEv.attendees || []).map(a => a.email).join(', ')
                 };
 
+                // Chave de identidade para detectar duplicatas do Google (mesmo evento, IDs diferentes)
+                const googleKey = `${mappedData.title}|${mappedData.date}|${mappedData.startTime}`;
+
+                // Pula se outro evento do Google com mesma chave já foi resolvido neste sync.
+                // Isso descarta duplicatas históricas no Google criadas pelo bug antigo,
+                // evitando que virem eventos locais órfãos sem clientId.
+                if (!match && resolvedGoogleKeys.has(googleKey)) continue;
+
                 // Fallback: se não achou por calendarEventId, tenta por título+data+hora
                 // para evitar criar duplicatas sem clientId quando o ID perdeu sincronismo
                 const fuzzyMatch = !match
@@ -3274,8 +3284,10 @@ class AppController {
                     mappedData.relatedTaskId = effective.relatedTaskId;
                     if (!mappedData.meetLink) mappedData.meetLink = effective.meetLink || '';
                     processedLocalIds.add(effective.id); // Marca como processado — evita duplicata no Passo 2
+                    resolvedGoogleKeys.add(googleKey);   // Marca chave como resolvida — descarta Google duplicatas
                     await store.updateAgendaEvent(mappedData);
                 } else {
+                    resolvedGoogleKeys.add(googleKey); // Mesmo sem match local, marca chave para não reimportar
                     await store.addAgendaEvent(mappedData);
                 }
             } catch (err) {
