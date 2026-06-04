@@ -4404,7 +4404,7 @@ class AppController {
                         <i data-lucide="clipboard-list" style="width:32px;height:32px;opacity:.4"></i>
                         <p class="text-muted">Nenhum apontamento para este dia.</p>
                         <button class="btn btn-primary" onclick="app.openNewApontamento()">
-                            <i data-lucide="plus"></i> Novo Apontamento
+                            + Novo Apontamento
                         </button>
                     </div>`;
                 lucide.createIcons();
