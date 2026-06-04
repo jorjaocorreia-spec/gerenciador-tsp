@@ -1,4 +1,4 @@
-/* =========================================
+﻿/* =========================================
    Design System & Variables
    ========================================= */
 :root {
@@ -285,6 +285,7 @@ h4 {
 
 .view-section.active {
   display: block;
+  animation: none; /* V1: prevent base fadeIn from re-triggering when slide class is removed */
 }
 
 @keyframes fadeIn {
@@ -3357,7 +3358,7 @@ kbd {
     to   { opacity: 1; transform: translateX(0) scaleX(1); }
 }
 .event-block {
-    animation: event-block-in 0.25s ease-out both;
+    animation: event-block-in 0.25s ease-out forwards;
 }
 .event-block:nth-child(2)  { animation-delay: 0.04s; }
 .event-block:nth-child(3)  { animation-delay: 0.08s; }
@@ -3369,14 +3370,7 @@ kbd {
 .event-block:nth-child(9)  { animation-delay: 0.32s; }
 .event-block:nth-child(10) { animation-delay: 0.36s; }
 
-/* A3 — Agenda: crossfade ao trocar de view */
-@keyframes agenda-fade-in {
-    from { opacity: 0; transform: translateY(8px); }
-    to   { opacity: 1; transform: translateY(0); }
-}
-#agenda-container > * {
-    animation: agenda-fade-in 0.28s ease-out both;
-}
+/* A3 — Removed: caused flickering; A5+V1 handle transitions */
 
 /* A4 — Ícone do botão sync gira enquanto sincroniza */
 #btn-agenda-sync.syncing svg {
@@ -3449,16 +3443,7 @@ kbd {
     transition: transform 0.2s ease-in, opacity 0.2s ease-in !important;
 }
 
-/* V4 — Modal overlay: backdrop blur cresce de 0 a 4px ao abrir */
-.modal-overlay {
-    -webkit-backdrop-filter: blur(0px) !important;
-    backdrop-filter: blur(0px) !important;
-    transition: opacity 0.3s ease, backdrop-filter 0.3s ease, -webkit-backdrop-filter 0.3s ease !important;
-}
-.modal-overlay.active {
-    -webkit-backdrop-filter: blur(4px) !important;
-    backdrop-filter: blur(4px) !important;
-}
+/* V4 — Removed: backdrop-filter on base class caused compositing overhead */
 
 /* B3 — Badge "Estourado": shake periódico + pulso */
 @keyframes badge-esgotado-shake {
