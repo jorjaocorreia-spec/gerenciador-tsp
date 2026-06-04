@@ -2661,6 +2661,7 @@ class AppController {
         if (panel) panel.style.display = 'none';
         this._renderAgendaTaskChips();
         this._updateAgendaLinkBtn();
+        this._updateDescriptionWithTasks();
     }
 
     toggleAgendaTaskTemp(taskId) {
@@ -2679,6 +2680,7 @@ class AppController {
         this._agendaRelatedTaskIds = this._agendaRelatedTaskIds.filter(id => id !== taskId);
         this._renderAgendaTaskChips();
         this._updateAgendaLinkBtn();
+        this._updateDescriptionWithTasks();
     }
 
     _renderAgendaTaskPanel() {
@@ -2720,6 +2722,24 @@ class AppController {
         const count = this._agendaRelatedTaskIds.length;
         badge.textContent = count;
         badge.style.display = count > 0 ? 'inline-block' : 'none';
+    }
+
+    _updateDescriptionWithTasks() {
+        const textarea = document.getElementById('agenda-desc');
+        if (!textarea) return;
+        const SENTINEL = '\n\nTarefas executadas:\n';
+        const full = textarea.value;
+        const sentinelIdx = full.indexOf(SENTINEL);
+        const userText = sentinelIdx !== -1 ? full.slice(0, sentinelIdx) : full;
+        if (this._agendaRelatedTaskIds.length === 0) {
+            textarea.value = userText;
+            return;
+        }
+        const taskMap = new Map(this._agendaAllTasks.map(t => [t.id, t.title]));
+        const lines = this._agendaRelatedTaskIds
+            .map(id => `- ${taskMap.get(id) || id}`)
+            .join('\n');
+        textarea.value = userText + SENTINEL + lines;
     }
 
     async handleAgendaSubmit(e) {
