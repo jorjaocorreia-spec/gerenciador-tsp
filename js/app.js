@@ -107,6 +107,8 @@ class AppController {
         this._reportClient = null;
         // Navegação de mês no Dashboard
         this._dashboardMonth = new Date().toISOString().slice(0, 7); // YYYY-MM
+        this._dashSlideDir   = null;  // D6: direção do slide ao trocar mês
+        this._agendaNavDir   = null;  // A5: direção do slide na agenda
         // Tarefas vinculadas ao agendamento atual (multi-select)
         this._agendaRelatedTaskIds = [];  // confirmadas
         this._agendaTaskPanelTempIds = []; // seleção temporária enquanto painel está aberto
@@ -296,6 +298,13 @@ class AppController {
         const prevView = this.currentView;
         this.currentView = viewName;
 
+        // V1: direção do slide baseada na ordem do menu
+        const VIEW_ORDER = ['dashboard','clients','records','tasks','agenda','apontamentos','implementations','trainings','chamados'];
+        const prevIdx = VIEW_ORDER.indexOf(prevView);
+        const newIdx  = VIEW_ORDER.indexOf(viewName);
+        const slideDir = (prevIdx >= 0 && newIdx >= 0 && prevIdx !== newIdx)
+            ? (newIdx > prevIdx ? 'right' : 'left') : null;
+
         // Update nav UI
         document.querySelectorAll('.nav-item').forEach(item => {
             item.classList.remove('active');
@@ -306,9 +315,15 @@ class AppController {
 
         // Update sections
         document.querySelectorAll('.view-section').forEach(section => {
-            section.classList.remove('active');
+            section.classList.remove('active', 'slide-in-right', 'slide-in-left');
             if (section.id === `view-${viewName}`) {
                 section.classList.add('active');
+                if (slideDir) {
+                    section.classList.add(`slide-in-${slideDir}`);
+                    section.addEventListener('animationend', () => {
+                        section.classList.remove(`slide-in-${slideDir}`);
+                    }, { once: true });
+                }
             }
         });
 
@@ -353,7 +368,12 @@ class AppController {
     }
 
     closeModal(modalId) {
-        document.getElementById(modalId).classList.remove('active');
+        const overlay = document.getElementById(modalId);
+        overlay.classList.add('modal-overlay--exiting');
+        setTimeout(() => {
+            overlay.classList.remove('active', 'modal-overlay--exiting');
+        }, 200);
+        // Trigger cleanup immediately so forms reset while animating out
 
         if (modalId === 'modal-client') {
             document.getElementById('form-client').reset();
@@ -1569,6 +1589,8 @@ class AppController {
         const currentMonth = new Date().toISOString().slice(0, 7);
         if (newMonth > currentMonth) return;
         this._dashboardMonth = newMonth;
+        // D6: direção do slide — avançar = cards entram da direita, voltar = da esquerda
+        this._dashSlideDir = delta > 0 ? 'right' : 'left';
         this.renderDashboard();
     }
 
@@ -1703,6 +1725,14 @@ class AppController {
             stats = filterStats(allBatchStats);
         }
         stats = stats.filter(s => s !== null);
+
+        // D6: aplicar classe de direção para slide de mês
+        container.classList.remove('dash-slide-right', 'dash-slide-left');
+        if (this._dashSlideDir) {
+            container.classList.add(`dash-slide-${this._dashSlideDir}`);
+            this._dashSlideDir = null;
+            setTimeout(() => container.classList.remove('dash-slide-right', 'dash-slide-left'), 500);
+        }
 
         container.innerHTML = '';
 
@@ -1902,7 +1932,8 @@ class AppController {
     }
 
     toggleSidebar() {
-        const collapsed = document.getElementById('sidebar').classList.toggle('collapsed');
+        const sidebar = document.getElementById('sidebar');
+        const collapsed = sidebar.classList.toggle('collapsed');
         sessionStorage.setItem('sidebarCollapsed', collapsed ? '1' : '0');
         const icon = document.getElementById('icon-sidebar-toggle');
         if (icon) {
@@ -1911,6 +1942,11 @@ class AppController {
         }
         const toggle = document.getElementById('btn-sidebar-toggle');
         if (toggle) toggle.title = collapsed ? 'Expandir menu' : 'Recolher menu';
+        // S6: ícones giram ao colapsar/expandir
+        sidebar.classList.add('sidebar--icon-spin');
+        sidebar.addEventListener('transitionend', () => {
+            sidebar.classList.remove('sidebar--icon-spin');
+        }, { once: true });
     }
 
     applySidebarState() {
@@ -2814,6 +2850,7 @@ class AppController {
         } else {
             this.agendaCurrentDate.setDate(this.agendaCurrentDate.getDate() - 7);
         }
+        this._agendaNavDir = 'left';   // A5: desliza da esquerda ao voltar
         await this.renderAgenda();
     }
 
@@ -2827,6 +2864,7 @@ class AppController {
         } else {
             this.agendaCurrentDate.setDate(this.agendaCurrentDate.getDate() + 7);
         }
+        this._agendaNavDir = 'right';  // A5: desliza da direita ao avançar
         await this.renderAgenda();
     }
 
@@ -3140,6 +3178,14 @@ class AppController {
         const container = document.getElementById('agenda-container');
         if (!container) return;
 
+        // A5: aplicar direção de slide antes de rerender
+        container.classList.remove('agenda-nav-right', 'agenda-nav-left');
+        if (this._agendaNavDir) {
+            container.classList.add(`agenda-nav-${this._agendaNavDir}`);
+            this._agendaNavDir = null;
+            setTimeout(() => container.classList.remove('agenda-nav-right', 'agenda-nav-left'), 400);
+        }
+
         container.innerHTML = spinnerHtml;
 
         // Atualizar estado do botão de sync superior
@@ -3372,7 +3418,7 @@ class AppController {
 
             cellsHtml += `
                 <div class="agenda-month-cell ${!isCurrentMonth ? 'other-month' : ''} ${isToday ? 'today' : ''}"
-                     onclick="app.openNewAgendaEvent('${iso}')" style="cursor: pointer;">
+                     onclick="app.handleMonthCellClick(event, '${iso}')" style="cursor: pointer;">
                     <div class="agenda-month-day-num">${cursor.getDate()}</div>
                     <div class="agenda-month-events">${eventsHtml}</div>
                 </div>`;
@@ -3386,6 +3432,21 @@ class AppController {
                 <div class="agenda-month-grid">${cellsHtml}</div>
             </div>
         `;
+    }
+
+    // A2: ripple no clique do dia na view mensal
+    handleMonthCellClick(e, iso) {
+        const cell = e.currentTarget;
+        const rect = cell.getBoundingClientRect();
+        const size = Math.max(rect.width, rect.height);
+        const x = e.clientX - rect.left - size / 2;
+        const y = e.clientY - rect.top - size / 2;
+        const ripple = document.createElement('span');
+        ripple.className = 'agenda-month-ripple';
+        ripple.style.cssText = `width:${size}px;height:${size}px;left:${x}px;top:${y}px;position:absolute`;
+        cell.appendChild(ripple);
+        ripple.addEventListener('animationend', () => ripple.remove(), { once: true });
+        this.openNewAgendaEvent(iso);
     }
 
     async renderAgendaSchedule(container) {
