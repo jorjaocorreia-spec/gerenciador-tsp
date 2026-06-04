@@ -566,10 +566,22 @@ Animações CSS/JS implementadas em `styles/main.css` e `js/app.js` para dar vid
 ### Kanban — drop bounce
 - `.kb-card-dropped` + `@keyframes kb-card-drop`: card recém-solto faz bounce elástico (scaleY 0.88 → 1.04 → 0.98 → 1) via `cubic-bezier(0.34,1.56,0.64,1)`; classe adicionada em `_handleDrop()` e removida no `animationend` com `{ once: true }`.
 
+### Rodada 1 — Quick wins implementados (2026-06-04) ✅
+
+**Login:** L1 (`login-card-in` no `.glass`), L2 (logo `activity` rotaciona), L3+F1 (barra roxa deslizante no `focus` via `background-image` trick em `.form-control`).
+**Sidebar:** S4 (`nav-active-pulse` no `border-left` do item ativo), S5 (`brand-glow` no `text-shadow` do `.brand`).
+**Modais:** V2 (spring bounce `scale(0.93) → scale(1)` no `.modal`), V5 (shake em `:invalid` + classe `input-shake` via JS capture-phase + `void el.offsetWidth` reflow).
+**Dashboard:** D4 (`card-danger-pulse` em `.stat-card.over-limit` — usa longhand `animation-name` para rodar cascade + pulse em paralelo).
+**Kanban:** K2 (`kb-column-cascade` com stagger 70ms), K3 (`kb-card-new` pop-in via `_lastAddedTaskId` tracking), K4 (`priority-high-pulse`), K5 (`.kb-complete-btn` scale+glow), K6 (`.kb-dropzone.drag-over` glow lateral).
+**Agenda:** A1 (`event-block-in` com 9 regras nth-child), A3 (`agenda-fade-in` em `#agenda-container > *`), A4 (`#btn-agenda-sync.syncing svg` gira via classe JS + `try/finally`).
+**Badges:** B1 (`badge-ativo::before` ponto verde), B2 (`badge-danger-pulse::before` ponto vermelho).
+**Empty state:** E2 (`icon-float` em `.kb-empty-state svg, .empty-state svg`).
+
 ### Armadilhas de animação
 - **Lucide substitui `<i>` por `<svg>` em runtime** — seletores de ícone devem usar `#btn-ai-config svg`, nunca `i[data-lucide="sparkles"]`.
 - **`@keyframes` sobrescrevem `box-shadow` do elemento** — usar multi-shadow preservando o shadow original como primeiro valor em todos os keyframes; sem isso, o ring de ping "apaga" o shadow do botão.
 - **Duplo `requestAnimationFrame` é obrigatório para animar propriedades CSS definidas no innerHTML** — um único rAF não garante que o browser renderizou o estado inicial antes de aplicar o valor final.
+- **`opacity: 0` como propriedade direta + animação de entrada = armadilha de override** — se uma classe define `opacity: 0` explicitamente E usa `animation` para animar para 1, qualquer regra de maior especificidade que sobrescreva `animation` deixa o elemento invisível permanentemente (pois `opacity: 0` permanece sem a animação para restaurar). Padrão seguro: ou usar `animation-fill-mode: both` (sem `opacity: 0` direto) ou usar `animation-name` longhands para listar múltiplas animações em paralelo. Classes afetadas: `.stat-card-animate` e `.kb-column-cascade`. Correção aplicada em `.stat-card.over-limit`: usa `animation-name: card-cascade-in, card-danger-pulse` com longhand para rodar ambas simultaneamente.
 
 ---
 
@@ -581,27 +593,27 @@ Animações CSS/JS implementadas em `styles/main.css` e `js/app.js` para dar vid
 
 Plano completo de ~35 animações novas dividido em 3 rodadas de implementação. Princípio geral: `animation-play-state: paused` no hover, multi-shadow para preservar shadows existentes, duplo rAF para animar props definidas via innerHTML.
 
-**Rodada 1 — Quick wins (puro CSS, alto impacto):**
-- **L1** — Login: card entra com slide-up + fade (atualmente estático)
-- **L2** — Login: logo `activity` rotaciona uma volta ao carregar
-- **L3** — Login: input focus com barra inferior animada deslizando da esquerda
-- **S4** — Sidebar: item ativo pulsa levemente ao trocar de view (`border-left` roxa)
-- **S5** — Sidebar: marca "TSP Manager" com glow roxo pulse suave contínuo (animar `text-shadow` existente)
-- **V2** — Modal abre com spring bounce (scale 0.95 → 1.03 → 1)
-- **V5** — Campo inválido: shake horizontal (3 oscilações) ao tentar salvar com erro de validação
-- **D4** — Dashboard: card com consumo > 90% ganha borda vermelha pulsante
-- **K2** — Kanban: colunas entram em cascata ao carregar o board (slide da esquerda, stagger por coluna)
-- **K3** — Kanban: card criado via quick-add faz pop-in com spring (scale 0 → 1.05 → 1)
-- **K4** — Kanban: badge de prioridade Alta pisca suavemente em vermelho
-- **K5** — Kanban: botão de conclusão (✓) tem escala + brilho verde ao marcar
-- **K6** — Kanban: coluna recebe card no drag com borda lateral glow colorida (drag-over)
-- **A1** — Agenda: blocos de evento fade-in escalonado ao carregar view diária/semanal
-- **A3** — Agenda: troca de view (dia/semana/mês) com crossfade suave
-- **A4** — Agenda: ícone do botão sync Google gira enquanto sincroniza
-- **F1** — Formulários (global): input focus com barra roxa animada na borda inferior
-- **B1** — Badges: status "Ativo" nos clientes com ponto verde pulsante antes do texto
-- **B2** — Badges: status "Vencido" / prioridade alta com ponto vermelho pulsante
-- **E2** — Empty state: ícone central flutua em loop suave (keyframe translateY)
+**Rodada 1 — Quick wins (puro CSS, alto impacto): ✅ IMPLEMENTADA em 2026-06-04**
+- **L1** ✅ — Login: card entra com slide-up + fade
+- **L2** ✅ — Login: logo `activity` rotaciona uma volta ao carregar
+- **L3** ✅ — Login: input focus com barra inferior animada deslizando da esquerda
+- **S4** ✅ — Sidebar: item ativo pulsa levemente ao trocar de view (`border-left` roxa)
+- **S5** ✅ — Sidebar: marca "TSP Manager" com glow roxo pulse suave contínuo
+- **V2** ✅ — Modal abre com spring bounce (scale 0.93 → overshoot → 1)
+- **V5** ✅ — Campo inválido: shake horizontal ao tentar salvar com erro de validação
+- **D4** ✅ — Dashboard: card com consumo esgotado ganha borda vermelha pulsante
+- **K2** ✅ — Kanban: colunas entram em cascata ao carregar o board (slide da esquerda, stagger 70ms)
+- **K3** ✅ — Kanban: card criado via quick-add faz pop-in com spring
+- **K4** ✅ — Kanban: badge de prioridade Alta pisca suavemente em vermelho
+- **K5** ✅ — Kanban: botão de conclusão (✓) tem escala + brilho verde ao marcar
+- **K6** ✅ — Kanban: coluna recebe card no drag com borda lateral glow colorida
+- **A1** ✅ — Agenda: blocos de evento fade-in escalonado ao carregar view diária/semanal
+- **A3** ✅ — Agenda: troca de view (dia/semana/mês) com crossfade suave
+- **A4** ✅ — Agenda: ícone do botão sync Google gira enquanto sincroniza
+- **F1** ✅ — Formulários (global): input focus com barra roxa animada na borda inferior
+- **B1** ✅ — Badges: status "Ativo" em implementações/treinamentos com ponto verde pulsante
+- **B2** ✅ — Badges: badge "Estourado" com ponto vermelho pulsante
+- **E2** ✅ — Empty state: ícone central flutua em loop suave (keyframe translateY)
 
 **Rodada 2 — JS simples + médio esforço:**
 - **L4** — Login: botão "Entrar" com ripple ao clicar
