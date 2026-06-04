@@ -566,6 +566,22 @@ Animações CSS/JS implementadas em `styles/main.css` e `js/app.js` para dar vid
 ### Kanban — drop bounce
 - `.kb-card-dropped` + `@keyframes kb-card-drop`: card recém-solto faz bounce elástico (scaleY 0.88 → 1.04 → 0.98 → 1) via `cubic-bezier(0.34,1.56,0.64,1)`; classe adicionada em `_handleDrop()` e removida no `animationend` com `{ once: true }`.
 
+### T2 — hover curtain (implementado 2026-06-04)
+- **Tabelas** (`.data-table tbody tr`): `background-image: linear-gradient(90deg, rgba(139,92,246,0.055) 0%, transparent 70%)` no `tr`; `background-size` transiciona de `0% 100%` → `100% 100%` no hover. **Obrigatório**: `.data-table tbody td { background-color: transparent !important }` — sem isso, os `<td>` mascariam o gradiente do `<tr>` e o efeito ficaria dividido em células.
+- **Apontamentos** (`.apt-row`): mesmo padrão de `background-image`/`background-size` diretamente no `div` — os filhos são `<span>` e não têm background próprio, então não precisa do `transparent !important`.
+- **Não se aplica a cards** — gradiente horizontal faz sentido em row de tabela, não em card de grid.
+
+### T3 — delete animation + two-step confirm (implementado 2026-06-04)
+- `@keyframes row-delete-out`: `translateX(0) → -6px → +8px → +24px` com fade; 0.38s ease-out.
+- Classes de acionamento: `.row-deleting td` (tabelas), `.kb-card.row-deleting`, `.event-block.row-deleting`, `.event-allday-banner.row-deleting`, `.apt-row.row-deleting`.
+- **`_twostepDelete(btn, onConfirm)`** — helper compartilhado em `AppController`: 1º clique → botão vira vermelho + "⚠ Confirmar?" por 3 segundos via `setTimeout`; 2º clique → executa `onConfirm()`. Usado em `handleDeleteClient`, `handleDeleteTask`, `handleDeleteTaskFromModal`, `deleteAgendaEventFromModal`, `handleDeleteImplementation`, `handleDeleteTraining`, `handleDeleteSchedulingRule`. Ações de baixo risco (atendimentos, apontamentos, blocos de agenda inline) usam delete direto sem two-step.
+- **Não usar `window.confirm()`** em nenhum delete — substituído inteiramente por `_twostepDelete` + animação.
+
+### `.clickable-card` — hover unificado para cards (implementado 2026-06-04)
+- Classe CSS base: `transform: translateY(-2px)`, `box-shadow: 0 6px 20px rgba(139,92,246,0.18)`, `border-color: rgba(139,92,246,0.45) !important`, `transition: 0.18s ease`.
+- Aplicada em: cards de **Implementações** (`div.glass.clickable-card`), **Treinamentos** (`div.glass.training-card.clickable-card`), **Chamados** (`div.ticket-card.clickable-card`).
+- Todo novo card clicável deve receber essa classe — nunca adicionar `transition:border-color` inline.
+
 ### Rodada 1 — Quick wins implementados (2026-06-04) ✅
 
 **Login:** L1 (`login-card-in` no `.glass`), L2 (logo `activity` rotaciona), L3+F1 (barra roxa deslizante no `focus` via `background-image` trick em `.form-control`).
@@ -620,8 +636,8 @@ Plano completo de ~35 animações novas dividido em 3 rodadas de implementação
 - **V3** — Modal fecha com animação de saída (shrink + fade) — atualmente some sem animação
 - **V4** — Modal: overlay com backdrop-filter blur crescendo de 0 para 4px ao abrir
 - **T1** — Tabelas (todas): linhas entram em cascata (stagger 30ms, slide-up 8px)
-- **T2** — Tabelas: hover na linha com highlight deslizando da esquerda como cortina
-- **T3** — Tabelas: linha deletada faz shake + fade-out antes de remover do DOM
+- **T2** ✅ — Tabelas + Apontamentos: hover curtain da esquerda; cards clicáveis com `.clickable-card` (lift + glow roxo)
+- **T3** ✅ — Delete com shake/fade via `.row-deleting`; botões destrutivos com `_twostepDelete` two-step confirm
 - **D5** — Dashboard: card hover com glow dinâmico vazando da cor da barra de progresso
 - **D6** — Dashboard: troca de mês com cards deslizando para fora/dentro conforme direção
 - **A2** — Agenda: clique no dia (view mensal) com ripple circular no ponto clicado
