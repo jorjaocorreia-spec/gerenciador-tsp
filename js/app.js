@@ -600,25 +600,31 @@ class AppController {
         }
     }
 
-    async handleDeleteClient(id) {
+    async handleDeleteClient(id, btn) {
         if (confirm("Tem certeza que deseja excluir este cliente e TODOS os seus atendimentos?")) {
+            const row = btn?.closest('tr');
+            if (row) { row.classList.add('row-deleting'); await new Promise(r => setTimeout(r, 400)); }
             try {
                 await store.deleteClient(id);
                 await this.renderAll();
                 Toast.show('Cliente excluído.', 'success');
             } catch (err) {
+                if (row) row.classList.remove('row-deleting');
                 Toast.show('Erro ao excluir cliente: ' + err.message, 'error');
             }
         }
     }
 
-    async handleDeleteRecord(id) {
+    async handleDeleteRecord(id, btn) {
         if (confirm("Deseja realmente apagar este lançamento?")) {
+            const row = btn?.closest('tr');
+            if (row) { row.classList.add('row-deleting'); await new Promise(r => setTimeout(r, 400)); }
             try {
                 await store.deleteRecord(id);
                 await this.renderAll();
                 Toast.show('Atendimento excluído.', 'success');
             } catch (err) {
+                if (row) row.classList.remove('row-deleting');
                 Toast.show('Erro ao excluir atendimento: ' + err.message, 'error');
             }
         }
@@ -1715,6 +1721,14 @@ class AppController {
             card.className = 'stat-card glass stat-card-animate' + (stat.isOverLimit ? ' over-limit' : '');
             card.style.cursor = 'pointer';
             card.style.animationDelay = `${idx * 0.07}s`;
+            // D5: glow color vaza da cor da barra
+            if (stat.isOverLimit) {
+                card.style.setProperty('--card-glow-color', 'rgba(239,68,68,0.4)');
+                card.style.setProperty('--card-glow-shadow', 'rgba(239,68,68,0.2)');
+            } else if (stat.percentage >= 80) {
+                card.style.setProperty('--card-glow-color', 'rgba(245,158,11,0.4)');
+                card.style.setProperty('--card-glow-shadow', 'rgba(245,158,11,0.18)');
+            }
             if (stat.client.projectNum) card.title = `Projeto: ${stat.client.projectNum}`;
             card.onclick = () => app.openClientDashboard(stat.client.id);
 
@@ -1957,7 +1971,7 @@ class AppController {
                         <button class="btn btn-secondary" onclick="app.openEditClientModal('${c.id}')" style="padding: 6px 12px; font-size: 0.8rem;">
                             <i data-lucide="edit-2" style="width: 16px; height: 16px;"></i> Editar
                         </button>
-                        <button class="btn btn-danger" onclick="app.handleDeleteClient('${c.id}')" style="padding: 6px 12px; font-size: 0.8rem;">
+                        <button class="btn btn-danger" onclick="app.handleDeleteClient('${c.id}', this)" style="padding: 6px 12px; font-size: 0.8rem;">
                             <i data-lucide="trash-2" style="width: 16px; height: 16px;"></i> Apagar
                         </button>
                     </div>
@@ -2167,7 +2181,7 @@ class AppController {
                         <button class="btn btn-primary" onclick="app.handleEditRecord('${r.id}')" style="padding: 6px 10px; font-size: 0.8rem;" title="Editar">
                             <i data-lucide="pencil" style="width: 16px; height: 16px;"></i>
                         </button>
-                        <button class="btn btn-danger" onclick="app.handleDeleteRecord('${r.id}')" style="padding: 6px 10px; font-size: 0.8rem;" title="Apagar">
+                        <button class="btn btn-danger" onclick="app.handleDeleteRecord('${r.id}', this)" style="padding: 6px 10px; font-size: 0.8rem;" title="Apagar">
                             <i data-lucide="trash-2" style="width: 16px; height: 16px;"></i>
                         </button>
                     </div>
@@ -2402,7 +2416,7 @@ class AppController {
                         <button class="btn btn-primary" onclick="app.handleEditRecord('${r.id}')" style="padding: 6px 10px; font-size: 0.8rem;" title="Editar">
                             <i data-lucide="pencil" style="width: 16px; height: 16px;"></i>
                         </button>
-                        <button class="btn btn-danger" onclick="app.handleDeleteRecord('${r.id}')" style="padding: 6px 10px; font-size: 0.8rem;" title="Apagar">
+                        <button class="btn btn-danger" onclick="app.handleDeleteRecord('${r.id}', this)" style="padding: 6px 10px; font-size: 0.8rem;" title="Apagar">
                             <i data-lucide="trash-2" style="width: 16px; height: 16px;"></i>
                         </button>
                     </div>
