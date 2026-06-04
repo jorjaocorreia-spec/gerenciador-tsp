@@ -1456,8 +1456,9 @@ h4 {
 
 /* Multi-select de tarefas no modal de agendamento */
 .agenda-task-checklist {
-  max-height: 140px;
+  max-height: 130px;
   overflow-y: auto;
+  overflow-x: hidden;
   border: 1px solid var(--border-color, rgba(255,255,255,0.1));
   border-radius: 8px;
   background: rgba(255,255,255,0.03);
@@ -1480,6 +1481,7 @@ h4 {
   transition: background 0.15s;
   font-size: 0.82rem;
   color: var(--text-secondary, #cbd5e1);
+  min-width: 0;
 }
 .agenda-task-check-item:hover {
   background: rgba(99,102,241,0.12);
@@ -1499,6 +1501,8 @@ h4 {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  min-width: 0;
+  flex: 1;
 }
 
 .schedule-month-separator {
