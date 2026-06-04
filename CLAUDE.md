@@ -539,9 +539,90 @@ node run.js "C:\Users\jorge\AppData\Local\Temp\playwright-test-tsp-v2.js"
 
 ---
 
+## Animações de UI
+
+Animações CSS/JS implementadas em `styles/main.css` e `js/app.js` para dar vida à plataforma. Todas respeitam `animation-play-state: paused` no hover para não interferir com cliques.
+
+### Sidebar — botões permanentes
+- **Botão IA (`#btn-ai-config`)**: `@keyframes sparkle-burst` faz o SVG escalar até 1.35× com rotação de 18° a cada 3.5s; `@keyframes ai-glow-pulse` pulsa o box-shadow roxo a cada 2.5s.
+- **Botão WhatsApp (`#btn-whatsapp-config`)**: `@keyframes whatsapp-shake` simula vibração lateral a cada 4.5s (delay 1.2s); `::after` pseudo-element verde com `@keyframes ping-dot` cria dot de status pulsante.
+- **Ícones nav (`#btn-ai-config svg`, `.nav-item svg`)**: `transition: transform 0.2s ease` + `scale(1.18) translateX(2px)` no hover.
+
+### Toasts
+- `@keyframes toast-in`: entrada com slide da direita + slight scale bounce (0% → 60% → 80% → 100%).
+
+### Toggle de valores monetários
+- `.money-value`: `transition: filter 0.35s ease, opacity 0.35s ease`; no estado `body.money-hidden`, `filter: blur(8px); opacity: 0.4`.
+
+### Dashboard — cards e contadores
+- `.stat-card-animate` + `@keyframes card-cascade-in`: cards entram em cascata com `animationDelay = idx * 0.07s` e translateY de 18px → 0.
+- Barras de progresso: começam em `width: 0%` no innerHTML; duplo `requestAnimationFrame` dispara o `transition: width 1s ease-out` existente para o valor real.
+- `_animateCounter(el, target, hoursTotal, delay)`: contador de horas sobe de 0 ao valor real em 800ms com easing `1 - (1-t)^3`; delay sincronizado com a cascata de cards.
+
+### Estado vazio — botão primário
+- `.btn-pulse-empty` + `@keyframes btn-pulse-empty`: pulsa o botão principal quando a view não tem registros; usa multi-shadow para preservar o `box-shadow: 0 4px 15px rgba(139,92,246,0.3)` do `.btn-primary` e adiciona ring de ping como segundo valor. Adicionado por JS em `renderRecords()` e `renderTasks()` quando `records.length === 0` / `tasks.length === 0`.
+- IDs necessários: `id="btn-new-record"` no botão "Lançar Horas" (index.html), `id="btn-new-task"` no botão "Nova Tarefa" (index.html).
+
+### Kanban — drop bounce
+- `.kb-card-dropped` + `@keyframes kb-card-drop`: card recém-solto faz bounce elástico (scaleY 0.88 → 1.04 → 0.98 → 1) via `cubic-bezier(0.34,1.56,0.64,1)`; classe adicionada em `_handleDrop()` e removida no `animationend` com `{ once: true }`.
+
+### Armadilhas de animação
+- **Lucide substitui `<i>` por `<svg>` em runtime** — seletores de ícone devem usar `#btn-ai-config svg`, nunca `i[data-lucide="sparkles"]`.
+- **`@keyframes` sobrescrevem `box-shadow` do elemento** — usar multi-shadow preservando o shadow original como primeiro valor em todos os keyframes; sem isso, o ring de ping "apaga" o shadow do botão.
+- **Duplo `requestAnimationFrame` é obrigatório para animar propriedades CSS definidas no innerHTML** — um único rAF não garante que o browser renderizou o estado inicial antes de aplicar o valor final.
+
+---
+
 ## Backlog (planejado, não implementado)
 
 - **Transformar tarefa em apontamento** — botão no modal de tarefa (ou no card Kanban) que pré-preenche o modal de Apontamento com os dados da tarefa (título como descrição, `estimatedMinutes` como duração sugerida, cliente vinculado → `projectNum` via lookup); permite lançar o tempo da tarefa no ERP sem redigitar.
+
+### Backlog de Animações e Visuais (planejado em 2026-06-03)
+
+Plano completo de ~35 animações novas dividido em 3 rodadas de implementação. Princípio geral: `animation-play-state: paused` no hover, multi-shadow para preservar shadows existentes, duplo rAF para animar props definidas via innerHTML.
+
+**Rodada 1 — Quick wins (puro CSS, alto impacto):**
+- **L1** — Login: card entra com slide-up + fade (atualmente estático)
+- **L2** — Login: logo `activity` rotaciona uma volta ao carregar
+- **L3** — Login: input focus com barra inferior animada deslizando da esquerda
+- **S4** — Sidebar: item ativo pulsa levemente ao trocar de view (`border-left` roxa)
+- **S5** — Sidebar: marca "TSP Manager" com glow roxo pulse suave contínuo (animar `text-shadow` existente)
+- **V2** — Modal abre com spring bounce (scale 0.95 → 1.03 → 1)
+- **V5** — Campo inválido: shake horizontal (3 oscilações) ao tentar salvar com erro de validação
+- **D4** — Dashboard: card com consumo > 90% ganha borda vermelha pulsante
+- **K2** — Kanban: colunas entram em cascata ao carregar o board (slide da esquerda, stagger por coluna)
+- **K3** — Kanban: card criado via quick-add faz pop-in com spring (scale 0 → 1.05 → 1)
+- **K4** — Kanban: badge de prioridade Alta pisca suavemente em vermelho
+- **K5** — Kanban: botão de conclusão (✓) tem escala + brilho verde ao marcar
+- **K6** — Kanban: coluna recebe card no drag com borda lateral glow colorida (drag-over)
+- **A1** — Agenda: blocos de evento fade-in escalonado ao carregar view diária/semanal
+- **A3** — Agenda: troca de view (dia/semana/mês) com crossfade suave
+- **A4** — Agenda: ícone do botão sync Google gira enquanto sincroniza
+- **F1** — Formulários (global): input focus com barra roxa animada na borda inferior
+- **B1** — Badges: status "Ativo" nos clientes com ponto verde pulsante antes do texto
+- **B2** — Badges: status "Vencido" / prioridade alta com ponto vermelho pulsante
+- **E2** — Empty state: ícone central flutua em loop suave (keyframe translateY)
+
+**Rodada 2 — JS simples + médio esforço:**
+- **L4** — Login: botão "Entrar" com ripple ao clicar
+- **V3** — Modal fecha com animação de saída (shrink + fade) — atualmente some sem animação
+- **V4** — Modal: overlay com backdrop-filter blur crescendo de 0 para 4px ao abrir
+- **T1** — Tabelas (todas): linhas entram em cascata (stagger 30ms, slide-up 8px)
+- **T2** — Tabelas: hover na linha com highlight deslizando da esquerda como cortina
+- **T3** — Tabelas: linha deletada faz shake + fade-out antes de remover do DOM
+- **D5** — Dashboard: card hover com glow dinâmico vazando da cor da barra de progresso
+- **D6** — Dashboard: troca de mês com cards deslizando para fora/dentro conforme direção
+- **A2** — Agenda: clique no dia (view mensal) com ripple circular no ponto clicado
+- **B3** — Badge de horas "Esgotado" (> 100%): shake periódico + cor vermelha
+
+**Rodada 3 — Mais complexo (polish final):**
+- **V1** — Views: slide vem da direita ao avançar, da esquerda ao voltar (baseado na posição no menu)
+- **S6** — Sidebar: ícones giram 360° ao colapsar/expandir
+- **S7** — Sidebar: nav items aparecem em cascata no primeiro login
+- **T4** — Tabelas: valor de horas/tempo faz flip vertical ao mudar filtro
+- **A5** — Agenda: grid desliza para esquerda/direita ao navegar semana/mês
+- **F2** — Formulários: float label (label sobe ao focar no input)
+- **E3** — Skeleton loading com shimmer em vez de spinner (em todas as views)
 
 ---
 
