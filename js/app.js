@@ -86,6 +86,7 @@ class AppController {
         this._draggedCard      = null;
         this._dragPlaceholder  = null;
         this._draggingFromStatus = null;
+        this._lastAddedTaskId  = null;
         // Agendamento automático
         this._pendingPreviewEvents = [];
         this._pendingPreviewRuleId = null;
@@ -140,6 +141,18 @@ class AppController {
         document.getElementById('form-scheduling-rule').addEventListener('submit', this.handleSchedulingRuleSubmit.bind(this));
         document.getElementById('form-task-time').addEventListener('submit', this.handleTaskTimeSubmit.bind(this));
         document.getElementById('form-agenda-event').addEventListener('submit', this.handleAgendaSubmit.bind(this));
+
+        // V5 — shake em campos obrigatórios inválidos ao tentar submeter
+        document.querySelectorAll('form').forEach(form => {
+            form.addEventListener('submit', () => {
+                form.querySelectorAll(':invalid').forEach(el => {
+                    el.classList.remove('input-shake');
+                    void el.offsetWidth;
+                    el.classList.add('input-shake');
+                    el.addEventListener('animationend', () => el.classList.remove('input-shake'), { once: true });
+                });
+            }, true);
+        });
 
         // Links clicáveis na descrição do agendamento + auto-resize
         document.getElementById('agenda-desc').addEventListener('input', (e) => {
@@ -1097,9 +1110,11 @@ class AppController {
         if (!title) { this.closeQuickAdd(colId); return; }
         const clientId = document.getElementById('filter-task-client')?.value || null;
         try {
-            await store.addTask({ title, status: colId, clientId, priority: 'medium' });
+            const newTask = await store.addTask({ title, status: colId, clientId, priority: 'medium' });
+            this._lastAddedTaskId = newTask?.id || null;
             this.closeQuickAdd(colId);
             await this.renderAll();
+            this._lastAddedTaskId = null;
         } catch (err) {
             Toast.show('Erro ao criar tarefa: ' + err.message, 'error');
         }
@@ -1697,7 +1712,7 @@ class AppController {
             const statusColor = stat.isOverLimit ? 'var(--danger-color)' : 'var(--primary-color)';
 
             const card = document.createElement('div');
-            card.className = 'stat-card glass stat-card-animate';
+            card.className = 'stat-card glass stat-card-animate' + (stat.isOverLimit ? ' over-limit' : '');
             card.style.cursor = 'pointer';
             card.style.animationDelay = `${idx * 0.07}s`;
             if (stat.client.projectNum) card.title = `Projeto: ${stat.client.projectNum}`;
@@ -1814,7 +1829,7 @@ class AppController {
 
         clients.forEach((c, i) => {
             const stat = stats[i];
-            const overLimitBadge = stat && stat.isOverLimit ? `<span style="background: var(--danger-color); color: white; padding: 2px 6px; border-radius: 4px; font-size: 0.7rem; margin-left: 8px;">Estourado</span>` : '';
+            const overLimitBadge = stat && stat.isOverLimit ? `<span class="badge-danger-pulse" style="background: var(--danger-color); color: white; padding: 2px 6px; border-radius: 4px; font-size: 0.7rem; margin-left: 8px;">Estourado</span>` : '';
 
             const clientPaysStr = formatMoney(c.clientPays);
             const base43 = (c.clientPays && !isNaN(c.clientPays)) ? c.clientPays * 0.43 : 0;
@@ -2408,11 +2423,12 @@ class AppController {
             return;
         }
 
-        columns.forEach(col => {
+        columns.forEach((col, colIdx) => {
             const colTasks = tasks.filter(t => t.status === col.id);
             const colId = col.id;
             const colEl = document.createElement('div');
-            colEl.className = 'kb-column';
+            colEl.className = 'kb-column kb-column-cascade';
+            colEl.style.animationDelay = `${colIdx * 0.07}s`;
             colEl.dataset.status = colId;
 
             colEl.innerHTML = `
@@ -2452,7 +2468,7 @@ class AppController {
 
     createKanbanCard(task, clientsMap) {
         const card = document.createElement('div');
-        card.className = 'kb-card';
+        card.className = 'kb-card' + (task.id === this._lastAddedTaskId ? ' kb-card-new' : '');
         card.draggable = true;
         card.dataset.id = task.id;
 
@@ -3415,7 +3431,7 @@ class AppController {
             }
         }
 
-        btn.innerHTML = '<i data-lucide="loader" class="spin"></i> Buscando...';
+        btn.classList.add('syncing');
         btn.disabled = true;
 
         try {
@@ -3423,13 +3439,12 @@ class AppController {
             Toast.show('Sincronização concluída com sucesso!', 'success');
         } catch (error) {
             console.error("Erro no sync", error);
-            // Erros parciais (alguns eventos falharam mas outros foram salvos)
             const msg = error.message && error.message.includes('falharam')
                 ? error.message
                 : 'Erro durante a sincronização.';
             Toast.show(msg, 'warning');
         } finally {
-            btn.innerHTML = '<i data-lucide="refresh-cw"></i> Sincronizar Google';
+            btn.classList.remove('syncing');
             btn.disabled = false;
             this.renderAgenda();
         }
@@ -4604,7 +4619,8 @@ class AppController {
             const statusBadge = (s) => {
                 const map = { active: ['Ativo', 'var(--success-color)'], testing: ['Em Teste', 'var(--warning-color)'], discontinued: ['Descontinuado', 'var(--danger-color)'] };
                 const [label, color] = map[s] || ['—', 'var(--text-muted)'];
-                return `<span style="font-size:.7rem;padding:2px 8px;border-radius:20px;background:${color}22;color:${color};font-weight:600;">${label}</span>`;
+                const extraClass = s === 'active' ? ' badge-ativo' : '';
+                return `<span class="${extraClass.trim()}" style="font-size:.7rem;padding:2px 8px;border-radius:20px;background:${color}22;color:${color};font-weight:600;">${label}</span>`;
             };
 
             let html = '';
@@ -4828,7 +4844,8 @@ class AppController {
             const statusBadge = (s) => {
                 const map = { active: ['Ativo', 'var(--success-color)'], archived: ['Arquivado', 'var(--text-muted)'] };
                 const [label, color] = map[s] || ['—', 'var(--text-muted)'];
-                return `<span style="font-size:.7rem;padding:2px 8px;border-radius:20px;background:${color}22;color:${color};font-weight:600;">${label}</span>`;
+                const extraClass = s === 'active' ? ' badge-ativo' : '';
+                return `<span class="${extraClass.trim()}" style="font-size:.7rem;padding:2px 8px;border-radius:20px;background:${color}22;color:${color};font-weight:600;">${label}</span>`;
             };
 
             let html = '';

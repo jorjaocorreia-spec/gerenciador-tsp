@@ -459,19 +459,24 @@ h4 {
 .form-control {
   width: 100%;
   padding: 12px;
-  background: rgba(15, 23, 42, 0.5);
+  background-color: rgba(15, 23, 42, 0.5);
+  background-image: linear-gradient(var(--primary-color), var(--primary-color));
+  background-size: 0% 2px;
+  background-position: left bottom;
+  background-repeat: no-repeat;
   border: 1px solid var(--surface-border);
   border-radius: 8px;
   color: var(--text-main);
   font-family: inherit;
   font-size: 1rem;
-  transition: var(--transition);
+  transition: var(--transition), background-size 0.3s ease;
 }
 
 .form-control:focus {
   outline: none;
   border-color: var(--primary-color);
   box-shadow: 0 0 0 2px rgba(139, 92, 246, 0.2);
+  background-size: 100% 2px;
 }
 
 /* =========================================
@@ -503,12 +508,12 @@ h4 {
   width: 100%;
   max-width: 500px;
   padding: 32px;
-  transform: scale(0.95);
-  transition: transform 0.3s ease;
+  transform: scale(0.93) translateY(-12px);
+  transition: transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
 .modal-overlay.active .modal {
-  transform: scale(1);
+  transform: scale(1) translateY(0);
 }
 
 .modal-header {
@@ -3026,4 +3031,209 @@ kbd {
 .kb-card-dropped {
     animation: kb-card-drop 0.35s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
     transform-origin: center bottom;
+}
+
+/* ── Rodada 1: Quick Wins ──────────────────────────────────── */
+
+/* L1 — Login: card entra com slide-up + fade */
+@keyframes login-card-in {
+    from { opacity: 0; transform: translateY(28px) scale(0.97); }
+    to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+#auth-screen .glass {
+    animation: login-card-in 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+
+/* L2 — Login: logo rotaciona ao aparecer */
+@keyframes logo-appear {
+    from { opacity: 0; transform: rotate(-25deg) scale(0.65); }
+    to   { opacity: 1; transform: rotate(0deg) scale(1); }
+}
+#auth-screen svg[data-lucide="activity"] {
+    animation: logo-appear 0.65s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+    animation-delay: 0.18s;
+}
+
+/* S4 — Sidebar: item ativo pulsa levemente */
+@keyframes nav-active-pulse {
+    0%, 100% { border-left-color: var(--primary-color); }
+    50%       { border-left-color: rgba(139, 92, 246, 0.4); }
+}
+.nav-item.active {
+    animation: nav-active-pulse 2.8s ease-in-out infinite;
+    animation-delay: 1s;
+}
+
+/* S5 — Brand: glow roxo pulsante contínuo */
+@keyframes brand-glow {
+    0%, 100% { text-shadow: 0 0 15px rgba(139, 92, 246, 0.4); }
+    50%       { text-shadow: 0 0 30px rgba(139, 92, 246, 0.85), 0 0 55px rgba(139, 92, 246, 0.2); }
+}
+.brand {
+    animation: brand-glow 3s ease-in-out infinite;
+}
+
+/* V5 — Campo inválido: shake horizontal */
+@keyframes input-shake {
+    0%, 100% { transform: translateX(0); }
+    15%       { transform: translateX(-7px); }
+    30%       { transform: translateX(7px); }
+    45%       { transform: translateX(-5px); }
+    60%       { transform: translateX(5px); }
+    75%       { transform: translateX(-3px); }
+    90%       { transform: translateX(3px); }
+}
+.input-shake {
+    animation: input-shake 0.5s ease !important;
+    border-color: var(--danger-color) !important;
+}
+.form-control:user-invalid {
+    animation: input-shake 0.45s ease;
+    border-color: var(--danger-color);
+}
+
+/* D4 — Dashboard: card crítico (>90%) com borda pulsante */
+@keyframes card-danger-pulse {
+    0%, 100% { border-color: rgba(239, 68, 68, 0.2); box-shadow: 0 0 0 rgba(239, 68, 68, 0); }
+    50%       { border-color: rgba(239, 68, 68, 0.65); box-shadow: 0 0 18px rgba(239, 68, 68, 0.14); }
+}
+.stat-card.over-limit {
+    animation: card-danger-pulse 2s ease-in-out infinite;
+}
+
+/* K2 — Kanban: colunas entram em cascata */
+@keyframes kb-column-in {
+    from { opacity: 0; transform: translateX(-18px); }
+    to   { opacity: 1; transform: translateX(0); }
+}
+.kb-column-cascade {
+    opacity: 0;
+    animation: kb-column-in 0.32s ease-out forwards;
+}
+
+/* K3 — Kanban: card novo via quick-add com pop-in */
+@keyframes kb-card-pop-in {
+    0%   { opacity: 0; transform: scale(0.78) translateY(-8px); }
+    65%  { transform: scale(1.05) translateY(1px); }
+    100% { opacity: 1; transform: scale(1) translateY(0); }
+}
+.kb-card-new {
+    animation: kb-card-pop-in 0.3s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+
+/* K4 — Kanban: badge prioridade Alta pisca suavemente */
+@keyframes priority-high-pulse {
+    0%, 70%, 100% { box-shadow: none; }
+    35%            { box-shadow: 0 0 7px rgba(239, 68, 68, 0.55); }
+}
+.kb-badge-priority-high {
+    animation: priority-high-pulse 2.2s ease-in-out infinite;
+}
+
+/* K5 — Kanban: botão conclusão com escala e brilho */
+.kb-complete-btn {
+    transition: transform 0.15s ease, color 0.15s ease, filter 0.15s ease !important;
+}
+.kb-complete-btn:hover {
+    transform: scale(1.28) !important;
+    color: var(--success-color) !important;
+    filter: drop-shadow(0 0 5px rgba(16, 185, 129, 0.65)) !important;
+}
+.kb-complete-btn--done {
+    color: var(--success-color) !important;
+    filter: drop-shadow(0 0 3px rgba(16, 185, 129, 0.45));
+}
+.kb-complete-btn--done:hover {
+    filter: drop-shadow(0 0 8px rgba(16, 185, 129, 0.8)) !important;
+}
+
+/* K6 — Kanban: coluna recebe drag com glow lateral */
+.kb-dropzone.drag-over {
+    background: rgba(139, 92, 246, 0.06);
+    box-shadow: inset 3px 0 12px rgba(139, 92, 246, 0.12);
+    border-left: 3px solid rgba(139, 92, 246, 0.5);
+    border-radius: 4px;
+    transition: background 0.2s ease, box-shadow 0.2s ease, border-left 0.2s ease;
+}
+
+/* A1 — Agenda: blocos de evento fade-in escalonado */
+@keyframes event-block-in {
+    from { opacity: 0; transform: translateX(-8px) scaleX(0.95); }
+    to   { opacity: 1; transform: translateX(0) scaleX(1); }
+}
+.event-block {
+    animation: event-block-in 0.25s ease-out both;
+}
+.event-block:nth-child(2)  { animation-delay: 0.04s; }
+.event-block:nth-child(3)  { animation-delay: 0.08s; }
+.event-block:nth-child(4)  { animation-delay: 0.12s; }
+.event-block:nth-child(5)  { animation-delay: 0.16s; }
+.event-block:nth-child(6)  { animation-delay: 0.20s; }
+.event-block:nth-child(7)  { animation-delay: 0.24s; }
+.event-block:nth-child(8)  { animation-delay: 0.28s; }
+.event-block:nth-child(9)  { animation-delay: 0.32s; }
+.event-block:nth-child(10) { animation-delay: 0.36s; }
+
+/* A3 — Agenda: crossfade ao trocar de view */
+@keyframes agenda-fade-in {
+    from { opacity: 0; transform: translateY(8px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+#agenda-container > * {
+    animation: agenda-fade-in 0.28s ease-out both;
+}
+
+/* A4 — Ícone do botão sync gira enquanto sincroniza */
+#btn-agenda-sync.syncing svg {
+    animation: spin 0.75s linear infinite;
+}
+
+/* B1 — Badge "Ativo" com ponto verde pulsante */
+@keyframes dot-pulse-green {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7); }
+    50%       { box-shadow: 0 0 0 4px rgba(16, 185, 129, 0); }
+}
+.badge-ativo {
+    position: relative;
+}
+.badge-ativo::before {
+    content: '';
+    display: inline-block;
+    width: 6px;
+    height: 6px;
+    background: var(--success-color);
+    border-radius: 50%;
+    margin-right: 5px;
+    vertical-align: middle;
+    animation: dot-pulse-green 1.8s ease-out infinite;
+}
+
+/* B2 — Badge perigo/estourado com ponto vermelho pulsante */
+@keyframes dot-pulse-red {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7); }
+    50%       { box-shadow: 0 0 0 4px rgba(239, 68, 68, 0); }
+}
+.badge-danger-pulse {
+    position: relative;
+}
+.badge-danger-pulse::before {
+    content: '';
+    display: inline-block;
+    width: 6px;
+    height: 6px;
+    background: var(--danger-color);
+    border-radius: 50%;
+    margin-right: 5px;
+    vertical-align: middle;
+    animation: dot-pulse-red 1.5s ease-out infinite;
+}
+
+/* E2 — Empty state: ícone flutua em loop suave */
+@keyframes icon-float {
+    0%, 100% { transform: translateY(0); }
+    50%       { transform: translateY(-10px); }
+}
+.kb-empty-state svg,
+.empty-state svg {
+    animation: icon-float 3s ease-in-out infinite;
 }
