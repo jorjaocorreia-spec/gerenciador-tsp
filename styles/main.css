@@ -379,16 +379,18 @@ h4 {
   letter-spacing: 0.05em;
 }
 
-/* T2: hover curtain da esquerda — aplicado nos td (tr não renderiza background atrás de td) */
+/* T2: hover curtain da esquerda — gradiente no tr, td forçado transparent para não bloquear */
 .data-table tbody td {
+  background-color: transparent !important;
+}
+.data-table tbody tr {
   background-image: linear-gradient(90deg, rgba(139,92,246,0.055) 0%, transparent 70%);
   background-size: 0% 100%;
   background-repeat: no-repeat;
-  transition: background-size 0.28s ease, background-color 0.28s ease;
+  transition: background-size 0.28s ease;
 }
-.data-table tbody tr:hover td {
+.data-table tbody tr:hover {
   background-size: 100% 100%;
-  background-color: transparent;
 }
 
 /* T1: linhas entram em cascata */
@@ -2335,6 +2337,7 @@ kbd {
 .apt-row { border-bottom: 1px solid rgba(255,255,255,.06); transition: background .15s; }
 .apt-row:last-of-type { border-bottom: none; }
 .apt-row:hover { background: rgba(255,255,255,.04); }
+.apt-row.row-deleting { animation: row-delete-out 0.38s ease-out forwards !important; }
 .apt-horario { font-variant-numeric: tabular-nums; color: var(--primary-color, #7c3aed); font-weight: 500; }
 .apt-proj { font-weight: 600; display: flex; flex-direction: column; gap: 2px; }
 .apt-proj-name { font-weight: 400; font-size: 0.7rem; opacity: .5; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }

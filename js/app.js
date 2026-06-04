@@ -4674,7 +4674,7 @@ class AppController {
     }
 
     async deleteApontamento(id, btn) {
-        const row = btn?.closest('tr');
+        const row = btn?.closest('.apt-row');
         if (row) { row.classList.add('row-deleting'); await new Promise(r => setTimeout(r, 400)); }
         try {
             await store.deleteApontamento(id);
