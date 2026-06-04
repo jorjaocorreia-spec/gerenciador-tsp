@@ -2749,7 +2749,7 @@ kbd {
     animation: ai-glow-pulse 2.5s ease-in-out infinite;
 }
 
-#btn-ai-config i[data-lucide="sparkles"] {
+#btn-ai-config svg {
     animation: sparkle-burst 3.5s ease-in-out infinite;
     display: inline-block;
     transform-origin: center;
@@ -2759,7 +2759,7 @@ kbd {
     animation-play-state: paused;
 }
 
-#btn-ai-config:hover i[data-lucide="sparkles"] {
+#btn-ai-config:hover svg {
     animation-play-state: paused;
 }
 
@@ -2768,14 +2768,14 @@ kbd {
     position: relative;
 }
 
-#btn-whatsapp-config i[data-lucide="message-circle"] {
+#btn-whatsapp-config svg {
     animation: whatsapp-shake 4.5s ease-in-out infinite;
     animation-delay: 1.2s;
     display: inline-block;
     transform-origin: center bottom;
 }
 
-#btn-whatsapp-config:hover i[data-lucide="message-circle"] {
+#btn-whatsapp-config:hover svg {
     animation-play-state: paused;
 }
 
