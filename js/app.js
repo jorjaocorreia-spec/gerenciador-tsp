@@ -107,8 +107,9 @@ class AppController {
         // Navegação de mês no Dashboard
         this._dashboardMonth = new Date().toISOString().slice(0, 7); // YYYY-MM
         // Tarefas vinculadas ao agendamento atual (multi-select)
-        this._agendaRelatedTaskIds = [];
-        this._agendaAllTasks = []; // cache das tarefas para exibir nomes nos chips
+        this._agendaRelatedTaskIds = [];  // confirmadas
+        this._agendaTaskPanelTempIds = []; // seleção temporária enquanto painel está aberto
+        this._agendaAllTasks = [];
         // Guard para evitar renderAll() concorrente
         this._renderAllRunning = false;
         this._renderAllPending = false;
@@ -411,7 +412,11 @@ class AppController {
             document.getElementById('agenda-sync-google').checked = calendarAPI.isEnabled;
             this._updateDescLinks('');
             this._agendaRelatedTaskIds = [];
-            this._renderAgendaTaskChecklist();
+            this._agendaTaskPanelTempIds = [];
+            const agendaPanel = document.getElementById('agenda-task-panel');
+            if (agendaPanel) agendaPanel.style.display = 'none';
+            this._renderAgendaTaskChips();
+            this._updateAgendaLinkBtn();
         }
         if (modalId === 'modal-manage-columns') {
             this._manageCols = [];
@@ -2571,7 +2576,9 @@ class AppController {
         document.getElementById('agenda-generate-meet-row').style.display = syncChecked ? 'flex' : 'none';
         // Reseta multi-select de tarefas
         this._agendaRelatedTaskIds = [];
-        this._renderAgendaTaskChecklist();
+        this._agendaTaskPanelTempIds = [];
+        this._renderAgendaTaskChips();
+        this._updateAgendaLinkBtn();
     }
 
     toggleAllDayAgenda(isAllDay) {
@@ -2628,40 +2635,91 @@ class AppController {
         const allCols = await store.getAllColumns().catch(() => []);
         const doneIds = new Set(allCols.filter(c => c.isDone).map(c => c.id));
         doneIds.add('done');
-        const tasks = (await store.getTasks()).filter(t => !doneIds.has(t.status));
-        this._agendaAllTasks = tasks;
-        this._renderAgendaTaskChecklist();
+        this._agendaAllTasks = (await store.getTasks()).filter(t => !doneIds.has(t.status));
     }
 
-    toggleAgendaTask(taskId) {
-        const idx = this._agendaRelatedTaskIds.indexOf(taskId);
-        if (idx === -1) this._agendaRelatedTaskIds.push(taskId);
-        else this._agendaRelatedTaskIds.splice(idx, 1);
-        // Atualiza só o item clicado para não perder foco
-        const item = document.querySelector(`.agenda-task-check-item[data-id="${taskId}"]`);
+    openAgendaTaskPanel() {
+        const panel = document.getElementById('agenda-task-panel');
+        if (!panel) return;
+        // Copia confirmadas para temporárias
+        this._agendaTaskPanelTempIds = [...this._agendaRelatedTaskIds];
+        this._renderAgendaTaskPanel();
+        panel.style.display = 'block';
+        lucide.createIcons();
+    }
+
+    cancelAgendaTaskPanel() {
+        const panel = document.getElementById('agenda-task-panel');
+        if (panel) panel.style.display = 'none';
+        this._agendaTaskPanelTempIds = [];
+    }
+
+    confirmAgendaTaskPanel() {
+        this._agendaRelatedTaskIds = [...this._agendaTaskPanelTempIds];
+        this._agendaTaskPanelTempIds = [];
+        const panel = document.getElementById('agenda-task-panel');
+        if (panel) panel.style.display = 'none';
+        this._renderAgendaTaskChips();
+        this._updateAgendaLinkBtn();
+    }
+
+    toggleAgendaTaskTemp(taskId) {
+        const idx = this._agendaTaskPanelTempIds.indexOf(taskId);
+        if (idx === -1) this._agendaTaskPanelTempIds.push(taskId);
+        else this._agendaTaskPanelTempIds.splice(idx, 1);
+        const item = document.querySelector(`.agenda-task-panel-item[data-id="${taskId}"]`);
         if (item) {
-            const checked = this._agendaRelatedTaskIds.includes(taskId);
+            const checked = this._agendaTaskPanelTempIds.includes(taskId);
             item.classList.toggle('checked', checked);
             item.querySelector('input').checked = checked;
         }
     }
 
-    _renderAgendaTaskChecklist() {
-        const container = document.getElementById('agenda-task-list');
-        if (!container) return;
-        const selectedSet = new Set(this._agendaRelatedTaskIds);
-        if (!this._agendaAllTasks.length) {
-            container.innerHTML = '';
-            return;
-        }
-        container.innerHTML = this._agendaAllTasks.map(t => {
-            const checked = selectedSet.has(t.id);
+    removeAgendaTask(taskId) {
+        this._agendaRelatedTaskIds = this._agendaRelatedTaskIds.filter(id => id !== taskId);
+        this._renderAgendaTaskChips();
+        this._updateAgendaLinkBtn();
+    }
+
+    _renderAgendaTaskPanel() {
+        const list = document.getElementById('agenda-task-panel-list');
+        if (!list) return;
+        const clientId = document.getElementById('agenda-client')?.value || '';
+        const tasks = clientId
+            ? this._agendaAllTasks.filter(t => t.clientId === clientId)
+            : this._agendaAllTasks;
+        const tempSet = new Set(this._agendaTaskPanelTempIds);
+        if (!tasks.length) { list.innerHTML = ''; return; }
+        list.innerHTML = tasks.map(t => {
+            const checked = tempSet.has(t.id);
             const safe = t.title.replace(/</g, '&lt;').replace(/"/g, '&quot;');
-            return `<label class="agenda-task-check-item${checked ? ' checked' : ''}" data-id="${t.id}">
-                <input type="checkbox" ${checked ? 'checked' : ''} onchange="app.toggleAgendaTask('${t.id}')">
-                <span class="agenda-task-check-label" title="${safe}">${safe}</span>
+            return `<label class="agenda-task-panel-item${checked ? ' checked' : ''}" data-id="${t.id}">
+                <input type="checkbox" ${checked ? 'checked' : ''} onchange="app.toggleAgendaTaskTemp('${t.id}')">
+                <span class="agenda-task-panel-item-label" title="${safe}">${safe}</span>
             </label>`;
         }).join('');
+    }
+
+    _renderAgendaTaskChips() {
+        const container = document.getElementById('agenda-task-chips');
+        if (!container) return;
+        const taskMap = new Map(this._agendaAllTasks.map(t => [t.id, t.title]));
+        container.innerHTML = this._agendaRelatedTaskIds.map(id => {
+            const title = taskMap.get(id) || id;
+            const safe = title.replace(/</g, '&lt;').replace(/"/g, '&quot;');
+            return `<span class="agenda-task-chip" title="${safe}">
+                <span class="agenda-task-chip-name">${safe}</span>
+                <button type="button" class="agenda-task-chip-remove" onclick="app.removeAgendaTask('${id}')" title="Remover">×</button>
+            </span>`;
+        }).join('');
+    }
+
+    _updateAgendaLinkBtn() {
+        const badge = document.getElementById('agenda-task-count-badge');
+        if (!badge) return;
+        const count = this._agendaRelatedTaskIds.length;
+        badge.textContent = count;
+        badge.style.display = count > 0 ? 'inline-block' : 'none';
     }
 
     async handleAgendaSubmit(e) {
@@ -2787,7 +2845,10 @@ class AppController {
         document.getElementById('agenda-type').value = ev.type;
         document.getElementById('agenda-client').value = ev.clientId || '';
         this._agendaRelatedTaskIds = Array.isArray(ev.relatedTaskIds) ? [...ev.relatedTaskIds] : [];
+        this._agendaTaskPanelTempIds = [];
         await this.updateAgendaTaskSelect();
+        this._renderAgendaTaskChips();
+        this._updateAgendaLinkBtn();
         document.getElementById('agenda-date').value = ev.date;
         document.getElementById('agenda-date-end').value = ev.dateEnd || ev.date;
         const isAllDay = !ev.startTime;

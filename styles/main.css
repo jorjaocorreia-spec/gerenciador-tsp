@@ -1454,56 +1454,146 @@ h4 {
   flex-direction: column;
 }
 
-/* Multi-select de tarefas no modal de agendamento */
-.agenda-task-checklist {
-  max-height: 130px;
-  overflow-y: auto;
-  overflow-x: hidden;
-  border: 1px solid var(--border-color, rgba(255,255,255,0.1));
+/* Botão e painel de vinculação de tarefas no modal de agendamento */
+.btn-agenda-link-tasks {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 7px 14px;
+  background: rgba(99,102,241,0.12);
+  border: 1px solid rgba(99,102,241,0.35);
   border-radius: 8px;
-  background: rgba(255,255,255,0.03);
-  padding: 4px 0;
+  color: #a5b4fc;
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
 }
-.agenda-task-checklist:empty::before {
-  content: 'Nenhuma tarefa aberta';
+.btn-agenda-link-tasks:hover {
+  background: rgba(99,102,241,0.22);
+  border-color: rgba(99,102,241,0.6);
+}
+.agenda-task-count-badge {
+  background: #6366f1;
+  color: #fff;
+  font-size: 0.72rem;
+  font-weight: 700;
+  padding: 1px 6px;
+  border-radius: 10px;
+  line-height: 1.4;
+}
+.agenda-task-panel {
+  margin-top: 8px;
+  border: 1px solid rgba(99,102,241,0.3);
+  border-radius: 10px;
+  background: var(--bg-secondary, #1e2235);
+  overflow: hidden;
+}
+.agenda-task-panel-list {
+  max-height: 200px;
+  overflow-y: auto;
+  padding: 6px 0;
+}
+.agenda-task-panel-list:empty::before {
+  content: 'Nenhuma tarefa aberta para este cliente';
   display: block;
-  padding: 8px 12px;
+  padding: 10px 14px;
   font-size: 0.8rem;
   color: var(--text-muted);
 }
-.agenda-task-check-item {
+.agenda-task-panel-item {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 5px 10px;
+  gap: 10px;
+  padding: 7px 14px;
   cursor: pointer;
-  border-radius: 4px;
-  transition: background 0.15s;
-  font-size: 0.82rem;
+  font-size: 0.84rem;
   color: var(--text-secondary, #cbd5e1);
-  min-width: 0;
+  transition: background 0.12s;
 }
-.agenda-task-check-item:hover {
-  background: rgba(99,102,241,0.12);
-}
-.agenda-task-check-item.checked {
+.agenda-task-panel-item:hover { background: rgba(99,102,241,0.1); }
+.agenda-task-panel-item.checked {
   background: rgba(99,102,241,0.18);
   color: #a5b4fc;
 }
-.agenda-task-check-item input[type="checkbox"] {
-  width: 14px;
-  height: 14px;
+.agenda-task-panel-item input[type="checkbox"] {
+  width: 15px;
+  height: 15px;
   accent-color: #6366f1;
   cursor: pointer;
   flex-shrink: 0;
 }
-.agenda-task-check-label {
+.agenda-task-panel-item-label {
+  flex: 1;
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  min-width: 0;
-  flex: 1;
 }
+.agenda-task-panel-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 10px 14px;
+  border-top: 1px solid rgba(255,255,255,0.06);
+}
+.btn-agenda-panel-cancel {
+  padding: 6px 14px;
+  border-radius: 6px;
+  border: 1px solid rgba(255,255,255,0.12);
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 0.83rem;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.btn-agenda-panel-cancel:hover { background: rgba(255,255,255,0.07); color: var(--text-primary); }
+.btn-agenda-panel-confirm {
+  padding: 6px 16px;
+  border-radius: 6px;
+  border: none;
+  background: #6366f1;
+  color: #fff;
+  font-size: 0.83rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.btn-agenda-panel-confirm:hover { background: #4f52d4; }
+.agenda-task-chips-display {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+.agenda-task-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 9px 3px 10px;
+  border-radius: 12px;
+  background: rgba(99,102,241,0.18);
+  border: 1px solid rgba(99,102,241,0.3);
+  color: #a5b4fc;
+  font-size: 0.78rem;
+  max-width: 220px;
+}
+.agenda-task-chip-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.agenda-task-chip-remove {
+  background: none;
+  border: none;
+  color: inherit;
+  opacity: 0.6;
+  cursor: pointer;
+  padding: 0;
+  font-size: 1rem;
+  line-height: 1;
+  flex-shrink: 0;
+}
+.agenda-task-chip-remove:hover { opacity: 1; }
 
 .schedule-month-separator {
   padding: 12px 0 6px;

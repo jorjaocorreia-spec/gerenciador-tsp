@@ -1304,17 +1304,27 @@
                     </div>
                 </div>
 
-                <div style="display: flex; gap: 16px; align-items: flex-start;">
-                    <div class="form-group" style="flex: 1; min-width: 0;">
-                        <label>Cliente (Opcional)</label>
-                        <select id="agenda-client" class="form-control">
-                            <!-- Options carregados via JS -->
-                        </select>
+                <div class="form-group">
+                    <label>Cliente (Opcional)</label>
+                    <select id="agenda-client" class="form-control">
+                        <!-- Options carregados via JS -->
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <button type="button" id="btn-agenda-link-tasks" class="btn-agenda-link-tasks" onclick="app.openAgendaTaskPanel()">
+                        <i data-lucide="link-2" style="width:15px;height:15px;flex-shrink:0;"></i>
+                        <span>Vincular Tarefas</span>
+                        <span id="agenda-task-count-badge" class="agenda-task-count-badge" style="display:none;">0</span>
+                    </button>
+                    <div id="agenda-task-panel" class="agenda-task-panel" style="display:none;">
+                        <div id="agenda-task-panel-list" class="agenda-task-panel-list"></div>
+                        <div class="agenda-task-panel-footer">
+                            <button type="button" class="btn-agenda-panel-cancel" onclick="app.cancelAgendaTaskPanel()">Cancelar</button>
+                            <button type="button" class="btn-agenda-panel-confirm" onclick="app.confirmAgendaTaskPanel()">Confirmar</button>
+                        </div>
                     </div>
-                    <div class="form-group" style="flex: 1; min-width: 0;">
-                        <label>Vincular Tarefas (Opcional)</label>
-                        <div id="agenda-task-list" class="agenda-task-checklist"></div>
-                    </div>
+                    <div id="agenda-task-chips" class="agenda-task-chips-display"></div>
                 </div>
 
                 <div style="display: flex; gap: 16px;">
