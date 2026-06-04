@@ -2337,9 +2337,15 @@ kbd {
     opacity: .55;
     border-bottom: 1px solid rgba(255,255,255,.08);
 }
-.apt-row { border-bottom: 1px solid rgba(255,255,255,.06); transition: background .15s; }
+.apt-row {
+    border-bottom: 1px solid rgba(255,255,255,.06);
+    background-image: linear-gradient(90deg, rgba(139,92,246,0.055) 0%, transparent 70%);
+    background-size: 0% 100%;
+    background-repeat: no-repeat;
+    transition: background-size 0.28s ease;
+}
 .apt-row:last-of-type { border-bottom: none; }
-.apt-row:hover { background: rgba(255,255,255,.04); }
+.apt-row:hover { background-size: 100% 100%; }
 .apt-row.row-deleting { animation: row-delete-out 0.38s ease-out forwards !important; }
 .apt-horario { font-variant-numeric: tabular-nums; color: var(--primary-color, #7c3aed); font-weight: 500; }
 .apt-proj { font-weight: 600; display: flex; flex-direction: column; gap: 2px; }
