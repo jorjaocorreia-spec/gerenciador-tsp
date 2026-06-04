@@ -3,7 +3,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 // ── Tipos ──────────────────────────────────────────────────────────────────
 
-type Intent = "query_hours" | "query_agenda" | "help";
+type Intent = "query_hours" | "query_agenda" | "query_tasks" | "help";
 
 interface Client {
   id: string;
@@ -21,6 +21,28 @@ interface AgendaEvent {
   end_time: string;
   type: string;
   client_id: string | null;
+}
+
+interface Task {
+  id: string;
+  title: string;
+  priority: string | null;
+  due_date: string | null;
+  status: string;
+  client_id: string;
+  completed: boolean | null;
+}
+
+interface KanbanColumn {
+  id: string;
+  name: string;
+  client_id: string | null;
+  is_done: boolean;
+}
+
+interface BotState {
+  pending?: string;
+  expires?: string;
 }
 
 // ── Supabase admin (service role) ─────────────────────────────────────────
@@ -91,6 +113,13 @@ const INTENT_RULES: { intent: Intent; patterns: RegExp[] }[] = [
     ],
   },
   {
+    intent: "query_tasks",
+    patterns: [
+      /\btarefas?\b/i, /\bkanban\b/i, /\bpendente\b/i,
+      /\bem aberto\b/i, /\bo que (tem|está|falta) pra fazer\b/i,
+    ],
+  },
+  {
     intent: "query_agenda",
     patterns: [
       /\bagenda\b/i, /\brevisi[oó]o?\b/i,
@@ -127,6 +156,35 @@ function fmtMinutes(minutes: number): string {
   return `${h}h${String(m).padStart(2, "0")}`;
 }
 
+function fmtDate(dateStr: string): string {
+  const [, month, day] = dateStr.split("-");
+  return `${day}/${month}`;
+}
+
+// ── Estado conversacional (bot_state em user_profiles) ───────────────────
+
+async function getBotState(userId: string): Promise<BotState> {
+  const db = getAdminClient();
+  const { data } = await db
+    .from("user_profiles")
+    .select("bot_state")
+    .eq("user_id", userId)
+    .maybeSingle();
+  return (data?.bot_state as BotState) ?? {};
+}
+
+async function setBotState(userId: string, state: BotState): Promise<void> {
+  const db = getAdminClient();
+  await db
+    .from("user_profiles")
+    .update({ bot_state: state })
+    .eq("user_id", userId);
+}
+
+async function clearBotState(userId: string): Promise<void> {
+  await setBotState(userId, {});
+}
+
 // ── Handlers de consulta ──────────────────────────────────────────────────
 
 async function handleQueryHours(userId: string, text: string): Promise<string> {
@@ -147,13 +205,11 @@ async function handleQueryHours(userId: string, text: string): Promise<string> {
     return "Nenhum cliente ativo encontrado. Acesse o app para cadastrar clientes.";
   }
 
-  // Agrupa minutos usados por cliente
   const usedMap: Record<string, number> = {};
   for (const r of records ?? []) {
     usedMap[r.client_id] = (usedMap[r.client_id] ?? 0) + r.minutes;
   }
 
-  // Filtra por palavra-chave se mencionada
   const lowerText = text.toLowerCase();
   let filtered = clients as Client[];
 
@@ -172,7 +228,6 @@ async function handleQueryHours(userId: string, text: string): Promise<string> {
     }
   }
 
-  // Limita a 8 clientes para não ultrapassar limite de mensagem
   const shown = filtered.slice(0, 8);
 
   const monthLabel = now.toLocaleDateString("pt-BR", { month: "long", year: "numeric" });
@@ -234,8 +289,96 @@ async function handleQueryAgenda(userId: string): Promise<string> {
   return `📅 *Agenda — próximos 7 dias*\n\n${lines.join("\n\n")}`;
 }
 
+async function handleQueryTasks(userId: string, clientQuery: string): Promise<string> {
+  const db = getAdminClient();
+
+  const [{ data: columns }, { data: clients }] = await Promise.all([
+    db.from("kanban_columns").select("id, name, client_id, is_done").eq("user_id", userId),
+    db.from("clients").select("id, name").eq("user_id", userId).eq("status", "active"),
+  ]);
+
+  if (!clients || clients.length === 0) {
+    return "Nenhum cliente ativo encontrado. Acesse o app para cadastrar clientes.";
+  }
+
+  // Fuzzy match de cliente se query fornecida
+  let targetClients = clients as { id: string; name: string }[];
+  if (clientQuery.trim().length >= 2) {
+    const q = clientQuery.trim().toLowerCase();
+    const matched = targetClients.filter((c) => c.name.toLowerCase().includes(q));
+    if (matched.length > 0) {
+      targetClients = matched;
+    } else {
+      return `❌ Nenhum cliente encontrado com "*${clientQuery}*".\n\nEnvie *tarefas* para ver todos os clientes.`;
+    }
+  }
+
+  const allColumns = (columns ?? []) as KanbanColumn[];
+  const doneColIds = new Set(allColumns.filter((c) => c.is_done).map((c) => c.id));
+  const colNameMap = new Map(allColumns.map((c) => [c.id, c.name]));
+
+  const clientIds = targetClients.map((c) => c.id);
+  const { data: tasks } = await db
+    .from("tasks")
+    .select("id, title, priority, due_date, status, client_id, completed")
+    .eq("user_id", userId)
+    .in("client_id", clientIds)
+    .or("completed.is.null,completed.eq.false")
+    .order("client_id", { ascending: true })
+    .limit(100);
+
+  const openTasks = ((tasks ?? []) as Task[]).filter((t) => !doneColIds.has(t.status));
+
+  if (openTasks.length === 0) {
+    const names = targetClients.map((c) => c.name).join(", ");
+    return `✅ Nenhuma tarefa em aberto para *${names}*.`;
+  }
+
+  const priorityEmoji: Record<string, string> = { high: "🔴", medium: "🟡", low: "🟢" };
+  const priorityOrder: Record<string, number> = { high: 0, medium: 1, low: 2 };
+
+  // Agrupa por cliente
+  const byClient = new Map<string, Task[]>();
+  for (const c of targetClients) byClient.set(c.id, []);
+  for (const t of openTasks) {
+    byClient.get(t.client_id)?.push(t);
+  }
+
+  const sections: string[] = [];
+
+  for (const client of targetClients) {
+    const clientTasks = byClient.get(client.id) ?? [];
+    if (clientTasks.length === 0) continue;
+
+    clientTasks.sort((a, b) => (priorityOrder[a.priority ?? ""] ?? 3) - (priorityOrder[b.priority ?? ""] ?? 3));
+
+    const shown = clientTasks.slice(0, 20);
+    const extra = clientTasks.length - shown.length;
+
+    const taskLines = shown.map((t) => {
+      const emoji = priorityEmoji[t.priority ?? ""] ?? "⚪";
+      const title = t.title.length > 50 ? t.title.slice(0, 47) + "..." : t.title;
+      const colName = colNameMap.get(t.status);
+      const colStr = colName ? ` | ${colName}` : "";
+      const dueStr = t.due_date ? ` | Vence ${fmtDate(t.due_date)}` : "";
+      return `${emoji} ${title}${colStr}${dueStr}`;
+    });
+
+    const count = clientTasks.length;
+    const header = `📋 *${client.name}* (${count} tarefa${count !== 1 ? "s" : ""})`;
+    const moreStr = extra > 0 ? `\n_(+ ${extra} mais)_` : "";
+    sections.push(`${header}\n${taskLines.join("\n")}${moreStr}`);
+  }
+
+  if (sections.length === 0) {
+    return "✅ Nenhuma tarefa em aberto encontrada.";
+  }
+
+  return sections.join("\n\n");
+}
+
 function handleHelp(): string {
-  return `🤖 *TSP Manager Bot*\n\nComandos disponíveis:\n\n📊 *horas* — consumo de horas por cliente no mês atual\n   Ex: "horas", "horas cliente X"\n\n📅 *agenda* — eventos dos próximos 7 dias\n   Ex: "agenda", "reuniões de hoje"\n\n❓ *ajuda* — exibe esta mensagem\n\n_Envie uma mensagem de texto para começar!_`;
+  return `🤖 *TSP Manager Bot*\n\nComandos disponíveis:\n\n📊 *horas* — consumo de horas por cliente no mês atual\n   Ex: "horas", "horas cliente X"\n\n📅 *agenda* — eventos dos próximos 7 dias\n   Ex: "agenda", "reuniões de hoje"\n\n📋 *tarefas* — tarefas em aberto por cliente\n   Ex: "tarefas", "tarefas cascavel"\n\n❓ *ajuda* — exibe esta mensagem\n\n_Envie uma mensagem de texto para começar!_`;
 }
 
 // ── Lookup de usuário por número ──────────────────────────────────────────
@@ -243,10 +386,9 @@ function handleHelp(): string {
 async function findUserByPhone(phone: string): Promise<string | null> {
   const db = getAdminClient();
 
-  // Gera variantes do número (com/sem 55, com/sem 9° dígito)
   const phoneAlt = phone.startsWith("55") && phone.length >= 12 ? phone.slice(2) : null;
   const phoneAlt9 = phoneAlt && phoneAlt.length === 10 ? phoneAlt.slice(0, 2) + "9" + phoneAlt.slice(2) : null;
-  const phoneAlt9With55 = phoneAlt9 ? "55" + phoneAlt9 : null; // ex: 554599910111 → 5545999910111
+  const phoneAlt9With55 = phoneAlt9 ? "55" + phoneAlt9 : null;
   const variants = [phone, phoneAlt, phoneAlt9, phoneAlt9With55].filter(Boolean) as string[];
   const orFilter = variants.map((v) => `whatsapp_number.eq.${v}`).join(",");
 
@@ -343,14 +485,52 @@ serve(async (req) => {
     return new Response(JSON.stringify({ ok: true, skipped: true, reason: "phone not found" }));
   }
 
-  const intent = detectIntent(text);
-  console.log("[WA] userId:", userId, "| intent:", intent);
+  // Lê estado conversacional pendente
+  const botState = await getBotState(userId);
+  const nowIso = new Date().toISOString();
+
+  let intent: Intent;
+  let clientQuery = "";
+
+  if (botState.pending === "query_tasks" && botState.expires && botState.expires > nowIso) {
+    // Usuário está respondendo à pergunta "Para qual cliente?"
+    // Se mandar outro comando conhecido, cancela o estado e trata normalmente
+    const isOtherCommand = /\b(ajuda|horas?|agenda|cancelar|menu)\b/i.test(text);
+    if (!isOtherCommand) {
+      intent = "query_tasks";
+      clientQuery = text;
+      await clearBotState(userId);
+    } else {
+      await clearBotState(userId);
+      intent = detectIntent(text);
+    }
+  } else {
+    intent = detectIntent(text);
+    if (intent === "query_tasks") {
+      // Extrai nome do cliente inline, se fornecido (ex: "tarefas cascavel")
+      const match = text.match(/^tarefas?\s+(.*)/i);
+      clientQuery = match?.[1]?.trim() ?? "";
+      if (!clientQuery) {
+        // Pede o nome do cliente e salva estado pendente por 5 minutos
+        await setBotState(userId, {
+          pending: "query_tasks",
+          expires: new Date(Date.now() + 5 * 60 * 1000).toISOString(),
+        });
+        await sendMessage(phone, "Para qual cliente? Responda com o nome (ou parte dele).\n\n_Ou envie *ajuda* para cancelar._");
+        return new Response(JSON.stringify({ ok: true, intent: "query_tasks_ask" }));
+      }
+    }
+  }
+
+  console.log("[WA] userId:", userId, "| intent:", intent, "| clientQuery:", clientQuery);
 
   let reply: string;
   if (intent === "query_hours") {
     reply = await handleQueryHours(userId, text);
   } else if (intent === "query_agenda") {
     reply = await handleQueryAgenda(userId);
+  } else if (intent === "query_tasks") {
+    reply = await handleQueryTasks(userId, clientQuery);
   } else {
     reply = handleHelp();
   }
