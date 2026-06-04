@@ -1062,6 +1062,13 @@ class AppController {
             Toast.show('Erro ao salvar ordem.', 'error');
         }
         await this.renderAll();
+
+        // Bounce no card após o drop
+        const droppedCard = document.querySelector(`.kb-card[data-id="${draggedId}"]`);
+        if (droppedCard) {
+            droppedCard.classList.add('kb-card-dropped');
+            droppedCard.addEventListener('animationend', () => droppedCard.classList.remove('kb-card-dropped'), { once: true });
+        }
     }
 
     // ===================================
@@ -1685,23 +1692,24 @@ class AppController {
             return;
         }
 
-        stats.forEach(stat => {
+        stats.forEach((stat, idx) => {
             const isCritical = stat.isOverLimit ? 'over-limit' : '';
             const statusColor = stat.isOverLimit ? 'var(--danger-color)' : 'var(--primary-color)';
 
             const card = document.createElement('div');
-            card.className = 'stat-card glass';
+            card.className = 'stat-card glass stat-card-animate';
             card.style.cursor = 'pointer';
+            card.style.animationDelay = `${idx * 0.07}s`;
             if (stat.client.projectNum) card.title = `Projeto: ${stat.client.projectNum}`;
             card.onclick = () => app.openClientDashboard(stat.client.id);
 
             card.innerHTML = `
                 <div class="stat-header">
                     <span class="client-name">${escapeHtml(stat.client.name)}</span>
-                    <span style="font-weight: 600; color: ${statusColor}">${stat.hoursUsed}h / ${stat.hoursTotal}h</span>
+                    <span style="font-weight: 600; color: ${statusColor}" class="dash-hours-value" data-target="${stat.hoursUsed}" data-total="${stat.hoursTotal}">0h / ${stat.hoursTotal}h</span>
                 </div>
                 <div class="progress-container">
-                    <div class="progress-bar ${isCritical}" style="width: ${stat.percentage}%;"></div>
+                    <div class="progress-bar ${isCritical}" style="width: 0%;"></div>
                 </div>
                 <div style="display: flex; justify-content: space-between; font-size: 0.85rem; margin-top: 8px;">
                     <span class="text-muted">${stat.percentage}% utilizado</span>
@@ -1709,7 +1717,33 @@ class AppController {
                 </div>
             `;
             container.appendChild(card);
+
+            // Anima barra de progresso: 0% → valor real (double rAF para ativar transition)
+            const bar = card.querySelector('.progress-bar');
+            requestAnimationFrame(() => requestAnimationFrame(() => {
+                bar.style.width = `${stat.percentage}%`;
+            }));
+
+            // Anima contador de horas com delay escalonado
+            const hoursEl = card.querySelector('.dash-hours-value');
+            this._animateCounter(hoursEl, stat.hoursUsed, stat.hoursTotal, idx * 70);
         });
+    }
+
+    _animateCounter(el, target, hoursTotal, delay = 0) {
+        if (!el || target <= 0) { if (el) el.textContent = `${target}h / ${hoursTotal}h`; return; }
+        const duration = 800;
+        const startTime = performance.now() + delay;
+        const tick = (now) => {
+            if (now < startTime) { requestAnimationFrame(tick); return; }
+            const elapsed = now - startTime;
+            const progress = Math.min(elapsed / duration, 1);
+            const eased = 1 - Math.pow(1 - progress, 3);
+            el.textContent = `${(eased * target).toFixed(1)}h / ${hoursTotal}h`;
+            if (progress < 1) requestAnimationFrame(tick);
+            else el.textContent = `${target}h / ${hoursTotal}h`;
+        };
+        requestAnimationFrame(tick);
     }
 
     toggleSidebar() {
@@ -1987,10 +2021,13 @@ class AppController {
 
         tbody.innerHTML = '';
 
+        const btnNewRecord = document.getElementById('btn-new-record');
         if (records.length === 0) {
             tbody.innerHTML = `<tr><td colspan="5" class="text-muted" style="text-align: center;">Nenhum atendimento lançado.</td></tr>`;
+            if (btnNewRecord) btnNewRecord.classList.add('btn-pulse-empty');
             return;
         }
+        if (btnNewRecord) btnNewRecord.classList.remove('btn-pulse-empty');
 
         const clientsList = preloadedClients || await store.getClients();
         const clientsMap = {};
@@ -2325,6 +2362,12 @@ class AppController {
         this._renderKanbanBoard(this._currentColumns, tasks, clientsMap);
         await this.renderTasksDashboard(tasks, filterClient);
         lucide.createIcons();
+
+        const btnNewTask = document.getElementById('btn-new-task');
+        if (btnNewTask) {
+            if (tasks.length === 0) btnNewTask.classList.add('btn-pulse-empty');
+            else btnNewTask.classList.remove('btn-pulse-empty');
+        }
     }
 
     async _migrateOldStatuses() {

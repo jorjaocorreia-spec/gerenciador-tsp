@@ -198,6 +198,14 @@ h4 {
   color: var(--text-main);
 }
 
+.nav-item svg {
+  transition: transform 0.2s ease;
+}
+
+.nav-item:hover svg {
+  transform: scale(1.18) translateX(2px);
+}
+
 .nav-item.active {
   background: linear-gradient(90deg, rgba(139, 92, 246, 0.15) 0%, transparent 100%);
   color: var(--primary-color);
@@ -1827,14 +1835,15 @@ h4 {
 /* =========================================
    Money Blur Toggle
    ========================================= */
-body.money-hidden .money-value {
-  filter: blur(6px);
-  user-select: none;
-  transition: filter 0.2s ease;
+.money-value {
+  transition: filter 0.35s ease, opacity 0.35s ease;
 }
 
-.money-value {
-  transition: filter 0.2s ease;
+body.money-hidden .money-value {
+  filter: blur(8px);
+  opacity: 0.4;
+  -webkit-user-select: none;
+  user-select: none;
 }
 
 /* =========================================
@@ -1905,8 +1914,10 @@ body.money-hidden .money-value {
   color: #a78bfa;
 }
 @keyframes toast-in {
-  from { opacity: 0; transform: translateX(40px); }
-  to   { opacity: 1; transform: translateX(0); }
+  0%   { opacity: 0; transform: translateX(40px) scale(0.95); }
+  60%  { opacity: 1; transform: translateX(-6px) scale(1.02); }
+  80%  { transform: translateX(3px) scale(0.99); }
+  100% { opacity: 1; transform: translateX(0) scale(1); }
 }
 @keyframes toast-out {
   from { opacity: 1; transform: translateX(0); }
@@ -2975,4 +2986,40 @@ kbd {
 .ticket-type-badge {
     background: rgba(159,122,234,0.15);
     color: #9f7aea;
+}
+
+/* ── Animações de interface ────────────────────────────────── */
+
+/* Cards do Dashboard em cascata */
+@keyframes card-cascade-in {
+    from { opacity: 0; transform: translateY(18px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+
+.stat-card-animate {
+    opacity: 0;
+    animation: card-cascade-in 0.4s ease-out forwards;
+}
+
+/* Botão primário pulsando quando view está vazia */
+@keyframes btn-pulse-empty {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(139, 92, 246, 0.5); }
+    50%       { box-shadow: 0 0 0 8px rgba(139, 92, 246, 0); }
+}
+
+.btn-pulse-empty {
+    animation: btn-pulse-empty 1.8s ease-in-out infinite;
+}
+
+/* Bounce do card Kanban ao ser solto */
+@keyframes kb-card-drop {
+    0%   { transform: scaleY(0.88) scaleX(1.03); }
+    55%  { transform: scaleY(1.04) scaleX(0.98); }
+    80%  { transform: scaleY(0.98) scaleX(1.01); }
+    100% { transform: scaleY(1) scaleX(1); }
+}
+
+.kb-card-dropped {
+    animation: kb-card-drop 0.35s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+    transform-origin: center bottom;
 }
