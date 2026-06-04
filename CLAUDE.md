@@ -541,7 +541,7 @@ node run.js "C:\Users\jorge\AppData\Local\Temp\playwright-test-tsp-v2.js"
 
 ## Backlog (planejado, não implementado)
 
-Nenhum item pendente no momento.
+- **Transformar tarefa em apontamento** — botão no modal de tarefa (ou no card Kanban) que pré-preenche o modal de Apontamento com os dados da tarefa (título como descrição, `estimatedMinutes` como duração sugerida, cliente vinculado → `projectNum` via lookup); permite lançar o tempo da tarefa no ERP sem redigitar.
 
 ---
 
