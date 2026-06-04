@@ -1455,41 +1455,51 @@ h4 {
 }
 
 /* Multi-select de tarefas no modal de agendamento */
-.agenda-task-chips {
+.agenda-task-checklist {
+  max-height: 140px;
+  overflow-y: auto;
+  border: 1px solid var(--border-color, rgba(255,255,255,0.1));
+  border-radius: 8px;
+  background: rgba(255,255,255,0.03);
+  padding: 4px 0;
+}
+.agenda-task-checklist:empty::before {
+  content: 'Nenhuma tarefa aberta';
+  display: block;
+  padding: 8px 12px;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+.agenda-task-check-item {
   display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  margin-top: 6px;
-  min-height: 0;
-}
-.agenda-task-chip {
-  display: inline-flex;
   align-items: center;
-  gap: 5px;
-  padding: 3px 8px;
-  border-radius: 12px;
-  background: rgba(99, 102, 241, 0.18);
-  color: var(--primary-light, #a5b4fc);
-  font-size: 0.75rem;
-  max-width: 200px;
+  gap: 8px;
+  padding: 5px 10px;
+  cursor: pointer;
+  border-radius: 4px;
+  transition: background 0.15s;
+  font-size: 0.82rem;
+  color: var(--text-secondary, #cbd5e1);
 }
-.agenda-task-chip span {
+.agenda-task-check-item:hover {
+  background: rgba(99,102,241,0.12);
+}
+.agenda-task-check-item.checked {
+  background: rgba(99,102,241,0.18);
+  color: #a5b4fc;
+}
+.agenda-task-check-item input[type="checkbox"] {
+  width: 14px;
+  height: 14px;
+  accent-color: #6366f1;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+.agenda-task-check-label {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.agenda-task-chip-remove {
-  background: none;
-  border: none;
-  cursor: pointer;
-  color: inherit;
-  opacity: 0.7;
-  padding: 0;
-  line-height: 1;
-  font-size: 0.85rem;
-  flex-shrink: 0;
-}
-.agenda-task-chip-remove:hover { opacity: 1; }
 
 .schedule-month-separator {
   padding: 12px 0 6px;

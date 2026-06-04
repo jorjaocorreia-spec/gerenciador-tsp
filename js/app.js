@@ -411,7 +411,7 @@ class AppController {
             document.getElementById('agenda-sync-google').checked = calendarAPI.isEnabled;
             this._updateDescLinks('');
             this._agendaRelatedTaskIds = [];
-            this._renderAgendaTaskChips();
+            this._renderAgendaTaskChecklist();
         }
         if (modalId === 'modal-manage-columns') {
             this._manageCols = [];
@@ -2571,7 +2571,7 @@ class AppController {
         document.getElementById('agenda-generate-meet-row').style.display = syncChecked ? 'flex' : 'none';
         // Reseta multi-select de tarefas
         this._agendaRelatedTaskIds = [];
-        this._renderAgendaTaskChips();
+        this._renderAgendaTaskChecklist();
     }
 
     toggleAllDayAgenda(isAllDay) {
@@ -2625,54 +2625,42 @@ class AppController {
     }
 
     async updateAgendaTaskSelect() {
-        const select = document.getElementById('agenda-task');
-        if (!select) return;
         const allCols = await store.getAllColumns().catch(() => []);
         const doneIds = new Set(allCols.filter(c => c.isDone).map(c => c.id));
         doneIds.add('done');
         const tasks = (await store.getTasks()).filter(t => !doneIds.has(t.status));
         this._agendaAllTasks = tasks;
-        this._rebuildAgendaTaskSelect();
+        this._renderAgendaTaskChecklist();
     }
 
-    _rebuildAgendaTaskSelect() {
-        const select = document.getElementById('agenda-task');
-        if (!select) return;
-        select.innerHTML = '<option value="">-- Adicionar tarefa --</option>';
-        const selectedSet = new Set(this._agendaRelatedTaskIds);
-        this._agendaAllTasks.forEach(t => {
-            if (selectedSet.has(t.id)) return; // já selecionada — ocultar da lista
-            const opt = document.createElement('option');
-            opt.value = t.id;
-            opt.textContent = t.title;
-            select.appendChild(opt);
-        });
+    toggleAgendaTask(taskId) {
+        const idx = this._agendaRelatedTaskIds.indexOf(taskId);
+        if (idx === -1) this._agendaRelatedTaskIds.push(taskId);
+        else this._agendaRelatedTaskIds.splice(idx, 1);
+        // Atualiza só o item clicado para não perder foco
+        const item = document.querySelector(`.agenda-task-check-item[data-id="${taskId}"]`);
+        if (item) {
+            const checked = this._agendaRelatedTaskIds.includes(taskId);
+            item.classList.toggle('checked', checked);
+            item.querySelector('input').checked = checked;
+        }
     }
 
-    addAgendaTask(taskId) {
-        if (!taskId || this._agendaRelatedTaskIds.includes(taskId)) return;
-        this._agendaRelatedTaskIds.push(taskId);
-        this._rebuildAgendaTaskSelect();
-        this._renderAgendaTaskChips();
-    }
-
-    removeAgendaTask(taskId) {
-        this._agendaRelatedTaskIds = this._agendaRelatedTaskIds.filter(id => id !== taskId);
-        this._rebuildAgendaTaskSelect();
-        this._renderAgendaTaskChips();
-    }
-
-    _renderAgendaTaskChips() {
-        const container = document.getElementById('agenda-task-chips');
+    _renderAgendaTaskChecklist() {
+        const container = document.getElementById('agenda-task-list');
         if (!container) return;
-        const taskMap = new Map(this._agendaAllTasks.map(t => [t.id, t.title]));
-        container.innerHTML = this._agendaRelatedTaskIds.map(id => {
-            const title = taskMap.get(id) || id;
-            const safe = title.replace(/"/g, '&quot;').replace(/</g, '&lt;');
-            return `<span class="agenda-task-chip" title="${safe}">
-                <span>${safe}</span>
-                <button type="button" class="agenda-task-chip-remove" onclick="app.removeAgendaTask('${id}')" title="Remover">×</button>
-            </span>`;
+        const selectedSet = new Set(this._agendaRelatedTaskIds);
+        if (!this._agendaAllTasks.length) {
+            container.innerHTML = '';
+            return;
+        }
+        container.innerHTML = this._agendaAllTasks.map(t => {
+            const checked = selectedSet.has(t.id);
+            const safe = t.title.replace(/</g, '&lt;').replace(/"/g, '&quot;');
+            return `<label class="agenda-task-check-item${checked ? ' checked' : ''}" data-id="${t.id}">
+                <input type="checkbox" ${checked ? 'checked' : ''} onchange="app.toggleAgendaTask('${t.id}')">
+                <span class="agenda-task-check-label" title="${safe}">${safe}</span>
+            </label>`;
         }).join('');
     }
 
