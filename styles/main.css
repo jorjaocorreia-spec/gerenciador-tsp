@@ -3003,12 +3003,16 @@ kbd {
 
 /* Botão primário pulsando quando view está vazia */
 @keyframes btn-pulse-empty {
-    0%, 100% { box-shadow: 0 0 0 0 rgba(139, 92, 246, 0.5); }
-    50%       { box-shadow: 0 0 0 8px rgba(139, 92, 246, 0); }
+    0%   { box-shadow: 0 4px 15px rgba(139, 92, 246, 0.3), 0 0 0 0 rgba(139, 92, 246, 0.7);
+           transform: scale(1); }
+    60%  { box-shadow: 0 4px 15px rgba(139, 92, 246, 0.3), 0 0 0 12px rgba(139, 92, 246, 0);
+           transform: scale(1.04); }
+    100% { box-shadow: 0 4px 15px rgba(139, 92, 246, 0.3), 0 0 0 0 rgba(139, 92, 246, 0);
+           transform: scale(1); }
 }
 
 .btn-pulse-empty {
-    animation: btn-pulse-empty 1.8s ease-in-out infinite;
+    animation: btn-pulse-empty 1.6s ease-out infinite;
 }
 
 /* Bounce do card Kanban ao ser solto */
