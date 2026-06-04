@@ -1571,7 +1571,7 @@ class AppController {
 
     async renderDashboard(preloadedClients, batchStats) {
         const container = document.getElementById('dashboard-container');
-        container.innerHTML = spinnerHtml;
+        this._skDashboard(container);
 
         const currentMonth = new Date().toISOString().slice(0, 7);
         const isCurrentMonth = this._dashboardMonth === currentMonth;
@@ -1744,6 +1744,71 @@ class AppController {
             this._animateCounter(hoursEl, stat.hoursUsed, stat.hoursTotal, idx * 70);
         });
     }
+
+    // ── Skeleton helpers ─────────────────────────────────────────────────
+
+    _skDashboard(container, count = 6) {
+        container.innerHTML = Array.from({ length: count }, (_, i) => `
+            <div class="sk-stat-card" style="animation-delay:${i * 50}ms">
+                <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:16px">
+                    <div>
+                        <div class="sk" style="width:140px;height:14px;margin-bottom:8px"></div>
+                        <div class="sk" style="width:80px;height:11px"></div>
+                    </div>
+                    <div class="sk" style="width:48px;height:22px;border-radius:11px"></div>
+                </div>
+                <div style="display:flex;align-items:flex-end;gap:16px;margin-bottom:14px">
+                    <div>
+                        <div class="sk" style="width:100px;height:28px;margin-bottom:6px"></div>
+                        <div class="sk" style="width:72px;height:11px"></div>
+                    </div>
+                    <div class="sk" style="width:64px;height:32px;border-radius:4px;margin-left:auto;flex-shrink:0"></div>
+                </div>
+                <div class="sk" style="height:5px;width:100%;margin-bottom:12px;border-radius:3px"></div>
+                <div style="display:flex;justify-content:space-between">
+                    <div class="sk" style="width:36px;height:13px"></div>
+                    <div class="sk" style="width:72px;height:13px"></div>
+                </div>
+            </div>
+        `).join('');
+    }
+
+    _skTable(tbody, cols = 5, rows = 6) {
+        const widths = [55, 70, 100, 45, 60, 40];
+        tbody.innerHTML = Array.from({ length: rows }, (_, r) => `
+            <tr class="sk-row" style="animation-delay:${r * 35}ms">
+                ${Array.from({ length: cols }, (_, c) =>
+                    `<td><div class="sk" style="height:13px;width:${widths[c] || 60}px"></div></td>`
+                ).join('')}
+            </tr>
+        `).join('');
+    }
+
+    _skKanban(board, numCols = 3) {
+        const cardCounts = [3, 2, 4];
+        board.innerHTML = Array.from({ length: numCols }, (_, ci) => `
+            <div class="sk-kb-col" style="animation-delay:${ci * 70}ms">
+                <div style="display:flex;align-items:center;gap:8px;margin-bottom:16px">
+                    <div class="sk" style="width:10px;height:10px;border-radius:50%;flex-shrink:0"></div>
+                    <div class="sk" style="width:100px;height:14px"></div>
+                    <div class="sk" style="width:22px;height:18px;border-radius:9px;margin-left:auto"></div>
+                </div>
+                ${Array.from({ length: cardCounts[ci] ?? 2 }, (_, ki) => `
+                    <div class="sk-kb-card" style="animation-delay:${(ci * 70) + (ki * 40)}ms">
+                        <div class="sk" style="height:5px;width:100%;border-radius:3px;margin-bottom:12px"></div>
+                        <div class="sk" style="width:85%;height:13px;margin-bottom:8px"></div>
+                        <div class="sk" style="width:60%;height:13px;margin-bottom:12px"></div>
+                        <div style="display:flex;gap:6px">
+                            <div class="sk" style="width:60px;height:20px;border-radius:10px"></div>
+                            <div class="sk" style="width:48px;height:20px;border-radius:10px"></div>
+                        </div>
+                    </div>
+                `).join('')}
+            </div>
+        `).join('');
+    }
+
+    // ─────────────────────────────────────────────────────────────────────
 
     _animateCounter(el, target, hoursTotal, delay = 0) {
         if (!el || target <= 0) { if (el) el.textContent = `${target}h / ${hoursTotal}h`; return; }
@@ -2016,7 +2081,7 @@ class AppController {
 
     async renderRecords(preloadedClients) {
         const tbody = document.querySelector('#records-table tbody');
-        tbody.innerHTML = `<tr><td colspan="5">${spinnerHtml}</td></tr>`;
+        this._skTable(tbody, 5, 6);
         let records = (await store.getRecords()).sort((a, b) => new Date(b.date) - new Date(a.date));
 
         // APERFEIÇOAMENTO: Filtros da Interface
@@ -2368,7 +2433,7 @@ class AppController {
         if (filterPriority) tasks = tasks.filter(t => t.priority === filterPriority);
         if (filterLabel)    tasks = tasks.filter(t => (t.labels || []).some(l => l.color === filterLabel));
 
-        board.innerHTML = spinnerHtml;
+        this._skKanban(board, this._currentColumns.length || 3);
 
         const clientIds = [...new Set(tasks.map(t => t.clientId).filter(Boolean))];
         const clientsMap = {};

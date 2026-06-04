@@ -1816,6 +1816,75 @@ h4 {
 }
 
 /* =========================================
+   Skeleton Loading System
+   ========================================= */
+@keyframes sk-shimmer {
+  from { transform: translateX(-100%); }
+  to   { transform: translateX( 100%); }
+}
+
+.sk {
+  position: relative;
+  overflow: hidden;
+  background: rgba(255,255,255,0.05);
+  border-radius: 6px;
+  display: block;
+}
+
+.sk::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(255,255,255,0.07) 50%,
+    transparent 100%
+  );
+  animation: sk-shimmer 1.6s ease-in-out infinite;
+  will-change: transform;
+}
+
+/* Skeleton card do dashboard */
+.sk-stat-card {
+  background: var(--surface-color);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid var(--surface-border);
+  border-radius: var(--border-radius);
+  padding: 20px;
+  animation: card-cascade-in 0.35s ease-out both;
+}
+
+/* Skeleton de linhas de tabela */
+.sk-row td {
+  padding: 12px 16px;
+  vertical-align: middle;
+}
+
+/* Skeleton do kanban */
+.sk-kb-card {
+  background: var(--kb-card-bg);
+  border: var(--kb-card-border);
+  border-radius: var(--kb-card-radius);
+  padding: var(--kb-card-padding);
+  margin-bottom: var(--kb-card-gap);
+}
+
+.sk-kb-col {
+  background: var(--kb-column-bg);
+  border: var(--kb-column-border);
+  border-radius: var(--kb-column-radius);
+  padding: var(--kb-column-padding);
+  min-width: var(--kb-column-width);
+  flex-shrink: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sk { animation: none; background: rgba(255,255,255,0.06); }
+}
+
+/* =========================================
    Loading Spinner
    ========================================= */
 @keyframes spin {
