@@ -1454,6 +1454,43 @@ h4 {
   flex-direction: column;
 }
 
+/* Multi-select de tarefas no modal de agendamento */
+.agenda-task-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 6px;
+  min-height: 0;
+}
+.agenda-task-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 8px;
+  border-radius: 12px;
+  background: rgba(99, 102, 241, 0.18);
+  color: var(--primary-light, #a5b4fc);
+  font-size: 0.75rem;
+  max-width: 200px;
+}
+.agenda-task-chip span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.agenda-task-chip-remove {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: inherit;
+  opacity: 0.7;
+  padding: 0;
+  line-height: 1;
+  font-size: 0.85rem;
+  flex-shrink: 0;
+}
+.agenda-task-chip-remove:hover { opacity: 1; }
+
 .schedule-month-separator {
   padding: 12px 0 6px;
   font-size: 0.8rem;

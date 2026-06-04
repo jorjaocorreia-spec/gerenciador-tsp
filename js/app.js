@@ -106,6 +106,9 @@ class AppController {
         this._reportClient = null;
         // Navegação de mês no Dashboard
         this._dashboardMonth = new Date().toISOString().slice(0, 7); // YYYY-MM
+        // Tarefas vinculadas ao agendamento atual (multi-select)
+        this._agendaRelatedTaskIds = [];
+        this._agendaAllTasks = []; // cache das tarefas para exibir nomes nos chips
         // Guard para evitar renderAll() concorrente
         this._renderAllRunning = false;
         this._renderAllPending = false;
@@ -407,6 +410,8 @@ class AppController {
             document.getElementById('modal-agenda-title').innerText = 'Novo Agendamento';
             document.getElementById('agenda-sync-google').checked = calendarAPI.isEnabled;
             this._updateDescLinks('');
+            this._agendaRelatedTaskIds = [];
+            this._renderAgendaTaskChips();
         }
         if (modalId === 'modal-manage-columns') {
             this._manageCols = [];
@@ -2564,6 +2569,9 @@ class AppController {
         // Mostra opção de Meet apenas se sync Google estiver ativo
         const syncChecked = document.getElementById('agenda-sync-google').checked;
         document.getElementById('agenda-generate-meet-row').style.display = syncChecked ? 'flex' : 'none';
+        // Reseta multi-select de tarefas
+        this._agendaRelatedTaskIds = [];
+        this._renderAgendaTaskChips();
     }
 
     toggleAllDayAgenda(isAllDay) {
@@ -2619,17 +2627,53 @@ class AppController {
     async updateAgendaTaskSelect() {
         const select = document.getElementById('agenda-task');
         if (!select) return;
-        select.innerHTML = '<option value="">-- Nenhuma tarefa vinculada --</option>';
         const allCols = await store.getAllColumns().catch(() => []);
         const doneIds = new Set(allCols.filter(c => c.isDone).map(c => c.id));
         doneIds.add('done');
         const tasks = (await store.getTasks()).filter(t => !doneIds.has(t.status));
-        tasks.forEach(t => {
+        this._agendaAllTasks = tasks;
+        this._rebuildAgendaTaskSelect();
+    }
+
+    _rebuildAgendaTaskSelect() {
+        const select = document.getElementById('agenda-task');
+        if (!select) return;
+        select.innerHTML = '<option value="">-- Adicionar tarefa --</option>';
+        const selectedSet = new Set(this._agendaRelatedTaskIds);
+        this._agendaAllTasks.forEach(t => {
+            if (selectedSet.has(t.id)) return; // já selecionada — ocultar da lista
             const opt = document.createElement('option');
             opt.value = t.id;
             opt.textContent = t.title;
             select.appendChild(opt);
         });
+    }
+
+    addAgendaTask(taskId) {
+        if (!taskId || this._agendaRelatedTaskIds.includes(taskId)) return;
+        this._agendaRelatedTaskIds.push(taskId);
+        this._rebuildAgendaTaskSelect();
+        this._renderAgendaTaskChips();
+    }
+
+    removeAgendaTask(taskId) {
+        this._agendaRelatedTaskIds = this._agendaRelatedTaskIds.filter(id => id !== taskId);
+        this._rebuildAgendaTaskSelect();
+        this._renderAgendaTaskChips();
+    }
+
+    _renderAgendaTaskChips() {
+        const container = document.getElementById('agenda-task-chips');
+        if (!container) return;
+        const taskMap = new Map(this._agendaAllTasks.map(t => [t.id, t.title]));
+        container.innerHTML = this._agendaRelatedTaskIds.map(id => {
+            const title = taskMap.get(id) || id;
+            const safe = title.replace(/"/g, '&quot;').replace(/</g, '&lt;');
+            return `<span class="agenda-task-chip" title="${safe}">
+                <span>${safe}</span>
+                <button type="button" class="agenda-task-chip-remove" onclick="app.removeAgendaTask('${id}')" title="Remover">×</button>
+            </span>`;
+        }).join('');
     }
 
     async handleAgendaSubmit(e) {
@@ -2650,7 +2694,8 @@ class AppController {
             description: document.getElementById('agenda-desc').value,
             type: document.getElementById('agenda-type').value,
             clientId: document.getElementById('agenda-client').value || null,
-            relatedTaskId: document.getElementById('agenda-task').value || null,
+            relatedTaskId: this._agendaRelatedTaskIds[0] || null,
+            relatedTaskIds: [...this._agendaRelatedTaskIds],
             date: startDate,
             dateEnd: endDate < startDate ? startDate : endDate,
             startTime: allDay ? '' : document.getElementById('agenda-start').value,
@@ -2753,8 +2798,8 @@ class AppController {
         setTimeout(() => this._autoResizeTextarea(agendaDescEl), 0);
         document.getElementById('agenda-type').value = ev.type;
         document.getElementById('agenda-client').value = ev.clientId || '';
-        this.updateAgendaTaskSelect();
-        document.getElementById('agenda-task').value = ev.relatedTaskId || '';
+        this._agendaRelatedTaskIds = Array.isArray(ev.relatedTaskIds) ? [...ev.relatedTaskIds] : [];
+        await this.updateAgendaTaskSelect();
         document.getElementById('agenda-date').value = ev.date;
         document.getElementById('agenda-date-end').value = ev.dateEnd || ev.date;
         const isAllDay = !ev.startTime;
@@ -3368,6 +3413,7 @@ class AppController {
                     mappedData.type = effective.type; // Preserva o tipo customizado do TSP
                     mappedData.clientId = effective.clientId;
                     mappedData.relatedTaskId = effective.relatedTaskId;
+                    mappedData.relatedTaskIds = effective.relatedTaskIds || [];
                     if (!mappedData.meetLink) mappedData.meetLink = effective.meetLink || '';
                     processedLocalIds.add(effective.id); // Marca como processado — evita duplicata no Passo 2
                     resolvedGoogleKeys.add(googleKey);   // Marca chave como resolvida — descarta Google duplicatas

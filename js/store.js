@@ -42,7 +42,12 @@ class TSPStore {
     }
 
     _event(r) {
-        return { id: r.id, clientId: r.client_id, relatedTaskId: r.related_task_id,
+        const legacySingle = r.related_task_id ? [r.related_task_id] : [];
+        const relatedTaskIds = Array.isArray(r.related_task_ids) && r.related_task_ids.length > 0
+            ? r.related_task_ids : legacySingle;
+        return { id: r.id, clientId: r.client_id,
+            relatedTaskId: r.related_task_id,
+            relatedTaskIds,
             title: r.title, description: r.description || '', type: r.type || 'meeting',
             date: r.date, dateEnd: r.date_end || r.date,
             startTime: r.start_time || '', endTime: r.end_time || '',
@@ -339,9 +344,11 @@ class TSPStore {
     }
 
     async addAgendaEvent(eventData) {
+        const ids = Array.isArray(eventData.relatedTaskIds) ? eventData.relatedTaskIds : [];
         const { data, error } = await this.db.from('agenda_events').insert({
             user_id: this.userId, client_id: eventData.clientId || null,
-            related_task_id: eventData.relatedTaskId || null,
+            related_task_id: ids[0] || eventData.relatedTaskId || null,
+            related_task_ids: ids,
             title: eventData.title || '', description: eventData.description || '',
             type: eventData.type || 'meeting', date: eventData.date,
             date_end: eventData.dateEnd || eventData.date,
@@ -354,8 +361,11 @@ class TSPStore {
     }
 
     async updateAgendaEvent(eventData) {
+        const ids = Array.isArray(eventData.relatedTaskIds) ? eventData.relatedTaskIds : [];
         const { data, error } = await this.db.from('agenda_events').update({
-            client_id: eventData.clientId || null, related_task_id: eventData.relatedTaskId || null,
+            client_id: eventData.clientId || null,
+            related_task_id: ids[0] || eventData.relatedTaskId || null,
+            related_task_ids: ids,
             title: eventData.title || '', description: eventData.description || '',
             type: eventData.type || 'meeting', date: eventData.date,
             date_end: eventData.dateEnd || eventData.date,

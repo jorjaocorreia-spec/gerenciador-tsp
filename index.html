@@ -1312,10 +1312,11 @@
                         </select>
                     </div>
                     <div class="form-group" style="flex: 1;">
-                        <label>Vincular Tarefa (Opcional)</label>
-                        <select id="agenda-task" class="form-control">
+                        <label>Vincular Tarefas (Opcional)</label>
+                        <select id="agenda-task" class="form-control" onchange="app.addAgendaTask(this.value); this.value='';">
                             <!-- Options carregados via JS -->
                         </select>
+                        <div id="agenda-task-chips" class="agenda-task-chips"></div>
                     </div>
                 </div>
 
