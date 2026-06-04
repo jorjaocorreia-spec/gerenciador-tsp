@@ -2712,6 +2712,91 @@ kbd {
     font-size: 0.73rem;
     color: var(--text-muted);
 }
+
+/* ── Animações dos botões IA e WhatsApp ──────────────────── */
+
+/* Keyframes — IA */
+@keyframes sparkle-burst {
+    0%, 65%, 100% { transform: scale(1) rotate(0deg); opacity: 1; }
+    75%            { transform: scale(1.35) rotate(18deg); opacity: 0.75; }
+    85%            { transform: scale(1.2) rotate(-10deg); opacity: 1; }
+    92%            { transform: scale(1.08) rotate(6deg); }
+}
+
+@keyframes ai-glow-pulse {
+    0%, 100% { box-shadow: 0 0 0px rgba(139, 92, 246, 0); }
+    50%       { box-shadow: 0 0 14px rgba(139, 92, 246, 0.55); }
+}
+
+/* Keyframes — WhatsApp */
+@keyframes whatsapp-shake {
+    0%, 78%, 100% { transform: rotate(0deg); }
+    80%            { transform: rotate(-13deg); }
+    84%            { transform: rotate(11deg); }
+    88%            { transform: rotate(-8deg); }
+    92%            { transform: rotate(6deg); }
+    95%            { transform: rotate(-3deg); }
+}
+
+@keyframes ping-dot {
+    0%    { transform: scale(0.8); opacity: 1; }
+    70%   { transform: scale(2.2); opacity: 0; }
+    100%  { transform: scale(0.8); opacity: 0; }
+}
+
+/* Botão IA */
+#btn-ai-config {
+    animation: ai-glow-pulse 2.5s ease-in-out infinite;
+}
+
+#btn-ai-config i[data-lucide="sparkles"] {
+    animation: sparkle-burst 3.5s ease-in-out infinite;
+    display: inline-block;
+    transform-origin: center;
+}
+
+#btn-ai-config:hover {
+    animation-play-state: paused;
+}
+
+#btn-ai-config:hover i[data-lucide="sparkles"] {
+    animation-play-state: paused;
+}
+
+/* Botão WhatsApp */
+#btn-whatsapp-config {
+    position: relative;
+}
+
+#btn-whatsapp-config i[data-lucide="message-circle"] {
+    animation: whatsapp-shake 4.5s ease-in-out infinite;
+    animation-delay: 1.2s;
+    display: inline-block;
+    transform-origin: center bottom;
+}
+
+#btn-whatsapp-config:hover i[data-lucide="message-circle"] {
+    animation-play-state: paused;
+}
+
+#btn-whatsapp-config::after {
+    content: '';
+    position: absolute;
+    top: 7px;
+    right: 10px;
+    width: 8px;
+    height: 8px;
+    background: #22c55e;
+    border-radius: 50%;
+    animation: ping-dot 2s ease-out infinite;
+    animation-delay: 0.6s;
+    pointer-events: none;
+}
+
+.sidebar.collapsed #btn-whatsapp-config::after {
+    top: 5px;
+    right: 8px;
+}
 .ticket-meta-item {
     display: flex;
     align-items: center;
