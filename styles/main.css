@@ -379,15 +379,17 @@ h4 {
   letter-spacing: 0.05em;
 }
 
-/* T2: hover curtain da esquerda (sobrescreve old hover) */
-.data-table tbody tr {
+/* T2: hover curtain da esquerda — aplicado nos td (tr não renderiza background atrás de td) */
+.data-table tbody td {
   background-image: linear-gradient(90deg, rgba(139,92,246,0.055) 0%, transparent 70%);
   background-size: 0% 100%;
   background-repeat: no-repeat;
-  transition: background-size 0.28s ease;
+  transition: background-size 0.28s ease, background-color 0.28s ease;
 }
-.data-table tbody tr:hover { background-size: 100% 100%; }
-.data-table tr:hover td    { background: transparent; }
+.data-table tbody tr:hover td {
+  background-size: 100% 100%;
+  background-color: transparent;
+}
 
 /* T1: linhas entram em cascata */
 @keyframes row-in {

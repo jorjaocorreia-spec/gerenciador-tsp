@@ -601,32 +601,46 @@ class AppController {
     }
 
     async handleDeleteClient(id, btn) {
-        if (confirm("Tem certeza que deseja excluir este cliente e TODOS os seus atendimentos?")) {
-            const row = btn?.closest('tr');
-            if (row) { row.classList.add('row-deleting'); await new Promise(r => setTimeout(r, 400)); }
-            try {
-                await store.deleteClient(id);
-                await this.renderAll();
-                Toast.show('Cliente excluído.', 'success');
-            } catch (err) {
-                if (row) row.classList.remove('row-deleting');
-                Toast.show('Erro ao excluir cliente: ' + err.message, 'error');
-            }
+        if (!btn._confirmDelete) {
+            btn._confirmDelete = true;
+            const origHtml = btn.innerHTML;
+            btn.innerHTML = '<i data-lucide="alert-triangle" style="width:14px;height:14px;margin-right:4px;vertical-align:middle;"></i>Confirmar?';
+            btn.style.cssText += ';background:linear-gradient(135deg,#ef4444,#dc2626)!important;border-color:transparent!important;';
+            lucide.createIcons();
+            btn._confirmTimer = setTimeout(() => {
+                if (btn._confirmDelete) {
+                    btn._confirmDelete = false;
+                    btn.innerHTML = origHtml;
+                    btn.style.cssText = btn.style.cssText.replace(/background:[^;]+!important;border-color:[^;]+!important;/g, '');
+                    lucide.createIcons();
+                }
+            }, 3000);
+            return;
+        }
+        clearTimeout(btn._confirmTimer);
+        btn._confirmDelete = false;
+        const row = btn?.closest('tr');
+        if (row) { row.classList.add('row-deleting'); await new Promise(r => setTimeout(r, 400)); }
+        try {
+            await store.deleteClient(id);
+            await this.renderAll();
+            Toast.show('Cliente excluído.', 'success');
+        } catch (err) {
+            if (row) row.classList.remove('row-deleting');
+            Toast.show('Erro ao excluir cliente: ' + err.message, 'error');
         }
     }
 
     async handleDeleteRecord(id, btn) {
-        if (confirm("Deseja realmente apagar este lançamento?")) {
-            const row = btn?.closest('tr');
-            if (row) { row.classList.add('row-deleting'); await new Promise(r => setTimeout(r, 400)); }
-            try {
-                await store.deleteRecord(id);
-                await this.renderAll();
-                Toast.show('Atendimento excluído.', 'success');
-            } catch (err) {
-                if (row) row.classList.remove('row-deleting');
-                Toast.show('Erro ao excluir atendimento: ' + err.message, 'error');
-            }
+        const row = btn?.closest('tr');
+        if (row) { row.classList.add('row-deleting'); await new Promise(r => setTimeout(r, 400)); }
+        try {
+            await store.deleteRecord(id);
+            await this.renderAll();
+            Toast.show('Atendimento excluído.', 'success');
+        } catch (err) {
+            if (row) row.classList.remove('row-deleting');
+            Toast.show('Erro ao excluir atendimento: ' + err.message, 'error');
         }
     }
 
@@ -4549,7 +4563,7 @@ class AppController {
                         <button class="btn-icon-sm" title="Editar" onclick="app.openEditApontamento('${item.id}')">
                             <i data-lucide="pencil"></i>
                         </button>
-                        <button class="btn-icon-sm btn-danger-sm" title="Excluir" onclick="app.deleteApontamento('${item.id}')">
+                        <button class="btn-icon-sm btn-danger-sm" title="Excluir" onclick="app.deleteApontamento('${item.id}', this)">
                             <i data-lucide="trash-2"></i>
                         </button>
                     </span>`;
@@ -4659,13 +4673,15 @@ class AppController {
         });
     }
 
-    async deleteApontamento(id) {
-        if (!confirm('Excluir este apontamento?')) return;
+    async deleteApontamento(id, btn) {
+        const row = btn?.closest('tr');
+        if (row) { row.classList.add('row-deleting'); await new Promise(r => setTimeout(r, 400)); }
         try {
             await store.deleteApontamento(id);
             await this.renderApontamentos();
             Toast.show('Apontamento excluído.', 'success');
         } catch (err) {
+            if (row) row.classList.remove('row-deleting');
             Toast.show('Erro ao excluir: ' + err.message, 'error');
         }
     }
