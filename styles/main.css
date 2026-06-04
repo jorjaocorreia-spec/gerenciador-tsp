@@ -3098,7 +3098,11 @@ kbd {
     50%       { border-color: rgba(239, 68, 68, 0.65); box-shadow: 0 0 18px rgba(239, 68, 68, 0.14); }
 }
 .stat-card.over-limit {
-    animation: card-danger-pulse 2s ease-in-out infinite;
+    animation-name: card-cascade-in, card-danger-pulse;
+    animation-duration: 0.4s, 2s;
+    animation-timing-function: ease-out, ease-in-out;
+    animation-fill-mode: forwards, none;
+    animation-iteration-count: 1, infinite;
 }
 
 /* K2 — Kanban: colunas entram em cascata */
