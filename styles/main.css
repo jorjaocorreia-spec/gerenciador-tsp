@@ -424,6 +424,18 @@ h4 {
 .kb-card.row-deleting { animation: row-delete-out 0.38s ease-out forwards !important; }
 .event-block.row-deleting,
 .event-allday-banner.row-deleting { animation: row-delete-out 0.38s ease-out forwards !important; }
+.apt-row.row-deleting { animation: row-delete-out 0.38s ease-out forwards !important; }
+
+/* Padrão unificado de hover para cards clicáveis (implementações, treinamentos, chamados) */
+.clickable-card {
+    cursor: pointer;
+    transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
+}
+.clickable-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(139,92,246,0.18);
+    border-color: rgba(139,92,246,0.45) !important;
+}
 
 /* =========================================
    Components: Buttons & Forms
@@ -2346,7 +2358,6 @@ kbd {
 }
 .apt-row:last-of-type { border-bottom: none; }
 .apt-row:hover { background-size: 100% 100%; }
-.apt-row.row-deleting { animation: row-delete-out 0.38s ease-out forwards !important; }
 .apt-horario { font-variant-numeric: tabular-nums; color: var(--primary-color, #7c3aed); font-weight: 500; }
 .apt-proj { font-weight: 600; display: flex; flex-direction: column; gap: 2px; }
 .apt-proj-name { font-weight: 400; font-size: 0.7rem; opacity: .5; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -2855,12 +2866,6 @@ kbd {
     border: 1px solid rgba(255,255,255,0.08);
     border-radius: 10px;
     padding: 16px;
-    cursor: pointer;
-    transition: border-color 0.18s, background 0.18s;
-}
-.ticket-card:hover {
-    border-color: var(--primary-color);
-    background: rgba(255,255,255,0.05);
 }
 .ticket-card-header {
     display: flex;

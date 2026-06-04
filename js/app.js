@@ -1,4 +1,4 @@
-﻿/**
+/**
  * TSP App - Controlador da Lógica da Interface
  */
 
@@ -4786,7 +4786,7 @@ class AppController {
                     const hasCode = impl.codeScript && impl.codeScript.trim().length > 0;
                     const attachCount = impl.attachments ? impl.attachments.length : 0;
 
-                    html += `<div class="glass" style="padding:16px;cursor:pointer;transition:border-color .2s;" onclick="app.openEditImplementation('${impl.id}')">
+                    html += `<div class="glass clickable-card" style="padding:16px;" onclick="app.openEditImplementation('${impl.id}')">
                         <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;margin-bottom:8px;">
                             <span style="font-weight:600;flex:1;">${escapeHtml(impl.name)}</span>
                             ${statusBadge(impl.status)}
@@ -5014,7 +5014,7 @@ class AppController {
                     if (images.length) metaParts.push(`<i data-lucide="image" style="width:12px;height:12px;vertical-align:middle;"></i> ${images.length}`);
                     const metaHtml = metaParts.length ? `<div style="font-size:.75rem;color:var(--text-muted);margin-bottom:8px;">${metaParts.join(' · ')}</div>` : '';
 
-                    html += `<div class="glass training-card" data-id="${t.id}" style="padding:16px;cursor:pointer;transition:border-color .2s;" onclick="app.openEditTraining('${t.id}')">
+                    html += `<div class="glass training-card clickable-card" data-id="${t.id}" style="padding:16px;" onclick="app.openEditTraining('${t.id}')">
                         <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;margin-bottom:8px;">
                             <span style="font-weight:600;flex:1;">${escapeHtml(t.title)}</span>
                             ${statusBadge(t.status)}
@@ -7175,7 +7175,7 @@ class AppController {
         const typeHtml = t.ticketType ? `<span class="ticket-badge ticket-type-badge">${escapeHtml(t.ticketType)}</span>` : '';
         const queueHtml = t.queue ? `<span class="ticket-meta-item"><i data-lucide="layers" style="width:11px;height:11px;"></i>${escapeHtml(t.queue)}</span>` : '';
         const ownerHtml = t.owner ? `<span class="ticket-meta-item"><i data-lucide="user" style="width:11px;height:11px;"></i>${escapeHtml(t.owner)}</span>` : '';
-        return `<div class="ticket-card" data-ticket-id="${escapeHtml(t.ticketId)}">
+        return `<div class="ticket-card clickable-card" data-ticket-id="${escapeHtml(t.ticketId)}">
             <div class="ticket-card-header">
                 <span class="ticket-number">#${escapeHtml(t.ticketNumber || t.ticketId)}</span>
             </div>
