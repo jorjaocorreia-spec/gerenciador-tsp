@@ -600,35 +600,19 @@ class AppController {
         }
     }
 
-    async handleDeleteClient(id, btn) {
-        if (!btn._confirmDelete) {
-            btn._confirmDelete = true;
-            const origHtml = btn.innerHTML;
-            btn.innerHTML = '<i data-lucide="alert-triangle" style="width:14px;height:14px;margin-right:4px;vertical-align:middle;"></i>Confirmar?';
-            btn.style.cssText += ';background:linear-gradient(135deg,#ef4444,#dc2626)!important;border-color:transparent!important;';
-            lucide.createIcons();
-            btn._confirmTimer = setTimeout(() => {
-                if (btn._confirmDelete) {
-                    btn._confirmDelete = false;
-                    btn.innerHTML = origHtml;
-                    btn.style.cssText = btn.style.cssText.replace(/background:[^;]+!important;border-color:[^;]+!important;/g, '');
-                    lucide.createIcons();
-                }
-            }, 3000);
-            return;
-        }
-        clearTimeout(btn._confirmTimer);
-        btn._confirmDelete = false;
-        const row = btn?.closest('tr');
-        if (row) { row.classList.add('row-deleting'); await new Promise(r => setTimeout(r, 400)); }
-        try {
-            await store.deleteClient(id);
-            await this.renderAll();
-            Toast.show('Cliente excluído.', 'success');
-        } catch (err) {
-            if (row) row.classList.remove('row-deleting');
-            Toast.show('Erro ao excluir cliente: ' + err.message, 'error');
-        }
+    handleDeleteClient(id, btn) {
+        this._twostepDelete(btn, async () => {
+            const row = btn?.closest('tr');
+            if (row) { row.classList.add('row-deleting'); await new Promise(r => setTimeout(r, 400)); }
+            try {
+                await store.deleteClient(id);
+                await this.renderAll();
+                Toast.show('Cliente excluído.', 'success');
+            } catch (err) {
+                if (row) row.classList.remove('row-deleting');
+                Toast.show('Erro ao excluir cliente: ' + err.message, 'error');
+            }
+        });
     }
 
     async handleDeleteRecord(id, btn) {
@@ -972,16 +956,19 @@ class AppController {
         this._renderImplAttachmentPreviews();
     }
 
-    async handleDeleteTask(id) {
-        if (confirm("Deseja realmente apagar esta tarefa?")) {
+    handleDeleteTask(id, btn) {
+        this._twostepDelete(btn, async () => {
+            const card = btn?.closest('.kb-card');
+            if (card) { card.classList.add('row-deleting'); await new Promise(r => setTimeout(r, 400)); }
             try {
                 await store.deleteTask(id);
                 await this.renderAll();
                 Toast.show('Tarefa excluída.', 'success');
             } catch (err) {
+                if (card) card.classList.remove('row-deleting');
                 Toast.show('Erro ao excluir tarefa: ' + err.message, 'error');
             }
-        }
+        });
     }
 
     async toggleTaskComplete(id, completed) {
@@ -998,10 +985,11 @@ class AppController {
         }
     }
 
-    async handleDeleteTaskFromModal() {
+    handleDeleteTaskFromModal() {
         const id = document.getElementById('task-id').value;
         if (!id) return;
-        if (confirm("Deseja realmente apagar esta tarefa?")) {
+        const btn = document.getElementById('btn-delete-task');
+        this._twostepDelete(btn, async () => {
             try {
                 await store.deleteTask(id);
                 this.closeModal('modal-task');
@@ -1010,7 +998,7 @@ class AppController {
             } catch (err) {
                 Toast.show('Erro ao excluir tarefa: ' + err.message, 'error');
             }
-        }
+        });
     }
 
     handleOpenTaskTime(id) {
@@ -1870,6 +1858,31 @@ class AppController {
         setTimeout(() => btn.classList.remove('btn-error'), 800);
     }
 
+    _twostepDelete(btn, onConfirm) {
+        if (!btn) return;
+        if (!btn._confirmDelete) {
+            btn._confirmDelete = true;
+            btn._origDeleteHtml = btn.innerHTML;
+            btn.innerHTML = '<i data-lucide="alert-triangle" style="width:14px;height:14px;margin-right:4px;vertical-align:middle;"></i>Confirmar?';
+            btn.style.setProperty('background', 'linear-gradient(135deg,#ef4444,#dc2626)', 'important');
+            btn.style.setProperty('border-color', 'transparent', 'important');
+            lucide.createIcons();
+            btn._confirmTimer = setTimeout(() => {
+                if (btn._confirmDelete) {
+                    btn._confirmDelete = false;
+                    btn.innerHTML = btn._origDeleteHtml;
+                    btn.style.removeProperty('background');
+                    btn.style.removeProperty('border-color');
+                    lucide.createIcons();
+                }
+            }, 3000);
+            return;
+        }
+        clearTimeout(btn._confirmTimer);
+        btn._confirmDelete = false;
+        onConfirm();
+    }
+
     // ─────────────────────────────────────────────────────────────────────
 
     _animateCounter(el, target, hoursTotal, delay = 0) {
@@ -2681,7 +2694,7 @@ class AppController {
                     <button type="button" class="kb-action-btn" onclick="event.stopPropagation();app.handleEditTask('${task.id}')" title="Editar">
                         <i data-lucide="pencil" style="width:12px;height:12px"></i>
                     </button>
-                    <button type="button" class="kb-action-btn kb-action-danger" onclick="event.stopPropagation();app.handleDeleteTask('${task.id}')" title="Excluir">
+                    <button type="button" class="kb-action-btn kb-action-danger" onclick="event.stopPropagation();app.handleDeleteTask('${task.id}', this)" title="Excluir">
                         <i data-lucide="trash-2" style="width:12px;height:12px"></i>
                     </button>
                 </div>
@@ -3084,29 +3097,28 @@ class AppController {
         this.openModal('modal-agenda-event');
     }
 
-    async deleteAgendaEvent(id, eventRoot) {
-        if (eventRoot) {
-            eventRoot.stopPropagation();
-        }
-        if (confirm("Deseja deletar este agendamento?")) {
-            try {
-                const ev = await store.getAgendaEvent(id);
-                if (ev && ev.calendarEventId && calendarAPI.isAuthenticated) {
-                    await calendarAPI.deleteGoogleEvent(ev.calendarEventId);
-                }
-                await store.deleteAgendaEvent(id);
-                await this.renderAgenda();
-                Toast.show('Agendamento excluído.', 'success');
-            } catch (err) {
-                Toast.show('Erro ao excluir agendamento: ' + err.message, 'error');
+    async deleteAgendaEvent(id, btn) {
+        const block = btn?.closest?.('.event-block') || btn?.closest?.('.event-allday-banner');
+        if (block) { block.classList.add('row-deleting'); await new Promise(r => setTimeout(r, 400)); }
+        try {
+            const ev = await store.getAgendaEvent(id);
+            if (ev && ev.calendarEventId && calendarAPI.isAuthenticated) {
+                await calendarAPI.deleteGoogleEvent(ev.calendarEventId);
             }
+            await store.deleteAgendaEvent(id);
+            await this.renderAgenda();
+            Toast.show('Agendamento excluído.', 'success');
+        } catch (err) {
+            if (block) block.classList.remove('row-deleting');
+            Toast.show('Erro ao excluir agendamento: ' + err.message, 'error');
         }
     }
 
-    async deleteAgendaEventFromModal() {
+    deleteAgendaEventFromModal() {
         const id = document.getElementById('agenda-id').value;
         if (!id) return;
-        if (confirm("Deseja deletar este agendamento?")) {
+        const btn = document.getElementById('btn-delete-agenda-event');
+        this._twostepDelete(btn, async () => {
             try {
                 const ev = await store.getAgendaEvent(id);
                 if (ev && ev.calendarEventId && calendarAPI.isAuthenticated) {
@@ -3119,7 +3131,7 @@ class AppController {
             } catch (err) {
                 Toast.show('Erro ao excluir agendamento: ' + err.message, 'error');
             }
-        }
+        });
     }
 
     async renderAgenda() {
@@ -3501,7 +3513,7 @@ class AppController {
                 <div style="display: flex; justify-content: space-between; align-items: flex-start;">
                     <div class="event-title">${escapeHtml(ev.title)}</div>
                     <button class="btn btn-danger" style="padding: 2px 4px; font-size: 0.6rem; border-radius: 4px; background: rgba(0,0,0,0.3); border:none; color:white;"
-                            onclick="app.deleteAgendaEvent('${ev.id}', event)">
+                            onclick="event.stopPropagation();app.deleteAgendaEvent('${ev.id}', this)">
                         <i data-lucide="x" style="width: 12px; height: 12px;"></i>
                     </button>
                 </div>
@@ -4892,18 +4904,20 @@ class AppController {
         }
     }
 
-    async handleDeleteImplementation() {
+    handleDeleteImplementation() {
         const id = document.getElementById('impl-id').value;
         if (!id) return;
-        if (!confirm('Excluir esta implementação? Os vínculos com clientes também serão removidos.')) return;
-        try {
-            await store.deleteImplementation(id);
-            this.closeModal('modal-implementation');
-            await this.renderImplementations();
-            Toast.show('Implementação excluída.', 'success');
-        } catch (err) {
-            Toast.show('Erro ao excluir: ' + err.message, 'error');
-        }
+        const btn = document.getElementById('btn-delete-implementation');
+        this._twostepDelete(btn, async () => {
+            try {
+                await store.deleteImplementation(id);
+                this.closeModal('modal-implementation');
+                await this.renderImplementations();
+                Toast.show('Implementação excluída.', 'success');
+            } catch (err) {
+                Toast.show('Erro ao excluir: ' + err.message, 'error');
+            }
+        });
     }
 
     clearImplFilters() {
@@ -5201,18 +5215,20 @@ class AppController {
         }
     }
 
-    async handleDeleteTraining() {
+    handleDeleteTraining() {
         const id = document.getElementById('training-id').value;
         if (!id) return;
-        if (!confirm('Excluir este treinamento? Os vínculos com clientes também serão removidos.')) return;
-        try {
-            await store.deleteTraining(id);
-            this.closeModal('modal-training');
-            await this.renderTrainings();
-            Toast.show('Treinamento excluído.', 'success');
-        } catch (err) {
-            Toast.show('Erro ao excluir: ' + err.message, 'error');
-        }
+        const btn = document.getElementById('btn-delete-training');
+        this._twostepDelete(btn, async () => {
+            try {
+                await store.deleteTraining(id);
+                this.closeModal('modal-training');
+                await this.renderTrainings();
+                Toast.show('Treinamento excluído.', 'success');
+            } catch (err) {
+                Toast.show('Erro ao excluir: ' + err.message, 'error');
+            }
+        });
     }
 
     clearTrainingFilters() {
@@ -5417,19 +5433,21 @@ class AppController {
         }
     }
 
-    async handleDeleteSchedulingRule() {
+    handleDeleteSchedulingRule() {
         const id = document.getElementById('rule-id').value;
         const clientId = document.getElementById('rule-client-id').value;
         if (!id) return;
-        if (!confirm('Excluir esta regra de agendamento?\n\nOs eventos já gerados na agenda NÃO serão removidos.')) return;
-        try {
-            await store.deleteSchedulingRule(id);
-            this.closeModal('modal-scheduling-rule');
-            await this._renderClientSchedulingTab(clientId);
-            Toast.show('Regra excluída.', 'success');
-        } catch (err) {
-            Toast.show('Erro ao excluir: ' + err.message, 'error');
-        }
+        const btn = document.getElementById('btn-delete-scheduling-rule');
+        this._twostepDelete(btn, async () => {
+            try {
+                await store.deleteSchedulingRule(id);
+                this.closeModal('modal-scheduling-rule');
+                await this._renderClientSchedulingTab(clientId);
+                Toast.show('Regra excluída.', 'success');
+            } catch (err) {
+                Toast.show('Erro ao excluir: ' + err.message, 'error');
+            }
+        });
     }
 
     // Calcula todas as ocorrências de uma regra no período

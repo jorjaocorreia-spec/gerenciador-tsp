@@ -421,6 +421,9 @@ h4 {
   100% { opacity: 0; transform: translateX(24px); }
 }
 .row-deleting td { animation: row-delete-out 0.38s ease-out forwards !important; }
+.kb-card.row-deleting { animation: row-delete-out 0.38s ease-out forwards !important; }
+.event-block.row-deleting,
+.event-allday-banner.row-deleting { animation: row-delete-out 0.38s ease-out forwards !important; }
 
 /* =========================================
    Components: Buttons & Forms
