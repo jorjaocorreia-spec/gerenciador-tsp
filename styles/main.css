@@ -1907,6 +1907,73 @@ h4 {
 }
 
 /* =========================================
+   Button States — loading / success / error / ripple
+   ========================================= */
+
+/* Ripple on click */
+.btn-primary, .btn-secondary { position: relative; overflow: hidden; }
+.btn-primary::after, .btn-secondary::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(circle, rgba(255,255,255,0.28) 0%, transparent 65%);
+    transform: scale(0);
+    opacity: 0;
+    border-radius: inherit;
+    pointer-events: none;
+}
+.btn-primary:active::after, .btn-secondary:active::after {
+    animation: btn-ripple 0.45s ease-out forwards;
+}
+@keyframes btn-ripple {
+    from { transform: scale(0); opacity: 1; }
+    to   { transform: scale(2.5); opacity: 0; }
+}
+
+/* Loading */
+.btn-loading { pointer-events: none; opacity: 0.82; }
+.btn-spinner {
+    display: inline-block;
+    width: 13px;
+    height: 13px;
+    border: 2px solid rgba(255,255,255,0.3);
+    border-top-color: #fff;
+    border-radius: 50%;
+    animation: btn-spin 0.7s linear infinite;
+    vertical-align: middle;
+    margin-right: 5px;
+    flex-shrink: 0;
+}
+@keyframes btn-spin { to { transform: rotate(360deg); } }
+
+/* Success */
+.btn-success {
+    background: linear-gradient(135deg, #10b981, #059669) !important;
+    border-color: transparent !important;
+    transition: background 0.18s ease !important;
+}
+
+/* Error */
+.btn-error {
+    background: linear-gradient(135deg, #ef4444, #dc2626) !important;
+    border-color: transparent !important;
+    animation: btn-error-shake 0.4s ease;
+}
+@keyframes btn-error-shake {
+    0%, 100% { transform: translateX(0); }
+    20%       { transform: translateX(-5px); }
+    40%       { transform: translateX(5px); }
+    60%       { transform: translateX(-4px); }
+    80%       { transform: translateX(4px); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .btn-spinner { animation: none; }
+    .btn-error { animation: none; }
+    .btn-primary::after, .btn-secondary::after { display: none; }
+}
+
+/* =========================================
    Money Blur Toggle
    ========================================= */
 .money-value {

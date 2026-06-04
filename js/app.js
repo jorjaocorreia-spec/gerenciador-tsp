@@ -469,22 +469,22 @@ class AppController {
             ? Math.round(parseFloat(initialBalanceH) * 60)
             : 0;
 
-        btn.disabled = true;
+        this._btnPending(btn);
         try {
             if (id) {
                 await store.updateClient(id, name, hours, csName, projectNum, clientPays, consultantBonus, notes, status, initialBalanceMinutes, balanceStartDate || null, otoboCustomerId || null);
             } else {
                 await store.addClient(name, hours, csName, projectNum, clientPays, consultantBonus, notes, status, initialBalanceMinutes, balanceStartDate || null, otoboCustomerId || null);
             }
+            await this._btnSuccess(btn);
             e.target.reset();
             document.getElementById('client-id').value = '';
             this.closeModal('modal-client');
             await this.renderAll();
             Toast.show(id ? 'Cliente atualizado.' : 'Cliente cadastrado.', 'success');
         } catch (err) {
+            this._btnError(btn);
             Toast.show('Erro ao salvar cliente: ' + err.message, 'error');
-        } finally {
-            btn.disabled = false;
         }
     }
 
@@ -578,7 +578,7 @@ class AppController {
         }
 
         const btn = e.target.querySelector('[type="submit"]');
-        btn.disabled = true;
+        this._btnPending(btn);
 
         try {
             if (recordId) {
@@ -586,6 +586,7 @@ class AppController {
             } else {
                 await store.addRecord(clientId, date, startTime, endTime, minutes, desc);
             }
+            await this._btnSuccess(btn);
             e.target.reset();
             document.getElementById('record-id').value = '';
             document.getElementById('record-calculated').dataset.minutes = 0;
@@ -594,9 +595,8 @@ class AppController {
             await this.renderAll();
             Toast.show(recordId ? 'Atendimento atualizado.' : 'Atendimento lançado.', 'success');
         } catch (err) {
+            this._btnError(btn);
             Toast.show('Erro ao salvar atendimento: ' + err.message, 'error');
-        } finally {
-            btn.disabled = false;
         }
     }
 
@@ -686,7 +686,7 @@ class AppController {
         };
 
         const btn = document.querySelector('#form-task [type="submit"]');
-        if (btn) btn.disabled = true;
+        if (btn) this._btnPending(btn);
 
         try {
             if (id) {
@@ -695,13 +695,13 @@ class AppController {
             } else {
                 await store.addTask(taskData);
             }
+            if (btn) await this._btnSuccess(btn);
             this.closeModal('modal-task');
             await this.renderAll();
             Toast.show(id ? 'Tarefa atualizada.' : 'Tarefa criada.', 'success');
         } catch (err) {
+            if (btn) this._btnError(btn);
             Toast.show('Erro ao salvar tarefa: ' + err.message, 'error');
-        } finally {
-            if (btn) btn.disabled = false;
         }
     }
 
@@ -1809,6 +1809,40 @@ class AppController {
     }
 
     // ─────────────────────────────────────────────────────────────────────
+    // Button state helpers — loading / success / error
+
+    _btnPending(btn) {
+        if (!btn) return;
+        btn._origHtml = btn.innerHTML;
+        btn._origDisabled = btn.disabled;
+        btn.disabled = true;
+        btn.classList.add('btn-loading');
+        btn.innerHTML = `<span class="btn-spinner"></span>${btn._origHtml}`;
+    }
+
+    _btnSuccess(btn) {
+        if (!btn) return;
+        btn.classList.remove('btn-loading');
+        btn.classList.add('btn-success');
+        btn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;margin-right:5px"><polyline points="20 6 9 17 4 12"/></svg>Salvo!`;
+        return new Promise(resolve => setTimeout(() => {
+            btn.classList.remove('btn-success');
+            btn.innerHTML = btn._origHtml || btn.innerHTML;
+            btn.disabled = btn._origDisabled || false;
+            resolve();
+        }, 550));
+    }
+
+    _btnError(btn) {
+        if (!btn) return;
+        btn.disabled = false;
+        btn.classList.remove('btn-loading');
+        btn.classList.add('btn-error');
+        if (btn._origHtml) btn.innerHTML = btn._origHtml;
+        setTimeout(() => btn.classList.remove('btn-error'), 800);
+    }
+
+    // ─────────────────────────────────────────────────────────────────────
 
     _animateCounter(el, target, hoursTotal, delay = 0) {
         if (!el || target <= 0) { if (el) el.textContent = `${target}h / ${hoursTotal}h`; return; }
@@ -2870,7 +2904,6 @@ class AppController {
         e.preventDefault();
         const id = document.getElementById('agenda-id').value;
         const btn = e.submitter || document.querySelector('#form-agenda-event button[type="submit"]');
-        const originalText = btn.innerText;
 
         const startDate = document.getElementById('agenda-date').value;
         const endDate = document.getElementById('agenda-date-end').value || startDate;
@@ -2896,8 +2929,7 @@ class AppController {
             meetLink: existingMeetLink
         };
 
-        btn.innerText = "Salvando...";
-        btn.disabled = true;
+        this._btnPending(btn);
 
         // Força sync se: (a) usuário marcou o checkbox, OU (b) evento já estava no Google
         const existingCalId = id ? (document.getElementById('agenda-calendar-event-id').value || null) : null;
@@ -2908,8 +2940,7 @@ class AppController {
                 const success = await calendarAPI.authenticateGoogle();
                 if (!success) {
                     Toast.show('Falha na autenticação do Google.', 'error');
-                    btn.innerText = originalText;
-                    btn.disabled = false;
+                    this._btnError(btn);
                     return;
                 }
             }
@@ -2957,21 +2988,21 @@ class AppController {
                 document.getElementById('modal-agenda-title').innerText = id ? 'Agendamento atualizado' : 'Agendamento criado';
                 navigator.clipboard.writeText(eventData.meetLink).catch(() => {});
                 Toast.show('Agendamento salvo! Link Meet gerado e copiado.', 'success');
-                // Desabilita o botão permanentemente para evitar duplo-envio
-                btn.innerText = 'Salvo ✓';
+                btn.classList.remove('btn-loading');
+                btn.classList.add('btn-success');
+                btn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;margin-right:5px"><polyline points="20 6 9 17 4 12"/></svg>Salvo!`;
                 btn.disabled = true;
                 this.renderAgenda();
                 return;
             } else {
+                await this._btnSuccess(btn);
                 this.closeModal('modal-agenda-event');
                 await this.renderAgenda();
                 Toast.show(id ? 'Agendamento atualizado.' : 'Agendamento criado.', 'success');
             }
         } catch (err) {
+            this._btnError(btn);
             Toast.show('Erro ao salvar agendamento: ' + err.message, 'error');
-        } finally {
-            btn.innerText = originalText;
-            btn.disabled = false;
         }
     }
 
