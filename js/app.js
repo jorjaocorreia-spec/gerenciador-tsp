@@ -2242,16 +2242,18 @@ class AppController {
         const allStats = this._horasMesStats || [];
 
         const sorted = [...allStats].sort((a, b) => b.hoursUsed - a.hoursUsed);
-        const totalMinutes = sorted.reduce((sum, s) => sum + s.hoursUsed, 0);
-        const maxMinutes = sorted.find(s => s.hoursUsed > 0)?.hoursUsed || 1;
+        // hoursUsed está em HORAS (totalMinutesUsed / 60 no store)
+        const totalHours = sorted.reduce((sum, s) => sum + s.hoursUsed, 0);
+        const maxHours = sorted.find(s => s.hoursUsed > 0)?.hoursUsed || 1;
         const withHours = sorted.filter(s => s.hoursUsed > 0);
         const zeroCount = sorted.filter(s => s.hoursUsed === 0).length;
         const display = showZero ? sorted : withHours;
 
-        const fmtTime = (min) => {
-            min = Math.round(min);
-            const h = Math.floor(min / 60);
-            const m = min % 60;
+        // Recebe horas (float), exibe como Xh YYmin
+        const fmtHours = (hours) => {
+            const totalMin = Math.round(hours * 60);
+            const h = Math.floor(totalMin / 60);
+            const m = totalMin % 60;
             if (h === 0) return `${m}min`;
             if (m === 0) return `${h}h`;
             return `${h}h ${String(m).padStart(2, '0')}min`;
@@ -2260,9 +2262,10 @@ class AppController {
         const rows = display.length === 0
             ? `<tr><td colspan="4" style="text-align:center; color:var(--text-muted); padding:24px;">Nenhum atendimento lançado no período.</td></tr>`
             : display.map((s, idx) => {
-                const barPct = Math.round(s.hoursUsed / maxMinutes * 100);
+                const barPct = Math.round(s.hoursUsed / maxHours * 100);
+                // hoursTotal do cliente também está em horas
                 const contractPct = s.client.hoursTotal > 0
-                    ? Math.round(s.hoursUsed / (s.client.hoursTotal * 60) * 100)
+                    ? Math.round(s.hoursUsed / s.client.hoursTotal * 100)
                     : null;
                 const barColor = contractPct !== null && contractPct > 100
                     ? '#f87171'
@@ -2277,7 +2280,7 @@ class AppController {
                     ? `<span style="font-size:0.75rem;margin-left:4px;color:${contractPct > 100 ? '#f87171' : 'var(--text-muted)'};">${contractPct}%</span>`
                     : '';
                 const timeLabel = s.hoursUsed > 0
-                    ? `<strong>${fmtTime(s.hoursUsed)}</strong>`
+                    ? `<strong>${fmtHours(s.hoursUsed)}</strong>`
                     : `<span class="text-muted">—</span>`;
 
                 return `<tr>
@@ -2293,7 +2296,7 @@ class AppController {
                 </tr>`;
             }).join('');
 
-        const totalLabel = totalMinutes > 0 ? fmtTime(totalMinutes) : '0h';
+        const totalLabel = totalHours > 0 ? fmtHours(totalHours) : '0h';
 
         content.innerHTML = `
             <div style="padding:16px 24px 12px; border-bottom:1px solid rgba(255,255,255,0.08); display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
