@@ -639,13 +639,13 @@ Plano completo de ~35 animações novas dividido em 3 rodadas de implementação
 - **E2** ✅ — Empty state: ícone central flutua em loop suave (keyframe translateY)
 
 **Rodada 2 — JS simples + médio esforço:**
-- **L4** — Login: botão "Entrar" com ripple ao clicar
+- **L4** ✅ — Login: botão "Entrar" com ripple ao clicar (`.btn-primary:active::after` + `@keyframes btn-ripple`)
 - **V3** ✅ — Modal fecha com animação de saída (shrink + fade): classe `modal-overlay--exiting` por 200ms ease-in
 - **V4** ~~✅~~ — Modal overlay backdrop-filter 0→4px — **REMOVIDO** 2026-06-04: `backdrop-filter` na classe base `.modal-overlay` forçava compositing em todos os overlays mesmo com `opacity:0`, causando repaints e piscadas ao carregar views
-- **T1** — Tabelas (todas): linhas entram em cascata (stagger 30ms, slide-up 8px)
+- **T1** ✅ — Tabelas (todas): linhas entram em cascata (`@keyframes row-in`, `.data-table tbody tr { animation: row-in 0.22s }`)
 - **T2** ✅ — Tabelas + Apontamentos: hover curtain da esquerda; cards clicáveis com `.clickable-card` (lift + glow roxo)
 - **T3** ✅ — Delete com shake/fade via `.row-deleting`; botões destrutivos com `_twostepDelete` two-step confirm
-- **D5** — Dashboard: card hover com glow dinâmico vazando da cor da barra de progresso
+- **D5** ✅ — Dashboard: card hover com glow dinâmico vazando da cor da barra de progresso (`.stat-card:hover` usa `var(--card-glow-color)` e `var(--card-glow-shadow)`)
 - **D6** ✅ — Dashboard: troca de mês com cards deslizando para fora/dentro conforme direção (prev=esquerda, next=direita)
 - **A2** ✅ — Agenda: ripple circular roxo no clique do dia na view mensal
 - **B3** ✅ — Badge "Estourado" faz shake periódico a cada 4s com escala
@@ -654,8 +654,8 @@ Plano completo de ~35 animações novas dividido em 3 rodadas de implementação
 
 - **V1** ✅ — Views: slide vem da direita ao avançar, da esquerda ao voltar (baseado na posição no menu)
 - **S6** ✅ — Sidebar: ícones giram 360° ao colapsar/expandir (`sidebar--icon-spin`)
-- **S7** — Sidebar: nav items aparecem em cascata no primeiro login
-- **T4** — Tabelas: valor de horas/tempo faz flip vertical ao mudar filtro
+- **S7** ✅ — Sidebar: nav items aparecem em cascata no primeiro login (`.sidebar--nav-cascade` + `@keyframes nav-item-in`, stagger 60ms por item, classe removida após 900ms)
+- **T4** ✅ — Tabelas: célula de horas faz flip vertical ao renderizar (`class="hours-flip"` nas tds de minutos em `renderRecords` e `renderMonthRecords`; `@keyframes hours-flip` com `perspective(400px) rotateX`)
 - **A5** ✅ — Agenda: grid desliza left/right ao navegar prev/next
 - **F2** ✅ — Formulários: float label JS-driven via `_initFloatLabels(container)` — label sobe ao focar/preencher
 - **E3** ✅ — Skeleton loading com shimmer — já implementado antes das rodadas 2/3 (`.sk`, `sk-shimmer`, `.sk-stat-card`, `.sk-row`)

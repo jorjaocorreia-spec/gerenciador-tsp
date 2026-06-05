@@ -1545,6 +1545,12 @@ class AppController {
         this.checkLocalStorageMigration();
         this.applySidebarState();
         this.applyMoneyVisibility();
+        // S7: cascata de nav items no login
+        const sidebar = document.getElementById('sidebar');
+        if (sidebar) {
+            sidebar.classList.add('sidebar--nav-cascade');
+            setTimeout(() => sidebar.classList.remove('sidebar--nav-cascade'), 900);
+        }
         const settings = await store.getUserSettings();
         if (settings && settings.googleClientId && settings.googleApiKey) {
             await calendarAPI.configure(settings.googleClientId, settings.googleApiKey);
@@ -2379,7 +2385,7 @@ class AppController {
                 <td>${r.date.split('-').reverse().join('/')}${timeRange}</td>
                 <td><strong>${clientName}</strong></td>
                 <td>${escapeHtml(r.description)}</td>
-                <td>${r.minutes} min <span class="text-muted">(${hoursStr})</span></td>
+                <td class="hours-flip">${r.minutes} min <span class="text-muted">(${hoursStr})</span></td>
                 <td>
                     <div style="display: flex; gap: 8px;">
                         <button class="btn btn-secondary" onclick="app.handleViewRecord('${r.id}')" style="padding: 6px 10px; font-size: 0.8rem;" title="Visualizar">
@@ -2614,7 +2620,7 @@ class AppController {
             tr.innerHTML = `
                 <td>${r.date.split('-').reverse().join('/')}${timeRange}</td>
                 <td>${escapeHtml(r.description)}</td>
-                <td>${r.minutes} min <span class="text-muted">(${hoursStr})</span></td>
+                <td class="hours-flip">${r.minutes} min <span class="text-muted">(${hoursStr})</span></td>
                 <td>
                     <div style="display: flex; gap: 8px;">
                         <button class="btn btn-secondary" onclick="app.handleViewRecord('${r.id}')" style="padding: 6px 10px; font-size: 0.8rem;" title="Visualizar">

@@ -3524,6 +3524,33 @@ kbd {
     animation: view-from-left 0.26s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
+/* T4 — Tabelas: célula de horas faz flip vertical ao renderizar */
+@keyframes hours-flip {
+    from { transform: perspective(400px) rotateX(70deg); opacity: 0; }
+    to   { transform: perspective(400px) rotateX(0deg);  opacity: 1; }
+}
+.hours-flip {
+    animation: hours-flip 0.3s ease-out both;
+}
+
+/* S7 — Sidebar: nav items entram em cascata no login */
+@keyframes nav-item-in {
+    from { opacity: 0; transform: translateX(-14px); }
+    to   { opacity: 1; transform: translateX(0); }
+}
+.sidebar--nav-cascade .nav-item {
+    animation: nav-item-in 0.28s ease-out both;
+}
+.sidebar--nav-cascade .nav-item:nth-child(1) { animation-delay: 0.04s; }
+.sidebar--nav-cascade .nav-item:nth-child(2) { animation-delay: 0.10s; }
+.sidebar--nav-cascade .nav-item:nth-child(3) { animation-delay: 0.16s; }
+.sidebar--nav-cascade .nav-item:nth-child(4) { animation-delay: 0.22s; }
+.sidebar--nav-cascade .nav-item:nth-child(5) { animation-delay: 0.28s; }
+.sidebar--nav-cascade .nav-item:nth-child(6) { animation-delay: 0.34s; }
+.sidebar--nav-cascade .nav-item:nth-child(7) { animation-delay: 0.40s; }
+.sidebar--nav-cascade .nav-item:nth-child(8) { animation-delay: 0.46s; }
+.sidebar--nav-cascade .nav-item:nth-child(9) { animation-delay: 0.52s; }
+
 /* S6 — Sidebar: ícones giram ao colapsar/expandir */
 @keyframes icon-spin-in {
     from { transform: rotate(-180deg) scale(0.6); opacity: 0.4; }
