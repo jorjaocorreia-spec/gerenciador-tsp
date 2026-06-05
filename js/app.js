@@ -3791,6 +3791,14 @@ class AppController {
         const btn = document.getElementById('btn-agenda-sync');
         if (!btn) return;
 
+        // Se os scripts do Google ainda não terminaram de carregar, aguarda até 3s
+        if (!calendarAPI.isEnabled) {
+            const deadline = Date.now() + 3000;
+            while (!calendarAPI.isEnabled && Date.now() < deadline) {
+                await new Promise(r => setTimeout(r, 200));
+            }
+        }
+
         if (!calendarAPI.isAuthenticated) {
             const success = await calendarAPI.authenticateGoogle();
             if (!success) {

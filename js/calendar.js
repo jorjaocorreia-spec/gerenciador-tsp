@@ -36,17 +36,6 @@ const GoogleCalendarAPI = {
         try { localStorage.removeItem(this._STORAGE_KEY); } catch {}
     },
 
-    _trySilentAuth() {
-        if (!this.tokenClient || !this.isEnabled) return;
-        this.tokenClient.callback = (resp) => {
-            if (resp.error) return;
-            this._saveToken(resp);
-            this.isAuthenticated = true;
-            if (window.app) app.onCalendarAuthenticated();
-        };
-        this.tokenClient.requestAccessToken({ prompt: '' });
-    },
-
     // Chamado após carregar as credenciais do Supabase.
     // Lida com dois cenários: scripts CDN já carregados, ou ainda pendentes.
     async configure(clientId, apiKey) {
@@ -103,11 +92,10 @@ const GoogleCalendarAPI = {
                 gapi.client.setToken(saved);
                 this.isAuthenticated = true;
                 if (window.app) app.onCalendarAuthenticated();
-            } else {
-                // Tenta renovar silenciosamente se o usuário já concedeu permissão antes
-                this._trySilentAuth();
             }
         }
+        // Atualiza chip de status mesmo quando não autenticado
+        if (window.app) app._updateGoogleSyncStatus();
     },
 
     async initGapiClient() {
@@ -149,7 +137,7 @@ const GoogleCalendarAPI = {
 
     async authenticateGoogle() {
         if (!this.isEnabled) {
-            alert('Configure as credenciais do Google Calendar nas configurações da Agenda.');
+            if (window.Toast) Toast.show('Configure as credenciais do Google Calendar nas configurações da Agenda.', 'warning');
             return Promise.resolve(false);
         }
         return new Promise((resolve) => {
