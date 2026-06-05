@@ -601,6 +601,7 @@ Animações CSS/JS implementadas em `styles/main.css` e `js/app.js` para dar vid
 - **`@keyframes` sobrescrevem `box-shadow` do elemento** — usar multi-shadow preservando o shadow original como primeiro valor em todos os keyframes; sem isso, o ring de ping "apaga" o shadow do botão.
 - **Duplo `requestAnimationFrame` é obrigatório para animar propriedades CSS definidas no innerHTML** — um único rAF não garante que o browser renderizou o estado inicial antes de aplicar o valor final.
 - **`opacity: 0` como propriedade direta + animação de entrada = armadilha de override** — se uma classe define `opacity: 0` explicitamente E usa `animation` para animar para 1, qualquer regra de maior especificidade que sobrescreva `animation` deixa o elemento invisível permanentemente (pois `opacity: 0` permanece sem a animação para restaurar). Padrão seguro: ou usar `animation-fill-mode: both` (sem `opacity: 0` direto) ou usar `animation-name` longhands para listar múltiplas animações em paralelo. Classes afetadas: `.stat-card-animate` e `.kb-column-cascade`. Correção aplicada em `.stat-card.over-limit`: usa `animation-name: card-cascade-in, card-danger-pulse` com longhand para rodar ambas simultaneamente.
+- **Float labels (F2) são JS-driven, não CSS puro** — a abordagem CSS via `:not(:placeholder-shown)` não funciona quando o `<label>` vem antes do `<input>` (padrão do app). A implementação usa `_initFloatLabels(container)` que adiciona listeners de `focus/blur/input/change` e alterna a classe `fl-up` no label; `dataset.flInit = '1'` evita registrar listeners duplicados ao reabrir o modal. `_refreshFloatLabels(container)` sincroniza o estado visual imediatamente (necessário ao abrir modal com campos pré-preenchidos). Chamado em `openModal()` para todos os modais e em `DOMContentLoaded` para o form de login (`#auth-form`). Classe CSS ativa: `.float-group` no `form-group`; label sobe via `.float-group > label.fl-up`.
 
 ---
 
@@ -636,23 +637,24 @@ Plano completo de ~35 animações novas dividido em 3 rodadas de implementação
 
 **Rodada 2 — JS simples + médio esforço:**
 - **L4** — Login: botão "Entrar" com ripple ao clicar
-- **V3** — Modal fecha com animação de saída (shrink + fade) — atualmente some sem animação
-- **V4** — Modal: overlay com backdrop-filter blur crescendo de 0 para 4px ao abrir
+- **V3** ✅ — Modal fecha com animação de saída (shrink + fade): classe `modal-overlay--exiting` por 200ms ease-in
+- **V4** ✅ — Modal: overlay com backdrop-filter blur crescendo de 0 para 4px ao abrir (transition no overlay)
 - **T1** — Tabelas (todas): linhas entram em cascata (stagger 30ms, slide-up 8px)
 - **T2** ✅ — Tabelas + Apontamentos: hover curtain da esquerda; cards clicáveis com `.clickable-card` (lift + glow roxo)
 - **T3** ✅ — Delete com shake/fade via `.row-deleting`; botões destrutivos com `_twostepDelete` two-step confirm
 - **D5** — Dashboard: card hover com glow dinâmico vazando da cor da barra de progresso
-- **D6** — Dashboard: troca de mês com cards deslizando para fora/dentro conforme direção
-- **A2** — Agenda: clique no dia (view mensal) com ripple circular no ponto clicado
-- **B3** — Badge de horas "Esgotado" (> 100%): shake periódico + cor vermelha
+- **D6** ✅ — Dashboard: troca de mês com cards deslizando para fora/dentro conforme direção (prev=esquerda, next=direita)
+- **A2** ✅ — Agenda: ripple circular roxo no clique do dia na view mensal
+- **B3** ✅ — Badge "Estourado" faz shake periódico a cada 4s com escala
 
 **Rodada 3 — Mais complexo (polish final):**
-- **V1** — Views: slide vem da direita ao avançar, da esquerda ao voltar (baseado na posição no menu)
-- **S6** — Sidebar: ícones giram 360° ao colapsar/expandir
+
+- **V1** ✅ — Views: slide vem da direita ao avançar, da esquerda ao voltar (baseado na posição no menu)
+- **S6** ✅ — Sidebar: ícones giram 360° ao colapsar/expandir (`sidebar--icon-spin`)
 - **S7** — Sidebar: nav items aparecem em cascata no primeiro login
 - **T4** — Tabelas: valor de horas/tempo faz flip vertical ao mudar filtro
-- **A5** — Agenda: grid desliza para esquerda/direita ao navegar semana/mês
-- **F2** — Formulários: float label (label sobe ao focar no input)
+- **A5** ✅ — Agenda: grid desliza left/right ao navegar prev/next
+- **F2** ✅ — Formulários: float label JS-driven via `_initFloatLabels(container)` — label sobe ao focar/preencher
 - **E3** — Skeleton loading com shimmer em vez de spinner (em todas as views)
 
 ---
