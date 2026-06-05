@@ -201,6 +201,7 @@ Todas têm `user_id uuid references auth.users` + RLS ativa (`auth.uid() = user_
 - **Fase 31** ✅ — Chamados: filtros locais + sincronização seletiva; barra de filtros na view Chamados (número/título, status, prioridade, fila, proprietário, tipo, cliente vinculado); filtros locais aplicados sobre cache em memória (`_cachedChamadosTickets`); modal `modal-otobo-config` reestruturado em duas tabs ("Conexão" + "Filtros de Sync"); filtros de sync salvos em `sync_filters JSONB` na tabela `otobo_config` e repassados ao proxy OTOBO; novo campo `ticket_type` em `tickets`; badge de tipo no card; linha "Tipo" na sidebar do modal de detalhe; migration SQL: `ALTER TABLE tickets ADD COLUMN IF NOT EXISTS ticket_type TEXT DEFAULT ''; ALTER TABLE otobo_config ADD COLUMN IF NOT EXISTS sync_filters JSONB DEFAULT '{}';`; novos métodos: `_attachChamadoFilterListeners()`, `_rerenderChamadosWithFilters()`, `_applyTicketFilters()`, `_populateChamadoFilterDropdowns()`, `clearChamadoFilters()`, `switchOtoboTab()`
 - **Fase 28** ✅ — Importação PDF: detecção de duplicatas; antes de exibir o modal de confirmação, `openPdfConfirmationModal()` faz uma única query via `store.getRecordsByDateRange(startDate, endDate, clientIds)` para buscar todos os registros existentes no intervalo de datas da ata; chave de comparação: `client_id|date|start_time|end_time`; registros já existentes recebem flag `_isDuplicate: true`; exibidos no modal com linha riscada (`.pdf-row-duplicate`), badge laranja "Já lançado" (`.pdf-dup-badge`) e checkbox desabilitado; painel amarelo `#pdf-dup-warnings` lista os registros ignorados acima da tabela; `confirmPdfImport()` pula registros `_isDuplicate` e inclui contagem no toast final ("X importados. Y já existiam e foram ignorados."); novo método `store.getRecordsByDateRange(startDate, endDate, clientIds[])`; sem migration necessária
 - **Fase 36** ✅ — Agenda: múltiplas tarefas por agendamento + auto-preenchimento da descrição; substitui o select único de tarefa por botão "Vincular Tarefas" que abre painel inline com checkboxes filtrados pelo cliente selecionado; seleção temporária em `_agendaTaskPanelTempIds` (descartada no Cancelar) confirmada em `_agendaRelatedTaskIds`; tarefas confirmadas exibidas como chips removíveis abaixo do botão; ao confirmar ou remover chip, campo Descrição atualizado automaticamente com bloco `\n\nTarefas executadas:\n- Título...` usando marcador sentinela para preservar texto digitado pelo usuário; nova coluna `related_task_ids JSONB DEFAULT '[]'` em `agenda_events` com retrocompatibilidade via `related_task_id` (legado); migration SQL: `ALTER TABLE agenda_events ADD COLUMN IF NOT EXISTS related_task_ids JSONB DEFAULT '[]';`; novos métodos: `openAgendaTaskPanel()`, `cancelAgendaTaskPanel()`, `confirmAgendaTaskPanel()`, `toggleAgendaTaskTemp(taskId)`, `removeAgendaTask(taskId)`, `_renderAgendaTaskPanel()`, `_renderAgendaTaskChips()`, `_updateAgendaLinkBtn()`, `_updateDescriptionWithTasks()`; estado em `_agendaRelatedTaskIds[]`, `_agendaTaskPanelTempIds[]`, `_agendaAllTasks[]`
+- **Fase 38** ✅ — Chamados: filtros de exibição persistidos por usuário no banco; coluna `local_filters JSONB DEFAULT '{}'` adicionada em `otobo_config`; `store.saveOtoboLocalFilters(filters)` faz UPDATE (não upsert) para não criar linhas sem config de conexão; `_restoreChamadoFilters(saved)` restaura checkboxes + campo de busca após `_populateChamadoFilterDropdowns()` na abertura da view; `_rerenderChamadosWithFilters()` agenda save debounced de 800ms após qualquer mudança; `clearChamadoFilters()` salva `{}` imediatamente; `_chamadoFilterSaveTimer` limpo no logout; migration SQL: `ALTER TABLE otobo_config ADD COLUMN IF NOT EXISTS local_filters JSONB DEFAULT '{}';`
 - **Fase 37** ✅ — Dashboard: modal "Horas do Mês" — botão "Horas do Mês" no header do Dashboard abre `modal-horas-mes` com ranking de clientes por horas aplicadas no mês selecionado; total geral em destaque no topo; barras horizontais proporcionais ao maior consumidor (100% = cliente com mais horas); cor da barra: roxo (normal), amarelo (≥80% do contrato), vermelho (>100% do contrato); coluna "Contrato / %" exibe cota mensal + percentual consumido; toggle "Mostrar sem horas" filtra clientes sem lançamentos no período; dados via `store.getBatchStats(this._dashboardMonth)` (4 queries paralelas, sem custo extra); sincroniza com o mês selecionado no Dashboard (navegação por mês funciona); estado cacheado em `_horasMesStats` — toggle não faz nova query; `_horasMesStats = null` no constructor e no logout; sem migration, sem novas tabelas; novos métodos: `openHorasMes()`, `_renderHorasMesContent()`, `_horasMesToggle()`
 - **Fase 23** ✅ — Gestão de Treinamentos: biblioteca de materiais didáticos por cliente; tabelas `trainings` + `training_clients` (M:N obrigatório — todo treinamento exige pelo menos um cliente); `attachments JSONB` com discriminador `type`: `'link'` (URL externa com detecção automática de tipo: youtube/drive/pdf/generic) e `'image'` (base64 JPEG comprimido via Canvas); view com cards agrupados por categoria (Geral/SAP/Sistema/Processo/Ferramenta) e filtros por categoria/status/cliente; modal com campo links externos (rótulo + URL + botão adicionar) e prints de tela (Ctrl+V + file picker); botão Excluir visível apenas no modo edição; migration SQL necessária antes do deploy nova tabela `kanban_columns` (id, user_id, client_id, name, color, position, is_done, created_at) com RLS; cada cliente tem seu próprio conjunto de colunas; migration automática na primeira abertura (status antigos 'new'/'doing'/'done' → UUIDs das novas colunas padrão); botão "Gerenciar Colunas" no header da view Tarefas (visível apenas com cliente filtrado); modal com lista reordenável (▲▼), color picker, checkbox "Finalizada", delete com bloqueio se houver tasks; Kanban requer seleção de cliente para exibir board (placeholder quando sem filtro); quick-add usa clientId do filtro; campo Cliente obrigatório no modal de tarefa; `store.getClientStats` detecta colunas "done" dinamicamente
 
@@ -270,6 +271,7 @@ O `docker-entrypoint.sh` injeta essas vars em `js/config.js` via `envsubst` na i
 - **Chamados: `_cachedChamadosTickets` e `_cachedChamadosClients` evitam query a cada filtro local** — populados em `renderChamados()` após carregar do banco; `_rerenderChamadosWithFilters()` usa exclusivamente esses arrays. Invalidados em `syncChamados()` (`_cachedChamadosTickets = null`) para forçar reload após sync. Limpos no logout junto com `_chamadoFiltersAttached = false`.
 - **Chamados: `_chamadoFiltersAttached` garante que os event listeners são adicionados uma única vez** — `_attachChamadoFilterListeners()` retorna imediatamente se `_chamadoFiltersAttached === true`. Resetado no logout. Se não for resetado, sair e entrar com outro usuário manteria listeners apontando para dados do usuário anterior.
 - **Chamados: filtros de sync com array vazio NÃO devem ser enviados ao OTOBO** — o proxy verifica `Array.isArray(sf.queues) && sf.queues.length > 0` antes de incluir no body da busca. Array vazio (`[]`) enviado como `Queues: []` em alguns deployments OTOBO retorna 0 resultados em vez de ignorar o filtro. Campos em branco no textarea = array vazio no JS = filtro omitido no proxy.
+- **Chamados: `local_filters` requer migration antes do deploy** — `ALTER TABLE otobo_config ADD COLUMN IF NOT EXISTS local_filters JSONB DEFAULT '{}';`. Sem a coluna, `saveOtoboLocalFilters` lança erro 400. Como usa UPDATE (não upsert), nenhuma linha é criada automaticamente — o save é silenciosamente ignorado se o usuário nunca configurou OTOBO.
 - **Chamados: `ticket_type` requer migration antes do próximo deploy** — `ALTER TABLE tickets ADD COLUMN IF NOT EXISTS ticket_type TEXT DEFAULT '';`; sem a coluna, `upsertTickets` com `ticket_type` no objeto lança erro 400 do PostgREST. Da mesma forma: `ALTER TABLE otobo_config ADD COLUMN IF NOT EXISTS sync_filters JSONB DEFAULT '{}';`.
 - **Chamados: match de cliente tem dois níveis** — `_mapTicketsToRows` tenta primeiro match exato por `clients.otobo_customer_id === t.CustomerID` (normalizado lowercase/trim); somente se não encontrar cai no fallback fuzzy `includes` bilateral por nome. Campo `otobo_customer_id TEXT` na tabela `clients`; migration: `ALTER TABLE clients ADD COLUMN IF NOT EXISTS otobo_customer_id TEXT;`. Campo "ID Cliente OTOBO" no modal de cliente (id: `client-otobo-id`). Tickets sem match vão para seção "Sem cliente vinculado".
 - **Chamados: artigos carregados on-demand, não cacheados** — `openChamadoModal` faz fetch do `TicketGet?AllArticles=1` a cada abertura do modal. Dados do artigo não são salvos em `raw_data` do cache (apenas o snapshot do ticket). Se o OTOBO estiver inacessível no momento de abrir o modal, exibe mensagem de erro; os metadados do ticket (sidebar) ainda são exibidos do cache local.
@@ -611,6 +613,75 @@ Animações CSS/JS implementadas em `styles/main.css` e `js/app.js` para dar vid
 ## Backlog (planejado, não implementado)
 
 - **Transformar tarefa em apontamento** — botão no modal de tarefa (ou no card Kanban) que pré-preenche o modal de Apontamento com os dados da tarefa (título como descrição, `estimatedMinutes` como duração sugerida, cliente vinculado → `projectNum` via lookup); permite lançar o tempo da tarefa no ERP sem redigitar.
+
+### Fase 38 — Painel de Posição de Projeto por Cliente (planejado em 2026-06-05)
+
+**Objetivo**: tela unificada que consolida, em uma única visão, a posição completa de um cliente — chamados OTOBO, tarefas Kanban, atendimentos, agenda e saldo de horas — equivalente a uma planilha de acompanhamento de projeto, mas viva e automática.
+
+**Motivação**: hoje o usuário precisa navegar entre 4–5 views para ter a visão completa de um cliente. A planilha de referência (Tickets/Prioridade/Status/Responsável/Data Entrega) mostra o padrão mental esperado: uma linha por item de trabalho, com coluna de status, responsável e data.
+
+#### Estrutura da view
+
+**Ponto de acesso**: botão "Posição do Projeto" no modal do cliente (nova aba) OU novo item no sidebar (ícone `layout-dashboard`).
+
+**Layout sugerido**: página dividida em painéis por categoria, todos filtrados pelo cliente selecionado:
+
+| Painel | Fonte de dados | Colunas exibidas |
+|--------|---------------|-----------------|
+| **Saldo de Horas** | `clients` + `records` | Cota mensal, horas usadas, % consumido, saldo acumulado |
+| **Chamados OTOBO** | `tickets` | Nº ticket, solicitação, responsável T5, status, data criação, data atualização |
+| **Tarefas (Kanban)** | `tasks` | Título, coluna (status), prioridade, data limite, % checklist |
+| **Próximos Agendamentos** | `agenda_events` | Data, tipo, título, horário, Google Meet |
+| **Últimos Atendimentos** | `records` | Data, início, fim, duração, descrição |
+
+**Seletor de cliente**: dropdown no header da view (ou usa o cliente aberto no modal); não exige navegação por cliente individual.
+
+#### Campos inspirados na planilha de referência
+
+- **Item**: numeração sequencial por categoria
+- **Prioridade**: herdada do chamado/tarefa (alta/média/baixa) — `?` para sem prioridade, igual à planilha
+- **Ticket/Referência**: número do chamado OTOBO ou ID interno
+- **Resp. SIGMA / Resp. T5**: responsável interno (coluna `owner` do ticket) e responsável T5 (campo livre — pode vir de `tasks.description` ou campo novo `assignee`)
+- **Solicitação/Título**: descrição curta do item
+- **Status**: badge colorido (Pendente / Em desenvolvimento / Resolvido / Concluído)
+- **Informações Complementares**: campo de observação livre — para chamados vem de `raw_data`; para tarefas vem de `description`
+- **Data Entrega**: `due_date` da tarefa ou campo `date_delivery` a criar em `tickets`
+- **Última Atualização**: `updated_at` do registro
+- **Data Criação**: `created_at`
+
+#### Interações
+
+- Clicar em um chamado → abre `modal-chamado` (reutiliza o existente)
+- Clicar em uma tarefa → abre `modal-task` (reutiliza o existente)
+- Clicar em um agendamento → abre `modal-agenda` (reutiliza o existente)
+- Botão "Exportar PDF" → jsPDF com todos os painéis em tabela (mesmo padrão do relatório de agenda)
+- Botão "Exportar Excel-like" → copiar para área de transferência em formato TSV (colar no Excel/Sheets)
+
+#### IA (se configurada)
+
+- Botão `✨ Resumo do Projeto` → `aiClient.complete()` recebe todos os dados do cliente e retorna parágrafo de situação atual, pontos de atenção e próximos passos; exibido em painel roxo colapsável no topo.
+
+#### Decisões de arquitetura
+
+- **Sem nova tabela**: todos os dados já existem; a view é puramente de leitura e agregação
+- **Sem nova rota de store**: usar métodos existentes (`getTicketsByClient`, `getTasks`, `getAgendaEventsByClientAndRange`, `getRecords`) com Promise.all para carregar em paralelo
+- **`renderProjectDashboard(clientId)`** — método em `app.js`; guarded por `currentView === 'project-dashboard'`; chamado pelo seletor de cliente
+- **Estado**: `this._projectDashboardClientId` — cliente selecionado; `this._projectDashboardData` — cache dos dados para o export sem re-fetch
+- **Filtro de chamados**: apenas tickets do cliente (match por `linked_client_id` já existente na tabela `tickets`)
+- **Filtro de tarefas**: `client_id` da tarefa
+- **Filtro de agenda**: próximos 30 dias a partir de hoje
+- **Filtro de atendimentos**: últimos 90 dias (configurável futuramente)
+
+#### Migration SQL necessária
+
+Nenhuma — a view usa apenas dados e colunas já existentes. Caso se queira o campo "Data de Entrega" nos chamados OTOBO: `ALTER TABLE tickets ADD COLUMN IF NOT EXISTS date_delivery DATE;`
+
+#### Itens a decidir antes da execução
+
+1. Ponto de acesso principal: aba no modal de cliente vs. item do sidebar?
+2. O painel deve ter filtro de período configurável ou usa janelas fixas (30d agenda, 90d atendimentos)?
+3. "Exportar PDF" deve gerar um único PDF com todos os painéis ou um PDF por painel?
+4. Campo "Responsável T5" nos chamados: usar `owner` do OTOBO ou criar campo novo no app?
 
 ### Backlog de Animações e Visuais (planejado em 2026-06-03)
 
