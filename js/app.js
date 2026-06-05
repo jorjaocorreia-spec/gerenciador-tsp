@@ -1613,7 +1613,8 @@ class AppController {
 
     async renderDashboard(preloadedClients, batchStats) {
         const container = document.getElementById('dashboard-container');
-        this._skDashboard(container);
+        // D6: ao navegar de mês, não mostrar skeleton — mantém cards antigos visíveis durante o fetch
+        if (!this._dashSlideDir) this._skDashboard(container);
 
         const currentMonth = new Date().toISOString().slice(0, 7);
         const isCurrentMonth = this._dashboardMonth === currentMonth;
@@ -1738,15 +1739,19 @@ class AppController {
         }
         stats = stats.filter(s => s !== null);
 
-        // D6: aplicar classe de direção para slide de mês
-        container.classList.remove('dash-slide-right', 'dash-slide-left');
-        if (this._dashSlideDir) {
-            container.classList.add(`dash-slide-${this._dashSlideDir}`);
-            this._dashSlideDir = null;
-            setTimeout(() => container.classList.remove('dash-slide-right', 'dash-slide-left'), 500);
-        }
+        // D6: captura direção e limpa o estado antes de tocar no DOM
+        const slideDir = this._dashSlideDir;
+        this._dashSlideDir = null;
 
         container.innerHTML = '';
+
+        // D6: aplica classe de slide DEPOIS do innerHTML = '' para que os novos cards
+        // já sejam inseridos no container com a classe ativa e a animação dispare corretamente
+        container.classList.remove('dash-slide-right', 'dash-slide-left');
+        if (slideDir) {
+            container.classList.add(`dash-slide-${slideDir}`);
+            setTimeout(() => container.classList.remove('dash-slide-right', 'dash-slide-left'), 500);
+        }
 
         if (stats.length === 0) {
             container.innerHTML = `
