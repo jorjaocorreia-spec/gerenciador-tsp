@@ -142,7 +142,12 @@
                     <h1>Visão Geral do TSP</h1>
                     <p class="text-muted" id="dash-subtitle">Acompanhe o consumo de horas dos seus contratos.</p>
                 </div>
-                <div>
+                <div style="display:flex;gap:8px;align-items:center;">
+                    <button id="btn-open-horas-mes" class="btn btn-ghost btn-sm" onclick="app.openHorasMes()"
+                        style="gap:4px;padding:6px 14px;font-size:13px;"
+                        title="Horas aplicadas no mês agrupadas por cliente">
+                        <i data-lucide="clock" style="width:14px;height:14px;"></i> Horas do Mês
+                    </button>
                     <button id="btn-dash-insights" class="btn btn-ghost btn-sm" onclick="app.generateDashboardInsights()"
                         style="gap:4px;color:#a78bfa;border-color:rgba(167,139,250,0.3);padding:6px 14px;font-size:13px;"
                         title="Análise inteligente dos contratos do mês">
@@ -915,6 +920,22 @@
                 <button class="close-modal" onclick="app.closeModal('modal-saldo')"><i data-lucide="x"></i></button>
             </div>
             <div id="saldo-content" style="padding: 8px 0; overflow-y: auto;">
+                <!-- preenchido dinamicamente -->
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL: HORAS DO MÊS -->
+    <div class="modal-overlay" id="modal-horas-mes" style="align-items: flex-start; padding: 40px 16px; overflow-y: auto;">
+        <div class="modal glass" style="max-width: 680px; max-height: none; display: flex; flex-direction: column;">
+            <div class="modal-header" style="flex-shrink: 0;">
+                <div>
+                    <h3>Horas Aplicadas no Mês</h3>
+                    <p class="text-muted" id="horas-mes-subtitle" style="font-size: 0.85rem; margin: 2px 0 0;"></p>
+                </div>
+                <button class="close-modal" onclick="app.closeModal('modal-horas-mes')"><i data-lucide="x"></i></button>
+            </div>
+            <div id="horas-mes-content" style="padding: 8px 0; overflow-y: auto;">
                 <!-- preenchido dinamicamente -->
             </div>
         </div>

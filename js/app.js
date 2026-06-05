@@ -116,6 +116,8 @@ class AppController {
         // Guard para evitar renderAll() concorrente
         this._renderAllRunning = false;
         this._renderAllPending = false;
+        // Horas do Mês
+        this._horasMesStats = null;
         // OTOBO
         this._otoboConfig = null;
         this._currentTicket = null;
@@ -2205,6 +2207,116 @@ class AppController {
         } catch (err) {
             content.innerHTML = `<p style="color:var(--danger-color); padding:16px;">Erro ao carregar saldo: ${err.message}</p>`;
         }
+    }
+
+    async openHorasMes() {
+        const content = document.getElementById('horas-mes-content');
+        const subtitle = document.getElementById('horas-mes-subtitle');
+        content.innerHTML = `<div style="text-align:center; padding: 24px;">${spinnerHtml}</div>`;
+        this.openModal('modal-horas-mes');
+
+        try {
+            const stats = await store.getBatchStats(this._dashboardMonth);
+            this._horasMesStats = stats.filter(s => s !== null);
+            subtitle.textContent = this._formatDashboardMonth(this._dashboardMonth);
+            this._renderHorasMesContent();
+        } catch (err) {
+            content.innerHTML = `<p style="color:var(--danger-color); padding:16px;">Erro ao carregar: ${err.message}</p>`;
+        }
+    }
+
+    _renderHorasMesContent() {
+        const content = document.getElementById('horas-mes-content');
+        if (!content) return;
+        const showZero = document.getElementById('horas-mes-show-zero')?.checked ?? false;
+        const allStats = this._horasMesStats || [];
+
+        const sorted = [...allStats].sort((a, b) => b.hoursUsed - a.hoursUsed);
+        const totalMinutes = sorted.reduce((sum, s) => sum + s.hoursUsed, 0);
+        const maxMinutes = sorted.find(s => s.hoursUsed > 0)?.hoursUsed || 1;
+        const withHours = sorted.filter(s => s.hoursUsed > 0);
+        const zeroCount = sorted.filter(s => s.hoursUsed === 0).length;
+        const display = showZero ? sorted : withHours;
+
+        const fmtTime = (min) => {
+            const h = Math.floor(min / 60);
+            const m = min % 60;
+            if (h === 0) return `${m}min`;
+            if (m === 0) return `${h}h`;
+            return `${h}h ${String(m).padStart(2, '0')}min`;
+        };
+
+        const rows = display.length === 0
+            ? `<tr><td colspan="4" style="text-align:center; color:var(--text-muted); padding:24px;">Nenhum atendimento lançado no período.</td></tr>`
+            : display.map((s, idx) => {
+                const barPct = Math.round(s.hoursUsed / maxMinutes * 100);
+                const contractPct = s.client.hoursTotal > 0
+                    ? Math.round(s.hoursUsed / (s.client.hoursTotal * 60) * 100)
+                    : null;
+                const barColor = contractPct !== null && contractPct > 100
+                    ? '#f87171'
+                    : contractPct !== null && contractPct >= 80
+                        ? '#fbbf24'
+                        : 'linear-gradient(90deg,#a855f7,#7c3aed)';
+                const proj = s.client.projectNum
+                    ? ` <span style="color:var(--text-muted);font-size:0.75rem;">#${escapeHtml(s.client.projectNum)}</span>`
+                    : '';
+                const contractLabel = s.client.hoursTotal > 0 ? `${s.client.hoursTotal}h` : '—';
+                const pctLabel = contractPct !== null
+                    ? `<span style="font-size:0.75rem;margin-left:4px;color:${contractPct > 100 ? '#f87171' : 'var(--text-muted)'};">${contractPct}%</span>`
+                    : '';
+                const timeLabel = s.hoursUsed > 0
+                    ? `<strong>${fmtTime(s.hoursUsed)}</strong>`
+                    : `<span class="text-muted">—</span>`;
+
+                return `<tr>
+                    <td style="width:28px; color:var(--text-muted); font-size:0.8rem; text-align:right; padding-right:8px;">${idx + 1}</td>
+                    <td>
+                        <div style="font-weight:500;">${escapeHtml(s.client.name)}${proj}</div>
+                        <div style="margin-top:5px; height:5px; background:rgba(255,255,255,0.07); border-radius:3px; overflow:hidden;">
+                            <div class="hm-bar" data-w="${barPct}" style="height:100%; width:0; background:${barColor}; border-radius:3px; transition:width 0.55s ease;"></div>
+                        </div>
+                    </td>
+                    <td style="text-align:right; white-space:nowrap;">${timeLabel}</td>
+                    <td style="text-align:right; color:var(--text-muted); white-space:nowrap;">${contractLabel}${pctLabel}</td>
+                </tr>`;
+            }).join('');
+
+        const totalLabel = totalMinutes > 0 ? fmtTime(totalMinutes) : '0h';
+
+        content.innerHTML = `
+            <div style="padding:16px 24px 12px; border-bottom:1px solid rgba(255,255,255,0.08); display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
+                <div>
+                    <span style="font-size:1.6rem; font-weight:700; color:var(--primary-color);">${totalLabel}</span>
+                    <span style="color:var(--text-muted); font-size:0.875rem; margin-left:10px;">em ${withHours.length} cliente${withHours.length !== 1 ? 's' : ''}</span>
+                </div>
+                <label style="display:flex; align-items:center; gap:8px; cursor:pointer; font-size:0.85rem; color:var(--text-muted);">
+                    <input type="checkbox" id="horas-mes-show-zero" ${showZero ? 'checked' : ''} onchange="app._horasMesToggle()" style="width:16px;height:16px;">
+                    Mostrar sem horas (${zeroCount})
+                </label>
+            </div>
+            <table class="data-table" style="margin:0;">
+                <thead>
+                    <tr>
+                        <th style="width:28px;"></th>
+                        <th>Cliente</th>
+                        <th style="text-align:right;">Aplicado</th>
+                        <th style="text-align:right;">Contrato / %</th>
+                    </tr>
+                </thead>
+                <tbody>${rows}</tbody>
+            </table>`;
+
+        requestAnimationFrame(() => requestAnimationFrame(() => {
+            document.querySelectorAll('#horas-mes-content .hm-bar').forEach(bar => {
+                bar.style.width = bar.dataset.w + '%';
+            });
+        }));
+        lucide.createIcons();
+    }
+
+    _horasMesToggle() {
+        this._renderHorasMesContent();
     }
 
     async renderRecords(preloadedClients) {
@@ -7662,6 +7774,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             window.app._cachedChamadosClients = null;
             window.app._chamadoFiltersAttached = false;
             window.app._whatsappProfile = null;
+            window.app._horasMesStats = null;
         }
         if (window.aiClient) aiClient.reset();
         await Auth.signOut();
