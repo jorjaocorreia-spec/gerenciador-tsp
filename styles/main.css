@@ -3732,3 +3732,13 @@ kbd {
     padding-top: 18px;
     padding-bottom: 6px;
 }
+/* Esconde placeholder enquanto o label ainda está na posição de repouso */
+.float-group > input::placeholder,
+.float-group > textarea::placeholder {
+    color: transparent;
+    transition: color 0.15s ease;
+}
+.float-group > input:focus::placeholder,
+.float-group > textarea:focus::placeholder {
+    color: var(--text-muted, rgba(255,255,255,0.35));
+}
