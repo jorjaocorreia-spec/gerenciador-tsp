@@ -53,18 +53,22 @@ serve(async (req) => {
 
     if (action === "search") {
       const sf = (syncFilters || {}) as Record<string, unknown>;
+      const hasOwnerFilter = typeof sf.ownerLogin === "string" && (sf.ownerLogin as string).trim().length > 0;
       const searchBody: Record<string, unknown> = {
         ...creds,
         SortBy: "Changed",
         OrderBy: "Down",
-        Limit: (typeof sf.limit === "number" && sf.limit > 0) ? sf.limit : 500,
+        // Quando filtrando por proprietário, o OTOBO ignora OwnerLogin no servidor e o filtro
+        // ocorre localmente após o fetch. Usar limite alto para garantir que todos os tickets
+        // do usuário sejam retornados, independente do limite configurado pelo usuário.
+        Limit: hasOwnerFilter ? 5000 : ((typeof sf.limit === "number" && sf.limit > 0) ? sf.limit : 500),
       };
       // Só adiciona filtros se o array não estiver vazio (array vazio = retorna 0 resultados no OTOBO)
       if (Array.isArray(sf.queues) && sf.queues.length > 0) searchBody.Queues = sf.queues;
       if (Array.isArray(sf.states) && sf.states.length > 0) searchBody.States = sf.states;
       if (Array.isArray(sf.types) && sf.types.length > 0) searchBody.Types = sf.types;
-      if (typeof sf.ownerLogin === "string" && sf.ownerLogin.trim()) {
-        const login = sf.ownerLogin.trim();
+      if (hasOwnerFilter) {
+        const login = (sf.ownerLogin as string).trim();
         // Enviar nos dois formatos para máxima compatibilidade com versões do OTOBO
         searchBody.Owners = [login];
         searchBody.OwnerLogin = login;
