@@ -380,6 +380,7 @@ class AppController {
                 document.getElementById('agenda-date-end').value = today;
             }
         }
+        this._initFloatLabels(document.getElementById(modalId));
     }
 
     closeModal(modalId) {
@@ -7750,6 +7751,49 @@ class AppController {
         const ticket = (data.Ticket || [])[0];
         return ticket?.Article || [];
     }
+
+    // ===================================
+    // FLOAT LABELS (F2)
+    // ===================================
+    _initFloatLabels(container) {
+        container.querySelectorAll('.form-group').forEach(group => {
+            if (group.dataset.flInit) return;
+            const lbl = group.querySelector(':scope > label');
+            const ctrl = group.querySelector(
+                ':scope > input:not([type=checkbox]):not([type=radio]):not([readonly]),' +
+                ':scope > textarea:not([readonly]),' +
+                ':scope > select'
+            );
+            if (!lbl || !ctrl) return;
+            group.dataset.flInit = '1';
+            group.classList.add('float-group');
+
+            const update = () => {
+                const focused = document.activeElement === ctrl;
+                const hasVal  = ctrl.value !== '';
+                lbl.classList.toggle('fl-up', focused || hasVal);
+            };
+            ctrl.addEventListener('focus',  update);
+            ctrl.addEventListener('blur',   update);
+            ctrl.addEventListener('input',  update);
+            ctrl.addEventListener('change', update);
+        });
+        this._refreshFloatLabels(container);
+    }
+
+    _refreshFloatLabels(container) {
+        container.querySelectorAll('.float-group').forEach(group => {
+            const lbl  = group.querySelector(':scope > label');
+            const ctrl = group.querySelector(
+                ':scope > input:not([type=checkbox]):not([type=radio]):not([readonly]),' +
+                ':scope > textarea:not([readonly]),' +
+                ':scope > select'
+            );
+            if (!lbl || !ctrl) return;
+            const focused = document.activeElement === ctrl;
+            lbl.classList.toggle('fl-up', focused || ctrl.value !== '');
+        });
+    }
 }
 
 // Iniciar a aplicação quando DOM estiver pronto
@@ -7759,6 +7803,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     const user = await Auth.getSession();
 
     window.app = new AppController();
+    window.app._initFloatLabels(document.getElementById('auth-form'));
 
     if (!user) {
         Auth.showAuthScreen();

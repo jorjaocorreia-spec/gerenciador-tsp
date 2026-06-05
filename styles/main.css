@@ -3551,37 +3551,40 @@ kbd {
     animation: agenda-slide-from-left 0.28s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
-/* F2 — Float label nos formulários */
-.float-field {
+/* F2 — Float label nos formulários (JS-driven, funciona com label antes do input) */
+.float-group {
     position: relative;
-    margin-bottom: 4px;
 }
-.float-field input,
-.float-field textarea,
-.float-field select {
-    padding-top: 22px;
-    padding-bottom: 8px;
-}
-.float-field label {
+.float-group > label {
     position: absolute;
     left: 14px;
     top: 14px;
+    margin-bottom: 0;
     font-size: 0.9rem;
+    font-weight: 500;
     color: var(--text-muted);
     pointer-events: none;
     transition: top 0.18s ease, font-size 0.18s ease, color 0.18s ease;
-    transform-origin: left center;
-    background: transparent;
-    padding: 0 2px;
+    z-index: 1;
+    line-height: 1;
+    max-width: calc(100% - 28px);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
-.float-field input:focus ~ label,
-.float-field input:not(:placeholder-shown) ~ label,
-.float-field textarea:focus ~ label,
-.float-field textarea:not(:placeholder-shown) ~ label,
-.float-field select:focus ~ label,
-.float-field select:valid ~ label {
-    top: 4px;
+.float-group > label.fl-up {
+    top: 5px;
     font-size: 0.72rem;
     color: var(--primary-color);
     letter-spacing: 0.03em;
+    white-space: nowrap;
+}
+.float-group > input.form-control:not([readonly]),
+.float-group > textarea.form-control {
+    padding-top: 22px;
+    padding-bottom: 8px;
+}
+.float-group > select.form-control {
+    padding-top: 18px;
+    padding-bottom: 6px;
 }
