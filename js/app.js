@@ -6637,6 +6637,10 @@ class AppController {
     toggleAIKeyVisibility() {
         const input = document.getElementById('ai-api-key');
         const icon = document.getElementById('icon-ai-key-toggle');
+        if (input.value.startsWith('•')) {
+            Toast.show('A chave está salva de forma segura. Redigite para alterá-la.', 'info');
+            return;
+        }
         if (input.type === 'password') {
             input.type = 'text';
             icon.setAttribute('data-lucide', 'eye-off');
