@@ -125,6 +125,7 @@ class AppController {
         this._cachedChamadosTickets = null;
         this._cachedChamadosClients = null;
         this._chamadoFiltersAttached = false;
+        this._chamadoFilterSaveTimer = null;
         this.init();
     }
 
@@ -7147,6 +7148,7 @@ class AppController {
 
             document.getElementById('chamados-filters').style.display = '';
             this._populateChamadoFilterDropdowns(tickets, clients);
+            this._restoreChamadoFilters(this._otoboConfig?.localFilters || {});
             this._attachChamadoFilterListeners();
 
             const filtered = this._applyTicketFilters(tickets, clients);
@@ -7269,6 +7271,12 @@ class AppController {
             this._renderChamadosCards(filtered, this._cachedChamadosClients, content);
         }
         lucide.createIcons();
+        clearTimeout(this._chamadoFilterSaveTimer);
+        this._chamadoFilterSaveTimer = setTimeout(() => {
+            const state = this._getChamadoFilterState();
+            store.saveOtoboLocalFilters(state).catch(() => {});
+            if (this._otoboConfig) this._otoboConfig.localFilters = state;
+        }, 800);
     }
 
     _applyTicketFilters(tickets, clients) {
@@ -7327,6 +7335,38 @@ class AppController {
         const search = document.getElementById('filter-chamado-search');
         if (search) search.value = '';
         this._rerenderChamadosWithFilters();
+        clearTimeout(this._chamadoFilterSaveTimer);
+        store.saveOtoboLocalFilters({}).catch(() => {});
+        if (this._otoboConfig) this._otoboConfig.localFilters = {};
+    }
+
+    _getChamadoFilterState() {
+        return {
+            search:   document.getElementById('filter-chamado-search')?.value || '',
+            status:   this._getMfValues('mf-status'),
+            priority: this._getMfValues('mf-priority'),
+            queue:    this._getMfValues('mf-queue'),
+            owner:    this._getMfValues('mf-owner'),
+            type:     this._getMfValues('mf-type'),
+            client:   this._getMfValues('mf-client')
+        };
+    }
+
+    _restoreChamadoFilters(saved) {
+        if (!saved || !Object.keys(saved).length) return;
+        const mfKeys = ['status', 'priority', 'queue', 'owner', 'type', 'client'];
+        for (const key of mfKeys) {
+            const vals = saved[key];
+            if (!vals?.length) continue;
+            const wrap = document.getElementById(`mf-${key}`);
+            if (!wrap) continue;
+            wrap.querySelectorAll('.mf-dropdown input').forEach(cb => {
+                cb.checked = vals.includes(cb.value);
+            });
+            this._updateMfLabel(`mf-${key}`);
+        }
+        const searchEl = document.getElementById('filter-chamado-search');
+        if (searchEl && saved.search) searchEl.value = saved.search;
     }
 
     switchOtoboTab(tab) {
@@ -7841,6 +7881,8 @@ document.addEventListener('DOMContentLoaded', async () => {
             window.app._cachedChamadosTickets = null;
             window.app._cachedChamadosClients = null;
             window.app._chamadoFiltersAttached = false;
+            clearTimeout(window.app._chamadoFilterSaveTimer);
+            window.app._chamadoFilterSaveTimer = null;
             window.app._whatsappProfile = null;
             window.app._horasMesStats = null;
         }
