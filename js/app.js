@@ -7657,7 +7657,10 @@ class AppController {
         document.getElementById('sync-filter-queues').value  = (sf.queues  || []).join('\n');
         document.getElementById('sync-filter-states').value  = (sf.states  || []).join('\n');
         document.getElementById('sync-filter-types').value   = (sf.types   || []).join('\n');
-        document.getElementById('sync-filter-owner').value   = sf.ownerLogin || '';
+        const onlyMine = !!sf.onlyMine;
+        document.getElementById('sync-filter-only-mine').checked = onlyMine;
+        document.getElementById('sync-filter-owner').value   = onlyMine ? '' : (sf.ownerLogin || '');
+        document.getElementById('owner-filter-row').style.display = onlyMine ? 'none' : '';
         document.getElementById('sync-filter-limit').value   = sf.limit || 100;
         this.switchOtoboTab('conexao');
         this.openModal('modal-otobo-config');
@@ -7674,11 +7677,13 @@ class AppController {
         }
         const parseLines = id => document.getElementById(id).value
             .split('\n').map(s => s.trim()).filter(Boolean);
+        const onlyMine = document.getElementById('sync-filter-only-mine').checked;
         const syncFilters = {
             queues:     parseLines('sync-filter-queues'),
             states:     parseLines('sync-filter-states'),
             types:      parseLines('sync-filter-types'),
-            ownerLogin: document.getElementById('sync-filter-owner').value.trim(),
+            ownerLogin: onlyMine ? username : document.getElementById('sync-filter-owner').value.trim(),
+            onlyMine,
             limit:      parseInt(document.getElementById('sync-filter-limit').value) || 100
         };
         try {
@@ -7690,6 +7695,11 @@ class AppController {
         } catch (err) {
             Toast.show('Erro ao salvar: ' + err.message, 'error');
         }
+    }
+
+    toggleOnlyMineFilter(checked) {
+        document.getElementById('owner-filter-row').style.display = checked ? 'none' : '';
+        if (checked) document.getElementById('sync-filter-owner').value = '';
     }
 
     // ─── WhatsApp Bot ───────────────────────────────────────────────────────
