@@ -3411,24 +3411,26 @@ class AppController {
         let eventsHtml = timedEvents.map(ev => this.createEventBlockHtml(ev, '100%', clientsMap)).join('');
 
         const allDaySection = allDayEvents.length > 0
-            ? `<div class="agenda-allday-row"><div class="agenda-allday-label">Dia inteiro</div><div class="agenda-allday-events">${allDayHtml}</div></div>`
+            ? `<div class="agenda-allday-time-slot">DIA INTEIRO</div>
+               <div class="agenda-allday-week-grid" style="grid-template-columns: 1fr;">
+                   <div class="agenda-allday-col">${allDayHtml}</div>
+               </div>`
             : '';
 
         container.innerHTML = `
-            <div class="agenda-grid">
+            <div class="agenda-week-grid">
+                <div class="agenda-week-header-spacer"></div>
+                <div class="agenda-days-row" style="grid-template-columns: 1fr;">
+                    <div class="agenda-day-header active">${this.formatDateBR(this.agendaCurrentDate)}</div>
+                </div>
+                ${allDaySection}
                 <div class="agenda-time-column">
                     ${this.generateTimeSlots()}
                 </div>
-                <div class="agenda-content-column">
-                    <div class="agenda-days-row" style="grid-template-columns: 1fr;">
-                        <div class="agenda-day-header active">${this.formatDateBR(this.agendaCurrentDate)}</div>
-                    </div>
-                    ${allDaySection}
-                    <div class="events-container" style="cursor: pointer;"
-                         onclick="app.openNewAgendaEvent('${isoDate}')">
-                        <div class="agenda-grid-lines"></div>
-                        ${eventsHtml}
-                    </div>
+                <div class="events-container" style="cursor: pointer;"
+                     onclick="app.openNewAgendaEvent('${isoDate}')">
+                    <div class="agenda-grid-lines"></div>
+                    ${eventsHtml}
                 </div>
             </div>
         `;
