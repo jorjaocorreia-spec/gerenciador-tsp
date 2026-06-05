@@ -365,32 +365,43 @@
                     <h1>Agenda</h1>
                     <p class="text-muted">Agendamento de reuniões, consultorias e tarefas.</p>
                 </div>
-                <div style="display: flex; gap: 12px; align-items: center;">
-                    <button class="btn btn-secondary" id="btn-agenda-sync" onclick="app.promptGoogleSync()">
-                        <i data-lucide="refresh-cw"></i> Sincronizar Google
-                    </button>
-                    <button class="btn btn-secondary" id="btn-calendar-settings" onclick="app.openCalendarSettings()" title="Configurar integração Google Calendar">
-                        <i data-lucide="settings"></i>
-                    </button>
-                    <button class="btn btn-secondary" onclick="app.openAgendaHelp()" title="Como funciona a integração com Google Calendar" style="font-weight:600; min-width:36px;">
-                        <i data-lucide="help-circle"></i>
-                    </button>
-                    <button class="btn btn-ghost btn-sm" id="btn-agenda-ai-assistant" onclick="app.toggleAgendaAssistant()"
-                        style="gap:4px;color:#a78bfa;border-color:rgba(167,139,250,0.3);padding:6px 12px;font-size:13px;"
-                        title="Criar evento com linguagem natural">
-                        <i data-lucide="sparkles" style="width:14px;height:14px;"></i> Assistente
-                    </button>
-                    <button class="btn btn-secondary" id="btn-agenda-report" onclick="app.openAgendaReportModal()" title="Gerar relatório de agenda por cliente">
-                        <i data-lucide="file-text"></i> Relatório
-                    </button>
-                    <button class="btn btn-secondary active-mode" id="btn-agenda-schedule"
-                        onclick="app.switchAgendaMode('schedule')">Programação</button>
-                    <button class="btn btn-secondary" id="btn-agenda-monthly"
-                        onclick="app.switchAgendaMode('monthly')">Mensal</button>
-                    <button class="btn btn-secondary" id="btn-agenda-weekly"
-                        onclick="app.switchAgendaMode('weekly')">Semanal</button>
-                    <button class="btn btn-secondary" id="btn-agenda-daily"
-                        onclick="app.switchAgendaMode('daily')">Diário</button>
+                <div class="agenda-toolbar">
+                    <!-- Grupo 1: integração Google -->
+                    <div class="agenda-toolbar-group">
+                        <button class="btn btn-secondary btn-icon-sm" id="btn-calendar-settings" onclick="app.openCalendarSettings()" title="Configurar integração Google Calendar">
+                            <i data-lucide="settings"></i>
+                        </button>
+                        <button class="btn btn-secondary btn-icon-sm" onclick="app.openAgendaHelp()" title="Como funciona a integração com Google Calendar">
+                            <i data-lucide="help-circle"></i>
+                        </button>
+                        <button class="btn btn-secondary" id="btn-agenda-sync" onclick="app.promptGoogleSync()">
+                            <i data-lucide="refresh-cw"></i> Sincronizar
+                        </button>
+                    </div>
+
+                    <div class="agenda-toolbar-sep"></div>
+
+                    <!-- Grupo 2: ferramentas IA -->
+                    <div class="agenda-toolbar-group">
+                        <button class="btn btn-secondary agenda-ai-btn" id="btn-agenda-ai-assistant" onclick="app.toggleAgendaAssistant()" title="Criar evento com linguagem natural">
+                            <i data-lucide="sparkles"></i> Assistente
+                        </button>
+                        <button class="btn btn-secondary" id="btn-agenda-report" onclick="app.openAgendaReportModal()" title="Gerar relatório de agenda por cliente">
+                            <i data-lucide="file-text"></i> Relatório
+                        </button>
+                    </div>
+
+                    <div class="agenda-toolbar-sep"></div>
+
+                    <!-- Grupo 3: seletor de view (segmented control) -->
+                    <div class="agenda-view-switcher">
+                        <button class="agenda-view-btn active-mode" id="btn-agenda-schedule" onclick="app.switchAgendaMode('schedule')">Programação</button>
+                        <button class="agenda-view-btn" id="btn-agenda-monthly" onclick="app.switchAgendaMode('monthly')">Mensal</button>
+                        <button class="agenda-view-btn" id="btn-agenda-weekly" onclick="app.switchAgendaMode('weekly')">Semanal</button>
+                        <button class="agenda-view-btn" id="btn-agenda-daily" onclick="app.switchAgendaMode('daily')">Diário</button>
+                    </div>
+
+                    <!-- CTA -->
                     <button class="btn btn-primary" onclick="app.openNewAgendaEvent(new Date().toISOString().split('T')[0])">
                         <i data-lucide="plus"></i> Novo Agendamento
                     </button>
