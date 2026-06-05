@@ -7657,7 +7657,7 @@ class AppController {
         document.getElementById('sync-filter-queues').value  = (sf.queues  || []).join('\n');
         document.getElementById('sync-filter-states').value  = (sf.states  || []).join('\n');
         document.getElementById('sync-filter-types').value   = (sf.types   || []).join('\n');
-        const onlyMine = !!sf.onlyMine;
+        const onlyMine = cfg ? !!sf.onlyMine : true;
         document.getElementById('sync-filter-only-mine').checked = onlyMine;
         document.getElementById('sync-filter-owner').value   = onlyMine ? '' : (sf.ownerLogin || '');
         document.getElementById('owner-filter-row').style.display = onlyMine ? 'none' : '';
