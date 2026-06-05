@@ -7926,6 +7926,8 @@ document.addEventListener('DOMContentLoaded', async () => {
                 window.app._googleSyncInterval = null;
             }
             window.app._lastGoogleSync = 0;
+            calendarAPI.isAuthenticated = false;
+            calendarAPI.clearSavedToken();
             window.app._otoboConfig = null;
             window.app._currentTicket = null;
             window.app._cachedChamadosTickets = null;

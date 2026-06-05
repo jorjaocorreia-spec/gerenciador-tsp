@@ -9,6 +9,41 @@ const GoogleCalendarAPI = {
     gisInited: false,
     _clientId: '',
     _apiKey: '',
+    _STORAGE_KEY: 'gapi_calendar_token',
+
+    _saveToken() {
+        const token = gapi.client.getToken();
+        if (!token || !token.access_token) return;
+        try {
+            localStorage.setItem(this._STORAGE_KEY, JSON.stringify({ ...token, _savedAt: Date.now() }));
+        } catch {}
+    },
+
+    _loadSavedToken() {
+        try {
+            const raw = localStorage.getItem(this._STORAGE_KEY);
+            if (!raw) return null;
+            const data = JSON.parse(raw);
+            const ageMs = Date.now() - (data._savedAt || 0);
+            const maxAgeMs = ((data.expires_in || 3600) - 120) * 1000;
+            return ageMs < maxAgeMs ? data : null;
+        } catch { return null; }
+    },
+
+    clearSavedToken() {
+        try { localStorage.removeItem(this._STORAGE_KEY); } catch {}
+    },
+
+    _trySilentAuth() {
+        if (!this.tokenClient || !this.isEnabled) return;
+        this.tokenClient.callback = (resp) => {
+            if (resp.error) return;
+            this._saveToken();
+            this.isAuthenticated = true;
+            if (window.app) app.onCalendarAuthenticated();
+        };
+        this.tokenClient.requestAccessToken({ prompt: '' });
+    },
 
     // Chamado após carregar as credenciais do Supabase.
     // Lida com dois cenários: scripts CDN já carregados, ou ainda pendentes.
@@ -57,9 +92,19 @@ const GoogleCalendarAPI = {
         }
 
         const token = gapi.client.getToken();
-        if (token) {
+        if (token && token.access_token) {
             this.isAuthenticated = true;
             if (window.app) app.onCalendarAuthenticated();
+        } else {
+            const saved = this._loadSavedToken();
+            if (saved) {
+                gapi.client.setToken(saved);
+                this.isAuthenticated = true;
+                if (window.app) app.onCalendarAuthenticated();
+            } else {
+                // Tenta renovar silenciosamente se o usuário já concedeu permissão antes
+                this._trySilentAuth();
+            }
         }
     },
 
@@ -112,6 +157,7 @@ const GoogleCalendarAPI = {
                     resolve(false);
                     return;
                 }
+                this._saveToken();
                 this.isAuthenticated = true;
                 resolve(true);
             };
