@@ -7,6 +7,9 @@ const corsHeaders = {
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
+// Estados que nunca devem ser sincronizados (tickets fechados)
+const EXCLUDED_STATES = ["fechado com sucesso", "fechado sem sucesso"];
+
 async function fetchJson(url: string, options: RequestInit): Promise<unknown> {
   const res = await fetch(url, options);
   const text = await res.text();
@@ -95,8 +98,12 @@ serve(async (req) => {
           }
           // Resposta pode ser { Ticket: [...] } ou { Ticket: {} }
           const t = res?.Ticket;
-          if (Array.isArray(t)) tickets.push(...t);
-          else if (t) tickets.push(t);
+          const addTicket = (tk: unknown) => {
+            const state = ((tk as Record<string, unknown>)?.State as string || "").toLowerCase();
+            if (!EXCLUDED_STATES.includes(state)) tickets.push(tk);
+          };
+          if (Array.isArray(t)) t.forEach(addTicket);
+          else if (t) addTicket(t);
         } catch {
           denied++;
         }
