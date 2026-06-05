@@ -36,6 +36,47 @@ const GoogleCalendarAPI = {
         try { localStorage.removeItem(this._STORAGE_KEY); } catch {}
     },
 
+    // Tenta obter token sem UI — funciona silenciosamente quando o usuário já tem
+    // sessão Google ativa e já concedeu consentimento anteriormente.
+    // Fire-and-forget: falha silenciosa se não houver sessão.
+    _trySilentAuth() {
+        if (!this.isEnabled || !this.tokenClient || this.isAuthenticated) return;
+        this.tokenClient.callback = (resp) => {
+            if (resp.error !== undefined) return; // sem sessão ativa — ok, usuário conecta manualmente
+            this._saveToken(resp);
+            this.isAuthenticated = true;
+            if (window.app) { app.onCalendarAuthenticated(); app._updateGoogleSyncStatus(); }
+        };
+        try { this.tokenClient.requestAccessToken({ prompt: '' }); } catch {}
+    },
+
+    // Garante token válido antes de chamadas à API.
+    // Tenta restaurar do localStorage; se expirado, tenta silent re-auth.
+    // Retorna true se token disponível, false se precisar de interação do usuário.
+    async _ensureToken() {
+        if (this.isAuthenticated && gapi.client.getToken()?.access_token) return true;
+        const saved = this._loadSavedToken();
+        if (saved) {
+            gapi.client.setToken(saved);
+            this.isAuthenticated = true;
+            return true;
+        }
+        // Token expirado — tenta silent re-auth com timeout de 5s
+        return new Promise((resolve) => {
+            const timer = setTimeout(() => resolve(false), 5000);
+            this.tokenClient.callback = (resp) => {
+                clearTimeout(timer);
+                if (resp.error !== undefined) { this.isAuthenticated = false; resolve(false); return; }
+                this._saveToken(resp);
+                this.isAuthenticated = true;
+                if (window.app) app._updateGoogleSyncStatus();
+                resolve(true);
+            };
+            try { this.tokenClient.requestAccessToken({ prompt: '' }); }
+            catch { clearTimeout(timer); resolve(false); }
+        });
+    },
+
     // Chamado após carregar as credenciais do Supabase.
     // Lida com dois cenários: scripts CDN já carregados, ou ainda pendentes.
     async configure(clientId, apiKey) {
@@ -92,6 +133,9 @@ const GoogleCalendarAPI = {
                 gapi.client.setToken(saved);
                 this.isAuthenticated = true;
                 if (window.app) app.onCalendarAuthenticated();
+            } else {
+                // Nenhum token válido — tenta conectar automaticamente se sessão Google ativa
+                this._trySilentAuth();
             }
         }
         // Atualiza chip de status mesmo quando não autenticado
@@ -161,7 +205,7 @@ const GoogleCalendarAPI = {
     },
 
     async syncEventsFromGoogle(syncRangeDays = 30) {
-        if (!this.isAuthenticated) return null;
+        if (!await this._ensureToken()) return null;
         const timeMin = new Date();
         timeMin.setDate(timeMin.getDate() - syncRangeDays);
         const timeMax = new Date();
@@ -255,7 +299,7 @@ const GoogleCalendarAPI = {
     },
 
     async createGoogleEvent(eventData) {
-        if (!this.isAuthenticated) return null;
+        if (!await this._ensureToken()) return null;
         try {
             const params = { calendarId: 'primary', resource: this.mapLocalToGoogleEvent(eventData) };
             if (eventData.generateMeet) params.conferenceDataVersion = 1;
@@ -272,7 +316,7 @@ const GoogleCalendarAPI = {
     },
 
     async updateGoogleEvent(eventId, eventData) {
-        if (!this.isAuthenticated) return false;
+        if (!await this._ensureToken()) return false;
         try {
             const params = {
                 calendarId: 'primary',
@@ -293,7 +337,7 @@ const GoogleCalendarAPI = {
     },
 
     async deleteGoogleEvent(eventId) {
-        if (!this.isAuthenticated || !eventId) return false;
+        if (!eventId || !await this._ensureToken()) return false;
         try {
             await gapi.client.calendar.events.delete({ calendarId: 'primary', eventId });
             return true;
