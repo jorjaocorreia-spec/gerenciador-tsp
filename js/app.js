@@ -216,6 +216,18 @@ class AppController {
             if (e.key === 'Enter' && e.ctrlKey) { e.preventDefault(); this.handleAddTaskComment(); }
         });
 
+        // Ao trocar cliente no modal de tarefa: recarrega colunas e atualiza "Mover Para"
+        document.getElementById('task-client')?.addEventListener('change', async (e) => {
+            const clientId = e.target.value;
+            if (clientId) {
+                this._currentColumns = await store.ensureDefaultColumns(clientId).catch(() => []);
+            } else {
+                this._currentColumns = [];
+            }
+            this._modalStatus = this._currentColumns[0]?.id || 'new';
+            this._syncModalColumnButtons();
+        });
+
         // Paste de imagens nos modais de tarefa, implementação e treinamento
         document.addEventListener('paste', (e) => {
             const taskActive     = document.getElementById('modal-task')?.classList.contains('active');
@@ -2495,11 +2507,8 @@ class AppController {
     async renderTasks() {
         if (this.currentView !== 'tasks') return;
 
-        // Migração única por sessão: status antigos ('new','doing','done') → UUIDs
-        if (!sessionStorage.getItem('kbMigrated')) {
-            await this._migrateOldStatuses();
-            sessionStorage.setItem('kbMigrated', '1');
-        }
+        // Migração: status antigos ('new','doing','done') → UUIDs das colunas do cliente
+        await this._migrateOldStatuses();
 
         const filterClient   = document.getElementById('filter-task-client')?.value;
         const filterPriority = document.getElementById('filter-task-priority')?.value;
