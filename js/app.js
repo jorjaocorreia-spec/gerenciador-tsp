@@ -6650,10 +6650,12 @@ class AppController {
     async handleAIConfigSubmit(e) {
         e.preventDefault();
         const provider = document.getElementById('ai-provider').value;
-        const apiKey = document.getElementById('ai-api-key').value.trim();
+        const rawKey = document.getElementById('ai-api-key').value.trim();
         const model = document.getElementById('ai-model').value;
+        const keyUnchanged = rawKey.startsWith('•');
+        const apiKey = keyUnchanged ? null : rawKey;
 
-        if (!apiKey || apiKey.startsWith('•')) {
+        if (!keyUnchanged && !rawKey) {
             Toast.show('Insira uma API key válida.', 'error');
             return;
         }
@@ -6679,10 +6681,12 @@ class AppController {
 
     async testAIConnection() {
         const provider = document.getElementById('ai-provider').value;
-        const apiKey = document.getElementById('ai-api-key').value.trim();
+        const rawKey = document.getElementById('ai-api-key').value.trim();
         const model = document.getElementById('ai-model').value;
+        const keyUnchanged = rawKey.startsWith('•');
+        const apiKey = keyUnchanged ? null : rawKey;
 
-        if (!apiKey || apiKey.startsWith('•')) {
+        if (!keyUnchanged && !rawKey) {
             Toast.show('Salve a configuração antes de testar.', 'error');
             return;
         }
@@ -6693,7 +6697,6 @@ class AppController {
         btn.innerHTML = '<div class="spinner" style="width:14px;height:14px;"></div> Testando...';
 
         try {
-            // Salva temporariamente para testar via proxy
             await store.saveAIConfig(provider, apiKey, model);
             await aiClient.loadConfig();
             const resp = await aiClient.testConnection();

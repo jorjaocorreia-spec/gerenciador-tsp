@@ -1059,11 +1059,19 @@ class TSPStore {
     }
 
     async saveAIConfig(provider, apiKey, model) {
-        const { error } = await this.db.from('user_ai_config').upsert({
-            user_id: this.userId, provider, api_key: apiKey, model,
-            updated_at: new Date().toISOString()
-        }, { onConflict: 'user_id' });
-        if (error) throw error;
+        if (apiKey === null) {
+            // Key unchanged — only update provider and model
+            const { error } = await this.db.from('user_ai_config')
+                .update({ provider, model, updated_at: new Date().toISOString() })
+                .eq('user_id', this.userId);
+            if (error) throw error;
+        } else {
+            const { error } = await this.db.from('user_ai_config').upsert({
+                user_id: this.userId, provider, api_key: apiKey, model,
+                updated_at: new Date().toISOString()
+            }, { onConflict: 'user_id' });
+            if (error) throw error;
+        }
     }
 
     async deleteAIConfig() {
