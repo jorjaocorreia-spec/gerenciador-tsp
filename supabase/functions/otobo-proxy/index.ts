@@ -43,7 +43,7 @@ serve(async (req) => {
       return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers: corsHeaders });
     }
 
-    const { action, otoboUrl, username, password, ticketIds, ticketId, syncFilters } = await req.json();
+    const { action, otoboUrl, username, password, ticketIds, ticketId, syncFilters, lastSyncAt } = await req.json();
     const base = (otoboUrl || "").replace(/\/$/, "");
     const creds = { UserLogin: username, Password: password };
     const jsonHeaders = { "Content-Type": "application/json" };
@@ -54,14 +54,16 @@ serve(async (req) => {
     if (action === "search") {
       const sf = (syncFilters || {}) as Record<string, unknown>;
       const hasOwnerFilter = typeof sf.ownerLogin === "string" && (sf.ownerLogin as string).trim().length > 0;
+      const isIncremental = typeof lastSyncAt === "string" && lastSyncAt.trim().length > 0;
+
       const searchBody: Record<string, unknown> = {
         ...creds,
         SortBy: "Changed",
         OrderBy: "Down",
-        // Quando filtrando por proprietário, o OTOBO ignora OwnerLogin no servidor e o filtro
-        // ocorre localmente após o fetch. Usar limite alto para garantir que todos os tickets
-        // do usuário sejam retornados, independente do limite configurado pelo usuário.
-        Limit: hasOwnerFilter ? 5000 : ((typeof sf.limit === "number" && sf.limit > 0) ? sf.limit : 500),
+        // Sync incremental: limite baixo pois só busca tickets recentemente alterados.
+        // Sync completa com owner (agora funciona server-side): 500 suficiente para a carteira do usuário.
+        // Sem owner: 500 para comportamento padrão.
+        Limit: isIncremental ? 200 : ((typeof sf.limit === "number" && sf.limit > 0) ? sf.limit : 500),
       };
       // Só adiciona filtros se o array não estiver vazio (array vazio = retorna 0 resultados no OTOBO)
       if (Array.isArray(sf.queues) && sf.queues.length > 0) searchBody.Queues = sf.queues;
@@ -72,6 +74,14 @@ serve(async (req) => {
         // Enviar nos dois formatos para máxima compatibilidade com versões do OTOBO
         searchBody.Owners = [login];
         searchBody.OwnerLogin = login;
+      }
+      // Sync incremental: só buscar tickets alterados desde a última sincronização.
+      // Formato esperado pelo OTOBO: "YYYY-MM-DD HH:MM:SS"
+      if (isIncremental) {
+        const d = new Date(lastSyncAt as string);
+        const pad = (n: number) => String(n).padStart(2, "0");
+        const otoboDate = `${d.getUTCFullYear()}-${pad(d.getUTCMonth()+1)}-${pad(d.getUTCDate())} ${pad(d.getUTCHours())}:${pad(d.getUTCMinutes())}:${pad(d.getUTCSeconds())}`;
+        searchBody.TicketLastChangeTimeNewerDate = otoboDate;
       }
 
       data = await fetchJson(

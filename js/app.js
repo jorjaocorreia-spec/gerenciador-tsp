@@ -7137,6 +7137,14 @@ class AppController {
 
         document.getElementById('btn-sync-chamados').style.display = '';
 
+        // Mostrar data da última sync (incremental ou completa)
+        const syncInfo = document.getElementById('chamados-sync-info');
+        if (syncInfo && this._otoboConfig.lastSyncAt) {
+            const lastSync = new Date(this._otoboConfig.lastSyncAt).toLocaleString('pt-BR');
+            syncInfo.textContent = `Última sync: ${lastSync} (incremental)`;
+            syncInfo.style.display = '';
+        }
+
         try {
             const [tickets, clients] = await Promise.all([store.getTickets(), store.getClients()]);
             this._cachedChamadosTickets = tickets;
@@ -7483,34 +7491,44 @@ class AppController {
         return `há ${diffMonths} ${diffMonths === 1 ? 'mês' : 'meses'}`;
     }
 
-    async syncChamados() {
+    async syncChamados(force = false) {
         const btn = document.getElementById('btn-sync-chamados');
         const info = document.getElementById('chamados-sync-info');
         const setInfo = (txt) => { if (info) { info.textContent = txt; info.style.display = ''; } };
         if (btn) { btn.disabled = true; btn.classList.add('syncing'); }
-        setInfo('Conectando ao OTOBO...');
+
+        const lastSyncAt = force ? null : (this._otoboConfig?.lastSyncAt || null);
+        const isIncremental = !!lastSyncAt;
+        const syncStart = new Date().toISOString();
+
+        setInfo(isIncremental ? 'Sincronizando atualizações...' : 'Conectando ao OTOBO...');
         try {
             const config = this._otoboConfig;
-            const { tickets: otoboTickets, foundIds, denied } = await this._fetchTicketsFromOtobo(config, setInfo);
+            const { tickets: otoboTickets, foundIds, denied } = await this._fetchTicketsFromOtobo(config, setInfo, lastSyncAt);
             setInfo(`Mapeando ${otoboTickets.length} chamado(s)...`);
             const clients = await store.getClients();
             const rows = this._mapTicketsToRows(otoboTickets, clients);
             const ticketIds = rows.map(r => r.ticket_id);
             setInfo('Salvando no banco...');
             await store.upsertTickets(rows);
-            // Quando filtrando por proprietário, não deletar o cache — o sync traz apenas
-            // uma janela recente (500 mais modificados) e tickets antigos do usuário que
-            // não caíram nessa janela devem permanecer no banco.
-            // Sem filtro de owner: deletar normalmente tickets que saíram do OTOBO.
+            // Sync completa sem owner: apagar tickets que sumiram do OTOBO.
+            // Sync incremental: nunca apagar — só vieram tickets recentemente alterados,
+            // não todos os tickets do usuário.
             const ownerFilter = (this._otoboConfig?.syncFilters?.ownerLogin || '').trim();
-            if (!ownerFilter) {
+            if (!isIncremental && !ownerFilter) {
                 await store.deleteTicketsNotIn(ticketIds);
             }
+            // Salvar timestamp da sync para a próxima ser incremental
+            await store.saveOtoboLastSync(syncStart).catch(() => {});
+            this._otoboConfig.lastSyncAt = syncStart;
+
             const now = new Date().toLocaleString('pt-BR');
-            setInfo(`Última sync: ${now}`);
+            setInfo(`Última sync: ${now}${isIncremental ? ' (incremental)' : ''}`);
             this._cachedChamadosTickets = null;
             await this.renderChamados();
-            let msg = `${rows.length} chamado(s) sincronizado(s)!`;
+            let msg = isIncremental
+                ? `${rows.length} chamado(s) atualizado(s)!`
+                : `${rows.length} chamado(s) sincronizado(s)!`;
             if (denied > 0) msg += ` (${foundIds} encontrados no OTOBO, ${denied} sem acesso)`;
             else if (foundIds > rows.length) msg += ` (${foundIds} encontrados no OTOBO)`;
             Toast.show(msg, 'success', denied > 0 ? 8000 : 4000);
@@ -7549,10 +7567,11 @@ class AppController {
         return res.json();
     }
 
-    async _fetchTicketsFromOtobo(config, onProgress) {
+    async _fetchTicketsFromOtobo(config, onProgress, lastSyncAt = null) {
         const syncFilters = this._otoboConfig?.syncFilters || {};
-        if (onProgress) onProgress('Buscando lista de chamados...');
-        const searchData = await this._otoboProxyFetch('search', { syncFilters });
+        const isIncremental = !!lastSyncAt;
+        if (onProgress) onProgress(isIncremental ? 'Buscando tickets alterados...' : 'Buscando lista de chamados...');
+        const searchData = await this._otoboProxyFetch('search', { syncFilters, lastSyncAt });
         const ticketIds = Array.isArray(searchData.TicketID)
             ? searchData.TicketID
             : (searchData.TicketID ? [searchData.TicketID] : []);

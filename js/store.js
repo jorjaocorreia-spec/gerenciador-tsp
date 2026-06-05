@@ -969,7 +969,7 @@ class TSPStore {
         return {
             url: r.url || '', username: r.username || '', password: r.password || '',
             syncFilters: r.sync_filters || {}, localFilters: r.local_filters || {},
-            updatedAt: r.updated_at
+            updatedAt: r.updated_at, lastSyncAt: r.last_sync_at || null
         };
     }
 
@@ -1007,6 +1007,13 @@ class TSPStore {
     async saveOtoboLocalFilters(filters) {
         const { error } = await this.db.from('otobo_config')
             .update({ local_filters: filters, updated_at: new Date().toISOString() })
+            .eq('user_id', this.userId);
+        if (error) throw error;
+    }
+
+    async saveOtoboLastSync(isoTimestamp) {
+        const { error } = await this.db.from('otobo_config')
+            .update({ last_sync_at: isoTimestamp })
             .eq('user_id', this.userId);
         if (error) throw error;
     }
