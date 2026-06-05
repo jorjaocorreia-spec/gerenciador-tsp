@@ -3490,7 +3490,8 @@ kbd {
 /* A3 — Removed: caused flickering; A5+V1 handle transitions */
 
 /* A4 — Ícone do botão sync gira enquanto sincroniza */
-#btn-agenda-sync.syncing svg {
+#btn-agenda-sync.syncing svg,
+#btn-sync-chamados.syncing svg {
     animation: spin 0.75s linear infinite;
 }
 

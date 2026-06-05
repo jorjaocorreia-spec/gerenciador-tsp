@@ -7485,14 +7485,18 @@ class AppController {
 
     async syncChamados() {
         const btn = document.getElementById('btn-sync-chamados');
-        if (btn) btn.disabled = true;
-        Toast.show('Sincronizando com OTOBO...', 'info', 2000);
+        const info = document.getElementById('chamados-sync-info');
+        const setInfo = (txt) => { if (info) { info.textContent = txt; info.style.display = ''; } };
+        if (btn) { btn.disabled = true; btn.classList.add('syncing'); }
+        setInfo('Conectando ao OTOBO...');
         try {
             const config = this._otoboConfig;
-            const { tickets: otoboTickets, foundIds, denied } = await this._fetchTicketsFromOtobo(config);
+            const { tickets: otoboTickets, foundIds, denied } = await this._fetchTicketsFromOtobo(config, setInfo);
+            setInfo(`Mapeando ${otoboTickets.length} chamado(s)...`);
             const clients = await store.getClients();
             const rows = this._mapTicketsToRows(otoboTickets, clients);
             const ticketIds = rows.map(r => r.ticket_id);
+            setInfo('Salvando no banco...');
             await store.upsertTickets(rows);
             // Quando filtrando por proprietário, não deletar o cache — o sync traz apenas
             // uma janela recente (500 mais modificados) e tickets antigos do usuário que
@@ -7503,8 +7507,7 @@ class AppController {
                 await store.deleteTicketsNotIn(ticketIds);
             }
             const now = new Date().toLocaleString('pt-BR');
-            const info = document.getElementById('chamados-sync-info');
-            if (info) { info.textContent = `Última sync: ${now}`; info.style.display = ''; }
+            setInfo(`Última sync: ${now}`);
             this._cachedChamadosTickets = null;
             await this.renderChamados();
             let msg = `${rows.length} chamado(s) sincronizado(s)!`;
@@ -7512,9 +7515,10 @@ class AppController {
             else if (foundIds > rows.length) msg += ` (${foundIds} encontrados no OTOBO)`;
             Toast.show(msg, 'success', denied > 0 ? 8000 : 4000);
         } catch (err) {
+            setInfo('Erro na sincronização');
             Toast.show(`Erro na sincronização: ${err.message}`, 'error', 6000);
         } finally {
-            if (btn) btn.disabled = false;
+            if (btn) { btn.disabled = false; btn.classList.remove('syncing'); }
         }
     }
 
@@ -7545,14 +7549,18 @@ class AppController {
         return res.json();
     }
 
-    async _fetchTicketsFromOtobo(config) {
+    async _fetchTicketsFromOtobo(config, onProgress) {
         const syncFilters = this._otoboConfig?.syncFilters || {};
+        if (onProgress) onProgress('Buscando lista de chamados...');
         const searchData = await this._otoboProxyFetch('search', { syncFilters });
         const ticketIds = Array.isArray(searchData.TicketID)
             ? searchData.TicketID
             : (searchData.TicketID ? [searchData.TicketID] : []);
         console.log(`[OTOBO] Busca retornou ${ticketIds.length} ID(s)`);
         if (ticketIds.length === 0) return { tickets: [], foundIds: 0, denied: 0 };
+
+        const totalBatches = Math.ceil(ticketIds.length / 10);
+        if (onProgress) onProgress(`Buscando detalhes (0 / ${ticketIds.length})...`);
 
         // TicketGet em lotes de 10
         const results = [];
@@ -7567,6 +7575,7 @@ class AppController {
             } catch (e) {
                 console.warn(`[OTOBO] Lote ${Math.floor(i/10)+1} falhou:`, e.message);
             }
+            if (onProgress) onProgress(`Buscando detalhes (${Math.min(i + 10, ticketIds.length)} / ${ticketIds.length})...`);
         }
         console.log(`[OTOBO] Total: ${results.length} ticket(s) obtido(s), ${totalDenied} negado(s)`);
 

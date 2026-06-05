@@ -614,6 +614,8 @@ Animações CSS/JS implementadas em `styles/main.css` e `js/app.js` para dar vid
 
 - **Transformar tarefa em apontamento** — botão no modal de tarefa (ou no card Kanban) que pré-preenche o modal de Apontamento com os dados da tarefa (título como descrição, `estimatedMinutes` como duração sugerida, cliente vinculado → `projectNum` via lookup); permite lançar o tempo da tarefa no ERP sem redigitar.
 
+- **Monitorar no OTOBO** — opção nos chamados para marcar um ticket como "monitorado"; tickets monitorados seriam destacados na view Chamados (ex.: badge ou seção separada) para facilitar o acompanhamento de tickets importantes sem precisar lembrar o número. Detalhes de implementação a definir (pode ser coluna `monitored BOOLEAN` em `tickets` ou lista local por usuário).
+
 ### Fase 38 — Painel de Posição de Projeto por Cliente (planejado em 2026-06-05)
 
 **Objetivo**: tela unificada que consolida, em uma única visão, a posição completa de um cliente — chamados OTOBO, tarefas Kanban, atendimentos, agenda e saldo de horas — equivalente a uma planilha de acompanhamento de projeto, mas viva e automática.
