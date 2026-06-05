@@ -108,6 +108,7 @@ class AppController {
         // Navegação de mês no Dashboard
         this._dashboardMonth = new Date().toISOString().slice(0, 7); // YYYY-MM
         this._dashSlideDir   = null;  // D6: direção do slide ao trocar mês
+        this._dashRenderGen  = 0;     // D6: geração — cancela renders anteriores se um novo começar
         this._agendaNavDir   = null;  // A5: direção do slide na agenda
         // Tarefas vinculadas ao agendamento atual (multi-select)
         this._agendaRelatedTaskIds = [];  // confirmadas
@@ -1614,6 +1615,8 @@ class AppController {
     }
 
     async renderDashboard(preloadedClients, batchStats) {
+        // D6: generation counter — se uma chamada mais nova chegar durante o await, esta é cancelada
+        const myGen = ++this._dashRenderGen;
         const container = document.getElementById('dashboard-container');
         // D6: ao navegar de mês, não mostrar skeleton — mantém cards antigos visíveis durante o fetch
         if (!this._dashSlideDir) this._skDashboard(container);
@@ -1737,6 +1740,8 @@ class AppController {
             stats = filterStats(batchStats);
         } else {
             const allBatchStats = await store.getBatchStats(this._dashboardMonth);
+            // D6: se uma chamada mais nova começou enquanto aguardávamos o fetch, abortar esta
+            if (myGen !== this._dashRenderGen) return;
             stats = filterStats(allBatchStats);
         }
         stats = stats.filter(s => s !== null);
@@ -1771,7 +1776,8 @@ class AppController {
             const card = document.createElement('div');
             card.className = 'stat-card glass stat-card-animate' + (stat.isOverLimit ? ' over-limit' : '');
             card.style.cursor = 'pointer';
-            card.style.animationDelay = `${idx * 0.07}s`;
+            // D6: sem stagger durante slide — cards entram juntos; stagger só no carregamento inicial
+            card.style.animationDelay = slideDir ? '0s' : `${idx * 0.07}s`;
             // D5: glow color vaza da cor da barra
             if (stat.isOverLimit) {
                 card.style.setProperty('--card-glow-color', 'rgba(239,68,68,0.4)');
@@ -1783,13 +1789,17 @@ class AppController {
             if (stat.client.projectNum) card.title = `Projeto: ${stat.client.projectNum}`;
             card.onclick = () => app.openClientDashboard(stat.client.id);
 
+            // D6: durante slide os cards entram com valores já preenchidos (sem animação de barra/contador)
+            // para evitar a ilusão de "dois carregamentos" (cards vazios → dados aparecem)
+            const barWidth = slideDir ? `${stat.percentage}%` : '0%';
+            const hoursLabel = slideDir ? `${stat.hoursUsed}h / ${stat.hoursTotal}h` : `0h / ${stat.hoursTotal}h`;
             card.innerHTML = `
                 <div class="stat-header">
                     <span class="client-name">${escapeHtml(stat.client.name)}</span>
-                    <span style="font-weight: 600; color: ${statusColor}" class="dash-hours-value" data-target="${stat.hoursUsed}" data-total="${stat.hoursTotal}">0h / ${stat.hoursTotal}h</span>
+                    <span style="font-weight: 600; color: ${statusColor}" class="dash-hours-value" data-target="${stat.hoursUsed}" data-total="${stat.hoursTotal}">${hoursLabel}</span>
                 </div>
                 <div class="progress-container">
-                    <div class="progress-bar ${isCritical}" style="width: 0%;"></div>
+                    <div class="progress-bar ${isCritical}" style="width: ${barWidth};${slideDir ? ' transition: none;' : ''}"></div>
                 </div>
                 <div style="display: flex; justify-content: space-between; font-size: 0.85rem; margin-top: 8px;">
                     <span class="text-muted">${stat.percentage}% utilizado</span>
@@ -1798,15 +1808,15 @@ class AppController {
             `;
             container.appendChild(card);
 
-            // Anima barra de progresso: 0% → valor real (double rAF para ativar transition)
-            const bar = card.querySelector('.progress-bar');
-            requestAnimationFrame(() => requestAnimationFrame(() => {
-                bar.style.width = `${stat.percentage}%`;
-            }));
-
-            // Anima contador de horas com delay escalonado
-            const hoursEl = card.querySelector('.dash-hours-value');
-            this._animateCounter(hoursEl, stat.hoursUsed, stat.hoursTotal, idx * 70);
+            if (!slideDir) {
+                // Carregamento inicial: anima barra (0% → real) e contador (0 → real)
+                const bar = card.querySelector('.progress-bar');
+                requestAnimationFrame(() => requestAnimationFrame(() => {
+                    bar.style.width = `${stat.percentage}%`;
+                }));
+                const hoursEl = card.querySelector('.dash-hours-value');
+                this._animateCounter(hoursEl, stat.hoursUsed, stat.hoursTotal, idx * 70);
+            }
         });
     }
 
@@ -2024,7 +2034,7 @@ class AppController {
 
         clients.forEach((c, i) => {
             const stat = stats[i];
-            const overLimitBadge = stat && stat.isOverLimit ? `<span class="badge-danger-pulse" style="background: var(--danger-color); color: white; padding: 2px 6px; border-radius: 4px; font-size: 0.7rem; margin-left: 8px;">Estourado</span>` : '';
+            const overLimitBadge = stat && stat.isOverLimit ? `<span class="badge-danger-pulse">Estourado</span>` : '';
 
             const clientPaysStr = formatMoney(c.clientPays);
             const base43 = (c.clientPays && !isNaN(c.clientPays)) ? c.clientPays * 0.43 : 0;
