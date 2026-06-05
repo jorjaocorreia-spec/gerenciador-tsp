@@ -601,6 +601,9 @@ Animações CSS/JS implementadas em `styles/main.css` e `js/app.js` para dar vid
 - **`@keyframes` sobrescrevem `box-shadow` do elemento** — usar multi-shadow preservando o shadow original como primeiro valor em todos os keyframes; sem isso, o ring de ping "apaga" o shadow do botão.
 - **Duplo `requestAnimationFrame` é obrigatório para animar propriedades CSS definidas no innerHTML** — um único rAF não garante que o browser renderizou o estado inicial antes de aplicar o valor final.
 - **`opacity: 0` como propriedade direta + animação de entrada = armadilha de override** — se uma classe define `opacity: 0` explicitamente E usa `animation` para animar para 1, qualquer regra de maior especificidade que sobrescreva `animation` deixa o elemento invisível permanentemente (pois `opacity: 0` permanece sem a animação para restaurar). Padrão seguro: ou usar `animation-fill-mode: both` (sem `opacity: 0` direto) ou usar `animation-name` longhands para listar múltiplas animações em paralelo. Classes afetadas: `.stat-card-animate` e `.kb-column-cascade`. Correção aplicada em `.stat-card.over-limit`: usa `animation-name: card-cascade-in, card-danger-pulse` com longhand para rodar ambas simultaneamente.
+- **Animação permanente em elemento re-renderizado causa piscadas** — CSS `animation: ... both` em classes permanentes (ex.: `.event-block`, `#container > *`) faz todos os elementos começarem em `opacity:0` a cada re-render do DOM. Este app recria o DOM em cada `renderAll()`, então animações devem ser disparadas por classes transientes (adicionadas/removidas por JS) ou por classes de container que só existem durante a navegação. **A3** (`#agenda-container > * { animation: agenda-fade-in both }`) foi removida por este motivo — causava flash em todo conteúdo da agenda a cada re-render (incluindo auto-sync de 5 min). **A1** (`.event-block`) foi corrigida de `both` para `forwards` para não iniciar invisível.
+- **`backdrop-filter` no estado base de `.modal-overlay` força compositing layer** — se aplicar `backdrop-filter` na classe base (sem `.active`), o browser cria camada de compositing para TODOS os overlays mesmo quando `opacity:0` e invisíveis. Isso gera repaints constantes. Aplicar `backdrop-filter` APENAS no estado `.active`. **V4** foi removida por este motivo.
+- **`.view-section` tem `animation: fadeIn` base que conflita com V1 slide** — a regra `.view-section { animation: fadeIn 0.4s ease-out }` existia antes das rodadas de animação. Quando V1 adiciona `.slide-in-right` (que tem mesma especificidade que `.view-section` de base → a classe slide vence), ao remover a classe slide no `animationend`, o browser recomputa estilos e re-dispara `fadeIn` — causando um segundo flash. Correção: `.view-section.active { animation: none }` — especificidade maior que a base, menor que as classes slide (`.view-section.slide-in-right` vence por vir depois no CSS).
 - **Float labels (F2) são JS-driven, não CSS puro** — a abordagem CSS via `:not(:placeholder-shown)` não funciona quando o `<label>` vem antes do `<input>` (padrão do app). A implementação usa `_initFloatLabels(container)` que adiciona listeners de `focus/blur/input/change` e alterna a classe `fl-up` no label; `dataset.flInit = '1'` evita registrar listeners duplicados ao reabrir o modal. `_refreshFloatLabels(container)` sincroniza o estado visual imediatamente (necessário ao abrir modal com campos pré-preenchidos). Chamado em `openModal()` para todos os modais e em `DOMContentLoaded` para o form de login (`#auth-form`). Classe CSS ativa: `.float-group` no `form-group`; label sobe via `.float-group > label.fl-up`.
 
 ---
@@ -638,7 +641,7 @@ Plano completo de ~35 animações novas dividido em 3 rodadas de implementação
 **Rodada 2 — JS simples + médio esforço:**
 - **L4** — Login: botão "Entrar" com ripple ao clicar
 - **V3** ✅ — Modal fecha com animação de saída (shrink + fade): classe `modal-overlay--exiting` por 200ms ease-in
-- **V4** ✅ — Modal: overlay com backdrop-filter blur crescendo de 0 para 4px ao abrir (transition no overlay)
+- **V4** ~~✅~~ — Modal overlay backdrop-filter 0→4px — **REMOVIDO** 2026-06-04: `backdrop-filter` na classe base `.modal-overlay` forçava compositing em todos os overlays mesmo com `opacity:0`, causando repaints e piscadas ao carregar views
 - **T1** — Tabelas (todas): linhas entram em cascata (stagger 30ms, slide-up 8px)
 - **T2** ✅ — Tabelas + Apontamentos: hover curtain da esquerda; cards clicáveis com `.clickable-card` (lift + glow roxo)
 - **T3** ✅ — Delete com shake/fade via `.row-deleting`; botões destrutivos com `_twostepDelete` two-step confirm
@@ -647,7 +650,7 @@ Plano completo de ~35 animações novas dividido em 3 rodadas de implementação
 - **A2** ✅ — Agenda: ripple circular roxo no clique do dia na view mensal
 - **B3** ✅ — Badge "Estourado" faz shake periódico a cada 4s com escala
 
-**Rodada 3 — Mais complexo (polish final):**
+**Rodada 3 — Mais complexo (polish final): ✅ IMPLEMENTADA em 2026-06-04**
 
 - **V1** ✅ — Views: slide vem da direita ao avançar, da esquerda ao voltar (baseado na posição no menu)
 - **S6** ✅ — Sidebar: ícones giram 360° ao colapsar/expandir (`sidebar--icon-spin`)
@@ -655,7 +658,7 @@ Plano completo de ~35 animações novas dividido em 3 rodadas de implementação
 - **T4** — Tabelas: valor de horas/tempo faz flip vertical ao mudar filtro
 - **A5** ✅ — Agenda: grid desliza left/right ao navegar prev/next
 - **F2** ✅ — Formulários: float label JS-driven via `_initFloatLabels(container)` — label sobe ao focar/preencher
-- **E3** — Skeleton loading com shimmer em vez de spinner (em todas as views)
+- **E3** ✅ — Skeleton loading com shimmer — já implementado antes das rodadas 2/3 (`.sk`, `sk-shimmer`, `.sk-stat-card`, `.sk-row`)
 
 ---
 
