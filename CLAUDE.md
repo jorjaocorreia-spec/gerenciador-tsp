@@ -638,7 +638,7 @@ Plano completo de ~35 animações novas dividido em 3 rodadas de implementação
 - **B2** ✅ — Badges: badge "Estourado" com ponto vermelho pulsante
 - **E2** ✅ — Empty state: ícone central flutua em loop suave (keyframe translateY)
 
-**Rodada 2 — JS simples + médio esforço:**
+**Rodada 2 — JS simples + médio esforço: ✅ IMPLEMENTADA em 2026-06-04**
 - **L4** ✅ — Login: botão "Entrar" com ripple ao clicar (`.btn-primary:active::after` + `@keyframes btn-ripple`)
 - **V3** ✅ — Modal fecha com animação de saída (shrink + fade): classe `modal-overlay--exiting` por 200ms ease-in
 - **V4** ~~✅~~ — Modal overlay backdrop-filter 0→4px — **REMOVIDO** 2026-06-04: `backdrop-filter` na classe base `.modal-overlay` forçava compositing em todos os overlays mesmo com `opacity:0`, causando repaints e piscadas ao carregar views
