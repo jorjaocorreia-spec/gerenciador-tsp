@@ -4652,6 +4652,7 @@ class AppController {
                 clientIdInput.value = settings.googleClientId || '';
                 apiKeyInput.value = settings.googleApiKey || '';
             }
+            this._refreshFloatLabels(document.getElementById('form-calendar-settings'));
 
             const configured = settings && settings.googleClientId && settings.googleApiKey;
             statusEl.innerHTML = configured
