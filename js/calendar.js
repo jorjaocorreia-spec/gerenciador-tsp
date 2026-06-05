@@ -11,8 +11,10 @@ const GoogleCalendarAPI = {
     _apiKey: '',
     _STORAGE_KEY: 'gapi_calendar_token',
 
-    _saveToken() {
-        const token = gapi.client.getToken();
+    _saveToken(tokenResp) {
+        // Prefere o resp passado diretamente — gapi.client.getToken() ainda pode ser null
+        // dentro do callback GIS, pois a sincronização com gapi é assíncrona via postMessage.
+        const token = (tokenResp && tokenResp.access_token) ? tokenResp : gapi.client.getToken();
         if (!token || !token.access_token) return;
         try {
             localStorage.setItem(this._STORAGE_KEY, JSON.stringify({ ...token, _savedAt: Date.now() }));
@@ -38,7 +40,7 @@ const GoogleCalendarAPI = {
         if (!this.tokenClient || !this.isEnabled) return;
         this.tokenClient.callback = (resp) => {
             if (resp.error) return;
-            this._saveToken();
+            this._saveToken(resp);
             this.isAuthenticated = true;
             if (window.app) app.onCalendarAuthenticated();
         };
@@ -157,7 +159,7 @@ const GoogleCalendarAPI = {
                     resolve(false);
                     return;
                 }
-                this._saveToken();
+                this._saveToken(resp);
                 this.isAuthenticated = true;
                 resolve(true);
             };
