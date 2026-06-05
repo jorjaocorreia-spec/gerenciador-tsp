@@ -3337,16 +3337,7 @@ class AppController {
 
         container.innerHTML = spinnerHtml;
 
-        // Atualizar estado do botão de sync superior
-        const syncBtn = document.getElementById('btn-agenda-sync');
-        if (syncBtn) {
-            if (calendarAPI && calendarAPI.isAuthenticated) {
-                syncBtn.classList.remove('btn-secondary');
-                syncBtn.classList.add('btn-primary');
-                syncBtn.innerHTML = '<i data-lucide="refresh-cw"></i> Sincronizando...';
-                syncBtn.innerHTML = '<i data-lucide="refresh-cw"></i> Sincronizar Google';
-            }
-        }
+        this._updateGoogleSyncStatus();
 
         if (this.agendaViewMode === 'daily') {
             await this.renderAgendaDaily(container);
@@ -3744,13 +3735,13 @@ class AppController {
 
     async onCalendarAuthenticated() {
         console.log("App ciente que Calendar está autenticado");
-        // Inicia sync periódico a cada 5 minutos
         if (this._googleSyncInterval) clearInterval(this._googleSyncInterval);
         this._googleSyncInterval = setInterval(() => {
             if (calendarAPI.isAuthenticated && this.currentView === 'agenda') {
                 this._autoSyncGoogle().catch(() => {});
             }
         }, 5 * 60 * 1000);
+        this._updateGoogleSyncStatus();
         await this.renderAgenda();
     }
 
@@ -3762,9 +3753,38 @@ class AppController {
         try {
             await this.executeBiDirectionalSync();
             if (this.currentView === 'agenda') await this.renderAgenda();
+            else this._updateGoogleSyncStatus();
         } catch (err) {
             console.warn('Auto-sync Google Calendar falhou:', err);
         }
+    }
+
+    _updateGoogleSyncStatus() {
+        const el = document.getElementById('google-sync-status');
+        const btn = document.getElementById('btn-agenda-sync');
+        if (!el) return;
+
+        if (!calendarAPI.isEnabled) {
+            el.style.display = 'none';
+            if (btn) btn.innerHTML = '<i data-lucide="refresh-cw"></i> Sincronizar';
+            lucide.createIcons();
+            return;
+        }
+
+        el.style.display = 'flex';
+        if (calendarAPI.isAuthenticated) {
+            const timeStr = this._lastGoogleSync
+                ? new Date(this._lastGoogleSync).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
+                : '';
+            el.className = 'google-sync-status status-connected';
+            el.innerHTML = `<span class="sync-status-dot"></span> Conectado${timeStr ? ' · ' + timeStr : ''}`;
+            if (btn) btn.innerHTML = '<i data-lucide="refresh-cw"></i> Sincronizar';
+        } else {
+            el.className = 'google-sync-status status-disconnected';
+            el.innerHTML = '<span class="sync-status-dot"></span> Não conectado';
+            if (btn) btn.innerHTML = '<i data-lucide="refresh-cw"></i> Conectar ao Google';
+        }
+        lucide.createIcons();
     }
 
     async promptGoogleSync() {
@@ -3784,6 +3804,7 @@ class AppController {
 
         try {
             await this.executeBiDirectionalSync();
+            this._lastGoogleSync = Date.now();
             Toast.show('Sincronização concluída com sucesso!', 'success');
         } catch (error) {
             console.error("Erro no sync", error);
@@ -7928,6 +7949,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             window.app._lastGoogleSync = 0;
             calendarAPI.isAuthenticated = false;
             calendarAPI.clearSavedToken();
+            if (window.app) window.app._updateGoogleSyncStatus();
             window.app._otoboConfig = null;
             window.app._currentTicket = null;
             window.app._cachedChamadosTickets = null;
