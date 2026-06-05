@@ -1703,8 +1703,9 @@ class AppController {
                 if (b.hasTracking) {
                     const balanceColor = b.balanceH >= 0 ? '#4ade80' : '#f87171';
                     const balanceSign = b.balanceH >= 0 ? '+' : '';
-                    const pct = b.totalContractedH > 0
-                        ? Math.min(100, Math.round((b.totalAppliedH / b.totalContractedH) * 100))
+                    const totalTargetH = b.monthsCount * client.hoursTotal;
+                    const pct = totalTargetH > 0
+                        ? Math.min(100, Math.round((b.totalAppliedH / totalTargetH) * 100))
                         : 0;
                     const isCritical = b.totalAppliedH > b.totalContractedH ? 'over-limit' : '';
                     const startLabel = new Date(client.balanceStartDate + 'T00:00:00')
