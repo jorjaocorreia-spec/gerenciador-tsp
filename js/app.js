@@ -4050,26 +4050,26 @@ class AppController {
         const allRecords = [];
         const warnings = [];
 
-        // Detect and merge continuation pages (description overflow + hours table from previous page).
-        // Detection: a new atendimento page always has "Projeto.: NNNNN" in the body.
-        // A continuation page has only the Ref-line format "( Projeto NNNNN )" — no "Projeto.:" with dots.
-        // Using the project-body check (same regex as _parseSinglePage line 1) is more reliable than
-        // checking for the date header, whose dot-leader characters ("Data......:") may be extracted
-        // differently by PDF.js depending on the PDF renderer.
+        // Detect and merge continuation pages (description overflow to next page).
+        // A new atendimento page always has "Descrição do Atendimento" in the body — same regex
+        // used by _parseSinglePage (line ~4150). This is robust against all PDF.js extraction modes:
+        // standard ("Projeto.: NNNNN"), inverted ("NNNNN Projeto.:"), and column-by-column.
+        // A continuation page (pure description overflow or hours-table-only) never has this header.
         const mergedPages = [];
         for (let i = 0; i < pageTexts.length; i++) {
             const text = pageTexts[i];
-            // Matches "Projeto.: 35091" but NOT "Projeto 35091" (Ref-line parenthetical format)
-            const isNewPage = /Projeto\s*[.:]+\s*\d{4,6}/i.test(text);
+            const isNewPage = /Descri..o\s+do\s+Atendimento/i.test(text);
+            console.log(`[PDF Import] Pág.${i + 1}: isNewPage=${isNewPage}, chars=${text.length}, início="${text.substring(0, 60).replace(/\s+/g, ' ')}"`);
             if (!isNewPage && mergedPages.length > 0) {
-                // Strip everything up to and including "Programa: XXXXXXXX " (last token of the
-                // repeated page header). Non-greedy .*? stops at the first "Programa:" occurrence.
+                // Strip repeated page header (TECINCO / Ref.: / Página N / Programa: XXXXX)
                 const cleanText = text.replace(/^.*?Programa:\s*\S+\s*/i, '').trim();
                 mergedPages[mergedPages.length - 1] += ' ' + cleanText;
             } else {
                 mergedPages.push(text);
             }
         }
+
+        console.log(`[PDF Import] ${pageTexts.length} páginas → ${mergedPages.length} bloco(s) após merge`);
 
         for (let i = 0; i < mergedPages.length; i++) {
             const result = this._parseSinglePage(mergedPages[i], i + 1);
