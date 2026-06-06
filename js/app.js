@@ -4050,17 +4050,20 @@ class AppController {
         const allRecords = [];
         const warnings = [];
 
-        // Detect and merge continuation pages (overflow of description + hours table from previous page).
-        // A continuation page lacks a "Data......: DD/MM/YYYY" date header — it has no independent date
-        // anchor of its own. We strip the repeated page header (TECINCO / Ref.: / Página / Programa:)
-        // before appending so those strings don't pollute the description of the merged page.
+        // Detect and merge continuation pages (description overflow + hours table from previous page).
+        // Detection: a new atendimento page always has "Projeto.: NNNNN" in the body.
+        // A continuation page has only the Ref-line format "( Projeto NNNNN )" — no "Projeto.:" with dots.
+        // Using the project-body check (same regex as _parseSinglePage line 1) is more reliable than
+        // checking for the date header, whose dot-leader characters ("Data......:") may be extracted
+        // differently by PDF.js depending on the PDF renderer.
         const mergedPages = [];
         for (let i = 0; i < pageTexts.length; i++) {
             const text = pageTexts[i];
-            const hasDateHeader = /Data\s*[.:]+\s*\d{2}\/\d{2}\/\d{4}/i.test(text);
-            if (!hasDateHeader && mergedPages.length > 0) {
-                // Strip everything up to and including "Programa: XXXXXXXX " (the last token of the
-                // repeated page header). The non-greedy .*? stops at the first "Programa:" occurrence.
+            // Matches "Projeto.: 35091" but NOT "Projeto 35091" (Ref-line parenthetical format)
+            const isNewPage = /Projeto\s*[.:]+\s*\d{4,6}/i.test(text);
+            if (!isNewPage && mergedPages.length > 0) {
+                // Strip everything up to and including "Programa: XXXXXXXX " (last token of the
+                // repeated page header). Non-greedy .*? stops at the first "Programa:" occurrence.
                 const cleanText = text.replace(/^.*?Programa:\s*\S+\s*/i, '').trim();
                 mergedPages[mergedPages.length - 1] += ' ' + cleanText;
             } else {
