@@ -4050,8 +4050,26 @@ class AppController {
         const allRecords = [];
         const warnings = [];
 
+        // Detect and merge continuation pages (overflow of description + hours table from previous page).
+        // A continuation page lacks a "Data......: DD/MM/YYYY" date header — it has no independent date
+        // anchor of its own. We strip the repeated page header (TECINCO / Ref.: / Página / Programa:)
+        // before appending so those strings don't pollute the description of the merged page.
+        const mergedPages = [];
         for (let i = 0; i < pageTexts.length; i++) {
-            const result = this._parseSinglePage(pageTexts[i], i + 1);
+            const text = pageTexts[i];
+            const hasDateHeader = /Data\s*[.:]+\s*\d{2}\/\d{2}\/\d{4}/i.test(text);
+            if (!hasDateHeader && mergedPages.length > 0) {
+                // Strip everything up to and including "Programa: XXXXXXXX " (the last token of the
+                // repeated page header). The non-greedy .*? stops at the first "Programa:" occurrence.
+                const cleanText = text.replace(/^.*?Programa:\s*\S+\s*/i, '').trim();
+                mergedPages[mergedPages.length - 1] += ' ' + cleanText;
+            } else {
+                mergedPages.push(text);
+            }
+        }
+
+        for (let i = 0; i < mergedPages.length; i++) {
+            const result = this._parseSinglePage(mergedPages[i], i + 1);
             allRecords.push(...result.records);
             warnings.push(...result.warnings);
         }
@@ -4134,7 +4152,7 @@ class AppController {
             const endIdx = textAfterLabel.search(/Horas\s+Aplicadas\s+no\s+Dia\s+\d{2}\/\d{2}\/\d{4}|Hora\s+Inicial\s+Hora\s+Final/i);
             const rawDesc = endIdx !== -1
                 ? textAfterLabel.substring(0, endIdx)
-                : textAfterLabel.substring(0, 600);
+                : textAfterLabel.substring(0, 8000);
             description = rawDesc
                 // Remove "Horas contratadas/executadas" que o PDF.js injeta na descrição por inversão de colunas
                 .replace(/[\d:]+\s+Horas\s+contratadas[.:]*\s*[\d:]*\s*Horas\s+executadas[.:]*\s*[\d:]*/gi, '')
@@ -4144,7 +4162,6 @@ class AppController {
         }
 
         if (!description) description = 'Importado via Ata PDF';
-        if (description.length > 800) description = description.substring(0, 800).trim();
 
         // === 4. LINHAS DA TABELA DE HORAS ===
         // Formato antigo: "Horas Aplicadas no Dia DD/MM" vem antes das colunas (Hora Inicial | Hora Final | Horas Aplicadas | Analista)
