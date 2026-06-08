@@ -464,6 +464,13 @@ class AppController {
             document.getElementById('agenda-generate-meet').checked = false;
             document.getElementById('modal-agenda-title').innerText = 'Novo Agendamento';
             document.getElementById('agenda-sync-google').checked = calendarAPI.isEnabled;
+            // Re-enable submit button — may have been left disabled by a prior Meet-link generation
+            const agendaSubmitBtn = document.querySelector('#form-agenda-event button[type="submit"]');
+            if (agendaSubmitBtn) {
+                agendaSubmitBtn.disabled = false;
+                agendaSubmitBtn.classList.remove('btn-loading', 'btn-success', 'btn-error');
+                if (agendaSubmitBtn._origHtml) agendaSubmitBtn.innerHTML = agendaSubmitBtn._origHtml;
+            }
             this._updateDescLinks('');
             this._agendaRelatedTaskIds = [];
             this._agendaTaskPanelTempIds = [];
