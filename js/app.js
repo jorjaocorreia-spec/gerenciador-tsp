@@ -386,10 +386,14 @@ class AppController {
 
     closeModal(modalId) {
         const overlay = document.getElementById(modalId);
-        overlay.classList.add('modal-overlay--exiting');
-        setTimeout(() => {
-            overlay.classList.remove('active', 'modal-overlay--exiting');
-        }, 200);
+        // Only animate out if the modal is currently open; otherwise clean up immediately
+        // (prevents the 200ms timeout from closing a modal that was just re-opened)
+        if (overlay.classList.contains('active')) {
+            overlay.classList.add('modal-overlay--exiting');
+            setTimeout(() => {
+                overlay.classList.remove('active', 'modal-overlay--exiting');
+            }, 200);
+        }
         // Trigger cleanup immediately so forms reset while animating out
 
         if (modalId === 'modal-client') {
