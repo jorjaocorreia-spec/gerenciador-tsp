@@ -2532,6 +2532,46 @@ kbd {
     font-weight: 600;
     border: 1px solid rgba(255,255,255,.1);
 }
+/* ── Gerador de Apontamentos ─────────────────────────────────── */
+.apt-gen-card {
+    padding: 16px;
+    border-radius: var(--radius);
+    margin-bottom: 14px;
+    border: 1px solid rgba(255,255,255,0.07);
+    transition: border-color 0.2s ease;
+}
+.apt-gen-card-error { border-color: rgba(239,68,68,0.5) !important; }
+.apt-gen-card-header {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    margin-bottom: 10px;
+}
+.apt-gen-check {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    cursor: pointer;
+}
+.apt-gen-check input[type="checkbox"] { width: 16px; height: 16px; cursor: pointer; flex-shrink: 0; }
+.apt-gen-client-name { font-weight: 600; font-size: 0.95rem; }
+.apt-gen-tasks-summary { font-size: 0.78rem; padding-left: 26px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.apt-gen-desc-wrap { margin-bottom: 10px; }
+.apt-gen-textarea { font-size: 0.875rem; resize: vertical; min-height: 72px; }
+.apt-gen-loading {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.85rem;
+    opacity: 0.6;
+    padding: 10px 0;
+}
+.apt-gen-times {
+    display: flex;
+    gap: 12px;
+}
+/* ─────────────────────────────────────────────────────────────── */
+
 .btn-sm { padding: 5px 12px; font-size: .82rem; }
 .btn-icon-sm {
     background: none;

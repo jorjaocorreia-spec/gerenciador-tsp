@@ -119,6 +119,8 @@ class AppController {
         this._renderAllPending = false;
         // Horas do Mês
         this._horasMesStats = null;
+        // Gerador de apontamentos a partir de tarefas
+        this._aptGenEntries = null;
         // OTOBO
         this._otoboConfig = null;
         this._currentTicket = null;
@@ -4793,6 +4795,8 @@ class AppController {
         if (this.currentView !== 'apontamentos') return;
         const container = document.getElementById('apontamentos-container');
         if (!container) return;
+        const genBtn = document.getElementById('btn-generate-apontamentos');
+        if (genBtn) genBtn.style.display = aiClient.isConfigured ? '' : 'none';
         container.innerHTML = spinnerHtml;
 
         const label = document.getElementById('apt-date-label');
@@ -4974,6 +4978,209 @@ class AppController {
         } catch (err) {
             if (row) row.classList.remove('row-deleting');
             Toast.show('Erro ao excluir: ' + err.message, 'error');
+        }
+    }
+
+    // ===================================
+    // GERADOR DE APONTAMENTOS A PARTIR DE TAREFAS
+    // ===================================
+
+    async generateApontamentosFromTasks() {
+        if (!aiClient.isConfigured) {
+            Toast.show('Configure a IA primeiro (botão ✨ na sidebar).', 'error');
+            return;
+        }
+
+        const btn = document.getElementById('btn-generate-apontamentos');
+        const origHtml = btn?.innerHTML;
+        if (btn) { btn.disabled = true; btn.innerHTML = `<i data-lucide="loader-2" style="animation:spin 1s linear infinite"></i><span class="nav-label">Buscando...</span>`; lucide.createIcons(); }
+
+        try {
+            const [tasks, clients] = await Promise.all([
+                store.getTasksForApontamento(this.aptCurrentDate),
+                store.getClients()
+            ]);
+
+            if (tasks.length === 0) {
+                Toast.show('Nenhuma tarefa trabalhada neste dia.', 'info');
+                return;
+            }
+
+            const clientMap = {};
+            clients.forEach(c => { clientMap[c.id] = c; });
+
+            // Agrupa tasks por clientId
+            const grouped = {};
+            tasks.forEach(t => {
+                if (!grouped[t.clientId]) grouped[t.clientId] = [];
+                grouped[t.clientId].push(t);
+            });
+
+            // Filtra clientes que existem
+            const entries = Object.entries(grouped).filter(([cid]) => clientMap[cid]);
+
+            if (entries.length === 0) {
+                Toast.show('Nenhuma tarefa com cliente válido encontrada.', 'info');
+                return;
+            }
+
+            // Monta estado inicial sem descrições ainda
+            this._aptGenEntries = entries.map(([cid, taskList]) => ({
+                clientId: cid,
+                client: clientMap[cid],
+                tasks: taskList,
+                description: '',
+                startTime: '',
+                endTime: '',
+                checked: true,
+                loading: true,
+                error: false
+            }));
+
+            const subtitle = document.getElementById('apt-gen-subtitle');
+            const [y, m, d] = this.aptCurrentDate.split('-');
+            if (subtitle) subtitle.textContent = `${d}/${m}/${y} — ${entries.length} cliente${entries.length > 1 ? 's' : ''}`;
+
+            this._renderAptGenContent();
+            this.openModal('modal-apontamento-generator');
+
+            // Gera descrições em paralelo
+            const aiResults = await Promise.allSettled(
+                this._aptGenEntries.map(e =>
+                    aiClient.generateApontamentoFromTasks(e.client.name, e.client.projectNum, e.tasks, this.aptCurrentDate)
+                )
+            );
+
+            aiResults.forEach((result, idx) => {
+                if (result.status === 'fulfilled') {
+                    this._aptGenEntries[idx].description = result.value;
+                    this._aptGenEntries[idx].loading = false;
+                } else {
+                    this._aptGenEntries[idx].loading = false;
+                    this._aptGenEntries[idx].error = true;
+                }
+            });
+
+            this._renderAptGenContent();
+
+        } catch (err) {
+            Toast.show('Erro ao buscar tarefas: ' + err.message, 'error');
+        } finally {
+            if (btn) { btn.disabled = false; btn.innerHTML = origHtml; lucide.createIcons(); }
+        }
+    }
+
+    _renderAptGenContent() {
+        const content = document.getElementById('apt-gen-content');
+        if (!content || !this._aptGenEntries) return;
+
+        const entries = this._aptGenEntries;
+        content.innerHTML = '';
+
+        entries.forEach((e, idx) => {
+            const taskTitles = e.tasks.map(t => escapeHtml(t.title)).join(', ');
+            const card = document.createElement('div');
+            card.className = 'apt-gen-card glass';
+            card.innerHTML = `
+                <div class="apt-gen-card-header">
+                    <label class="apt-gen-check">
+                        <input type="checkbox" ${e.checked ? 'checked' : ''} onchange="app._aptGenToggle(${idx}, this.checked)">
+                        <span class="apt-gen-client-name">${escapeHtml(e.client.name)}</span>
+                        ${e.client.projectNum ? `<span class="badge badge-outline" style="font-size:0.75rem;">${escapeHtml(e.client.projectNum)}</span>` : ''}
+                    </label>
+                    <span class="apt-gen-tasks-summary text-muted">${e.tasks.length} tarefa${e.tasks.length > 1 ? 's' : ''}: ${taskTitles}</span>
+                </div>
+                <div class="apt-gen-desc-wrap">
+                    ${e.loading
+                        ? `<div class="apt-gen-loading"><i data-lucide="loader-2" style="animation:spin 1s linear infinite"></i> Gerando com IA...</div>`
+                        : e.error
+                            ? `<textarea class="form-control apt-gen-textarea" rows="3" placeholder="Descreva o que foi feito..." data-idx="${idx}" onchange="app._aptGenDescChange(${idx}, this.value)"></textarea><p class="text-muted" style="font-size:0.8rem;margin-top:4px;">⚠ IA indisponível — preencha manualmente.</p>`
+                            : `<textarea class="form-control apt-gen-textarea" rows="3" data-idx="${idx}" onchange="app._aptGenDescChange(${idx}, this.value)">${escapeHtml(e.description)}</textarea>`
+                    }
+                </div>
+                <div class="apt-gen-times">
+                    <div class="form-group" style="margin:0;flex:1;">
+                        <label style="font-size:0.8rem;margin-bottom:4px;display:block;">Início</label>
+                        <input type="time" class="form-control" value="${e.startTime}" onchange="app._aptGenTimeChange(${idx}, 'start', this.value)">
+                    </div>
+                    <div class="form-group" style="margin:0;flex:1;">
+                        <label style="font-size:0.8rem;margin-bottom:4px;display:block;">Fim</label>
+                        <input type="time" class="form-control" value="${e.endTime}" onchange="app._aptGenTimeChange(${idx}, 'end', this.value)">
+                    </div>
+                </div>`;
+            content.appendChild(card);
+        });
+
+        this._aptGenUpdateConfirmBtn();
+        lucide.createIcons();
+    }
+
+    _aptGenToggle(idx, checked) {
+        if (this._aptGenEntries) this._aptGenEntries[idx].checked = checked;
+        this._aptGenUpdateConfirmBtn();
+    }
+
+    _aptGenDescChange(idx, value) {
+        if (this._aptGenEntries) this._aptGenEntries[idx].description = value;
+    }
+
+    _aptGenTimeChange(idx, field, value) {
+        if (!this._aptGenEntries) return;
+        if (field === 'start') this._aptGenEntries[idx].startTime = value;
+        else this._aptGenEntries[idx].endTime = value;
+    }
+
+    _aptGenUpdateConfirmBtn() {
+        const btn = document.getElementById('btn-confirm-apt-gen');
+        const label = document.getElementById('btn-confirm-apt-gen-label');
+        if (!btn || !this._aptGenEntries) return;
+        const count = this._aptGenEntries.filter(e => e.checked).length;
+        if (label) label.textContent = `Criar ${count} Apontamento${count !== 1 ? 's' : ''}`;
+        btn.disabled = count === 0;
+    }
+
+    async confirmApontamentoGeneration() {
+        if (!this._aptGenEntries) return;
+
+        const toSave = this._aptGenEntries.filter(e => e.checked && !e.loading);
+
+        // Validação de horários
+        const missing = toSave.filter(e => !e.startTime || !e.endTime);
+        if (missing.length > 0) {
+            Toast.show('Preencha o horário de início e fim para todos os apontamentos selecionados.', 'error');
+            // Destaca os campos faltantes
+            const cards = document.querySelectorAll('.apt-gen-card');
+            this._aptGenEntries.forEach((e, idx) => {
+                if (!e.checked || !e.loading) {
+                    const card = cards[idx];
+                    if (!card) return;
+                    if (!e.startTime || !e.endTime) card.classList.add('apt-gen-card-error');
+                }
+            });
+            return;
+        }
+
+        const btn = document.getElementById('btn-confirm-apt-gen');
+        if (btn) btn.disabled = true;
+
+        try {
+            await Promise.all(toSave.map(e =>
+                store.addApontamento(
+                    this.aptCurrentDate,
+                    e.startTime,
+                    e.endTime,
+                    e.client.projectNum || '',
+                    e.description
+                )
+            ));
+
+            this.closeModal('modal-apontamento-generator');
+            this._aptGenEntries = null;
+            await this.renderApontamentos();
+            Toast.show(`${toSave.length} apontamento${toSave.length > 1 ? 's' : ''} criado${toSave.length > 1 ? 's' : ''} com sucesso.`, 'success');
+        } catch (err) {
+            Toast.show('Erro ao salvar: ' + err.message, 'error');
+            if (btn) btn.disabled = false;
         }
     }
 
@@ -6797,14 +7004,17 @@ class AppController {
 
     _updateAIStatusBadge() {
         const btn = document.getElementById('btn-ai-config');
-        if (!btn) return;
-        if (aiClient.isConfigured) {
-            btn.style.borderColor = 'rgba(139,92,246,0.5)';
-            btn.style.color = 'var(--primary-color)';
-        } else {
-            btn.style.borderColor = '';
-            btn.style.color = '';
+        if (btn) {
+            if (aiClient.isConfigured) {
+                btn.style.borderColor = 'rgba(139,92,246,0.5)';
+                btn.style.color = 'var(--primary-color)';
+            } else {
+                btn.style.borderColor = '';
+                btn.style.color = '';
+            }
         }
+        const genBtn = document.getElementById('btn-generate-apontamentos');
+        if (genBtn) genBtn.style.display = aiClient.isConfigured ? '' : 'none';
     }
 
     // ===================================
@@ -8004,6 +8214,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             window.app._chamadoFilterSaveTimer = null;
             window.app._whatsappProfile = null;
             window.app._horasMesStats = null;
+            window.app._aptGenEntries = null;
         }
         if (window.aiClient) aiClient.reset();
         await Auth.signOut();

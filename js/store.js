@@ -203,6 +203,17 @@ class TSPStore {
         return data.map(r => this._task(r));
     }
 
+    async getTasksForApontamento(date) {
+        const { data, error } = await this.db.from('tasks').select('*')
+            .eq('user_id', this.userId);
+        if (error) throw error;
+        return data.map(r => this._task(r)).filter(t => {
+            if (!t.clientId) return false;
+            if (t.completedAt && t.completedAt.startsWith(date)) return true;
+            return t.comments.some(c => c.createdAt && c.createdAt.startsWith(date));
+        });
+    }
+
     async addTask(taskData) {
         const targetStatus = taskData.status || 'new';
         const { data: existing } = await this.db.from('tasks')

@@ -509,6 +509,10 @@
                     </div>
                 </div>
                 <div class="view-header-actions">
+                    <button id="btn-generate-apontamentos" class="btn btn-secondary" style="display:none;" onclick="app.generateApontamentosFromTasks()" title="Gerar apontamentos a partir das tarefas trabalhadas hoje">
+                        <i data-lucide="sparkles"></i>
+                        <span class="nav-label">Gerar do Dia</span>
+                    </button>
                     <button id="btn-new-apontamento" class="btn btn-primary">
                         <i data-lucide="plus"></i>
                         <span class="nav-label">Novo Apontamento</span>
@@ -1689,6 +1693,29 @@
                     <button type="submit" class="btn btn-primary" style="flex: 2; justify-content: center;">Salvar</button>
                 </div>
             </form>
+        </div>
+    </div>
+
+    <!-- MODAL: GERADOR DE APONTAMENTOS -->
+    <div class="modal-overlay" id="modal-apontamento-generator" style="align-items: flex-start; padding: 40px 16px; overflow-y: auto;">
+        <div class="modal glass" style="max-width: 680px; max-height: none; display: flex; flex-direction: column;">
+            <div class="modal-header" style="flex-shrink: 0;">
+                <div>
+                    <h3>Gerar Apontamentos</h3>
+                    <p class="text-muted" id="apt-gen-subtitle" style="font-size: 0.85rem; margin: 2px 0 0;"></p>
+                </div>
+                <button class="close-modal" onclick="app.closeModal('modal-apontamento-generator')"><i data-lucide="x"></i></button>
+            </div>
+            <div id="apt-gen-content" style="padding: 16px 24px; overflow-y: auto; flex: 1;">
+                <!-- preenchido dinamicamente -->
+            </div>
+            <div style="padding: 16px 24px; border-top: 1px solid rgba(255,255,255,0.08); display: flex; gap: 12px; justify-content: flex-end; flex-shrink: 0;">
+                <button type="button" class="btn btn-secondary" onclick="app.closeModal('modal-apontamento-generator')">Cancelar</button>
+                <button type="button" id="btn-confirm-apt-gen" class="btn btn-primary" onclick="app.confirmApontamentoGeneration()">
+                    <i data-lucide="sparkles"></i>
+                    <span id="btn-confirm-apt-gen-label">Criar Apontamentos</span>
+                </button>
+            </div>
         </div>
     </div>
 

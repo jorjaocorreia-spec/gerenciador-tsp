@@ -182,6 +182,38 @@ Regras:
         return JSON.parse(cleaned);
     }
 
+    async generateApontamentoFromTasks(clientName, projectNum, tasks, date) {
+        const system = `Você é um assistente de consultoria SAP gerando descrições de apontamento para lançamento no ERP.
+Escreva um texto profissional, conciso e objetivo resumindo as atividades realizadas.
+Use linguagem técnica adequada. Máximo 4 linhas.
+Responda APENAS com o texto do apontamento, sem título, sem prefixos, sem aspas.`;
+
+        const dateLabel = new Date(date + 'T12:00:00').toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: 'long' });
+
+        const taskLines = tasks.map(t => {
+            const checklist = (t.checklist || []).filter(i => i.done).map(i => `  • ${i.text}`).join('\n');
+            const dayActivity = (t.comments || [])
+                .filter(c => c.createdAt && c.createdAt.startsWith(date) && c.type !== 'comment')
+                .map(c => {
+                    if (c.type === 'status_change') return `movida para nova etapa`;
+                    if (c.type === 'time_added') return `${c.activityData?.minutes ? Math.round(c.activityData.minutes) + ' min' : ''}`;
+                    if (c.type === 'completed') return `concluída`;
+                    return '';
+                }).filter(Boolean).join(', ');
+            return `- ${t.title}${t.description ? `: ${t.description.substring(0, 120)}` : ''}${checklist ? '\n' + checklist : ''}${dayActivity ? ` [${dayActivity}]` : ''}`;
+        }).join('\n');
+
+        const user = `Cliente: ${clientName}${projectNum ? ` (Projeto ${projectNum})` : ''}
+Data: ${dateLabel}
+
+Tarefas trabalhadas:
+${taskLines}
+
+Gere a descrição do apontamento.`;
+
+        return this.complete(system, user);
+    }
+
     async generateAgendaReportNarrative(clientName, events, startDate, endDate) {
         const system = `Você é um consultor de TI escrevendo um relatório mensal para um cliente.
 Escreva um texto profissional e amigável resumindo os atendimentos do período.
