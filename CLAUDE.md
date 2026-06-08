@@ -262,7 +262,7 @@ O `docker-entrypoint.sh` injeta essas vars em `js/config.js` via `envsubst` na i
 - **CSP nginx: `worker-src blob:` é obrigatório para PDF.js** — sem a diretiva `worker-src blob:`, o nginx bloqueia o Web Worker que PDF.js cria internamente como blob URL. O resultado é texto vazio em PDFs text-based. O `nginx.conf` já inclui `worker-src blob: https://cdnjs.cloudflare.com` desde o commit `6285b38`.
 - **PDF.js achata colunas visuais em texto plano** — layout de colunas do SAP faz PDF.js extrair `"22851 Projeto.:"` (número antes do rótulo) em vez de `"Projeto.: 22851"`. O parser suporta ambos os formatos.
 - **Horas na Ata SAP são centesimais, não sexagesimais** — `00:75` = 0,75 h = 45 min reais (não 1h15). A coluna "Horas Aplicadas" usa formato centesimal. **Hora Inicial e Hora Final também podem estar em centesimal** quando o SAP usa timestamps intermediários (ex: `16:75` = 16h45m). O parser detecta minutos > 59 e converte via `round(CC * 60 / 100)`. Para converter centesimal → minutos: `(HH * 100 + CC) / 100 * 60`.
-- **Cada página da Ata PDF = um bloco independente** — nunca concatenar textos de páginas diferentes antes de parsear. O parser (`parsePdfPages`) processa cada página em isolamento via `_parseSinglePage`.
+- **Atas com descrição multi-página: `parsePdfPages` mescla páginas de continuação antes de parsear** — quando uma descrição de atendimento extrapola para a página seguinte (sem cabeçalho "Descrição do Atendimento"), `parsePdfPages` detecta a continuação via `/Descri..o\s+do\s+Atendimento/i` e mescla o texto da página de continuação (com o header TECINCO/Ref./Programa stripped) ao bloco anterior. Só depois chama `_parseSinglePage` em cada bloco mesclado. Para PDFs normais (uma página por atendimento), cada página tem "Descrição do Atendimento" → `isNewPage = true` → sem mescla → comportamento idêntico ao anterior. **Nunca usar o número do projeto (`Projeto.:`) como detector de nova página** — PDF.js pode extrair no formato invertido (`35091 Projeto.:`) que não bate com o padrão `Projeto\s*[.:]+\s*\d{4,6}`, causando falsos negativos.
 - **Chamados: proxy Supabase Edge Function evita CORS** — todas as chamadas ao OTOBO passam por `supabase/functions/otobo-proxy/index.ts` (não direto do browser). O proxy autentica o usuário via JWT antes de repassar ao OTOBO. Deploy via `npx supabase@latest functions deploy otobo-proxy --project-ref klimkamnydfnzqetqlqm` com `SUPABASE_ACCESS_TOKEN` setado.
 - **Chamados: nome do web service OTOBO é `ProgramaGestorTSP_jorge`** — o proxy usa este nome fixo na URL: `{url}/otobo/nph-genericinterface.pl/Webservice/ProgramaGestorTSP_jorge/Ticket`. Se o admin criar o web service com nome diferente, atualizar o proxy.
 - **Chamados: rota de busca é POST `/Ticket`, não `/Ticket/Search`** — o OTOBO mapeia `/Ticket/:TicketID` para TicketGet; chamar `/Ticket/Search` resulta em TicketGet com `TicketID = "Search"` (erro `AccessDenied`). A busca correta é POST para `/Ticket` com os critérios no body. O proxy usa `SortBy: "Changed", OrderBy: "Down", Limit: 500` para trazer os 500 mais recentes.
@@ -466,7 +466,7 @@ Funcionalidade na view **Atendimentos**: botão "Importar Ata (PDF)" lê um PDF 
 
 ### Fluxo
 1. Usuário seleciona o PDF → `setupPdfImport()` lê página por página com PDF.js
-2. `parsePdfPages(pageTexts[])` processa cada página independentemente via `_parseSinglePage()`
+2. `parsePdfPages(pageTexts[])` detecta páginas de continuação (sem "Descrição do Atendimento") e mescla ao bloco anterior; depois chama `_parseSinglePage()` em cada bloco mesclado
 3. Modal de confirmação (`openPdfConfirmationModal()`) mostra registros identificados; clientes sem cadastro são criados automaticamente com nota "Cadastro incompleto"
 4. Usuário confirma → `confirmPdfImport()` salva via `store.addRecord()`
 
@@ -511,7 +511,7 @@ Total Horas Dia.: 03:00
 | Método | Descrição |
 |--------|-----------|
 | `setupPdfImport()` | Configura listener do input de arquivo; coleta `pageTexts[]` |
-| `parsePdfPages(pageTexts)` | Itera páginas, agrega records e warnings |
+| `parsePdfPages(pageTexts)` | Mescla páginas de continuação; itera blocos mesclados; agrega records e warnings |
 | `_parseSinglePage(text, pageNum)` | Extrai projeto, data, descrição, linhas da tabela e valida total |
 | `openPdfConfirmationModal()` | Mapeia projetos → clientes; cria cliente auto se não encontrado |
 | `confirmPdfImport()` | Salva records confirmados pelo usuário com progress feedback |
