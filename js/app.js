@@ -425,7 +425,13 @@ class AppController {
             document.getElementById('task-due-date').value = '';
             document.getElementById('task-estimated-minutes').value = '';
             document.getElementById('task-priority').value = 'medium';
-            document.getElementById('btn-delete-task').style.display = 'none';
+            const _delTaskBtn = document.getElementById('btn-delete-task');
+            clearTimeout(_delTaskBtn._confirmTimer);
+            _delTaskBtn._confirmDelete = false;
+            _delTaskBtn.innerHTML = '<i data-lucide="trash-2" style="width:14px;height:14px"></i> Excluir';
+            _delTaskBtn.style.removeProperty('background');
+            _delTaskBtn.style.removeProperty('border-color');
+            _delTaskBtn.style.display = 'none';
             document.getElementById('btn-add-time-task').style.display = 'none';
             document.getElementById('modal-task-cover').style.display = 'none';
             const suggestPanel = document.getElementById('ai-task-suggestions');
