@@ -60,6 +60,7 @@ class TSPStore {
         return { id: r.id, date: r.date,
             startTime: r.start_time || '', endTime: r.end_time || '',
             projectNum: r.project_num || '', description: r.description || '',
+            taskIds: Array.isArray(r.task_ids) ? r.task_ids : [],
             createdAt: r.created_at };
     }
 
@@ -619,20 +620,22 @@ class TSPStore {
         return (data || []).map(r => this._apontamento(r));
     }
 
-    async addApontamento(date, startTime, endTime, projectNum, description) {
+    async addApontamento(date, startTime, endTime, projectNum, description, taskIds = []) {
         const { data, error } = await this.db.from('apontamentos').insert({
             user_id: this.userId, date,
             start_time: startTime, end_time: endTime,
-            project_num: projectNum, description: description || ''
+            project_num: projectNum, description: description || '',
+            task_ids: taskIds
         }).select().single();
         if (error) throw error;
         return this._apontamento(data);
     }
 
-    async updateApontamento(id, date, startTime, endTime, projectNum, description) {
+    async updateApontamento(id, date, startTime, endTime, projectNum, description, taskIds = []) {
         const { data, error } = await this.db.from('apontamentos').update({
             date, start_time: startTime, end_time: endTime,
-            project_num: projectNum, description: description || ''
+            project_num: projectNum, description: description || '',
+            task_ids: taskIds
         }).eq('id', id).eq('user_id', this.userId).select().single();
         if (error) throw error;
         return this._apontamento(data);

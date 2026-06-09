@@ -5276,6 +5276,9 @@ class AppController {
             const clientMap = {};
             clients.forEach(c => { clientMap[c.id] = c; });
 
+            // IDs de tasks já vinculadas a apontamentos de hoje
+            const usedTaskIds = new Set(existingApts.flatMap(a => a.taskIds || []));
+
             // Agrupa tasks por clientId
             const grouped = {};
             tasks.forEach(t => {
@@ -5283,56 +5286,82 @@ class AppController {
                 grouped[t.clientId].push(t);
             });
 
-            // Filtra clientes que existem
-            const entries = Object.entries(grouped).filter(([cid]) => clientMap[cid]);
+            // Monta entries separando tasks novas das já lançadas
+            const entries = Object.entries(grouped)
+                .filter(([cid]) => clientMap[cid])
+                .map(([cid, taskList]) => {
+                    const client = clientMap[cid];
+                    const newTasks = taskList.filter(t => !usedTaskIds.has(t.id));
+                    const launchedTasks = taskList.filter(t => usedTaskIds.has(t.id));
+
+                    if (newTasks.length === 0) {
+                        return {
+                            clientId: cid, client,
+                            tasks: launchedTasks, launchedTasks,
+                            description: '', startTime: '', endTime: '',
+                            checked: false, loading: false, error: false,
+                            conflictApt: null, conflictAction: null,
+                            alreadyLaunched: true
+                        };
+                    }
+
+                    const conflictApt = client.projectNum
+                        ? (existingApts.find(a => a.projectNum && a.projectNum.trim() === client.projectNum.trim()) || null)
+                        : null;
+
+                    return {
+                        clientId: cid, client,
+                        tasks: newTasks, launchedTasks,
+                        description: '', startTime: '', endTime: '',
+                        checked: true, loading: true, error: false,
+                        conflictApt, conflictAction: conflictApt ? 'append' : null,
+                        alreadyLaunched: false
+                    };
+                });
 
             if (entries.length === 0) {
                 Toast.show('Nenhuma tarefa com cliente válido encontrada.', 'info');
                 return;
             }
 
-            // Monta estado inicial sem descrições ainda; detecta conflitos por projectNum
-            this._aptGenEntries = entries.map(([cid, taskList]) => {
-                const client = clientMap[cid];
-                const conflictApt = client.projectNum
-                    ? (existingApts.find(a => a.projectNum && a.projectNum.trim() === client.projectNum.trim()) || null)
-                    : null;
-                return {
-                    clientId: cid,
-                    client,
-                    tasks: taskList,
-                    description: '',
-                    startTime: '',
-                    endTime: '',
-                    checked: true,
-                    loading: true,
-                    error: false,
-                    conflictApt,
-                    conflictAction: conflictApt ? 'append' : null
-                };
-            });
+            // Entries novas primeiro, já lançadas por último
+            entries.sort((a, b) => (a.alreadyLaunched ? 1 : 0) - (b.alreadyLaunched ? 1 : 0));
+
+            if (!entries.some(e => !e.alreadyLaunched)) {
+                Toast.show('Todas as tarefas do dia já foram lançadas em apontamentos anteriores.', 'info');
+                return;
+            }
+
+            this._aptGenEntries = entries;
 
             const subtitle = document.getElementById('apt-gen-subtitle');
             const [y, m, d] = this.aptCurrentDate.split('-');
-            if (subtitle) subtitle.textContent = `${d}/${m}/${y} — ${entries.length} cliente${entries.length > 1 ? 's' : ''}`;
+            const newCount = entries.filter(e => !e.alreadyLaunched).length;
+            const doneCount = entries.filter(e => e.alreadyLaunched).length;
+            let subtitleText = `${d}/${m}/${y} — ${newCount} cliente${newCount !== 1 ? 's' : ''}`;
+            if (doneCount > 0) subtitleText += ` · ${doneCount} já lançada${doneCount !== 1 ? 's' : ''}`;
+            if (subtitle) subtitle.textContent = subtitleText;
 
             this._renderAptGenContent();
             this.openModal('modal-apontamento-generator');
 
-            // Gera descrições em paralelo
+            // Gera descrições em paralelo apenas para entries com tasks novas
             const aiResults = await Promise.allSettled(
                 this._aptGenEntries.map(e =>
-                    aiClient.generateApontamentoFromTasks(e.client.name, e.client.projectNum, e.tasks, this.aptCurrentDate)
+                    e.alreadyLaunched
+                        ? Promise.resolve(null)
+                        : aiClient.generateApontamentoFromTasks(e.client.name, e.client.projectNum, e.tasks, this.aptCurrentDate)
                 )
             );
 
             aiResults.forEach((result, idx) => {
-                if (result.status === 'fulfilled') {
+                if (this._aptGenEntries[idx].alreadyLaunched) return;
+                if (result.status === 'fulfilled' && result.value !== null) {
                     this._aptGenEntries[idx].description = result.value;
                     this._aptGenEntries[idx].loading = false;
                 } else {
                     this._aptGenEntries[idx].loading = false;
-                    this._aptGenEntries[idx].error = true;
+                    this._aptGenEntries[idx].error = result.status !== 'fulfilled';
                 }
             });
 
@@ -5352,15 +5381,46 @@ class AppController {
         const entries = this._aptGenEntries;
         content.innerHTML = '';
 
+        let shownDoneSeparator = false;
+
         entries.forEach((e, idx) => {
+            // Separador visual antes das entries já lançadas
+            if (e.alreadyLaunched && !shownDoneSeparator) {
+                shownDoneSeparator = true;
+                const sep = document.createElement('div');
+                sep.className = 'apt-gen-separator';
+                sep.innerHTML = `<span>Já lançadas hoje</span>`;
+                content.appendChild(sep);
+            }
+
+            const card = document.createElement('div');
+
+            if (e.alreadyLaunched) {
+                const taskTitles = e.tasks.map(t => escapeHtml(t.title)).join(', ');
+                card.className = 'apt-gen-card glass apt-gen-card-done';
+                card.innerHTML = `
+                    <div class="apt-gen-card-header" style="margin-bottom:0;">
+                        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+                            <span class="apt-gen-done-badge"><i data-lucide="check-circle-2"></i> Já lançada</span>
+                            <span class="apt-gen-client-name">${escapeHtml(e.client.name)}</span>
+                            ${e.client.projectNum ? `<span class="badge badge-outline" style="font-size:0.75rem;">${escapeHtml(e.client.projectNum)}</span>` : ''}
+                        </div>
+                        <span class="apt-gen-tasks-summary text-muted" style="padding-left:0;">${e.tasks.length} tarefa${e.tasks.length > 1 ? 's' : ''}: ${taskTitles}</span>
+                    </div>`;
+                content.appendChild(card);
+                return;
+            }
+
             const taskTitles = e.tasks.map(t => escapeHtml(t.title)).join(', ');
+            const launchedNote = e.launchedTasks && e.launchedTasks.length > 0
+                ? `<span class="apt-gen-launched-note"><i data-lucide="check"></i> ${e.launchedTasks.length} já lançada${e.launchedTasks.length > 1 ? 's' : ''}: ${e.launchedTasks.map(t => escapeHtml(t.title)).join(', ')}</span>`
+                : '';
+
             const descHtml = e.loading
                 ? `<div class="apt-gen-loading"><i data-lucide="loader-2" style="animation:spin 1s linear infinite"></i> Gerando com IA...</div>`
                 : e.error
                     ? `<textarea class="form-control apt-gen-textarea" rows="3" placeholder="Descreva o que foi feito..." data-idx="${idx}" onchange="app._aptGenDescChange(${idx}, this.value)"></textarea><p class="text-muted" style="font-size:0.8rem;margin-top:4px;">⚠ IA indisponível — preencha manualmente.</p>`
                     : `<textarea class="form-control apt-gen-textarea" rows="3" data-idx="${idx}" onchange="app._aptGenDescChange(${idx}, this.value)">${escapeHtml(e.description)}</textarea>`;
-
-            const card = document.createElement('div');
 
             if (e.conflictApt) {
                 // Card com conflito: mostra apontamento existente + opções de rádio
@@ -5377,7 +5437,8 @@ class AppController {
                             <span class="apt-gen-client-name">${escapeHtml(e.client.name)}</span>
                             ${e.client.projectNum ? `<span class="badge badge-outline" style="font-size:0.75rem;">${escapeHtml(e.client.projectNum)}</span>` : ''}
                         </div>
-                        <span class="apt-gen-tasks-summary text-muted">${e.tasks.length} tarefa${e.tasks.length > 1 ? 's' : ''}: ${taskTitles}</span>
+                        <span class="apt-gen-tasks-summary text-muted">${e.tasks.length} tarefa${e.tasks.length > 1 ? 's' : ''} nova${e.tasks.length > 1 ? 's' : ''}: ${taskTitles}</span>
+                        ${launchedNote}
                     </div>
                     <div class="apt-gen-existing-info">
                         ${exTimeLabel ? `<div class="apt-gen-existing-time">${exTimeLabel}</div>` : ''}
@@ -5407,6 +5468,7 @@ class AppController {
                             ${e.client.projectNum ? `<span class="badge badge-outline" style="font-size:0.75rem;">${escapeHtml(e.client.projectNum)}</span>` : ''}
                         </label>
                         <span class="apt-gen-tasks-summary text-muted">${e.tasks.length} tarefa${e.tasks.length > 1 ? 's' : ''}: ${taskTitles}</span>
+                        ${launchedNote}
                     </div>
                     <div class="apt-gen-desc-wrap">
                         ${descHtml}
@@ -5458,7 +5520,7 @@ class AppController {
         const label = document.getElementById('btn-confirm-apt-gen-label');
         if (!btn || !this._aptGenEntries) return;
         const count = this._aptGenEntries.filter(e => {
-            if (e.loading) return false;
+            if (e.loading || e.alreadyLaunched) return false;
             if (e.conflictApt === null) return e.checked;
             return e.conflictAction === 'append';
         }).length;
@@ -5469,8 +5531,8 @@ class AppController {
     async confirmApontamentoGeneration() {
         if (!this._aptGenEntries) return;
 
-        const toCreate = this._aptGenEntries.filter(e => !e.loading && e.conflictApt === null && e.checked);
-        const toAppend = this._aptGenEntries.filter(e => !e.loading && e.conflictApt !== null && e.conflictAction === 'append');
+        const toCreate = this._aptGenEntries.filter(e => !e.loading && !e.alreadyLaunched && e.conflictApt === null && e.checked);
+        const toAppend = this._aptGenEntries.filter(e => !e.loading && !e.alreadyLaunched && e.conflictApt !== null && e.conflictAction === 'append');
 
         if (toCreate.length === 0 && toAppend.length === 0) return;
 
@@ -5494,12 +5556,13 @@ class AppController {
         try {
             await Promise.all([
                 ...toCreate.map(e =>
-                    store.addApontamento(this.aptCurrentDate, e.startTime, e.endTime, e.client.projectNum || '', e.description)
+                    store.addApontamento(this.aptCurrentDate, e.startTime, e.endTime, e.client.projectNum || '', e.description, e.tasks.map(t => t.id))
                 ),
                 ...toAppend.map(e => {
                     const ex = e.conflictApt;
                     const newDesc = ex.description ? ex.description + '\n\n' + e.description : e.description;
-                    return store.updateApontamento(ex.id, ex.date, ex.startTime, ex.endTime, ex.projectNum, newDesc);
+                    const mergedTaskIds = [...new Set([...(ex.taskIds || []), ...e.tasks.map(t => t.id)])];
+                    return store.updateApontamento(ex.id, ex.date, ex.startTime, ex.endTime, ex.projectNum, newDesc, mergedTaskIds);
                 })
             ]);
 
