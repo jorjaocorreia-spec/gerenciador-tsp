@@ -8478,7 +8478,7 @@ class AppController {
 
             const update = () => {
                 const focused = document.activeElement === ctrl;
-                const hasVal  = ctrl.value !== '';
+                const hasVal  = ctrl.tagName === 'SELECT' || ctrl.value !== '';
                 lbl.classList.toggle('fl-up', focused || hasVal);
             };
             ctrl.addEventListener('focus',  update);
@@ -8499,7 +8499,8 @@ class AppController {
             );
             if (!lbl || !ctrl) return;
             const focused = document.activeElement === ctrl;
-            lbl.classList.toggle('fl-up', focused || ctrl.value !== '');
+            const hasVal  = ctrl.tagName === 'SELECT' || ctrl.value !== '';
+            lbl.classList.toggle('fl-up', focused || hasVal);
         });
     }
 }
