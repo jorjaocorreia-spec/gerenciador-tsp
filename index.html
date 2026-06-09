@@ -215,6 +215,9 @@
                     <button class="btn btn-secondary" id="btn-toggle-money" onclick="app.toggleMoneyVisibility()" title="Mostrar/ocultar valores monetários" style="padding: 8px 12px;">
                         <i data-lucide="eye" id="icon-toggle-money" style="width: 18px; height: 18px;"></i>
                     </button>
+                    <button class="btn btn-secondary" id="btn-agenda-coverage" onclick="app.openAgendaCoverage()" title="Panorama de cobertura de agenda vs. contrato" style="padding: 8px 14px; gap: 6px;">
+                        <i data-lucide="bar-chart-2" style="width: 16px; height: 16px;"></i> Cobertura
+                    </button>
                     <button class="btn btn-secondary" id="btn-open-saldo" onclick="app.openSaldoPanel()" title="Posição de horas por projeto" style="padding: 8px 14px; gap: 6px;">
                         <i data-lucide="scale" style="width: 16px; height: 16px;"></i> Saldo
                     </button>
@@ -952,6 +955,36 @@
                 <button class="close-modal" onclick="app.closeModal('modal-horas-mes')"><i data-lucide="x"></i></button>
             </div>
             <div id="horas-mes-content" style="padding: 8px 0; overflow-y: auto;">
+                <!-- preenchido dinamicamente -->
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL: COBERTURA DE AGENDA -->
+    <div class="modal-overlay" id="modal-agenda-coverage" style="align-items: flex-start; padding: 40px 16px; overflow-y: auto;">
+        <div class="modal glass" style="max-width: 900px; max-height: none; display: flex; flex-direction: column;">
+            <div class="modal-header" style="flex-shrink: 0;">
+                <div style="flex: 1; min-width: 0;">
+                    <div style="display:flex; align-items:center; gap: 12px; flex-wrap: wrap;">
+                        <h3 style="margin:0;">Cobertura de Agenda</h3>
+                        <div style="display:flex; align-items:center; gap:4px;">
+                            <button class="btn btn-ghost btn-sm" id="btn-cov-prev" onclick="app._coverageNavMonth(-1)" style="padding:4px 8px;">
+                                <i data-lucide="chevron-left" style="width:14px;height:14px;"></i>
+                            </button>
+                            <span id="cov-month-label" style="font-size:0.9rem; font-weight:600; min-width:110px; text-align:center;"></span>
+                            <button class="btn btn-ghost btn-sm" id="btn-cov-next" onclick="app._coverageNavMonth(1)" style="padding:4px 8px;">
+                                <i data-lucide="chevron-right" style="width:14px;height:14px;"></i>
+                            </button>
+                        </div>
+                        <button id="btn-cov-ai" class="btn btn-ghost btn-sm" onclick="app._coverageAiAnalysis()"
+                            style="display:none; gap:4px; color:#a78bfa; border-color:rgba(167,139,250,0.3); padding:5px 12px; font-size:12px;">
+                            <i data-lucide="sparkles" style="width:12px;height:12px;"></i> Análise IA
+                        </button>
+                    </div>
+                </div>
+                <button class="close-modal" onclick="app.closeModal('modal-agenda-coverage')"><i data-lucide="x"></i></button>
+            </div>
+            <div id="coverage-content" style="padding: 8px 0; overflow-y: auto;">
                 <!-- preenchido dinamicamente -->
             </div>
         </div>

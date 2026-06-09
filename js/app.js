@@ -123,6 +123,9 @@ class AppController {
         this._overLimitClientsCache = 0; // contagem de clientes sobrecarregados
         // Horas do Mês
         this._horasMesStats = null;
+        // Cobertura de Agenda
+        this._coverageMonth = new Date().toISOString().slice(0, 7);
+        this._coverageData = null;
         // Gerador de apontamentos a partir de tarefas
         this._aptGenEntries = null;
         // OTOBO
@@ -2533,6 +2536,278 @@ class AppController {
 
     _horasMesToggle() {
         this._renderHorasMesContent();
+    }
+
+    // ── COBERTURA DE AGENDA ────────────────────────────────────────
+
+    async openAgendaCoverage() {
+        const content = document.getElementById('coverage-content');
+        content.innerHTML = `<div style="text-align:center;padding:32px;">${spinnerHtml}</div>`;
+        this.openModal('modal-agenda-coverage');
+        this._coverageData = null;
+        await this._loadCoverageData();
+    }
+
+    async _loadCoverageData() {
+        const content = document.getElementById('coverage-content');
+        try {
+            const [batchStats, agendaEvents] = await Promise.all([
+                store.getBatchStats(this._coverageMonth),
+                store.getAgendaEventsByMonth(this._coverageMonth)
+            ]);
+            const agendaMinutesByClient = {};
+            for (const ev of agendaEvents) {
+                if (!ev.clientId) continue;
+                const mins = this._calcEventMinutesInMonth(ev, this._coverageMonth);
+                agendaMinutesByClient[ev.clientId] = (agendaMinutesByClient[ev.clientId] || 0) + mins;
+            }
+            this._coverageData = { batchStats, agendaMinutesByClient };
+            this._renderCoveragePanorama();
+        } catch (err) {
+            content.innerHTML = `<p style="color:var(--danger-color);padding:16px;">Erro ao carregar: ${err.message}</p>`;
+        }
+    }
+
+    _calcEventMinutesInMonth(event, yearMonth) {
+        if (!event.startTime) return 0;
+        const parts = event.startTime.split(':').map(Number);
+        const eParts = (event.endTime || '').split(':').map(Number);
+        if (parts.length < 2 || eParts.length < 2 || isNaN(parts[0]) || isNaN(eParts[0])) return 0;
+        const dailyMinutes = (eParts[0] * 60 + eParts[1]) - (parts[0] * 60 + parts[1]);
+        if (dailyMinutes <= 0) return 0;
+        const evEnd = event.dateEnd || event.date;
+        if (event.date === evEnd) return dailyMinutes;
+        const [yr, mo] = yearMonth.split('-').map(Number);
+        const lastDay = new Date(yr, mo, 0).getDate();
+        const monthStart = `${yearMonth}-01`;
+        const monthEnd   = `${yearMonth}-${String(lastDay).padStart(2, '0')}`;
+        const effectiveStart = event.date > monthStart ? event.date : monthStart;
+        const effectiveEnd   = evEnd < monthEnd ? evEnd : monthEnd;
+        const d1 = new Date(effectiveStart + 'T00:00:00');
+        const d2 = new Date(effectiveEnd + 'T00:00:00');
+        const days = Math.round((d2 - d1) / 86400000) + 1;
+        return dailyMinutes * Math.max(1, days);
+    }
+
+    async _coverageNavMonth(delta) {
+        const [yr, mo] = this._coverageMonth.split('-').map(Number);
+        const d = new Date(yr, mo - 1 + delta, 1);
+        this._coverageMonth = d.toISOString().slice(0, 7);
+        this._coverageData = null;
+        const content = document.getElementById('coverage-content');
+        if (content) content.innerHTML = `<div style="text-align:center;padding:32px;">${spinnerHtml}</div>`;
+        await this._loadCoverageData();
+    }
+
+    _renderCoveragePanorama() {
+        const content = document.getElementById('coverage-content');
+        if (!content || !this._coverageData) return;
+
+        const { batchStats, agendaMinutesByClient } = this._coverageData;
+
+        // Atualiza label do mês
+        const label = document.getElementById('cov-month-label');
+        if (label) label.textContent = this._formatDashboardMonth(this._coverageMonth);
+
+        // Botão IA
+        const aiBtn = document.getElementById('btn-cov-ai');
+        if (aiBtn) aiBtn.style.display = (aiClient?.isConfigured) ? 'flex' : 'none';
+
+        const fmtMin = (minutes) => {
+            const h = Math.floor(minutes / 60);
+            const m = minutes % 60;
+            if (h === 0) return `${m}min`;
+            if (m === 0) return `${h}h`;
+            return `${h}h ${String(m).padStart(2, '0')}min`;
+        };
+
+        // Constrói rows com dados calculados
+        const rows = batchStats
+            .filter(s => s.client.status !== 'finished' || s.client.hoursTotal > 0)
+            .map(s => {
+                const contractedMin = Math.round(s.client.hoursTotal * 60);
+                const scheduledMin  = agendaMinutesByClient[s.client.id] || 0;
+                const loggedMin     = Math.round(s.hoursUsed * 60);
+                const gapMin        = contractedMin - scheduledMin;
+                const covPct        = contractedMin > 0
+                    ? Math.round(scheduledMin / contractedMin * 100)
+                    : null;
+                return { s, contractedMin, scheduledMin, loggedMin, gapMin, covPct };
+            })
+            .sort((a, b) => {
+                if (a.covPct === null && b.covPct === null) return 0;
+                if (a.covPct === null) return 1;
+                if (b.covPct === null) return -1;
+                return a.covPct - b.covPct;
+            });
+
+        // Cards de resumo
+        const activeRows   = rows.filter(r => r.contractedMin > 0);
+        const totalContract = activeRows.reduce((sum, r) => sum + r.contractedMin, 0);
+        const totalScheduled = activeRows.reduce((sum, r) => sum + r.scheduledMin, 0);
+        const atRisk        = activeRows.filter(r => r.covPct !== null && r.covPct < 50).length;
+
+        const overallPct = totalContract > 0 ? Math.round(totalScheduled / totalContract * 100) : 0;
+        const overallColor = overallPct >= 90 ? '#4ade80' : overallPct >= 50 ? '#fbbf24' : '#f87171';
+
+        const summaryCards = `
+            <div class="cov-summary-grid">
+                <div class="cov-summary-card">
+                    <span class="cov-summary-value">${activeRows.length}</span>
+                    <span class="cov-summary-label">Clientes ativos</span>
+                </div>
+                <div class="cov-summary-card">
+                    <span class="cov-summary-value">${fmtMin(totalContract)}</span>
+                    <span class="cov-summary-label">Total contratado</span>
+                </div>
+                <div class="cov-summary-card">
+                    <span class="cov-summary-value" style="color:${overallColor};">${fmtMin(totalScheduled)}</span>
+                    <span class="cov-summary-label">Total agendado (${overallPct}%)</span>
+                </div>
+                <div class="cov-summary-card">
+                    <span class="cov-summary-value" style="color:${atRisk > 0 ? '#f87171' : '#4ade80'};">${atRisk}</span>
+                    <span class="cov-summary-label">Em risco (&lt;50%)</span>
+                </div>
+            </div>`;
+
+        // Legenda
+        const legend = `
+            <div style="display:flex;gap:16px;padding:6px 24px 12px;font-size:0.75rem;color:var(--text-muted);">
+                <span><span style="color:#4ade80;">●</span> ≥ 90% coberto</span>
+                <span><span style="color:#fbbf24;">●</span> 50–89% coberto</span>
+                <span><span style="color:#f87171;">●</span> &lt; 50% coberto</span>
+                <span style="margin-left:auto;font-style:italic;">Agendado = soma das durações dos eventos da agenda no mês</span>
+            </div>`;
+
+        // Linhas da tabela
+        const tableRows = rows.length === 0
+            ? `<tr><td colspan="6" style="text-align:center;color:var(--text-muted);padding:28px;">Nenhum cliente encontrado.</td></tr>`
+            : rows.map(({ s, contractedMin, scheduledMin, loggedMin, gapMin, covPct }) => {
+                const proj = s.client.projectNum
+                    ? `<span style="color:var(--text-muted);font-size:0.72rem;margin-left:4px;">#${escapeHtml(s.client.projectNum)}</span>`
+                    : '';
+                const contractLabel = contractedMin > 0 ? fmtMin(contractedMin) : `<span class="text-muted">—</span>`;
+
+                let dotColor, barColor;
+                if (covPct === null) {
+                    dotColor = 'rgba(255,255,255,0.2)'; barColor = 'rgba(255,255,255,0.1)';
+                } else if (covPct >= 90) {
+                    dotColor = '#4ade80'; barColor = '#4ade80';
+                } else if (covPct >= 50) {
+                    dotColor = '#fbbf24'; barColor = '#fbbf24';
+                } else {
+                    dotColor = '#f87171'; barColor = '#f87171';
+                }
+
+                const covLabel = covPct !== null
+                    ? `<span style="font-weight:600;color:${dotColor};">${covPct}%</span>`
+                    : `<span class="text-muted">—</span>`;
+
+                const barPct = covPct !== null ? Math.min(100, covPct) : 0;
+
+                const gapLabel = contractedMin === 0
+                    ? `<span class="text-muted">—</span>`
+                    : gapMin > 0
+                        ? `<span style="color:#f87171;">-${fmtMin(gapMin)}</span>`
+                        : gapMin < 0
+                            ? `<span style="color:#4ade80;">+${fmtMin(Math.abs(gapMin))}</span>`
+                            : `<span style="color:#4ade80;">✓</span>`;
+
+                const scheduledLabel = scheduledMin > 0 ? fmtMin(scheduledMin) : `<span class="text-muted">—</span>`;
+                const loggedLabel    = loggedMin > 0    ? fmtMin(loggedMin)    : `<span class="text-muted">—</span>`;
+
+                return `<tr>
+                    <td style="width:10px;padding-right:0;">
+                        <span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${dotColor};flex-shrink:0;"></span>
+                    </td>
+                    <td>
+                        <div style="font-weight:500;">${escapeHtml(s.client.name)}${proj}</div>
+                        <div style="margin-top:5px;height:4px;background:rgba(255,255,255,0.07);border-radius:3px;overflow:hidden;">
+                            <div class="cov-bar" data-w="${barPct}" style="height:100%;width:0;background:${barColor};border-radius:3px;transition:width 0.55s ease;"></div>
+                        </div>
+                    </td>
+                    <td style="text-align:right;white-space:nowrap;">${contractLabel}</td>
+                    <td style="text-align:right;white-space:nowrap;">${scheduledLabel}</td>
+                    <td style="text-align:right;white-space:nowrap;">${loggedLabel}</td>
+                    <td style="text-align:right;white-space:nowrap;">${gapLabel}</td>
+                    <td style="text-align:right;white-space:nowrap;">${covLabel}</td>
+                </tr>`;
+            }).join('');
+
+        content.innerHTML = `
+            ${summaryCards}
+            ${legend}
+            <table class="data-table" style="margin:0;">
+                <thead>
+                    <tr>
+                        <th style="width:10px;"></th>
+                        <th>Cliente</th>
+                        <th style="text-align:right;">Contrato/mês</th>
+                        <th style="text-align:right;">Agendado</th>
+                        <th style="text-align:right;">Lançado</th>
+                        <th style="text-align:right;">Gap</th>
+                        <th style="text-align:right;">Cobertura</th>
+                    </tr>
+                </thead>
+                <tbody>${tableRows}</tbody>
+            </table>
+            <p style="font-size:0.75rem;color:var(--text-muted);padding:10px 24px 4px;margin:0;">
+                Gap negativo (verde) = mais horas agendadas que o contrato. Gap positivo (vermelho) = faltam horas na agenda.
+            </p>`;
+
+        requestAnimationFrame(() => requestAnimationFrame(() => {
+            content.querySelectorAll('.cov-bar').forEach(bar => {
+                bar.style.width = bar.dataset.w + '%';
+            });
+        }));
+        lucide.createIcons();
+    }
+
+    async _coverageAiAnalysis() {
+        if (!aiClient?.isConfigured) return;
+        const btn = document.getElementById('btn-cov-ai');
+        if (!btn || !this._coverageData) return;
+
+        const { batchStats, agendaMinutesByClient } = this._coverageData;
+        const monthLabel = this._formatDashboardMonth(this._coverageMonth);
+
+        const clientData = batchStats
+            .filter(s => s.client.hoursTotal > 0)
+            .map(s => {
+                const contractedMin = Math.round(s.client.hoursTotal * 60);
+                const scheduledMin  = agendaMinutesByClient[s.client.id] || 0;
+                const loggedMin     = Math.round(s.hoursUsed * 60);
+                const covPct        = Math.round(scheduledMin / contractedMin * 100);
+                return `${s.client.name}: contrato=${s.client.hoursTotal}h, agendado=${Math.round(scheduledMin/60*10)/10}h (${covPct}%), lançado=${Math.round(loggedMin/60*10)/10}h`;
+            }).join('\n');
+
+        const origText = btn.innerHTML;
+        btn.disabled = true;
+        btn.innerHTML = `<i data-lucide="loader-2" style="width:12px;height:12px;" class="spin-icon"></i> Analisando...`;
+        lucide.createIcons();
+
+        try {
+            const result = await aiClient.complete(
+                `Você é um consultor analisando a cobertura de agenda de uma empresa de consultoria. Seja direto e objetivo. Responda sempre em português.`,
+                `Mês: ${monthLabel}\n\nDados de cobertura de agenda por cliente (agendado = eventos de agenda, lançado = horas já registradas):\n${clientData}\n\nAnalise em 3 parágrafos curtos:\n1. Situação geral da cobertura\n2. Clientes em atenção (agenda não cobre o contrato)\n3. Recomendações práticas para completar a cobertura`
+            );
+
+            let panel = document.getElementById('cov-ai-panel');
+            if (!panel) {
+                panel = document.createElement('div');
+                panel.id = 'cov-ai-panel';
+                panel.style.cssText = 'margin:12px 24px 0; padding:14px 16px; border-radius:10px; background:rgba(139,92,246,0.06); border:1px solid rgba(167,139,250,0.25); font-size:13px; line-height:1.7; color:var(--text-secondary); white-space:pre-wrap;';
+                const content = document.getElementById('coverage-content');
+                content.insertBefore(panel, content.firstChild.nextSibling);
+            }
+            panel.textContent = result;
+        } catch (err) {
+            Toast.show('Erro na análise IA: ' + err.message, 'error');
+        } finally {
+            btn.disabled = false;
+            btn.innerHTML = origText;
+            lucide.createIcons();
+        }
     }
 
     async renderRecords(preloadedClients) {
@@ -8611,6 +8886,8 @@ document.addEventListener('DOMContentLoaded', async () => {
             window.app._chamadoFilterSaveTimer = null;
             window.app._whatsappProfile = null;
             window.app._horasMesStats = null;
+            window.app._coverageData = null;
+            window.app._coverageMonth = new Date().toISOString().slice(0, 7);
             window.app._aptGenEntries = null;
             window.app._tasksCache = null;
             window.app._clientsMapCache = {};

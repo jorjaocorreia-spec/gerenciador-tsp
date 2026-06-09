@@ -415,6 +415,20 @@ class TSPStore {
         return data.map(r => this._event(r));
     }
 
+    async getAgendaEventsByMonth(yearMonth) {
+        const [yr, mo] = yearMonth.split('-').map(Number);
+        const lastDay = new Date(yr, mo, 0).getDate();
+        const start = `${yearMonth}-01`;
+        const end   = `${yearMonth}-${String(lastDay).padStart(2, '0')}`;
+        const { data, error } = await this.db.from('agenda_events')
+            .select('id, client_id, date, date_end, start_time, end_time')
+            .eq('user_id', this.userId)
+            .lte('date', end)
+            .or(`date_end.gte.${start},and(date_end.is.null,date.gte.${start})`);
+        if (error) throw error;
+        return (data || []).map(r => this._event(r));
+    }
+
     async getAgendaEventsByClientAndRange(clientId, startDate, endDate) {
         const { data, error } = await this.db.from('agenda_events').select('*')
             .eq('user_id', this.userId)
