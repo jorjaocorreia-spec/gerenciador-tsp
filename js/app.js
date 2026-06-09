@@ -2569,12 +2569,19 @@ class AppController {
     }
 
     _calcEventMinutesInMonth(event, yearMonth) {
-        if (!event.startTime) return 0;
-        const parts = event.startTime.split(':').map(Number);
-        const eParts = (event.endTime || '').split(':').map(Number);
-        if (parts.length < 2 || eParts.length < 2 || isNaN(parts[0]) || isNaN(eParts[0])) return 0;
-        const dailyMinutes = (eParts[0] * 60 + eParts[1]) - (parts[0] * 60 + parts[1]);
-        if (dailyMinutes <= 0) return 0;
+        // All-day events (startTime === '') count as a standard workday: 08:00-12:00 + 13:30-18:00 = 510 min
+        const WORKDAY_MINUTES = 510;
+        const isAllDay = !event.startTime;
+        let dailyMinutes;
+        if (isAllDay) {
+            dailyMinutes = WORKDAY_MINUTES;
+        } else {
+            const parts = event.startTime.split(':').map(Number);
+            const eParts = (event.endTime || '').split(':').map(Number);
+            if (parts.length < 2 || eParts.length < 2 || isNaN(parts[0]) || isNaN(eParts[0])) return 0;
+            dailyMinutes = (eParts[0] * 60 + eParts[1]) - (parts[0] * 60 + parts[1]);
+            if (dailyMinutes <= 0) return 0;
+        }
         const evEnd = event.dateEnd || event.date;
         if (event.date === evEnd) return dailyMinutes;
         const [yr, mo] = yearMonth.split('-').map(Number);
