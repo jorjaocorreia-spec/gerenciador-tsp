@@ -2376,6 +2376,7 @@ class AppController {
             totalAppliedH: totalAppliedMinutes / 60,
             balanceH: balanceMinutes / 60,
             thisMonthApplied: thisMonthMinutes / 60,
+            thisMonthDelta: thisMonthMinutes / 60 - client.hoursTotal,
             contracted: client.hoursTotal
         };
     }
