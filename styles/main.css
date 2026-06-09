@@ -2444,18 +2444,62 @@ kbd {
   color: var(--text-secondary);
 }
 
+.task-comment-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.task-comment-edit,
 .task-comment-delete {
   background: none;
   border: none;
   color: var(--text-secondary);
   cursor: pointer;
   padding: 0 2px;
-  font-size: 16px;
   line-height: 1;
   opacity: 0;
-  transition: opacity 0.15s;
+  transition: opacity 0.15s, color 0.15s;
+  display: flex;
+  align-items: center;
 }
+.task-comment-delete { font-size: 16px; }
+.task-comment-edit:hover { color: var(--primary); }
+.task-comment-delete:hover { color: #ff6b6b; }
+.task-comment-item:hover .task-comment-edit,
 .task-comment-item:hover .task-comment-delete { opacity: 1; }
+
+.task-comment-edit-textarea {
+  background: var(--bg-input, rgba(255,255,255,0.07));
+  border: 1px solid var(--primary);
+  border-radius: 6px;
+  color: var(--text-primary);
+  padding: 7px 10px;
+  resize: none;
+  font-size: 13px;
+  font-family: inherit;
+  line-height: 1.5;
+  width: 100%;
+  min-height: 60px;
+  overflow-y: hidden;
+  box-sizing: border-box;
+  outline: none;
+}
+
+.task-comment-save-edit,
+.task-comment-cancel-edit {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 11px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  transition: background 0.15s;
+}
+.task-comment-save-edit { color: var(--primary); font-weight: 600; }
+.task-comment-cancel-edit { color: var(--text-secondary); }
+.task-comment-save-edit:hover { background: rgba(139,92,246,0.12); }
+.task-comment-cancel-edit:hover { background: rgba(255,255,255,0.07); }
 
 .task-comment-text {
   font-size: 13px;

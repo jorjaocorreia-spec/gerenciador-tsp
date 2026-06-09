@@ -913,10 +913,13 @@ class AppController {
             const dateStr = date.toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' }) + ', ' +
                 date.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
             if (entry.type === 'comment') {
-                return `<div class="task-comment-item">
+                return `<div class="task-comment-item" data-comment-id="${entry.id}">
                     <div class="task-comment-meta">
                         <span>${dateStr}</span>
-                        <button type="button" class="task-comment-delete" onclick="app._deleteTaskComment('${entry.id}')" title="Excluir">×</button>
+                        <div class="task-comment-actions">
+                            <button type="button" class="task-comment-edit" onclick="app._startEditComment('${entry.id}')" title="Editar"><i data-lucide="pencil" style="width:12px;height:12px;pointer-events:none"></i></button>
+                            <button type="button" class="task-comment-delete" onclick="app._deleteTaskComment('${entry.id}')" title="Excluir">×</button>
+                        </div>
                     </div>
                     <div class="task-comment-text">${escapeHtml(entry.text)}</div>
                 </div>`;
@@ -984,6 +987,52 @@ class AppController {
             this._renderTaskComments();
         } catch (err) {
             Toast.show('Erro ao excluir comentário: ' + err.message, 'error');
+        }
+    }
+
+    _startEditComment(commentId) {
+        const entry = this._modalComments.find(c => c.id === commentId);
+        if (!entry) return;
+        const item = document.querySelector(`.task-comment-item[data-comment-id="${commentId}"]`);
+        if (!item) return;
+        const textDiv = item.querySelector('.task-comment-text');
+        const actionsDiv = item.querySelector('.task-comment-actions');
+        const ta = document.createElement('textarea');
+        ta.className = 'task-comment-edit-textarea';
+        ta.value = entry.text;
+        ta.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' && e.ctrlKey) { e.preventDefault(); this._saveEditComment(commentId); }
+            if (e.key === 'Escape') this._renderTaskComments();
+        });
+        ta.addEventListener('input', () => { ta.style.height = 'auto'; ta.style.height = ta.scrollHeight + 'px'; });
+        textDiv.replaceWith(ta);
+        ta.style.height = ta.scrollHeight + 'px';
+        ta.focus();
+        ta.setSelectionRange(ta.value.length, ta.value.length);
+        actionsDiv.innerHTML = `
+            <button type="button" class="task-comment-save-edit" onclick="app._saveEditComment('${commentId}')" title="Salvar (Ctrl+Enter)">Salvar</button>
+            <button type="button" class="task-comment-cancel-edit" onclick="app._renderTaskComments()" title="Cancelar (Esc)">Cancelar</button>`;
+    }
+
+    async _saveEditComment(commentId) {
+        const item = document.querySelector(`.task-comment-item[data-comment-id="${commentId}"]`);
+        const ta = item?.querySelector('.task-comment-edit-textarea');
+        const newText = ta?.value.trim();
+        if (!newText) return;
+        const entry = this._modalComments.find(c => c.id === commentId);
+        if (entry) entry.text = newText;
+        try {
+            await store.updateTask({ id: this._modalTaskId, comments: this._modalComments,
+                title: document.getElementById('task-title').value,
+                description: document.getElementById('task-description').value,
+                status: this._modalStatus, priority: document.getElementById('task-priority').value,
+                dueDate: document.getElementById('task-due-date').value,
+                estimatedMinutes: document.getElementById('task-estimated-minutes').value,
+                labels: this._modalLabels, checklist: this._modalChecklist,
+                coverColor: this._modalCoverColor, attachments: this.taskAttachments });
+            this._renderTaskComments();
+        } catch (err) {
+            Toast.show('Erro ao salvar edição: ' + err.message, 'error');
         }
     }
 
