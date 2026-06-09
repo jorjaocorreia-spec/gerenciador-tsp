@@ -298,10 +298,19 @@ class AppController {
             this._renderTaskAttachmentPreviews();
         });
 
-        // Seleção de arquivos de imagem via input — implementação
+        // Seleção de arquivos via input — implementação (imagens comprimidas; XML lido como base64)
         document.getElementById('impl-attachments')?.addEventListener('change', async (e) => {
             for (const file of e.target.files) {
-                const data = await compressImageFile(file);
+                let data;
+                if (file.type.startsWith('image/')) {
+                    data = await compressImageFile(file);
+                } else {
+                    data = await new Promise(res => {
+                        const r = new FileReader();
+                        r.onload = ev => res(ev.target.result);
+                        r.readAsDataURL(file);
+                    });
+                }
                 this.implAttachments.push({ name: file.name, data });
             }
             e.target.value = '';
@@ -1073,17 +1082,36 @@ class AppController {
         const hint = document.getElementById('impl-attach-hint');
         if (!container) return;
         if (hint) hint.style.display = this.implAttachments.length ? 'none' : '';
-        container.innerHTML = this.implAttachments.map((att, i) => `
+        container.innerHTML = this.implAttachments.map((att, i) => {
+            const isXml = att.name.toLowerCase().endsWith('.xml') || att.data?.startsWith('data:text/xml') || att.data?.startsWith('data:application/xml');
+            if (isXml) {
+                return `
+                <div class="attach-thumb attach-thumb-file" onclick="app._openImplAttachmentLightbox(${i})" title="${escapeHtml(att.name)}" style="cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;min-width:80px;padding:8px;background:var(--bg-glass);border:1px solid var(--border-color);border-radius:8px;">
+                    <i data-lucide="file-code-2" style="width:32px;height:32px;color:var(--primary);"></i>
+                    <span style="font-size:10px;color:var(--text-muted);text-align:center;max-width:80px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHtml(att.name)}</span>
+                    <button type="button" class="attach-remove" onclick="event.stopPropagation();app.removeImplAttachment(${i})" title="Remover" style="position:static;margin-top:2px;">×</button>
+                </div>`;
+            }
+            return `
             <div class="attach-thumb">
                 <img src="${att.data}" alt="${escapeHtml(att.name)}" onclick="app._openImplAttachmentLightbox(${i})" title="${escapeHtml(att.name)}">
                 <button type="button" class="attach-remove" onclick="app.removeImplAttachment(${i})" title="Remover">×</button>
-            </div>
-        `).join('');
+            </div>`;
+        }).join('');
+        lucide.createIcons();
     }
 
     _openImplAttachmentLightbox(index) {
         const att = this.implAttachments[index];
         if (!att) return;
+        const isXml = att.name.toLowerCase().endsWith('.xml') || att.data?.startsWith('data:text/xml') || att.data?.startsWith('data:application/xml');
+        if (isXml) {
+            const a = document.createElement('a');
+            a.href = att.data;
+            a.download = att.name;
+            a.click();
+            return;
+        }
         const overlay = document.createElement('div');
         overlay.style.cssText = 'position:fixed;inset:0;z-index:99999;background:rgba(0,0,0,0.88);display:flex;align-items:center;justify-content:center;cursor:zoom-out;';
         const img = document.createElement('img');
