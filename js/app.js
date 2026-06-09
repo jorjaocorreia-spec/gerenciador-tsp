@@ -117,6 +117,10 @@ class AppController {
         // Guard para evitar renderAll() concorrente
         this._renderAllRunning = false;
         this._renderAllPending = false;
+        // Cache para optimistic updates do Kanban
+        this._tasksCache = null;        // null = inválido; [] = vazio válido
+        this._clientsMapCache = {};     // { clientId: clientObj }
+        this._overLimitClientsCache = 0; // contagem de clientes sobrecarregados
         // Horas do Mês
         this._horasMesStats = null;
         // Gerador de apontamentos a partir de tarefas
@@ -752,12 +756,32 @@ class AppController {
             if (id) {
                 taskData.id = id;
                 await store.updateTask(taskData);
+                // Atualiza tarefa existente no cache
+                if (this._tasksCache) {
+                    const idx = this._tasksCache.findIndex(t => t.id === id);
+                    if (idx >= 0) this._tasksCache[idx] = { ...this._tasksCache[idx], ...taskData };
+                }
             } else {
-                await store.addTask(taskData);
+                const newTask = await store.addTask(taskData);
+                // Adiciona nova tarefa ao cache
+                if (this._tasksCache && newTask) {
+                    // Garante que o cliente está no mapa de clientes
+                    if (clientId && !this._clientsMapCache[clientId]) {
+                        store.getClient(clientId).then(c => { if (c) this._clientsMapCache[clientId] = c; }).catch(() => {});
+                    }
+                    this._lastAddedTaskId = newTask.id;
+                    this._tasksCache.push(newTask);
+                }
             }
             if (btn) await this._btnSuccess(btn);
             this.closeModal('modal-task');
-            await this.renderAll();
+            // Re-render rápido do Kanban sem renderAll()
+            if (this._tasksCache) {
+                this._renderTasksFromCache();
+                this._lastAddedTaskId = null;
+            } else {
+                await this.renderAll();
+            }
             Toast.show(id ? 'Tarefa atualizada.' : 'Tarefa criada.', 'success');
         } catch (err) {
             if (btn) this._btnError(btn);
@@ -777,12 +801,21 @@ class AppController {
             try {
                 await store.addTaskTime(id, minutes);
                 await store.logTaskActivity(id, 'time_added', { minutes, description });
+                // Atualiza spentMinutes no cache
+                if (this._tasksCache) {
+                    const t = this._tasksCache.find(t => t.id === id);
+                    if (t) t.spentMinutes = (t.spentMinutes || 0) + minutes;
+                }
                 if (this._modalTaskId === id) {
                     const t = await store.getTask(id);
                     if (t) { this._modalComments = t.comments; this._renderTaskComments(); }
                 }
                 this.closeModal('modal-task-time');
-                await this.renderAll();
+                if (this._tasksCache) {
+                    this._renderTasksFromCache();
+                } else {
+                    await this.renderAll();
+                }
                 Toast.show('Tempo adicionado.', 'success');
             } catch (err) {
                 Toast.show('Erro ao registrar tempo: ' + err.message, 'error');
@@ -1018,7 +1051,13 @@ class AppController {
             if (card) { card.classList.add('row-deleting'); await new Promise(r => setTimeout(r, 400)); }
             try {
                 await store.deleteTask(id);
-                await this.renderAll();
+                // Remove do cache e re-renderiza
+                if (this._tasksCache) {
+                    this._tasksCache = this._tasksCache.filter(t => t.id !== id);
+                    this._renderTasksFromCache();
+                } else {
+                    await this.renderAll();
+                }
                 Toast.show('Tarefa excluída.', 'success');
             } catch (err) {
                 if (card) card.classList.remove('row-deleting');
@@ -1028,15 +1067,39 @@ class AppController {
     }
 
     async toggleTaskComplete(id, completed) {
+        // Optimistic: atualiza cache e re-renderiza antes de ir ao banco
+        const prevState = {};
+        if (this._tasksCache) {
+            const t = this._tasksCache.find(t => t.id === id);
+            if (t) {
+                prevState.completed  = t.completed;
+                prevState.completedAt = t.completedAt;
+                t.completed  = completed;
+                t.completedAt = completed ? new Date().toISOString() : null;
+            }
+            this._renderTasksFromCache();
+        }
+
         try {
             const { completedAt } = await store.toggleTaskComplete(id, completed);
-            if (completed) {
-                await store.logTaskActivity(id, 'completed', { completedAt });
-            } else {
-                await store.removeCompletionActivity(id);
+            // Atualiza completedAt real retornado pelo banco
+            if (this._tasksCache) {
+                const t = this._tasksCache.find(t => t.id === id);
+                if (t) t.completedAt = completedAt;
             }
-            await this.renderAll();
+            // Activity log fire-and-forget
+            if (completed) {
+                store.logTaskActivity(id, 'completed', { completedAt }).catch(() => {});
+            } else {
+                store.removeCompletionActivity(id).catch(() => {});
+            }
         } catch (err) {
+            // Rollback: restaura estado anterior no cache
+            if (this._tasksCache && 'completed' in prevState) {
+                const t = this._tasksCache.find(t => t.id === id);
+                if (t) { t.completed = prevState.completed; t.completedAt = prevState.completedAt; }
+                this._renderTasksFromCache();
+            }
             Toast.show('Erro ao atualizar tarefa: ' + err.message, 'error');
         }
     }
@@ -1049,7 +1112,13 @@ class AppController {
             try {
                 await store.deleteTask(id);
                 this.closeModal('modal-task');
-                await this.renderAll();
+                // Remove do cache e re-renderiza
+                if (this._tasksCache) {
+                    this._tasksCache = this._tasksCache.filter(t => t.id !== id);
+                    this._renderTasksFromCache();
+                } else {
+                    await this.renderAll();
+                }
                 Toast.show('Tarefa excluída.', 'success');
             } catch (err) {
                 Toast.show('Erro ao excluir tarefa: ' + err.message, 'error');
@@ -1128,23 +1197,36 @@ class AppController {
         if (!ids.includes(draggedId)) ids.push(draggedId);
 
         const oldStatus = this._draggingFromStatus;
-        if (oldStatus !== newStatus) {
-            await store.updateTaskStatus(draggedId, newStatus);
-            store.logTaskActivity(draggedId, 'status_change', { from: oldStatus, to: newStatus }).catch(() => {});
-        }
-        try {
-            await store.reorderTasks(ids.map((id, pos) => ({ id, status: newStatus, position: pos })));
-        } catch (err) {
-            console.error('reorderTasks error:', err);
-            Toast.show('Erro ao salvar ordem.', 'error');
-        }
-        await this.renderAll();
+        const reorderData = ids.map((id, pos) => ({ id, status: newStatus, position: pos }));
 
-        // Bounce no card após o drop
-        const droppedCard = document.querySelector(`.kb-card[data-id="${draggedId}"]`);
-        if (droppedCard) {
-            droppedCard.classList.add('kb-card-dropped');
-            droppedCard.addEventListener('animationend', () => droppedCard.classList.remove('kb-card-dropped'), { once: true });
+        // Optimistic: atualiza cache imediatamente e re-renderiza o board (instantâneo)
+        if (this._tasksCache) {
+            reorderData.forEach(({ id, status, position }) => {
+                const t = this._tasksCache.find(t => t.id === id);
+                if (t) { t.status = status; t.position = position; }
+            });
+            this._renderTasksFromCache();
+        }
+
+        // Bounce animation no card após o re-render
+        requestAnimationFrame(() => {
+            const droppedCard = document.querySelector(`.kb-card[data-id="${draggedId}"]`);
+            if (droppedCard) {
+                droppedCard.classList.add('kb-card-dropped');
+                droppedCard.addEventListener('animationend', () => droppedCard.classList.remove('kb-card-dropped'), { once: true });
+            }
+        });
+
+        // Persiste em background (reorderTasks já salva status + position de todos os afetados)
+        store.reorderTasks(reorderData).catch(err => {
+            console.error('reorderTasks error:', err);
+            // Rollback: invalida cache e busca dados frescos do banco
+            this._tasksCache = null;
+            this.renderTasks();
+            Toast.show('Erro ao salvar posição da tarefa.', 'error');
+        });
+        if (oldStatus !== newStatus) {
+            store.logTaskActivity(draggedId, 'status_change', { from: oldStatus, to: newStatus }).catch(() => {});
         }
     }
 
@@ -1173,13 +1255,44 @@ class AppController {
         const title = input?.value.trim();
         if (!title) { this.closeQuickAdd(colId); return; }
         const clientId = document.getElementById('filter-task-client')?.value || null;
+
+        // Optimistic: insere card temporário no cache e renderiza imediatamente
+        const tempId = `temp-${Date.now()}`;
+        if (this._tasksCache) {
+            const tempTask = {
+                id: tempId, title, status: colId, clientId, priority: 'medium',
+                labels: [], checklist: [], attachments: [], comments: [],
+                completed: false, completedAt: null, coverColor: null,
+                dueDate: null, estimatedMinutes: 0, spentMinutes: 0
+            };
+            this._tasksCache.push(tempTask);
+            this._lastAddedTaskId = tempId;
+            this._renderTasksFromCache();
+            this._lastAddedTaskId = null;
+        }
+        this.closeQuickAdd(colId);
+
         try {
             const newTask = await store.addTask({ title, status: colId, clientId, priority: 'medium' });
-            this._lastAddedTaskId = newTask?.id || null;
-            this.closeQuickAdd(colId);
-            await this.renderAll();
-            this._lastAddedTaskId = null;
+            // Substitui o temp pelo registro real
+            if (this._tasksCache) {
+                const idx = this._tasksCache.findIndex(t => t.id === tempId);
+                if (idx >= 0) this._tasksCache[idx] = newTask;
+                else this._tasksCache.push(newTask);
+                this._lastAddedTaskId = newTask?.id || null;
+                this._renderTasksFromCache();
+                this._lastAddedTaskId = null;
+            } else {
+                this._lastAddedTaskId = newTask?.id || null;
+                await this.renderAll();
+                this._lastAddedTaskId = null;
+            }
         } catch (err) {
+            // Reverte: remove o temp do cache
+            if (this._tasksCache) {
+                this._tasksCache = this._tasksCache.filter(t => t.id !== tempId);
+                this._renderTasksFromCache();
+            }
             Toast.show('Erro ao criar tarefa: ' + err.message, 'error');
         }
     }
@@ -1591,6 +1704,7 @@ class AppController {
         this._renderAllRunning = true;
         this._renderAllPending = false;
         try {
+            this._tasksCache = null; // força re-fetch no próximo renderTasks()
             // Pre-busca tudo em 4 queries (antes: 4×N queries por ciclo)
             const batchStats = await store.getBatchStats();
             const clients = batchStats.map(s => s.client);
@@ -2673,9 +2787,6 @@ class AppController {
         const filterPriority = document.getElementById('filter-task-priority')?.value;
         const filterLabel    = document.getElementById('filter-task-label')?.value;
 
-        const allTasks = await store.getTasks();
-        this._populateLabelFilter(allTasks);
-
         const board = document.getElementById('kanban-board');
         if (!board) return;
 
@@ -2686,19 +2797,28 @@ class AppController {
             // Sem cliente: placeholder
             this._currentColumns = [];
             if (btnManage) btnManage.style.display = 'none';
+            // Usa cache se disponível, senão busca do banco
+            if (this._tasksCache === null) {
+                const allTasks = await store.getTasks();
+                this._tasksCache = allTasks;
+                const clientIds = [...new Set(allTasks.map(t => t.clientId).filter(Boolean))];
+                const entries = await Promise.all(clientIds.map(async id => [id, await store.getClient(id)]));
+                this._clientsMapCache = Object.fromEntries(entries);
+            }
+            this._populateLabelFilter(this._tasksCache);
             board.innerHTML = `
                 <div class="kb-empty-state">
                     <i data-lucide="columns" style="width:48px;height:48px;opacity:0.25"></i>
                     <p>Selecione um cliente nos filtros para visualizar o Kanban</p>
                 </div>`;
-            await this.renderTasksDashboard(allTasks, '');
+            await this.renderTasksDashboard(this._tasksCache, '');
             lucide.createIcons();
             return;
         }
 
         if (btnManage) btnManage.style.display = 'flex';
 
-        // Carrega (ou cria) colunas do cliente selecionado
+        // Carrega (ou cria) colunas do cliente selecionado — sempre, pois cliente pode ter mudado
         try {
             this._currentColumns = await store.ensureDefaultColumns(filterClient);
         } catch (err) {
@@ -2707,18 +2827,24 @@ class AppController {
             Toast.show('Erro ao carregar colunas. Execute o SQL de migração no Supabase.', 'error', 5000);
         }
 
-        // Filtra tasks do cliente
-        let tasks = allTasks.filter(t => t.clientId === filterClient);
+        // Usa cache se disponível, senão busca do banco (mostra skeleton durante a espera)
+        if (this._tasksCache === null) {
+            this._skKanban(board, this._currentColumns.length || 3);
+            const allTasks = await store.getTasks();
+            this._tasksCache = allTasks;
+            // Popula cache de clientes para todos os clientes nas tasks
+            const clientIds = [...new Set(allTasks.map(t => t.clientId).filter(Boolean))];
+            const entries = await Promise.all(clientIds.map(async id => [id, await store.getClient(id)]));
+            this._clientsMapCache = Object.fromEntries(entries);
+        }
+
+        this._populateLabelFilter(this._tasksCache);
+
+        let tasks = this._tasksCache.filter(t => t.clientId === filterClient);
         if (filterPriority) tasks = tasks.filter(t => t.priority === filterPriority);
         if (filterLabel)    tasks = tasks.filter(t => (t.labels || []).some(l => l.color === filterLabel));
 
-        this._skKanban(board, this._currentColumns.length || 3);
-
-        const clientIds = [...new Set(tasks.map(t => t.clientId).filter(Boolean))];
-        const clientsMap = {};
-        await Promise.all(clientIds.map(async id => { clientsMap[id] = await store.getClient(id); }));
-
-        this._renderKanbanBoard(this._currentColumns, tasks, clientsMap);
+        this._renderKanbanBoard(this._currentColumns, tasks, this._clientsMapCache);
         await this.renderTasksDashboard(tasks, filterClient);
         lucide.createIcons();
 
@@ -2755,6 +2881,85 @@ class AppController {
                 return newId ? store.updateTaskStatus(t.id, newId) : Promise.resolve();
             }));
         }
+    }
+
+    // Render instantâneo do board a partir do _tasksCache (zero queries ao banco)
+    _renderTasksFromCache() {
+        if (this.currentView !== 'tasks') return;
+        if (this._tasksCache === null) return;
+
+        const filterClient   = document.getElementById('filter-task-client')?.value;
+        const filterPriority = document.getElementById('filter-task-priority')?.value;
+        const filterLabel    = document.getElementById('filter-task-label')?.value;
+
+        this._populateLabelFilter(this._tasksCache);
+
+        const board = document.getElementById('kanban-board');
+        if (!board) return;
+
+        if (!filterClient) {
+            this._renderTasksDashboardSync(this._tasksCache, '');
+            return;
+        }
+
+        let tasks = this._tasksCache.filter(t => t.clientId === filterClient);
+        if (filterPriority) tasks = tasks.filter(t => t.priority === filterPriority);
+        if (filterLabel)    tasks = tasks.filter(t => (t.labels || []).some(l => l.color === filterLabel));
+
+        this._renderKanbanBoard(this._currentColumns, tasks, this._clientsMapCache);
+        this._renderTasksDashboardSync(tasks, filterClient);
+        lucide.createIcons();
+
+        const btnNewTask = document.getElementById('btn-new-task');
+        if (btnNewTask) {
+            if (tasks.length === 0) btnNewTask.classList.add('btn-pulse-empty');
+            else btnNewTask.classList.remove('btn-pulse-empty');
+        }
+    }
+
+    // Versão síncrona do dashboard de stats de tarefas (sem query ao banco)
+    _renderTasksDashboardSync(tasks, filteredClientId) {
+        const container = document.getElementById('tasks-dashboard-container');
+        if (!container) return;
+
+        const doneIds = new Set(this._currentColumns.filter(c => c.isDone).map(c => c.id));
+        doneIds.add('done');
+        const openTasks = tasks.filter(t => !doneIds.has(t.status));
+        const today = new Date().toISOString().split('T')[0];
+        let delayed = 0, totalEst = 0, totalSpent = 0;
+        openTasks.forEach(t => {
+            if (t.dueDate && t.dueDate < today) delayed++;
+            totalEst  += parseInt(t.estimatedMinutes) || 0;
+            totalSpent += parseInt(t.spentMinutes) || 0;
+        });
+
+        container.innerHTML = `
+            <div class="stat-card glass" style="padding: 16px;">
+                <div class="stat-header">
+                    <span class="client-name">Abertas</span>
+                    <span style="font-size: 1.5rem; color: var(--primary-color)">${openTasks.length}</span>
+                </div>
+            </div>
+            <div class="stat-card glass" style="padding: 16px;">
+                <div class="stat-header">
+                    <span class="client-name">Atrasadas</span>
+                    <span style="font-size: 1.5rem; color: ${delayed > 0 ? 'var(--danger-color)' : 'var(--success-color)'}">${delayed}</span>
+                </div>
+            </div>
+            <div class="stat-card glass" style="padding: 16px;">
+                <div class="stat-header">
+                    <span class="client-name">Tempo (Gasto / Estimado)</span>
+                    <span style="font-size: 1.2rem; color: var(--text-main)">${(totalSpent / 60).toFixed(1)}h / ${(totalEst / 60).toFixed(1)}h</span>
+                </div>
+            </div>
+            ${!filteredClientId ? `
+            <div class="stat-card glass" style="padding: 16px;">
+                <div class="stat-header">
+                    <span class="client-name" style="color: var(--danger-color)">Contratos Sobrecarregados</span>
+                    <span style="font-size: 1.2rem;">${this._overLimitClientsCache}</span>
+                </div>
+            </div>` : ''}
+        `;
     }
 
     _renderKanbanBoard(columns, tasks, clientsMap) {
@@ -2928,6 +3133,7 @@ class AppController {
 
         const stats = await store.getAllStats();
         const overLimitClients = stats.filter(s => s.isOverLimit);
+        this._overLimitClientsCache = overLimitClients.length;
 
         container.innerHTML = `
             <div class="stat-card glass" style="padding: 16px;">
@@ -8282,6 +8488,9 @@ document.addEventListener('DOMContentLoaded', async () => {
             window.app._whatsappProfile = null;
             window.app._horasMesStats = null;
             window.app._aptGenEntries = null;
+            window.app._tasksCache = null;
+            window.app._clientsMapCache = {};
+            window.app._overLimitClientsCache = 0;
         }
         if (window.aiClient) aiClient.reset();
         await Auth.signOut();
