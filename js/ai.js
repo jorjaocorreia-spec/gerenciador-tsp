@@ -183,25 +183,37 @@ Regras:
     }
 
     async generateApontamentoFromTasks(clientName, projectNum, tasks, date) {
-        const system = `Você é um assistente de consultoria SAP gerando descrições de apontamento para lançamento no ERP.
-Escreva um texto profissional, conciso e objetivo resumindo as atividades realizadas.
-Use linguagem técnica adequada. Máximo 4 linhas.
-Responda APENAS com o texto do apontamento, sem título, sem prefixos, sem aspas.`;
+        const system = `Você é um assistente especializado em consultoria de TI e SAP, gerando descrições de apontamento de serviço para lançamento no ERP.
+
+A descrição gerada deve:
+- Relatar de forma detalhada TODAS as atividades realizadas, cobrindo cada tarefa trabalhada
+- Transformar os itens de checklist concluídos em etapas concretas do trabalho realizado
+- Incorporar observações e comentários técnicos registrados durante o dia
+- Usar linguagem técnica profissional adequada para consultoria SAP/TI
+- Ser suficientemente detalhada para justificar a hora técnica perante auditoria ou cliente
+- Ter entre 5 e 12 linhas conforme o volume de atividades — nunca menos que isso
+- Ser escrita em prosa corrida e fluente, não em lista de bullets
+- Começar diretamente com o relato das atividades, sem saudações, prefixos ou títulos
+
+Responda APENAS com o texto do apontamento, sem aspas, sem markdown.`;
 
         const dateLabel = new Date(date + 'T12:00:00').toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: 'long' });
 
         const taskLines = tasks.map(t => {
             const checklist = (t.checklist || []).filter(i => i.done).map(i => `  • ${i.text}`).join('\n');
+            const manualComments = (t.comments || [])
+                .filter(c => c.createdAt && c.createdAt.startsWith(date) && c.type === 'comment' && c.text)
+                .map(c => `  → ${c.text.substring(0, 200)}`).join('\n');
             const dayActivity = (t.comments || [])
                 .filter(c => c.createdAt && c.createdAt.startsWith(date) && c.type !== 'comment')
                 .map(c => {
                     if (c.type === 'status_change') return `movida para nova etapa`;
-                    if (c.type === 'time_added') return `${c.activityData?.minutes ? Math.round(c.activityData.minutes) + ' min' : ''}`;
+                    if (c.type === 'time_added') return `${c.activityData?.minutes ? Math.round(c.activityData.minutes) + ' min registrados' : ''}`;
                     if (c.type === 'completed') return `concluída`;
                     return '';
                 }).filter(Boolean).join(', ');
-            return `- ${t.title}${t.description ? `: ${t.description.substring(0, 120)}` : ''}${checklist ? '\n' + checklist : ''}${dayActivity ? ` [${dayActivity}]` : ''}`;
-        }).join('\n');
+            return `- ${t.title}${t.description ? `: ${t.description.substring(0, 300)}` : ''}${checklist ? '\nEtapas concluídas:\n' + checklist : ''}${manualComments ? '\nObservações do dia:\n' + manualComments : ''}${dayActivity ? ` [${dayActivity}]` : ''}`;
+        }).join('\n\n');
 
         const user = `Cliente: ${clientName}${projectNum ? ` (Projeto ${projectNum})` : ''}
 Data: ${dateLabel}
@@ -209,7 +221,7 @@ Data: ${dateLabel}
 Tarefas trabalhadas:
 ${taskLines}
 
-Gere a descrição do apontamento.`;
+Gere a descrição detalhada do apontamento.`;
 
         return this.complete(system, user);
     }
