@@ -4996,9 +4996,10 @@ class AppController {
         if (btn) { btn.disabled = true; btn.innerHTML = `<i data-lucide="loader-2" style="animation:spin 1s linear infinite"></i><span class="nav-label">Buscando...</span>`; lucide.createIcons(); }
 
         try {
-            const [tasks, clients] = await Promise.all([
+            const [tasks, clients, existingApts] = await Promise.all([
                 store.getTasksForApontamento(this.aptCurrentDate),
-                store.getClients()
+                store.getClients(),
+                store.getApontamentos(this.aptCurrentDate)
             ]);
 
             if (tasks.length === 0) {
@@ -5024,18 +5025,26 @@ class AppController {
                 return;
             }
 
-            // Monta estado inicial sem descrições ainda
-            this._aptGenEntries = entries.map(([cid, taskList]) => ({
-                clientId: cid,
-                client: clientMap[cid],
-                tasks: taskList,
-                description: '',
-                startTime: '',
-                endTime: '',
-                checked: true,
-                loading: true,
-                error: false
-            }));
+            // Monta estado inicial sem descrições ainda; detecta conflitos por projectNum
+            this._aptGenEntries = entries.map(([cid, taskList]) => {
+                const client = clientMap[cid];
+                const conflictApt = client.projectNum
+                    ? (existingApts.find(a => a.projectNum && a.projectNum.trim() === client.projectNum.trim()) || null)
+                    : null;
+                return {
+                    clientId: cid,
+                    client,
+                    tasks: taskList,
+                    description: '',
+                    startTime: '',
+                    endTime: '',
+                    checked: true,
+                    loading: true,
+                    error: false,
+                    conflictApt,
+                    conflictAction: conflictApt ? 'append' : null
+                };
+            });
 
             const subtitle = document.getElementById('apt-gen-subtitle');
             const [y, m, d] = this.aptCurrentDate.split('-');
@@ -5079,35 +5088,75 @@ class AppController {
 
         entries.forEach((e, idx) => {
             const taskTitles = e.tasks.map(t => escapeHtml(t.title)).join(', ');
+            const descHtml = e.loading
+                ? `<div class="apt-gen-loading"><i data-lucide="loader-2" style="animation:spin 1s linear infinite"></i> Gerando com IA...</div>`
+                : e.error
+                    ? `<textarea class="form-control apt-gen-textarea" rows="3" placeholder="Descreva o que foi feito..." data-idx="${idx}" onchange="app._aptGenDescChange(${idx}, this.value)"></textarea><p class="text-muted" style="font-size:0.8rem;margin-top:4px;">⚠ IA indisponível — preencha manualmente.</p>`
+                    : `<textarea class="form-control apt-gen-textarea" rows="3" data-idx="${idx}" onchange="app._aptGenDescChange(${idx}, this.value)">${escapeHtml(e.description)}</textarea>`;
+
             const card = document.createElement('div');
-            card.className = 'apt-gen-card glass';
-            card.innerHTML = `
-                <div class="apt-gen-card-header">
-                    <label class="apt-gen-check">
-                        <input type="checkbox" ${e.checked ? 'checked' : ''} onchange="app._aptGenToggle(${idx}, this.checked)">
-                        <span class="apt-gen-client-name">${escapeHtml(e.client.name)}</span>
-                        ${e.client.projectNum ? `<span class="badge badge-outline" style="font-size:0.75rem;">${escapeHtml(e.client.projectNum)}</span>` : ''}
-                    </label>
-                    <span class="apt-gen-tasks-summary text-muted">${e.tasks.length} tarefa${e.tasks.length > 1 ? 's' : ''}: ${taskTitles}</span>
-                </div>
-                <div class="apt-gen-desc-wrap">
-                    ${e.loading
-                        ? `<div class="apt-gen-loading"><i data-lucide="loader-2" style="animation:spin 1s linear infinite"></i> Gerando com IA...</div>`
-                        : e.error
-                            ? `<textarea class="form-control apt-gen-textarea" rows="3" placeholder="Descreva o que foi feito..." data-idx="${idx}" onchange="app._aptGenDescChange(${idx}, this.value)"></textarea><p class="text-muted" style="font-size:0.8rem;margin-top:4px;">⚠ IA indisponível — preencha manualmente.</p>`
-                            : `<textarea class="form-control apt-gen-textarea" rows="3" data-idx="${idx}" onchange="app._aptGenDescChange(${idx}, this.value)">${escapeHtml(e.description)}</textarea>`
-                    }
-                </div>
-                <div class="apt-gen-times">
-                    <div class="form-group" style="margin:0;flex:1;">
-                        <label style="font-size:0.8rem;margin-bottom:4px;display:block;">Início</label>
-                        <input type="time" class="form-control" value="${e.startTime}" onchange="app._aptGenTimeChange(${idx}, 'start', this.value)">
+
+            if (e.conflictApt) {
+                // Card com conflito: mostra apontamento existente + opções de rádio
+                const ex = e.conflictApt;
+                const exTimeLabel = ex.startTime && ex.endTime ? `${ex.startTime} – ${ex.endTime}` : ex.startTime || '';
+                const exDescTrunc = ex.description ? escapeHtml(ex.description.substring(0, 120)) + (ex.description.length > 120 ? '…' : '') : '';
+                const isSkip = e.conflictAction === 'skip';
+
+                card.className = 'apt-gen-card glass apt-gen-card-conflict';
+                card.innerHTML = `
+                    <div class="apt-gen-card-header">
+                        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+                            <span class="apt-gen-conflict-badge"><i data-lucide="alert-triangle"></i> Já existe apontamento</span>
+                            <span class="apt-gen-client-name">${escapeHtml(e.client.name)}</span>
+                            ${e.client.projectNum ? `<span class="badge badge-outline" style="font-size:0.75rem;">${escapeHtml(e.client.projectNum)}</span>` : ''}
+                        </div>
+                        <span class="apt-gen-tasks-summary text-muted">${e.tasks.length} tarefa${e.tasks.length > 1 ? 's' : ''}: ${taskTitles}</span>
                     </div>
-                    <div class="form-group" style="margin:0;flex:1;">
-                        <label style="font-size:0.8rem;margin-bottom:4px;display:block;">Fim</label>
-                        <input type="time" class="form-control" value="${e.endTime}" onchange="app._aptGenTimeChange(${idx}, 'end', this.value)">
+                    <div class="apt-gen-existing-info">
+                        ${exTimeLabel ? `<div class="apt-gen-existing-time">${exTimeLabel}</div>` : ''}
+                        ${exDescTrunc ? `<p class="apt-gen-existing-desc">${exDescTrunc}</p>` : '<p class="text-muted" style="font-size:0.8rem;margin:0;">Sem descrição</p>'}
                     </div>
-                </div>`;
+                    <div class="apt-gen-conflict-actions">
+                        <label class="apt-gen-radio-label">
+                            <input type="radio" name="conflict-${idx}" value="append" ${!isSkip ? 'checked' : ''} onchange="app._aptGenConflictAction(${idx}, 'append')">
+                            Adicionar à descrição existente
+                        </label>
+                        <label class="apt-gen-radio-label">
+                            <input type="radio" name="conflict-${idx}" value="skip" ${isSkip ? 'checked' : ''} onchange="app._aptGenConflictAction(${idx}, 'skip')">
+                            Não fazer nada
+                        </label>
+                    </div>
+                    <div class="apt-gen-desc-wrap" id="apt-gen-desc-wrap-${idx}" style="${isSkip ? 'display:none' : ''}">
+                        ${descHtml}
+                    </div>`;
+            } else {
+                // Card normal sem conflito
+                card.className = 'apt-gen-card glass';
+                card.innerHTML = `
+                    <div class="apt-gen-card-header">
+                        <label class="apt-gen-check">
+                            <input type="checkbox" ${e.checked ? 'checked' : ''} onchange="app._aptGenToggle(${idx}, this.checked)">
+                            <span class="apt-gen-client-name">${escapeHtml(e.client.name)}</span>
+                            ${e.client.projectNum ? `<span class="badge badge-outline" style="font-size:0.75rem;">${escapeHtml(e.client.projectNum)}</span>` : ''}
+                        </label>
+                        <span class="apt-gen-tasks-summary text-muted">${e.tasks.length} tarefa${e.tasks.length > 1 ? 's' : ''}: ${taskTitles}</span>
+                    </div>
+                    <div class="apt-gen-desc-wrap">
+                        ${descHtml}
+                    </div>
+                    <div class="apt-gen-times">
+                        <div class="form-group" style="margin:0;flex:1;">
+                            <label style="font-size:0.8rem;margin-bottom:4px;display:block;">Início</label>
+                            <input type="time" class="form-control" value="${e.startTime}" onchange="app._aptGenTimeChange(${idx}, 'start', this.value)">
+                        </div>
+                        <div class="form-group" style="margin:0;flex:1;">
+                            <label style="font-size:0.8rem;margin-bottom:4px;display:block;">Fim</label>
+                            <input type="time" class="form-control" value="${e.endTime}" onchange="app._aptGenTimeChange(${idx}, 'end', this.value)">
+                        </div>
+                    </div>`;
+            }
+
             content.appendChild(card);
         });
 
@@ -5130,32 +5179,45 @@ class AppController {
         else this._aptGenEntries[idx].endTime = value;
     }
 
+    _aptGenConflictAction(idx, action) {
+        if (!this._aptGenEntries) return;
+        this._aptGenEntries[idx].conflictAction = action;
+        const wrap = document.getElementById(`apt-gen-desc-wrap-${idx}`);
+        if (wrap) wrap.style.display = action === 'skip' ? 'none' : '';
+        this._aptGenUpdateConfirmBtn();
+    }
+
     _aptGenUpdateConfirmBtn() {
         const btn = document.getElementById('btn-confirm-apt-gen');
         const label = document.getElementById('btn-confirm-apt-gen-label');
         if (!btn || !this._aptGenEntries) return;
-        const count = this._aptGenEntries.filter(e => e.checked).length;
-        if (label) label.textContent = `Criar ${count} Apontamento${count !== 1 ? 's' : ''}`;
+        const count = this._aptGenEntries.filter(e => {
+            if (e.loading) return false;
+            if (e.conflictApt === null) return e.checked;
+            return e.conflictAction === 'append';
+        }).length;
+        if (label) label.textContent = `Confirmar ${count} Apontamento${count !== 1 ? 's' : ''}`;
         btn.disabled = count === 0;
     }
 
     async confirmApontamentoGeneration() {
         if (!this._aptGenEntries) return;
 
-        const toSave = this._aptGenEntries.filter(e => e.checked && !e.loading);
+        const toCreate = this._aptGenEntries.filter(e => !e.loading && e.conflictApt === null && e.checked);
+        const toAppend = this._aptGenEntries.filter(e => !e.loading && e.conflictApt !== null && e.conflictAction === 'append');
 
-        // Validação de horários
-        const missing = toSave.filter(e => !e.startTime || !e.endTime);
-        if (missing.length > 0) {
+        if (toCreate.length === 0 && toAppend.length === 0) return;
+
+        // Validação de horários apenas para novos apontamentos (append mantém horário existente)
+        const missingTimes = toCreate.filter(e => !e.startTime || !e.endTime);
+        if (missingTimes.length > 0) {
             Toast.show('Preencha o horário de início e fim para todos os apontamentos selecionados.', 'error');
-            // Destaca os campos faltantes
             const cards = document.querySelectorAll('.apt-gen-card');
             this._aptGenEntries.forEach((e, idx) => {
-                if (!e.checked || !e.loading) {
-                    const card = cards[idx];
-                    if (!card) return;
-                    if (!e.startTime || !e.endTime) card.classList.add('apt-gen-card-error');
-                }
+                if (e.conflictApt !== null || !e.checked || e.loading) return;
+                const card = cards[idx];
+                if (!card) return;
+                if (!e.startTime || !e.endTime) card.classList.add('apt-gen-card-error');
             });
             return;
         }
@@ -5164,20 +5226,25 @@ class AppController {
         if (btn) btn.disabled = true;
 
         try {
-            await Promise.all(toSave.map(e =>
-                store.addApontamento(
-                    this.aptCurrentDate,
-                    e.startTime,
-                    e.endTime,
-                    e.client.projectNum || '',
-                    e.description
-                )
-            ));
+            await Promise.all([
+                ...toCreate.map(e =>
+                    store.addApontamento(this.aptCurrentDate, e.startTime, e.endTime, e.client.projectNum || '', e.description)
+                ),
+                ...toAppend.map(e => {
+                    const ex = e.conflictApt;
+                    const newDesc = ex.description ? ex.description + '\n\n' + e.description : e.description;
+                    return store.updateApontamento(ex.id, ex.date, ex.startTime, ex.endTime, ex.projectNum, newDesc);
+                })
+            ]);
 
             this.closeModal('modal-apontamento-generator');
             this._aptGenEntries = null;
             await this.renderApontamentos();
-            Toast.show(`${toSave.length} apontamento${toSave.length > 1 ? 's' : ''} criado${toSave.length > 1 ? 's' : ''} com sucesso.`, 'success');
+
+            const parts = [];
+            if (toCreate.length > 0) parts.push(`${toCreate.length} criado${toCreate.length > 1 ? 's' : ''}`);
+            if (toAppend.length > 0) parts.push(`${toAppend.length} atualizado${toAppend.length > 1 ? 's' : ''}`);
+            Toast.show(`Apontamentos: ${parts.join(', ')}.`, 'success');
         } catch (err) {
             Toast.show('Erro ao salvar: ' + err.message, 'error');
             if (btn) btn.disabled = false;
