@@ -2405,10 +2405,14 @@ kbd {
   border-radius: 6px;
   color: var(--text-primary);
   padding: 8px 10px;
-  resize: vertical;
+  resize: none;
   font-size: 13px;
   font-family: inherit;
   transition: border-color 0.15s;
+  min-height: 72px;
+  max-height: 240px;
+  overflow-y: auto;
+  line-height: 1.5;
 }
 .task-comment-input-row textarea:focus {
   outline: none;

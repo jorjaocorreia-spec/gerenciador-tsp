@@ -222,9 +222,13 @@ class AppController {
 
         // Comentários de tarefas
         document.getElementById('btn-add-task-comment')?.addEventListener('click', () => this.handleAddTaskComment());
-        document.getElementById('task-comment-input')?.addEventListener('keydown', (e) => {
-            if (e.key === 'Enter' && e.ctrlKey) { e.preventDefault(); this.handleAddTaskComment(); }
-        });
+        const _commentInput = document.getElementById('task-comment-input');
+        if (_commentInput) {
+            _commentInput.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter' && e.ctrlKey) { e.preventDefault(); this.handleAddTaskComment(); }
+            });
+            _commentInput.addEventListener('input', () => this._autoResizeCommentInput(_commentInput));
+        }
 
         // Ao trocar cliente no modal de tarefa: recarrega colunas e atualiza "Mover Para"
         document.getElementById('task-client')?.addEventListener('change', async (e) => {
@@ -424,7 +428,8 @@ class AppController {
             this._modalComments  = [];
             document.getElementById('modal-task-comments-section').style.display = 'none';
             document.getElementById('modal-task-comments-list').innerHTML = '';
-            document.getElementById('task-comment-input').value = '';
+            const _ci = document.getElementById('task-comment-input');
+            if (_ci) { _ci.value = ''; this._autoResizeCommentInput(_ci); }
             document.getElementById('task-id').value = '';
             document.getElementById('task-title').value = '';
             document.getElementById('task-description').value = '';
@@ -958,6 +963,7 @@ class AppController {
         try {
             this._modalComments = await store.addTaskComment(this._modalTaskId, text);
             input.value = '';
+            this._autoResizeCommentInput(input);
             this._renderTaskComments();
         } catch (err) {
             Toast.show('Erro ao salvar comentário: ' + err.message, 'error');
@@ -2057,6 +2063,11 @@ class AppController {
         btn.classList.add('btn-error');
         if (btn._origHtml) btn.innerHTML = btn._origHtml;
         setTimeout(() => btn.classList.remove('btn-error'), 800);
+    }
+
+    _autoResizeCommentInput(el) {
+        el.style.height = 'auto';
+        el.style.height = Math.min(el.scrollHeight, 240) + 'px';
     }
 
     _twostepDelete(btn, onConfirm) {
