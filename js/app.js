@@ -3365,7 +3365,8 @@ class AppController {
         }
 
         columns.forEach((col, colIdx) => {
-            const colTasks = tasks.filter(t => t.status === col.id);
+            const colTasks = tasks.filter(t => t.status === col.id)
+                .sort((a, b) => (a.position ?? 0) - (b.position ?? 0));
             const colId = col.id;
             const colEl = document.createElement('div');
             colEl.className = 'kb-column kb-column-cascade';
