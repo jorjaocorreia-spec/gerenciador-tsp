@@ -2867,6 +2867,8 @@ class AppController {
         }
 
         tbody.innerHTML = '';
+        const tfoot = document.getElementById('records-tfoot');
+        if (tfoot) tfoot.innerHTML = '';
 
         const btnNewRecord = document.getElementById('btn-new-record');
         if (records.length === 0) {
@@ -2908,6 +2910,25 @@ class AppController {
             `;
             tbody.appendChild(tr);
         });
+
+        // Totalizador
+        if (tfoot) {
+            const totalMinutes = records.reduce((sum, r) => sum + r.minutes, 0);
+            const totalH = Math.floor(totalMinutes / 60);
+            const totalM = totalMinutes % 60;
+            const totalLabel = totalM > 0 ? `${totalH}h ${totalM}min` : `${totalH}h`;
+            tfoot.innerHTML = `
+                <tr>
+                    <td colspan="3" style="text-align:right; font-weight:600; color:var(--text-muted); padding: 12px 16px; border-top: 1px solid rgba(255,255,255,0.08);">
+                        Total (${records.length} registro${records.length !== 1 ? 's' : ''}):
+                    </td>
+                    <td style="font-weight:700; color:var(--primary); padding: 12px 16px; border-top: 1px solid rgba(255,255,255,0.08); white-space:nowrap;">
+                        ${totalMinutes} min <span style="color:var(--text-muted); font-weight:400;">(${totalLabel})</span>
+                    </td>
+                    <td style="border-top: 1px solid rgba(255,255,255,0.08);"></td>
+                </tr>
+            `;
+        }
     }
 
     async updateClientSelects(clients) {
