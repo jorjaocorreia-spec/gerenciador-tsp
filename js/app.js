@@ -1313,6 +1313,13 @@ class AppController {
         });
         if (oldStatus !== newStatus) {
             store.logTaskActivity(draggedId, 'status_change', { from: oldStatus, to: newStatus }).catch(() => {});
+            const newCol = this._currentColumns.find(c => c.id === newStatus);
+            if (newCol?.isDone) {
+                const task = this._tasksCache?.find(t => t.id === draggedId);
+                if (task && !task.completed) {
+                    this.toggleTaskComplete(draggedId, true);
+                }
+            }
         }
     }
 
@@ -1428,6 +1435,13 @@ class AppController {
                 .then(() => store.getTask(this._modalTaskId))
                 .then(t => { if (t) { this._modalComments = t.comments; this._renderTaskComments(); } })
                 .catch(() => {});
+        }
+        if (oldStatus !== colId) {
+            const newCol = this._currentColumns.find(c => c.id === colId);
+            if (newCol?.isDone && !this._modalCompleted) {
+                this._modalCompleted = true;
+                this._modalCompletedAt = new Date().toISOString();
+            }
         }
     }
 
