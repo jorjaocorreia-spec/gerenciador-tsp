@@ -4389,33 +4389,30 @@ class AppController {
         const height = this.getHeightForTimeRange(ev.startTime, ev.endTime);
         const typeClass = 'type-' + ev.type;
 
-        let clientName = '';
+        let clientHtml = '';
         if (ev.clientId) {
             const client = clientsMap[ev.clientId];
-            if (client) clientName = `<div style="display:flex; align-items:center; gap:4px;"><i data-lucide="user" style="width:10px; height:10px;"></i> ${escapeHtml(client.name)}</div>`;
+            if (client) clientHtml = `<div class="event-client">${escapeHtml(client.name)}</div>`;
         }
+
+        const metaExtras = [
+            ev.calendarEventId ? `<i data-lucide="calendar-check" style="width:9px;height:9px;flex-shrink:0;" title="Google Calendar"></i>` : '',
+            ev.meetLink ? `<a href="${escapeHtml(ev.meetLink)}" target="_blank" rel="noopener" onclick="event.stopPropagation()" title="Google Meet" style="color:#34d399;display:flex;align-items:center;"><i data-lucide="video" style="width:9px;height:9px;"></i></a>` : ''
+        ].filter(Boolean).join('');
 
         return `
             <div class="event-block ${typeClass}"
-                 style="top: ${top}px; height: ${height}px; width: ${width}; left: ${left}; right: auto;"
-                 onclick="event.stopPropagation(); app.editAgendaEvent('${ev.id}')">
-
-                <div style="display: flex; justify-content: space-between; align-items: flex-start;">
-                    <div class="event-title">${escapeHtml(ev.title)}</div>
-                    <button class="btn btn-danger" style="padding: 2px 4px; font-size: 0.6rem; border-radius: 4px; background: rgba(0,0,0,0.3); border:none; color:white;"
-                            onclick="event.stopPropagation();app.deleteAgendaEvent('${ev.id}', this)">
-                        <i data-lucide="x" style="width: 12px; height: 12px;"></i>
-                    </button>
-                </div>
+                 style="top:${top}px;height:${height}px;width:${width};left:${left};right:auto;"
+                 onclick="event.stopPropagation();app.editAgendaEvent('${ev.id}')">
+                <button class="event-delete-btn"
+                        onclick="event.stopPropagation();app.deleteAgendaEvent('${ev.id}',this)"
+                        title="Excluir">×</button>
+                <div class="event-title">${escapeHtml(ev.title)}</div>
                 <div class="event-meta">
-                    <div style="display:flex; align-items:center; gap:4px;">
-                       <i data-lucide="clock" style="width:10px; height:10px;"></i>
-                       ${ev.startTime} - ${ev.endTime}
-                       ${ev.calendarEventId ? '<i data-lucide="calendar" style="width:10px; height:10px; margin-left:4px; color:#60a5fa;" title="Sincronizado via Google"></i>' : ''}
-                       ${ev.meetLink ? `<a href="${escapeHtml(ev.meetLink)}" target="_blank" rel="noopener" onclick="event.stopPropagation()" title="Entrar no Google Meet" style="color:#34d399; display:flex; align-items:center;"><i data-lucide="video" style="width:11px; height:11px;"></i></a>` : ''}
-                    </div>
-                    ${clientName}
+                    <span>${ev.startTime}–${ev.endTime}</span>
+                    ${metaExtras}
                 </div>
+                ${clientHtml}
             </div>
         `;
     }
