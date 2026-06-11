@@ -379,6 +379,11 @@
                             <i data-lucide="help-circle"></i>
                         </button>
                         <span id="google-sync-status" class="google-sync-status" style="display:none"></span>
+                        <button class="btn btn-secondary btn-icon-sm" id="btn-toggle-hide-declined"
+                                onclick="app.toggleHideDeclined()"
+                                title="Ocultar eventos declinados">
+                            <i data-lucide="eye-off"></i>
+                        </button>
                         <button class="btn btn-secondary" id="btn-agenda-sync" onclick="app.promptGoogleSync()">
                             <i data-lucide="refresh-cw"></i> Sincronizar
                         </button>
