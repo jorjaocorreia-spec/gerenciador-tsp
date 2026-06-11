@@ -62,7 +62,7 @@ class AppController {
         this.pendingPdfRecords = [];
         this.pendingPdfWarnings = [];
         this.agendaCurrentDate = new Date();
-        this.agendaViewMode = 'schedule'; // daily, weekly, monthly or schedule
+        this.agendaViewMode = localStorage.getItem('agendaViewMode') || 'schedule'; // daily, weekly, monthly or schedule
         this.aptCurrentDate = new Date().toISOString().split('T')[0]; // 'YYYY-MM-DD'
         this.taskAttachments = []; // [{name, data}] — imagens em base64 do modal de tarefa
         this.implAttachments = []; // [{name, data}] — imagens em base64 do modal de implementação
@@ -3622,6 +3622,7 @@ class AppController {
 
     async switchAgendaMode(mode) {
         this.agendaViewMode = mode;
+        localStorage.setItem('agendaViewMode', mode);
         document.getElementById('btn-agenda-schedule').classList.toggle('active-mode', mode === 'schedule');
         document.getElementById('btn-agenda-monthly').classList.toggle('active-mode', mode === 'monthly');
         document.getElementById('btn-agenda-weekly').classList.toggle('active-mode', mode === 'weekly');
@@ -3978,6 +3979,12 @@ class AppController {
         container.innerHTML = spinnerHtml;
 
         this._updateGoogleSyncStatus();
+
+        // sincroniza botões de modo com o estado atual (inclui restauração do localStorage)
+        ['schedule', 'monthly', 'weekly', 'daily'].forEach(m => {
+            const btn = document.getElementById(`btn-agenda-${m}`);
+            if (btn) btn.classList.toggle('active-mode', this.agendaViewMode === m);
+        });
 
         if (this.agendaViewMode === 'daily') {
             await this.renderAgendaDaily(container);
