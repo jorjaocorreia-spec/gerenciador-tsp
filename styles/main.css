@@ -1431,14 +1431,19 @@ h4 {
   opacity: 1;
 }
 
-/* Evento maior que tem sobreposição: levemente escurecido para dar profundidade */
-.event-block.has-overlays {
-  filter: brightness(0.78);
+/* Evento maior que tem sobreposição: pseudo-element escurece sem criar stacking context */
+.event-block.has-overlays::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.22);
+  border-radius: 5px;
+  pointer-events: none;
 }
 
-/* Evento menor sobreposto: aparece por cima, com sombra e borda de destaque */
+/* Evento menor sobreposto: z-index acima de 5 (z-index base do .event-block) */
 .event-block.event-overlay {
-  z-index: 3;
+  z-index: 8;
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.55);
   border-left-width: 4px;
   border-left-style: solid;
