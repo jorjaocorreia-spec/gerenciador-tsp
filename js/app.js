@@ -4346,19 +4346,41 @@ class AppController {
     _computeEventColumns(events) {
         if (!events.length) return {};
         const toMins = t => { const [h, m] = (t || '00:00').split(':').map(Number); return (h || 0) * 60 + (m || 0); };
-        const sorted = [...events].sort((a, b) => a.startTime.localeCompare(b.startTime));
-        const colEnds = [];
-        const evCol = {};
-        for (const ev of sorted) {
-            const s = toMins(ev.startTime);
-            const e = ev.endTime ? toMins(ev.endTime) : s + 60;
-            let ci = colEnds.findIndex(end => end <= s);
-            if (ci === -1) { ci = colEnds.length; colEnds.push(e); } else colEnds[ci] = e;
-            evCol[ev.id] = ci;
+        const getRange = ev => { const s = toMins(ev.startTime); return [s, ev.endTime ? toMins(ev.endTime) : s + 60]; };
+        const overlaps = (a, b) => { const [as, ae] = getRange(a), [bs, be] = getRange(b); return as < be && bs < ae; };
+
+        // Group events into clusters (transitively overlapping sets)
+        const n = events.length;
+        const visited = new Array(n).fill(false);
+        const clusters = [];
+        for (let i = 0; i < n; i++) {
+            if (visited[i]) continue;
+            const cluster = [], queue = [i];
+            visited[i] = true;
+            while (queue.length) {
+                const curr = queue.shift();
+                cluster.push(curr);
+                for (let j = 0; j < n; j++) {
+                    if (!visited[j] && overlaps(events[curr], events[j])) { visited[j] = true; queue.push(j); }
+                }
+            }
+            clusters.push(cluster.map(idx => events[idx]));
         }
-        const totalCols = colEnds.length;
+
         const result = {};
-        for (const ev of events) result[ev.id] = { colIdx: evCol[ev.id], totalCols };
+        for (const cluster of clusters) {
+            const sorted = [...cluster].sort((a, b) => toMins(a.startTime) - toMins(b.startTime));
+            const colEnds = [];
+            const evCol = {};
+            for (const ev of sorted) {
+                const [s, e] = getRange(ev);
+                let ci = colEnds.findIndex(end => end <= s);
+                if (ci === -1) { ci = colEnds.length; colEnds.push(e); } else colEnds[ci] = e;
+                evCol[ev.id] = ci;
+            }
+            const totalCols = colEnds.length;
+            for (const ev of cluster) result[ev.id] = { colIdx: evCol[ev.id], totalCols };
+        }
         return result;
     }
 
