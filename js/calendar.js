@@ -236,7 +236,7 @@ const GoogleCalendarAPI = {
                         orderBy: 'startTime',
                     });
                     for (const ev of (response.result.items || [])) {
-                        if (!seen.has(ev.id)) { seen.add(ev.id); allEvents.push(ev); }
+                        if (!seen.has(ev.id)) { seen.add(ev.id); allEvents.push({ ...ev, _calendarId: calId }); }
                     }
                     fetchSuccessCount++;
                 } catch (err) {
@@ -345,7 +345,31 @@ const GoogleCalendarAPI = {
             console.error('Erro ao deletar evento no Google', err);
             return false;
         }
-    }
+    },
+
+    async patchEventRsvp(calendarId, googleEventId, userEmail, responseStatus) {
+        if (!await this._ensureToken()) throw new Error('Google Calendar não autenticado');
+        const getResp = await gapi.client.calendar.events.get({
+            calendarId,
+            eventId: googleEventId
+        });
+        const currentAttendees = getResp.result.attendees || [];
+        let updated = false;
+        const updatedAttendees = currentAttendees.map(a => {
+            if (a.self || a.email === userEmail) {
+                updated = true;
+                return { ...a, responseStatus };
+            }
+            return a;
+        });
+        if (!updated) updatedAttendees.push({ email: userEmail, responseStatus });
+        await gapi.client.calendar.events.patch({
+            calendarId,
+            eventId: googleEventId,
+            sendUpdates: 'all',
+            resource: { attendees: updatedAttendees }
+        });
+    },
 };
 
 window.calendarAPI = GoogleCalendarAPI;
