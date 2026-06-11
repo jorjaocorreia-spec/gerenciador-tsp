@@ -1794,6 +1794,10 @@ class AppController {
         }
         // Carrega config de IA em background (não bloqueia o render)
         aiClient.loadConfig().then(() => this._updateAIStatusBadge());
+        store.getHideDeclinedSetting().then(val => {
+            this._hideDeclinedEvents = val;
+            this._updateHideDeclinedBtn();
+        }).catch(() => {});
         await this.renderAll();
     }
 
@@ -9029,6 +9033,13 @@ document.addEventListener('DOMContentLoaded', async () => {
             window.app._coverageData = null;
             window.app._coverageMonth = new Date().toISOString().slice(0, 7);
             window.app._aptGenEntries = null;
+            window.app._hideDeclinedEvents = false;
+            window.app._rsvpPopupEventId = null;
+            if (window.app._closeRsvpOnOutsideClick) {
+                document.removeEventListener('click', window.app._closeRsvpOnOutsideClick);
+                window.app._closeRsvpOnOutsideClick = null;
+            }
+            window.app.closeRsvpPopup();
             window.app._tasksCache = null;
             window.app._clientsMapCache = {};
             window.app._overLimitClientsCache = 0;
