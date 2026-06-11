@@ -4335,15 +4335,31 @@ class AppController {
         container.innerHTML = html;
     }
 
+    _renderRsvpIndicator(ev) {
+        if (!ev.isInvited) return '';
+        const status = ev.rsvpStatus || 'needsAction';
+        const labels = { needsAction: 'Sem resposta', accepted: 'Confirmado', tentative: 'Talvez', declined: 'Declinado' };
+        return `<button class="rsvp-dot rsvp-dot--${status}"
+                        title="Você vai? ${labels[status] || ''}"
+                        data-event-id="${ev.id}"
+                        onclick="event.stopPropagation(); app.openRsvpPopup('${ev.id}', this, event)">
+                </button>`;
+    }
+
     createAllDayBannerHtml(ev, clientsMap = {}) {
         const typeClass = 'type-' + ev.type;
         const clientName = ev.clientId && clientsMap[ev.clientId]
             ? escapeHtml(clientsMap[ev.clientId].name) : '';
-        return `<div class="allday-event-banner ${typeClass}"
+        const rsvpDeclinedClass = ev.isInvited && ev.rsvpStatus === 'declined' ? ' rsvp-declined' : '';
+        const rsvpHiddenClass   = ev.isInvited && ev.rsvpStatus === 'declined' && this._hideDeclinedEvents ? ' rsvp-hidden' : '';
+        return `<div class="allday-event-banner ${typeClass}${rsvpDeclinedClass}${rsvpHiddenClass}"
+                     data-event-id="${ev.id}"
+                     data-rsvp="${ev.rsvpStatus || 'needsAction'}"
                      onclick="event.stopPropagation(); app.editAgendaEvent('${ev.id}')"
                      title="${escapeHtml(ev.title)}${clientName ? ' · ' + clientName : ''}">
             <i data-lucide="sun" style="width:11px; height:11px; flex-shrink:0;"></i>
             <span>${escapeHtml(ev.title)}${clientName ? ' · ' + clientName : ''}</span>
+            ${this._renderRsvpIndicator(ev)}
         </div>`;
     }
 
@@ -4406,8 +4422,14 @@ class AppController {
             ev.meetLink ? `<a href="${escapeHtml(ev.meetLink)}" target="_blank" rel="noopener" onclick="event.stopPropagation()" title="Google Meet" style="color:#34d399;display:flex;align-items:center;"><i data-lucide="video" style="width:9px;height:9px;"></i></a>` : ''
         ].filter(Boolean).join('');
 
+        const rsvpDeclinedClass = ev.isInvited && ev.rsvpStatus === 'declined' ? ' rsvp-declined' : '';
+        const rsvpHiddenClass   = ev.isInvited && ev.rsvpStatus === 'declined' && this._hideDeclinedEvents ? ' rsvp-hidden' : '';
+        const hasRsvpClass      = ev.isInvited ? ' has-rsvp' : '';
+
         return `
-            <div class="event-block ${typeClass}${extraClasses}"
+            <div class="event-block ${typeClass}${extraClasses}${rsvpDeclinedClass}${rsvpHiddenClass}${hasRsvpClass}"
+                 data-event-id="${ev.id}"
+                 data-rsvp="${ev.rsvpStatus || 'needsAction'}"
                  style="top:${top}px;height:${height}px;width:${width};left:${left};right:auto;"
                  onclick="event.stopPropagation();app.editAgendaEvent('${ev.id}')">
                 <button class="event-delete-btn"
@@ -4419,6 +4441,7 @@ class AppController {
                     ${metaExtras}
                 </div>
                 ${clientHtml}
+                ${this._renderRsvpIndicator(ev)}
             </div>
         `;
     }
