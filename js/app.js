@@ -4430,6 +4430,35 @@ class AppController {
         }
     }
 
+    async toggleHideDeclined() {
+        this._hideDeclinedEvents = !this._hideDeclinedEvents;
+        this._updateHideDeclinedBtn();
+        this._applyDeclinedVisibility();
+        store.saveHideDeclinedSetting(this._hideDeclinedEvents).catch(err => {
+            console.warn('Erro ao salvar preferência de declinados:', err);
+        });
+    }
+
+    _updateHideDeclinedBtn() {
+        const btn = document.getElementById('btn-toggle-hide-declined');
+        if (!btn) return;
+        const icon = btn.querySelector('i');
+        if (icon) {
+            icon.setAttribute('data-lucide', this._hideDeclinedEvents ? 'eye' : 'eye-off');
+            lucide.createIcons();
+        }
+        btn.title = this._hideDeclinedEvents ? 'Mostrar eventos declinados' : 'Ocultar eventos declinados';
+        btn.classList.toggle('active', this._hideDeclinedEvents);
+    }
+
+    _applyDeclinedVisibility() {
+        document.querySelectorAll(
+            '.event-block[data-rsvp="declined"], .allday-event-banner[data-rsvp="declined"]'
+        ).forEach(el => {
+            el.classList.toggle('rsvp-hidden', this._hideDeclinedEvents);
+        });
+    }
+
     createAllDayBannerHtml(ev, clientsMap = {}) {
         const typeClass = 'type-' + ev.type;
         const clientName = ev.clientId && clientsMap[ev.clientId]
