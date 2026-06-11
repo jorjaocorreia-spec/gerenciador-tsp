@@ -114,6 +114,10 @@ class AppController {
         this._agendaRelatedTaskIds = [];  // confirmadas
         this._agendaTaskPanelTempIds = []; // seleção temporária enquanto painel está aberto
         this._agendaAllTasks = [];
+        // RSVP da Agenda
+        this._hideDeclinedEvents = false;
+        this._rsvpPopupEventId   = null;
+        this._closeRsvpOnOutsideClick = null;
         // Guard para evitar renderAll() concorrente
         this._renderAllRunning = false;
         this._renderAllPending = false;
@@ -4035,11 +4039,9 @@ class AppController {
         let allDayHtml = allDayEvents.map(ev => this.createAllDayBannerHtml(ev, clientsMap)).join('');
         const colMapDaily = this._computeEventColumns(timedEvents);
         let eventsHtml = timedEvents.map(ev => {
-            const { colIdx, totalCols } = colMapDaily[ev.id] || { colIdx: 0, totalCols: 1 };
-            const pct = 100 / totalCols;
-            const left = `calc(${(colIdx * pct).toFixed(2)}% + 2px)`;
-            const width = `calc(${pct.toFixed(2)}% - 4px)`;
-            return this.createEventBlockHtml(ev, width, clientsMap, left);
+            const colInfo = colMapDaily[ev.id] || { isOverlay: false, hasOverlays: false };
+            const inset = colInfo.isOverlay ? 8 : 4;
+            return this.createEventBlockHtml(ev, `calc(100% - ${inset * 2}px)`, clientsMap, `${inset}px`, colInfo);
         }).join('');
 
         const allDaySection = allDayEvents.length > 0
@@ -4108,11 +4110,9 @@ class AppController {
 
             const colMapDay = this._computeEventColumns(timedDayEvents);
             let dayEventsHtml = timedDayEvents.map(ev => {
-                const { colIdx, totalCols } = colMapDay[ev.id] || { colIdx: 0, totalCols: 1 };
-                const pct = 100 / totalCols;
-                const left = `calc(${(colIdx * pct).toFixed(2)}% + 2px)`;
-                const width = `calc(${pct.toFixed(2)}% - 4px)`;
-                return this.createEventBlockHtml(ev, width, clientsMap, left);
+                const colInfo = colMapDay[ev.id] || { isOverlay: false, hasOverlays: false };
+                const inset = colInfo.isOverlay ? 8 : 4;
+                return this.createEventBlockHtml(ev, `calc(100% - ${inset * 2}px)`, clientsMap, `${inset}px`, colInfo);
             }).join('');
             columnsHtml += `
                 <div style="position: relative; height: 100%; cursor: pointer;"
@@ -4369,25 +4369,27 @@ class AppController {
 
         const result = {};
         for (const cluster of clusters) {
-            const sorted = [...cluster].sort((a, b) => toMins(a.startTime) - toMins(b.startTime));
-            const colEnds = [];
-            const evCol = {};
-            for (const ev of sorted) {
-                const [s, e] = getRange(ev);
-                let ci = colEnds.findIndex(end => end <= s);
-                if (ci === -1) { ci = colEnds.length; colEnds.push(e); } else colEnds[ci] = e;
-                evCol[ev.id] = ci;
+            if (cluster.length === 1) {
+                result[cluster[0].id] = { isOverlay: false, hasOverlays: false };
+                continue;
             }
-            const totalCols = colEnds.length;
-            for (const ev of cluster) result[ev.id] = { colIdx: evCol[ev.id], totalCols };
+            // Longest duration = base (full width); shorter events are overlays on top
+            const getDur = ev => { const [s, e] = getRange(ev); return e - s; };
+            const sorted = [...cluster].sort((a, b) => getDur(b) - getDur(a) || toMins(a.startTime) - toMins(b.startTime));
+            result[sorted[0].id] = { isOverlay: false, hasOverlays: true };
+            sorted.slice(1).forEach((ev, idx) => {
+                result[ev.id] = { isOverlay: true, overlayIndex: idx };
+            });
         }
         return result;
     }
 
-    createEventBlockHtml(ev, width, clientsMap = {}, left = '4px') {
+    createEventBlockHtml(ev, width, clientsMap = {}, left = '4px', colInfo = {}) {
+        const { isOverlay = false, hasOverlays = false } = colInfo;
         const top = this.getTopPositionForTime(ev.startTime);
         const height = this.getHeightForTimeRange(ev.startTime, ev.endTime);
         const typeClass = 'type-' + ev.type;
+        const extraClasses = isOverlay ? ' event-overlay' : (hasOverlays ? ' has-overlays' : '');
 
         let clientHtml = '';
         if (ev.clientId) {
@@ -4401,7 +4403,7 @@ class AppController {
         ].filter(Boolean).join('');
 
         return `
-            <div class="event-block ${typeClass}"
+            <div class="event-block ${typeClass}${extraClasses}"
                  style="top:${top}px;height:${height}px;width:${width};left:${left};right:auto;"
                  onclick="event.stopPropagation();app.editAgendaEvent('${ev.id}')">
                 <button class="event-delete-btn"

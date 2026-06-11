@@ -1431,6 +1431,20 @@ h4 {
   opacity: 1;
 }
 
+/* Evento maior que tem sobreposição: levemente escurecido para dar profundidade */
+.event-block.has-overlays {
+  filter: brightness(0.78);
+}
+
+/* Evento menor sobreposto: aparece por cima, com sombra e borda de destaque */
+.event-block.event-overlay {
+  z-index: 3;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.55);
+  border-left-width: 4px;
+  border-left-style: solid;
+  border-left-color: rgba(255, 255, 255, 0.55);
+}
+
 .type-meeting {
   background: linear-gradient(135deg, #3b82f6, #2563eb);
   border-left: 4px solid #60a5fa;
