@@ -53,6 +53,9 @@ class TSPStore {
             startTime: r.start_time || '', endTime: r.end_time || '',
             location: r.location || '', calendarEventId: r.calendar_event_id || null,
             meetLink: r.meet_link || '', attendees: r.attendees || '',
+            rsvpStatus: r.rsvp_status || 'needsAction',
+            isInvited: !!r.is_invited,
+            calendarId: r.calendar_id || 'primary',
             createdAt: r.created_at };
     }
 
@@ -366,7 +369,10 @@ class TSPStore {
             date_end: eventData.dateEnd || eventData.date,
             start_time: eventData.startTime || '', end_time: eventData.endTime || '',
             location: eventData.location || '', calendar_event_id: eventData.calendarEventId || null,
-            meet_link: eventData.meetLink || '', attendees: eventData.attendees || ''
+            meet_link: eventData.meetLink || '', attendees: eventData.attendees || '',
+            rsvp_status: eventData.rsvpStatus || 'needsAction',
+            is_invited: eventData.isInvited || false,
+            calendar_id: eventData.calendarId || 'primary'
         }).select().single();
         if (error) throw error;
         return this._event(data);
@@ -383,7 +389,10 @@ class TSPStore {
             date_end: eventData.dateEnd || eventData.date,
             start_time: eventData.startTime || '', end_time: eventData.endTime || '',
             location: eventData.location || '', calendar_event_id: eventData.calendarEventId || null,
-            meet_link: eventData.meetLink || '', attendees: eventData.attendees || ''
+            meet_link: eventData.meetLink || '', attendees: eventData.attendees || '',
+            rsvp_status: eventData.rsvpStatus || 'needsAction',
+            is_invited: eventData.isInvited || false,
+            calendar_id: eventData.calendarId || 'primary'
         }).eq('id', eventData.id).select().single();
         if (error) throw error;
         return this._event(data);
@@ -391,6 +400,36 @@ class TSPStore {
 
     async deleteAgendaEvent(id) {
         const { error } = await this.db.from('agenda_events').delete().eq('id', id);
+        if (error) throw error;
+    }
+
+    async updateEventRsvp(id, rsvpStatus) {
+        const { error } = await this.db.from('agenda_events')
+            .update({ rsvp_status: rsvpStatus })
+            .eq('id', id).eq('user_id', this.userId);
+        if (error) throw error;
+    }
+
+    async getAgendaEventById(id) {
+        const { data, error } = await this.db.from('agenda_events')
+            .select('*').eq('id', id).eq('user_id', this.userId).single();
+        if (error) throw error;
+        return this._event(data);
+    }
+
+    async getHideDeclinedSetting() {
+        const { data, error } = await this.db.from('user_profiles')
+            .select('hide_declined_events').eq('user_id', this.userId).maybeSingle();
+        if (error) throw error;
+        return data ? !!data.hide_declined_events : false;
+    }
+
+    async saveHideDeclinedSetting(hide) {
+        const { error } = await this.db.from('user_profiles').upsert({
+            user_id: this.userId,
+            hide_declined_events: hide,
+            updated_at: new Date().toISOString()
+        }, { onConflict: 'user_id' });
         if (error) throw error;
     }
 
