@@ -4033,7 +4033,14 @@ class AppController {
         const timedEvents = events.filter(ev => ev.startTime);
 
         let allDayHtml = allDayEvents.map(ev => this.createAllDayBannerHtml(ev, clientsMap)).join('');
-        let eventsHtml = timedEvents.map(ev => this.createEventBlockHtml(ev, '100%', clientsMap)).join('');
+        const colMapDaily = this._computeEventColumns(timedEvents);
+        let eventsHtml = timedEvents.map(ev => {
+            const { colIdx, totalCols } = colMapDaily[ev.id] || { colIdx: 0, totalCols: 1 };
+            const pct = 100 / totalCols;
+            const left = `calc(${(colIdx * pct).toFixed(2)}% + 2px)`;
+            const width = `calc(${pct.toFixed(2)}% - 4px)`;
+            return this.createEventBlockHtml(ev, width, clientsMap, left);
+        }).join('');
 
         const allDaySection = allDayEvents.length > 0
             ? `<div class="agenda-allday-time-slot">DIA INTEIRO</div>
@@ -4099,7 +4106,14 @@ class AppController {
             if (allDayDayEvents.length > 0) hasAnyAllDay = true;
             allDayRowHtml += `<div class="agenda-allday-col">${allDayDayEvents.map(ev => this.createAllDayBannerHtml(ev, clientsMap)).join('')}</div>`;
 
-            let dayEventsHtml = timedDayEvents.map(ev => this.createEventBlockHtml(ev, 'calc(100% - 8px)', clientsMap)).join('');
+            const colMapDay = this._computeEventColumns(timedDayEvents);
+            let dayEventsHtml = timedDayEvents.map(ev => {
+                const { colIdx, totalCols } = colMapDay[ev.id] || { colIdx: 0, totalCols: 1 };
+                const pct = 100 / totalCols;
+                const left = `calc(${(colIdx * pct).toFixed(2)}% + 2px)`;
+                const width = `calc(${pct.toFixed(2)}% - 4px)`;
+                return this.createEventBlockHtml(ev, width, clientsMap, left);
+            }).join('');
             columnsHtml += `
                 <div style="position: relative; height: 100%; cursor: pointer;"
                      onclick="app.openNewAgendaEvent('${isoCurrentDay}')">
@@ -4329,7 +4343,26 @@ class AppController {
         </div>`;
     }
 
-    createEventBlockHtml(ev, width, clientsMap = {}) {
+    _computeEventColumns(events) {
+        if (!events.length) return {};
+        const toMins = t => { const [h, m] = (t || '00:00').split(':').map(Number); return (h || 0) * 60 + (m || 0); };
+        const sorted = [...events].sort((a, b) => a.startTime.localeCompare(b.startTime));
+        const colEnds = [];
+        const evCol = {};
+        for (const ev of sorted) {
+            const s = toMins(ev.startTime);
+            const e = ev.endTime ? toMins(ev.endTime) : s + 60;
+            let ci = colEnds.findIndex(end => end <= s);
+            if (ci === -1) { ci = colEnds.length; colEnds.push(e); } else colEnds[ci] = e;
+            evCol[ev.id] = ci;
+        }
+        const totalCols = colEnds.length;
+        const result = {};
+        for (const ev of events) result[ev.id] = { colIdx: evCol[ev.id], totalCols };
+        return result;
+    }
+
+    createEventBlockHtml(ev, width, clientsMap = {}, left = '4px') {
         const top = this.getTopPositionForTime(ev.startTime);
         const height = this.getHeightForTimeRange(ev.startTime, ev.endTime);
         const typeClass = 'type-' + ev.type;
@@ -4342,7 +4375,7 @@ class AppController {
 
         return `
             <div class="event-block ${typeClass}"
-                 style="top: ${top}px; height: ${height}px; width: ${width};"
+                 style="top: ${top}px; height: ${height}px; width: ${width}; left: ${left}; right: auto;"
                  onclick="event.stopPropagation(); app.editAgendaEvent('${ev.id}')">
 
                 <div style="display: flex; justify-content: space-between; align-items: flex-start;">
