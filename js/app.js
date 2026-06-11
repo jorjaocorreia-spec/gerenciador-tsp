@@ -4563,6 +4563,9 @@ class AppController {
 
                 if (!evDate) continue; // Pula se n conseguir extrair data
 
+                const selfAttendee = (gEv.attendees || []).find(a => a.self === true);
+                const isInvited = gEv.organizer?.self !== true && !!selfAttendee;
+
                 const mappedData = {
                     title: gEv.summary || 'Sem Título',
                     description: gEv.description || '',
@@ -4574,7 +4577,10 @@ class AppController {
                     endTime: evEnd,
                     calendarEventId: gEv.id,
                     meetLink: gEv.hangoutLink || '',
-                    attendees: (gEv.attendees || []).map(a => a.email).join(', ')
+                    attendees: (gEv.attendees || []).map(a => a.email).join(', '),
+                    isInvited,
+                    rsvpStatus: isInvited ? (selfAttendee.responseStatus || 'needsAction') : 'needsAction',
+                    calendarId: gEv._calendarId || 'primary'
                 };
 
                 // Chave de identidade para detectar duplicatas do Google (mesmo evento, IDs diferentes)
@@ -4603,6 +4609,8 @@ class AppController {
                     mappedData.relatedTaskId = effective.relatedTaskId;
                     mappedData.relatedTaskIds = effective.relatedTaskIds || [];
                     if (!mappedData.meetLink) mappedData.meetLink = effective.meetLink || '';
+                    // Preserva rsvpStatus local se o evento não é convite — evita sobrescrever resposta já dada
+                    if (!isInvited) { mappedData.rsvpStatus = effective.rsvpStatus || 'needsAction'; mappedData.isInvited = false; }
                     processedLocalIds.add(effective.id); // Marca como processado — evita duplicata no Passo 2
                     resolvedGoogleKeys.add(googleKey);   // Marca chave como resolvida — descarta Google duplicatas
                     await store.updateAgendaEvent(mappedData);
