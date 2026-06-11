@@ -1376,6 +1376,11 @@ h4 {
   z-index: 10;
 }
 
+/* Eventos base com overlays não devem subir acima dos overlays (z-index: 8) ao fazer hover */
+.event-block.has-overlays:hover {
+  z-index: 7;
+}
+
 .event-title {
   font-weight: 600;
   margin-bottom: 2px;
