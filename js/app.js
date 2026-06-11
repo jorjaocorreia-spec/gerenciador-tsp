@@ -4346,6 +4346,90 @@ class AppController {
                 </button>`;
     }
 
+    openRsvpPopup(eventId, anchorEl, e) {
+        e.stopPropagation();
+        this.closeRsvpPopup();
+        this._rsvpPopupEventId = eventId;
+
+        const popup = document.createElement('div');
+        popup.className = 'rsvp-popup';
+        popup.id = 'rsvp-popup-active';
+        popup.innerHTML = `
+            <span class="rsvp-popup-label">Você vai?</span>
+            <button class="rsvp-option" data-status="accepted"
+                    onclick="event.stopPropagation(); app.setRsvpResponse('${eventId}', 'accepted')">Sim</button>
+            <button class="rsvp-option" data-status="tentative"
+                    onclick="event.stopPropagation(); app.setRsvpResponse('${eventId}', 'tentative')">Talvez</button>
+            <button class="rsvp-option" data-status="declined"
+                    onclick="event.stopPropagation(); app.setRsvpResponse('${eventId}', 'declined')">Não</button>
+        `;
+        document.body.appendChild(popup);
+
+        const rect = anchorEl.getBoundingClientRect();
+        popup.style.top  = (rect.bottom + 6) + 'px';
+        popup.style.left = rect.left + 'px';
+
+        setTimeout(() => {
+            this._closeRsvpOnOutsideClick = (ev) => {
+                if (!popup.contains(ev.target)) this.closeRsvpPopup();
+            };
+            document.addEventListener('click', this._closeRsvpOnOutsideClick);
+        }, 0);
+    }
+
+    closeRsvpPopup() {
+        const existing = document.getElementById('rsvp-popup-active');
+        if (existing) existing.remove();
+        if (this._closeRsvpOnOutsideClick) {
+            document.removeEventListener('click', this._closeRsvpOnOutsideClick);
+            this._closeRsvpOnOutsideClick = null;
+        }
+        this._rsvpPopupEventId = null;
+    }
+
+    async setRsvpResponse(eventId, status) {
+        this.closeRsvpPopup();
+
+        document.querySelectorAll(`.rsvp-dot[data-event-id="${eventId}"]`).forEach(el => {
+            el.className = 'rsvp-dot rsvp-dot--loading';
+        });
+
+        try {
+            await store.updateEventRsvp(eventId, status);
+
+            const labels = { needsAction: 'Sem resposta', accepted: 'Confirmado', tentative: 'Talvez', declined: 'Declinado' };
+            document.querySelectorAll(`.rsvp-dot[data-event-id="${eventId}"]`).forEach(el => {
+                el.className = `rsvp-dot rsvp-dot--${status}`;
+                el.title = `Você vai? ${labels[status] || ''}`;
+            });
+            document.querySelectorAll(`.event-block[data-event-id="${eventId}"], .allday-event-banner[data-event-id="${eventId}"]`).forEach(el => {
+                el.dataset.rsvp = status;
+                el.classList.toggle('rsvp-declined', status === 'declined');
+                el.classList.toggle('rsvp-hidden', status === 'declined' && this._hideDeclinedEvents);
+            });
+
+            if (calendarAPI.isAuthenticated) {
+                store.getAgendaEventById(eventId).then(ev => {
+                    if (ev.calendarEventId && ev.calendarId) {
+                        const userEmail = Auth.getUserEmail();
+                        calendarAPI.patchEventRsvp(ev.calendarId, ev.calendarEventId, userEmail, status)
+                            .then(ok => {
+                                if (!ok) Toast.show('Resposta salva localmente. Sync com Google falhou.', 'warning');
+                            })
+                            .catch(err => {
+                                console.warn('RSVP sync ao Google falhou:', err);
+                                Toast.show('Resposta salva localmente. Sync com Google falhou.', 'warning');
+                            });
+                    }
+                }).catch(() => {});
+            }
+        } catch (err) {
+            console.error('Erro ao salvar RSVP:', err);
+            Toast.show('Erro ao salvar resposta RSVP', 'error');
+            await this.renderAgenda();
+        }
+    }
+
     createAllDayBannerHtml(ev, clientsMap = {}) {
         const typeClass = 'type-' + ev.type;
         const clientName = ev.clientId && clientsMap[ev.clientId]
