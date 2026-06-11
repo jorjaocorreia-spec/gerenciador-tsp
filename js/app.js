@@ -4610,7 +4610,13 @@ class AppController {
                     mappedData.relatedTaskIds = effective.relatedTaskIds || [];
                     if (!mappedData.meetLink) mappedData.meetLink = effective.meetLink || '';
                     // Preserva rsvpStatus local se o evento não é convite — evita sobrescrever resposta já dada
-                    if (!isInvited) { mappedData.rsvpStatus = effective.rsvpStatus || 'needsAction'; mappedData.isInvited = false; }
+                    if (!isInvited) {
+                        mappedData.rsvpStatus = effective.rsvpStatus || 'needsAction';
+                        mappedData.isInvited = false;
+                    } else if (effective.rsvpStatus && effective.rsvpStatus !== 'needsAction') {
+                        // Preserva resposta já dada localmente — Google pode ter status desatualizado
+                        mappedData.rsvpStatus = effective.rsvpStatus;
+                    }
                     processedLocalIds.add(effective.id); // Marca como processado — evita duplicata no Passo 2
                     resolvedGoogleKeys.add(googleKey);   // Marca chave como resolvida — descarta Google duplicatas
                     await store.updateAgendaEvent(mappedData);
