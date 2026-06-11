@@ -4079,9 +4079,14 @@ kbd {
     background: rgba(255,255,255,0.4);
     border: 2px solid rgba(255,255,255,0.6);
     animation: rsvp-spin 0.8s linear infinite;
+    pointer-events: none;
 }
 @keyframes rsvp-spin {
     to { transform: rotate(360deg); }
+}
+
+.event-block.has-rsvp {
+    overflow: visible;
 }
 
 /* Evento declinado */
@@ -4093,6 +4098,9 @@ kbd {
 }
 .allday-event-banner.rsvp-declined {
     opacity: 0.45;
+    text-decoration: line-through;
+}
+.allday-event-banner.rsvp-declined span {
     text-decoration: line-through;
 }
 
