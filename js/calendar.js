@@ -348,27 +348,33 @@ const GoogleCalendarAPI = {
     },
 
     async patchEventRsvp(calendarId, googleEventId, userEmail, responseStatus) {
-        if (!await this._ensureToken()) throw new Error('Google Calendar não autenticado');
-        const getResp = await gapi.client.calendar.events.get({
-            calendarId,
-            eventId: googleEventId
-        });
-        const currentAttendees = getResp.result.attendees || [];
-        let updated = false;
-        const updatedAttendees = currentAttendees.map(a => {
-            if (a.self || a.email === userEmail) {
-                updated = true;
-                return { ...a, responseStatus };
-            }
-            return a;
-        });
-        if (!updated) updatedAttendees.push({ email: userEmail, responseStatus });
-        await gapi.client.calendar.events.patch({
-            calendarId,
-            eventId: googleEventId,
-            sendUpdates: 'all',
-            resource: { attendees: updatedAttendees }
-        });
+        if (!await this._ensureToken()) return false;
+        try {
+            const getResp = await gapi.client.calendar.events.get({
+                calendarId,
+                eventId: googleEventId
+            });
+            const currentAttendees = getResp.result.attendees || [];
+            let updated = false;
+            const updatedAttendees = currentAttendees.map(a => {
+                if (a.self || a.email === userEmail) {
+                    updated = true;
+                    return { ...a, responseStatus };
+                }
+                return a;
+            });
+            if (!updated) updatedAttendees.push({ email: userEmail, responseStatus });
+            await gapi.client.calendar.events.patch({
+                calendarId,
+                eventId: googleEventId,
+                sendUpdates: 'all',
+                resource: { attendees: updatedAttendees }
+            });
+            return true;
+        } catch (err) {
+            console.error('Erro ao atualizar RSVP no Google', err);
+            return false;
+        }
     },
 };
 
