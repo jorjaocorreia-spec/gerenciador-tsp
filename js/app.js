@@ -2199,20 +2199,9 @@ class AppController {
 
     // ─────────────────────────────────────────────────────────────────────
 
-    _animateCounter(el, target, hoursTotal, delay = 0) {
-        if (!el || target <= 0) { if (el) el.textContent = `${target}h / ${hoursTotal}h`; return; }
-        const duration = 800;
-        const startTime = performance.now() + delay;
-        const tick = (now) => {
-            if (now < startTime) { requestAnimationFrame(tick); return; }
-            const elapsed = now - startTime;
-            const progress = Math.min(elapsed / duration, 1);
-            const eased = 1 - Math.pow(1 - progress, 3);
-            el.textContent = `${(eased * target).toFixed(1)}h / ${hoursTotal}h`;
-            if (progress < 1) requestAnimationFrame(tick);
-            else el.textContent = `${target}h / ${hoursTotal}h`;
-        };
-        requestAnimationFrame(tick);
+    _animateCounter(el, target, hoursTotal) {
+        if (!el) return;
+        el.textContent = `${target}h / ${hoursTotal}h`;
     }
 
     toggleSidebar() {

@@ -88,9 +88,7 @@ h4 {
 
 /* Glassmorphism Classes */
 .glass {
-  background: var(--surface-color);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
+  background: rgba(30, 41, 59, 0.82);
   border: 1px solid var(--surface-border);
   border-radius: var(--border-radius);
 }
@@ -394,25 +392,11 @@ h4 {
   background-size: 100% 100%;
 }
 
-/* T1: linhas entram em cascata */
+/* T1: row-in removido — re-disparava em todo renderAll() causando repaint contínuo */
 @keyframes row-in {
   from { opacity: 0; transform: translateY(6px); }
   to   { opacity: 1; transform: translateY(0); }
 }
-.data-table tbody tr { animation: row-in 0.22s ease-out both; }
-.data-table tbody tr:nth-child(1)  { animation-delay:   0ms; }
-.data-table tbody tr:nth-child(2)  { animation-delay:  30ms; }
-.data-table tbody tr:nth-child(3)  { animation-delay:  60ms; }
-.data-table tbody tr:nth-child(4)  { animation-delay:  90ms; }
-.data-table tbody tr:nth-child(5)  { animation-delay: 120ms; }
-.data-table tbody tr:nth-child(6)  { animation-delay: 150ms; }
-.data-table tbody tr:nth-child(7)  { animation-delay: 180ms; }
-.data-table tbody tr:nth-child(8)  { animation-delay: 210ms; }
-.data-table tbody tr:nth-child(9)  { animation-delay: 240ms; }
-.data-table tbody tr:nth-child(10) { animation-delay: 270ms; }
-.data-table tbody tr:nth-child(11) { animation-delay: 300ms; }
-.data-table tbody tr:nth-child(12) { animation-delay: 330ms; }
-.data-table tbody tr:nth-child(n+13) { animation-delay: 360ms; }
 
 /* T3: linha excluída faz shake + fade */
 @keyframes row-delete-out {
@@ -545,7 +529,6 @@ h4 {
   width: 100vw;
   height: 100vh;
   background: rgba(0, 0, 0, 0.6);
-  backdrop-filter: blur(4px);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -654,7 +637,6 @@ h4 {
   border-radius: var(--kb-column-radius);
   display: flex;
   flex-direction: column;
-  backdrop-filter: blur(8px);
 }
 .kb-column-header {
   display: flex;
@@ -2111,9 +2093,7 @@ h4 {
 
 /* Skeleton card do dashboard */
 .sk-stat-card {
-  background: var(--surface-color);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
+  background: rgba(30, 41, 59, 0.82);
   border: 1px solid var(--surface-border);
   border-radius: var(--border-radius);
   padding: 20px;
@@ -2293,8 +2273,6 @@ body.money-hidden .money-value {
   border-radius: 10px;
   font-size: 0.875rem;
   font-weight: 500;
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
   animation: toast-in 0.3s ease forwards;
   pointer-events: auto;
   max-width: 340px;
@@ -3314,8 +3292,8 @@ kbd {
 }
 
 @keyframes ai-glow-pulse {
-    0%, 100% { box-shadow: 0 0 0px rgba(139, 92, 246, 0); }
-    50%       { box-shadow: 0 0 14px rgba(139, 92, 246, 0.55); }
+    0%, 100% { opacity: 1; }
+    50%       { opacity: 0.7; }
 }
 
 /* Keyframes — WhatsApp */
@@ -3601,16 +3579,13 @@ kbd {
 
 /* Botão primário pulsando quando view está vazia */
 @keyframes btn-pulse-empty {
-    0%   { box-shadow: 0 4px 15px rgba(139, 92, 246, 0.3), 0 0 0 0 rgba(139, 92, 246, 0.7);
-           transform: scale(1); }
-    60%  { box-shadow: 0 4px 15px rgba(139, 92, 246, 0.3), 0 0 0 12px rgba(139, 92, 246, 0);
-           transform: scale(1.04); }
-    100% { box-shadow: 0 4px 15px rgba(139, 92, 246, 0.3), 0 0 0 0 rgba(139, 92, 246, 0);
-           transform: scale(1); }
+    0%, 100% { transform: scale(1); }
+    60%       { transform: scale(1.04); }
 }
 
 .btn-pulse-empty {
     animation: btn-pulse-empty 1.6s ease-out infinite;
+    will-change: transform;
 }
 
 /* Bounce do card Kanban ao ser solto */
@@ -3648,19 +3623,15 @@ kbd {
 }
 
 /* S4 — Sidebar: item ativo pulsa levemente */
-@keyframes nav-active-pulse {
-    0%, 100% { border-left-color: var(--primary-color); }
-    50%       { border-left-color: rgba(139, 92, 246, 0.4); }
-}
+/* S4 — nav-active-pulse removido: border-left-color causa repaint contínuo */
 .nav-item.active {
-    animation: nav-active-pulse 2.8s ease-in-out infinite;
-    animation-delay: 1s;
+    /* borda estática já comunica o estado ativo */
 }
 
 /* S5 — Brand: glow roxo pulsante contínuo */
 @keyframes brand-glow {
-    0%, 100% { text-shadow: 0 0 15px rgba(139, 92, 246, 0.4); }
-    50%       { text-shadow: 0 0 30px rgba(139, 92, 246, 0.85), 0 0 55px rgba(139, 92, 246, 0.2); }
+    0%, 100% { opacity: 0.85; }
+    50%       { opacity: 1; }
 }
 .brand {
     animation: brand-glow 3s ease-in-out infinite;
@@ -3720,8 +3691,8 @@ kbd {
 
 /* K4 — Kanban: badge prioridade Alta pisca suavemente */
 @keyframes priority-high-pulse {
-    0%, 70%, 100% { box-shadow: none; }
-    35%            { box-shadow: 0 0 7px rgba(239, 68, 68, 0.55); }
+    0%, 70%, 100% { opacity: 1; }
+    35%            { opacity: 0.55; }
 }
 .kb-badge-priority-high {
     animation: priority-high-pulse 2.2s ease-in-out infinite;
@@ -3781,8 +3752,8 @@ kbd {
 
 /* B1 — Badge "Ativo" com ponto verde pulsante */
 @keyframes dot-pulse-green {
-    0%, 100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7); }
-    50%       { box-shadow: 0 0 0 4px rgba(16, 185, 129, 0); }
+    0%, 100% { transform: scale(1);   opacity: 0.9; }
+    50%       { transform: scale(1.6); opacity: 0.3; }
 }
 .badge-ativo {
     position: relative;
@@ -3797,12 +3768,13 @@ kbd {
     margin-right: 5px;
     vertical-align: middle;
     animation: dot-pulse-green 1.8s ease-out infinite;
+    will-change: transform;
 }
 
 /* B2 — Badge perigo/estourado com ponto vermelho pulsante */
 @keyframes dot-pulse-red {
-    0%, 100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7); }
-    50%       { box-shadow: 0 0 0 4px rgba(239, 68, 68, 0); }
+    0%, 100% { transform: scale(1);   opacity: 0.9; }
+    50%       { transform: scale(1.6); opacity: 0.3; }
 }
 .badge-danger-pulse {
     position: relative;
@@ -3823,6 +3795,7 @@ kbd {
     margin-right: 5px;
     vertical-align: middle;
     animation: dot-pulse-red 1.5s ease-out infinite;
+    will-change: transform;
 }
 
 /* E2 — Empty state: ícone flutua em loop suave */
@@ -4146,8 +4119,6 @@ kbd {
     flex-direction: column;
     gap: 6px;
     box-shadow: 0 8px 24px rgba(0,0,0,0.4);
-    -webkit-backdrop-filter: blur(12px);
-    backdrop-filter: blur(12px);
     min-width: 110px;
 }
 .rsvp-popup-label {
