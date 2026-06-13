@@ -158,56 +158,38 @@ Todas têm `user_id uuid references auth.users` + RLS ativa (`auth.uid() = user_
 | `tickets` | id, user_id, ticket_id, ticket_number, title, status, priority, queue, customer_name, owner, created_at_otobo, updated_at_otobo, raw_data JSONB, linked_client_id, synced_at |
 | `user_ai_config` | user_id (PK), provider (openai\|anthropic), api_key TEXT, model TEXT, updated_at |
 
-### Fases de migração
+### Fases implementadas (1–42, todas ✅)
 
-- **Fase 1** ✅ — Supabase criado, tabelas e RLS configuradas
-- **Fase 2** ✅ — Autenticação: tela de login/logout integrada ao app
-- **Fase 3** ✅ — Reescrita do `store.js` para Supabase + adaptação completa do `app.js` para async/await
-- **Fase 4** ✅ — Loading states (spinners) e error handling (Toast notifications) na UI
-- **Fase 5** ✅ — Ferramenta de migração localStorage → Supabase (detecção automática + modal + limpeza)
-- **Fase 6** ✅ — Deploy final: correções RLS defense-in-depth, reset de estado no logout, checklist de testes multi-usuário
-- **Fase 7** ✅ — Suite de testes Playwright 48/48 passando; correção do Toast (`lucide.createIcons()`) e headers de segurança nginx
-- **Fase 8** ✅ — Importação de Ata PDF (SAP): parser page-by-page, extração de nome do cliente, criação automática de cliente, validação de horas centesimais
-- **Fase 9** ✅ — View Apontamentos: log diário independente de clientes (horário, nº projeto, descrição) para conferência antes de lançar no ERP; tabela `apontamentos` com RLS
-- **Fase 10** ✅ — Agenda: clicar no dia abre novo agendamento direto; campo Data Final (`date_end`) para eventos multi-dia; queries com overlap detection; sync Google Calendar usa dateEnd
-- **Fase 11** ✅ — Agenda: botão "Excluir" no modal de edição de agendamento (visível apenas ao editar); `deleteAgendaEventFromModal()` lida com remoção no Supabase + Google Calendar + fechamento do modal
-- **Fase 12** ✅ — Agenda: checkbox "Dia inteiro" no modal; quando marcado, oculta campos de horário e salva `startTime: ''`; eventos dia-inteiro exibidos como banners coloridos acima da grade horária nas views diária e semanal; view schedule exibe "Dia inteiro"; tooltip mensal atualizado; Google Calendar recebe formato `date` (sem hora) para eventos dia-inteiro
-- **Fase 13** ✅ — Tarefas: anexos reais com paste de prints (Ctrl+V) e seleção de arquivos; imagens salvas como base64 JPEG em coluna `attachments JSONB` na tabela `tasks`; thumbnails no modal com remoção individual; miniatura no card Kanban; compressão automática via Canvas (max 1400px, JPEG 75%)
-- **Fase 15** ✅ — Implementações: biblioteca de recursos técnicos (triggers, procedures, features, customizações, integrações) vinculados a zero, um ou vários clientes; tabelas `implementations` + `implementation_clients` (M:N) com RLS; view com grade de cards agrupada por tipo, filtros por tipo/status/cliente; modal com campos nome, tipo, status, versão, data, descrição, código (monospace), multi-select de clientes, notas; botão excluir visível apenas ao editar
-- **Fase 16** ✅ — Implementações: anexos de imagem (paste Ctrl+V + seleção de arquivo); imagens salvas como base64 JPEG em coluna `attachments JSONB` na tabela `implementations`; thumbnails no modal com remoção individual e lightbox; contador de anexos exibido no card; novo tipo "Relatório Customizado" (`report`) com ícone `file-bar-chart-2`; migration SQL necessária: `ALTER TABLE implementations ADD COLUMN IF NOT EXISTS attachments JSONB DEFAULT '[]'`
-- **Fase 14** ✅ — Agenda: Google Meet + convites por e-mail; checkbox "Gerar link do Google Meet" no modal (visível apenas quando sync Google ativo); campo Participantes (e-mails separados por vírgula); `createGoogleEvent()` usa `conferenceDataVersion=1` + `sendUpdates='all'` — Google gera a sala e envia convites automaticamente; `meetLink` salvo localmente; sync bidirecional captura `hangoutLink` e `attendees` do Google; ícone de vídeo clicável nos event blocks e na view schedule; botão Copiar no bloco read-only do link Meet
-- **Fase 17** ✅ — Kanban reescrito (Trello-like): colunas `.kb-column[data-status]` com quick-add inline por coluna; modal two-panel (conteúdo à esquerda, sidebar de ações à direita); labels coloridas (picker + chips no card); checklist com toggle/delete por item; cover color no card; ordenação persistente via campo `position INTEGER` no Supabase + `reorderTasks()` após DnD; design tokens `--kb-*` no CSS; migration SQL: `ADD COLUMN position INTEGER`, `labels JSONB`, `checklist JSONB`, `cover_color TEXT` + índice `idx_tasks_user_status_position`
-- **Fase 18** ✅ — Kanban DnD com placeholder em tempo real (estilo Trello): card arrastado fica semi-transparente (`opacity:0.4`, `pointer-events:none`); placeholder `.kb-drag-placeholder` (borda dashed, mesma altura do card) se move no DOM em tempo real conforme o mouse passa pelos cards; `reorderTasks()` reescrito de `upsert` para `Promise.all` de `UPDATE` individuais (upsert conflitava com RLS do Supabase); placeholder intercepta seus próprios `dragover`/`drop` com `stopPropagation` para evitar flickering causado por borbulhamento até a dropzone
-- **Fase 19** ✅ — Comentários e atividade nas tarefas: seção abaixo de Anexos no modal; comentários manuais (textarea + botão Comentar, Ctrl+Enter); log automático de mudanças de status (via botões "Mover para" no modal e DnD) e lançamentos de tempo; entradas armazenadas em coluna `comments JSONB DEFAULT '[]'` na tabela `tasks`; migration SQL: `ALTER TABLE tasks ADD COLUMN IF NOT EXISTS comments JSONB DEFAULT '[]'`; exibição mais recente primeiro; atividades compactas com ícone Lucide; comentários manuais com botão de excluir visível no hover
-- **Fase 20** ✅ — Importação PDF: UI de divergência de horas; `parsePdfPages` retorna `{ records, warnings }`; records de página divergente recebem `_warningMsg`; modal de confirmação exibe painel amarelo de aviso acima da tabela (com lista das páginas divergentes) e ícone `⚠` inline na coluna "Tempo" de cada linha afetada (com tooltip mostrando detalhe); `pendingPdfWarnings` limpo no logout e após confirmação
-- **Fase 21** ✅ — Sync Google Calendar robusto: `syncEventsFromGoogle` busca de **todos os calendários** do usuário (não só `primary`) via `calendarList.list` + deduplica por `id`; loop de import (parte 1) tem try-catch por evento — falha em um não impede os demais; loop de push (parte 2) corrigido para só enviar eventos SEM `calendarEventId` (evita recriar no Google eventos antigos fora da janela ±30 dias); toast de aviso mostra contagem de falhas parciais; **passo 3** (fix posterior): eventos locais com `calendarEventId` dentro da janela ±30 dias que não aparecem mais no Google são deletados localmente — reflete deleções feitas diretamente no Google Calendar
-- **Fase 22** ✅ — Colunas Kanban personalizadas por cliente:
-- **Fase 24** ✅ — Painel de Saldo de Horas: botão "Saldo" no header da view Clientes abre modal `modal-saldo` com posição acumulada de horas por projeto; novos campos em `clients`: `initial_balance_minutes INTEGER` (saldo de entrada em minutos) e `balance_start_date DATE` (início do período de cálculo automático); cálculo: `saldo = initialBalanceMinutes + totalAplicado − totalContratado` onde positivo = consultor entregou mais que o contratado; mês atual entra completo no contratado independente do dia; modal exibe tabela com Cota/mês, Mês atual (com delta colorido) e Saldo acumulado; clientes sem `balanceStartDate` exibem "sem controle" na coluna de saldo; migration SQL: `ALTER TABLE clients ADD COLUMN IF NOT EXISTS initial_balance_minutes INTEGER DEFAULT 0, ADD COLUMN IF NOT EXISTS balance_start_date DATE;`
-- **Fase 25** ✅ — Agendamento Automático: regras de recorrência por cliente (tabela `scheduling_rules`) com frequência semanal/quinzenal/mensal, dias da semana, horário, período fixo (data início + data fim) e geração idempotente via `last_generated_until`; aba "Agendamento" no modal do cliente (tabs `.modal-tab`/`.modal-tabs`) lista as regras ativas do cliente; modal `modal-scheduling-rule` para criar/editar regras com checkboxes de dias da semana (`.rule-day-btn`); botão ⚡ por regra abre modal `modal-schedule-preview` com lista de ocorrências calculadas e marcação de conflitos (⚠) com eventos existentes no mesmo horário; confirmação cria `agenda_events` + push Google Calendar + atualiza `last_generated_until`; migration SQL (criação): `CREATE TABLE scheduling_rules (id UUID PRIMARY KEY DEFAULT gen_random_uuid(), user_id UUID REFERENCES auth.users ON DELETE CASCADE NOT NULL, client_id UUID REFERENCES clients ON DELETE CASCADE NOT NULL, title TEXT NOT NULL DEFAULT 'Atendimento', event_type TEXT DEFAULT 'meeting', description TEXT DEFAULT '', days_of_week JSONB DEFAULT '[]', start_time TEXT NOT NULL DEFAULT '', end_time TEXT NOT NULL DEFAULT '', frequency TEXT NOT NULL DEFAULT 'weekly', period_start DATE NOT NULL, period_end DATE NOT NULL, location TEXT DEFAULT '', attendees TEXT DEFAULT '', generate_meet BOOLEAN DEFAULT FALSE, is_active BOOLEAN DEFAULT TRUE, last_generated_until DATE, created_at TIMESTAMPTZ DEFAULT now()); ALTER TABLE scheduling_rules ENABLE ROW LEVEL SECURITY; CREATE POLICY "users_own_scheduling_rules" ON scheduling_rules FOR ALL USING (auth.uid() = user_id);`; migration SQL (tabela já existe): `ALTER TABLE scheduling_rules ADD COLUMN IF NOT EXISTS description TEXT DEFAULT '';`
-- **Fase 25 (update)** ✅ — Paridade com agendamento manual: tipos de evento alinhados (meeting/consulting/task/reminder); campo Descrição adicionado (`rule-description`); checkbox "Dia inteiro" (`rule-all-day`) via `toggleAllDayRule()` — oculta campos de hora e salva `startTime: ''`; Meet row sempre visível (não depende mais do checkbox `agenda-sync-google`); `confirmScheduleGeneration()` passa `generateMeet: ev.generateMeet` ao `createGoogleEvent()` e `description` ao `addAgendaEvent()`; card na tab de agendamento exibe tipo, descrição e "Dia inteiro" quando aplicável
-- **Fase 26** ✅ — Agendamento Automático com Meta de Horas: modal `modal-schedule-preview` enriquecido com painel "Resumo de Horas" (horas agendadas vs meta mensal do cliente com delta colorido: verde ±10%, vermelho deficit, amarelo excesso); breakdown por mês em tabela quando a regra cobre múltiplos meses; botão "Sugerir X sessões extras" aparece automaticamente quando há deficit — calcula sessões faltantes via `Math.ceil(deficit / sessionMinutes)` e propõe próximas datas seguindo `daysOfWeek` da regra; campo "+ Adicionar data específica" com mini-calendário inline customizado (substituiu `<input type="date">` nativo) que exibe pontos coloridos nos dias ocupados — azul = já na lista, laranja = conflito com agenda existente; botão ✕ em cada linha para remover eventos antes de confirmar; resumo e contador do botão "Confirmar (N)" atualizam em tempo real via `_renderPreviewContent()`; eventos extras marcados com `isExtra: true` (apenas em memória — chegam ao banco como eventos normais); sem novas colunas no banco — usa `clients.hours_total` existente; novos métodos: `_renderPreviewContent()`, `_previewRemoveEvent(idx)`, `_previewSuggestExtras()`, `_previewAddManual()`, `_renderMiniCal()`, `_miniCalNav(delta)`, `_miniCalSelectDate(dateStr)`; novos estados de instância: `_pendingPreviewRule`, `_pendingPreviewClient`, `_pendingPreviewConflictSet`, `_miniCalYear`, `_miniCalMonth`, `_miniCalSelected`
-- **Fase 26 (update)** ✅ — Edição inline de data no preview: botão lápis em cada linha de evento do `modal-schedule-preview` converte o span de data em `<input type="date">` editável; ao confirmar a nova data, `_previewEditEventDate(idx, newDate)` atualiza `_pendingPreviewEvents[idx].date`, reavalia `hasConflict` via `_pendingPreviewConflictSet`, reordena o array e chama `_renderPreviewContent()`; perder o foco sem alterar cancela a edição via re-render; novos métodos: `_previewStartEditDate(idx)`, `_previewEditEventDate(idx, newDate)`; nova classe CSS `preview-edit-date-btn`; cada row recebe `data-preview-idx="${idx}"` e o span de data ganha classe `preview-date-text`
-- **Fase 27** ✅ — Relatório de Agenda por Cliente: geração de relatório de eventos da agenda filtrado por cliente + período; dois formatos de saída: PDF (jsPDF-AutoTable) e texto copiável (WhatsApp/e-mail); acessível de dois pontos — botão "Relatório" no header da view Agenda (abre `modal-agenda-report` com select de cliente + período) e aba "Relatório" no modal do cliente (painel inline `tab-client-report`); ambas as fontes compartilham os métodos `fetchAgendaReportEvents(source)`, `generateAgendaReportPdf(source)` e `generateAgendaReportText(source)` via `_reportGetContext(source)` que abstrai de onde vêm os dados; novo método `store.getAgendaEventsByClientAndRange(clientId, startDate, endDate)` — query com overlap detection por `client_id`; estado compartilhado em `_reportEvents` e `_reportClient`; `switchClientModalTab()` estendido para suportar aba `'report'` além de `'dados'` e `'scheduling'`; sem novas tabelas no banco
-- **Fase 30** ✅ — Kanban: marcar tarefa como concluída diretamente no card; botão circular no footer à esquerda do lápis (aparece no hover; verde e sempre visível quando concluída); badge "Concluída" verde nos badges do card; ao marcar: registra entrada `completed` na atividade da tarefa com data/hora; ao desmarcar: remove todas as entradas `completed`/`uncompleted` do log (sem nova entrada); migration SQL: `ALTER TABLE tasks ADD COLUMN IF NOT EXISTS completed BOOLEAN DEFAULT FALSE; ALTER TABLE tasks ADD COLUMN IF NOT EXISTS completed_at TIMESTAMPTZ;`; novos campos `completed`/`completedAt` em `_task()`, `updateTask()` e `handleTaskSubmit()`; novo método `store.toggleTaskComplete(taskId, completed)` e `store.removeCompletionActivity(taskId)`; `_modalCompleted` e `_modalCompletedAt` como estado do modal de tarefa
-- **Fase 29** ✅ — Chamados OTOBO: view "Chamados" com cache no Supabase (`otobo_config` + `tickets`), sync manual via REST API OTOBO (TicketSearch + TicketGet em lotes de 10), agrupamento por cliente TSP com match fuzzy por nome, badges de status/prioridade, modal two-panel com artigos carregados on-demand, link "Abrir no OTOBO"; migration SQL: criação das tabelas `otobo_config` e `tickets` com RLS; CORS é o principal risco — se o OTOBO bloquear, toast exibe mensagem orientando o admin
-- **Fase 32** ✅ — Bot WhatsApp via Evolution API: instância `tsp` criada no Evolution API (`jorge-evolution-api.27pl2o.easypanel.host`); Supabase Edge Function `whatsapp-bot` recebe webhooks, identifica usuário pelo número registrado em `user_profiles`, detecta intent por regex (query_hours, query_agenda, query_tasks, help) e responde via Evolution API; `query_hours` retorna consumo de horas por cliente no mês atual com barra visual de progresso (🟢🟡🔴); `query_agenda` retorna eventos dos próximos 7 dias com tipo e horário; `query_tasks` retorna tarefas em aberto por cliente (com estado conversacional via `bot_state` em `user_profiles`); botão "WhatsApp" no sidebar bottom abre modal `modal-whatsapp-config` onde o usuário cadastra seu número pessoal; botão "Enviar teste" chama Edge Function com JWT do usuário para enviar mensagem de boas-vindas; migration SQL: `CREATE TABLE user_profiles (user_id UUID PRIMARY KEY REFERENCES auth.users ON DELETE CASCADE, whatsapp_number TEXT, updated_at TIMESTAMPTZ DEFAULT now())` com RLS; migration SQL adicional (query_tasks): `ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS bot_state JSONB DEFAULT '{}';`; novos métodos: `store.getWhatsappProfile()`, `store.saveWhatsappProfile(number)`, `app.openWhatsappConfig()`, `app.saveWhatsappConfig()`, `app.sendTestWhatsapp()`; secrets da Edge Function: `EVOLUTION_API_URL`, `EVOLUTION_API_KEY`, `EVOLUTION_INSTANCE=tsp`, `WEBHOOK_SECRET`, `SUPABASE_SERVICE_ROLE_KEY`, `SUPABASE_URL`, `SUPABASE_ANON_KEY`; deploy: `npx supabase@latest functions deploy whatsapp-bot --project-ref klimkamnydfnzqetqlqm --no-verify-jwt` com `SUPABASE_ACCESS_TOKEN` setado; **PENDENTE: escanear QR code** em `https://jorge-evolution-api.27pl2o.easypanel.host` → instâncias → `tsp` para conectar o número ao bot
-- **Fase 33** ✅ — Integração de IA — infraestrutura base: tabela `user_ai_config` com RLS (upsert por `user_id`); Supabase Edge Function `ai-proxy` (Deno) autentica via JWT, lê config do usuário, roteia para OpenAI (`/v1/chat/completions`) ou Anthropic (`/v1/messages`) e retorna `{ content }`; classe `TSPAIClient` em `js/ai.js` com `complete()`, `loadConfig()`, `reset()`, `testConnection()`; modal `modal-ai-config` na sidebar bottom (botão ✨) com select de provider, select de model dinâmico, input de API key com toggle de visibilidade, botão "Testar conexão" e botão "Remover"; badge de status na sidebar atualizado em `initAfterAuth()`; deploy: `npx supabase@latest functions deploy ai-proxy --project-ref klimkamnydfnzqetqlqm`; migration SQL: `CREATE TABLE user_ai_config (user_id UUID PRIMARY KEY REFERENCES auth.users ON DELETE CASCADE, provider TEXT NOT NULL DEFAULT 'anthropic', api_key TEXT NOT NULL, model TEXT NOT NULL DEFAULT 'claude-haiku-4-5-20251001', updated_at TIMESTAMPTZ DEFAULT now()); ALTER TABLE user_ai_config ENABLE ROW LEVEL SECURITY; CREATE POLICY "users_own_ai_config" ON user_ai_config FOR ALL USING (auth.uid() = user_id);`
-- **Fase 34** ✅ — IA: melhoria de texto em 3 views: botão `✨ Melhorar com IA` nos campos de Descrição de Atendimento (`#record-desc`), Apontamento (`#apt-description`) e Implementação (`#impl-description`); botão oculto por padrão, exibido via `oninput` quando há 10+ chars e `aiClient.isConfigured`; ao clicar: lê contexto (cliente/projeto/duração/tipo/código), chama `aiClient.improveAtendimentoDescription()` ou `aiClient.improveImplementationDescription()`, substitui o textarea com flash roxo (`rgba(139,92,246,0.08)`); métodos: `onRecordDescInput()`, `improveRecordDescription()`, `onAptDescInput()`, `improveAptDescription()`, `onImplDescInput()`, `improveImplDescription()`; `setTimeout(() => this.onXxxDescInput(), 50)` nos métodos `open` para exibir botão ao editar registro existente
-- **Fase 35** ✅ — IA: features contextuais em 4 views:
-  - **Kanban (Fase C)**: botão `✨ Sugerir com IA` no header do Checklist (visível só ao editar tarefa existente com IA configurada); chama `aiClient.suggestTaskNextSteps(title, description, checklist, activityLog)`; exibe painel inline com 3-6 sugestões selecionáveis — botão `+` por item ou "Adicionar todos"; sugestão adicionada fica riscada; painel limpo ao fechar modal; estado `_aiTaskSuggestions` em AppController
-  - **Relatório de Agenda (Fase E)**: botão `✨ Narrativa com IA` aparece junto com PDF/Copiar texto após Buscar, nos dois pontos de acesso (modal standalone + aba Relatório do cliente); chama `aiClient.generateAgendaReportNarrative(clientName, events, startDate, endDate)`; exibe painel roxo com textarea editável + botão Copiar; painel oculta ao trocar cliente ou nova busca; `_copyReportNarrative(source)` usa `navigator.clipboard`; `_reportGetContext(source)` estendido com `aiBtn`, `aiPanel`, `aiTextarea`
-  - **Assistente de Linguagem Natural — Agenda (Fase F)**: botão `✨ Assistente` no header da view Agenda; abre painel colapsável com textarea e botão "Interpretar" (Ctrl+Enter); `aiClient.parseAgendaNaturalLanguage(text, todayDate)` retorna JSON `{title, type, date, dateEnd, startTime, endTime, allDay, location, description}`; `interpretAgendaEvent()` chama `openNewAgendaEvent(date)` e preenche todos os campos retornados; painel fecha após sucesso e limpa o input
-  - **Dashboard Insights (Fase G)**: botão `✨ Insights` no header do Dashboard; painel `#dashboard-ai-insights` aparece acima dos cards; `aiClient.generateDashboardInsights(stats, monthLabel)` recebe dados de consumo/projeção/tarefas por cliente e retorna análise em 3 seções (Visão Geral, Atenção Necessária, Oportunidades); respeita filtros de status e mês; botão ✕ fecha o painel
-- **Fase 31** ✅ — Chamados: filtros locais + sincronização seletiva; barra de filtros na view Chamados (número/título, status, prioridade, fila, proprietário, tipo, cliente vinculado); filtros locais aplicados sobre cache em memória (`_cachedChamadosTickets`); modal `modal-otobo-config` reestruturado em duas tabs ("Conexão" + "Filtros de Sync"); filtros de sync salvos em `sync_filters JSONB` na tabela `otobo_config` e repassados ao proxy OTOBO; novo campo `ticket_type` em `tickets`; badge de tipo no card; linha "Tipo" na sidebar do modal de detalhe; migration SQL: `ALTER TABLE tickets ADD COLUMN IF NOT EXISTS ticket_type TEXT DEFAULT ''; ALTER TABLE otobo_config ADD COLUMN IF NOT EXISTS sync_filters JSONB DEFAULT '{}';`; novos métodos: `_attachChamadoFilterListeners()`, `_rerenderChamadosWithFilters()`, `_applyTicketFilters()`, `_populateChamadoFilterDropdowns()`, `clearChamadoFilters()`, `switchOtoboTab()`
-- **Fase 28** ✅ — Importação PDF: detecção de duplicatas; antes de exibir o modal de confirmação, `openPdfConfirmationModal()` faz uma única query via `store.getRecordsByDateRange(startDate, endDate, clientIds)` para buscar todos os registros existentes no intervalo de datas da ata; chave de comparação: `client_id|date|start_time|end_time`; registros já existentes recebem flag `_isDuplicate: true`; exibidos no modal com linha riscada (`.pdf-row-duplicate`), badge laranja "Já lançado" (`.pdf-dup-badge`) e checkbox desabilitado; painel amarelo `#pdf-dup-warnings` lista os registros ignorados acima da tabela; `confirmPdfImport()` pula registros `_isDuplicate` e inclui contagem no toast final ("X importados. Y já existiam e foram ignorados."); novo método `store.getRecordsByDateRange(startDate, endDate, clientIds[])`; sem migration necessária
-- **Fase 36** ✅ — Agenda: múltiplas tarefas por agendamento + auto-preenchimento da descrição; substitui o select único de tarefa por botão "Vincular Tarefas" que abre painel inline com checkboxes filtrados pelo cliente selecionado; seleção temporária em `_agendaTaskPanelTempIds` (descartada no Cancelar) confirmada em `_agendaRelatedTaskIds`; tarefas confirmadas exibidas como chips removíveis abaixo do botão; ao confirmar ou remover chip, campo Descrição atualizado automaticamente com bloco `\n\nTarefas executadas:\n- Título...` usando marcador sentinela para preservar texto digitado pelo usuário; nova coluna `related_task_ids JSONB DEFAULT '[]'` em `agenda_events` com retrocompatibilidade via `related_task_id` (legado); migration SQL: `ALTER TABLE agenda_events ADD COLUMN IF NOT EXISTS related_task_ids JSONB DEFAULT '[]';`; novos métodos: `openAgendaTaskPanel()`, `cancelAgendaTaskPanel()`, `confirmAgendaTaskPanel()`, `toggleAgendaTaskTemp(taskId)`, `removeAgendaTask(taskId)`, `_renderAgendaTaskPanel()`, `_renderAgendaTaskChips()`, `_updateAgendaLinkBtn()`, `_updateDescriptionWithTasks()`; estado em `_agendaRelatedTaskIds[]`, `_agendaTaskPanelTempIds[]`, `_agendaAllTasks[]`
-- **Fase 38** ✅ — Chamados: filtros de exibição persistidos por usuário no banco; coluna `local_filters JSONB DEFAULT '{}'` adicionada em `otobo_config`; `store.saveOtoboLocalFilters(filters)` faz UPDATE (não upsert) para não criar linhas sem config de conexão; `_restoreChamadoFilters(saved)` restaura checkboxes + campo de busca após `_populateChamadoFilterDropdowns()` na abertura da view; `_rerenderChamadosWithFilters()` agenda save debounced de 800ms após qualquer mudança; `clearChamadoFilters()` salva `{}` imediatamente; `_chamadoFilterSaveTimer` limpo no logout; migration SQL: `ALTER TABLE otobo_config ADD COLUMN IF NOT EXISTS local_filters JSONB DEFAULT '{}';`
-- **Fase 39** ✅ — Chamados: sync incremental por timestamp; coluna `last_sync_at TIMESTAMPTZ` em `otobo_config`; primeira sync (ou Shift+clique) é completa (busca todos); syncs seguintes são incrementais — envia `TicketLastChangeTimeNewerDate` ao OTOBO via proxy, buscando apenas tickets alterados desde o último sync; limite incremental: 200 tickets (vs 500 completa); sync incremental nunca apaga cache (`deleteTicketsNotIn` só roda em sync completa sem `ownerFilter`); `store.saveOtoboLastSync(isoTimestamp)` persiste o timestamp no banco; `_otoboConfig.lastSyncAt` atualizado em memória após cada sync bem-sucedida; UI exibe `"(incremental)"` no status e no toast; botão "Sincronizar" passa `event.shiftKey` como `force`; `_fetchTicketsFromOtobo(config, onProgress, lastSyncAt)` repassa `lastSyncAt` ao proxy; proxy formata o timestamp para `"YYYY-MM-DD HH:MM:SS"` (UTC) exigido pelo OTOBO; migration SQL: `ALTER TABLE otobo_config ADD COLUMN IF NOT EXISTS last_sync_at TIMESTAMPTZ;`
-- **Fase 40** ✅ — Gerador de Apontamentos a partir de Tarefas: botão `⚡ Gerar do Dia` (`#btn-generate-apontamentos`) no header da view Apontamentos, visível apenas quando IA configurada; busca todas as tasks do usuário via `store.getTasksForApontamento(date)` — filtra em memória por `completedAt.startsWith(date)` OU qualquer entrada em `task.comments[].createdAt.startsWith(date)`; agrupa por `clientId`; abre modal `modal-apontamento-generator` com skeleton; dispara `Promise.all` de `aiClient.generateApontamentoFromTasks(clientName, projectNum, tasks, date)` por cliente (em paralelo); resultado exibido em cards editáveis com checkbox de inclusão, textarea de descrição (editável), e inputs de horário início/fim; `confirmApontamentoGeneration()` valida horários, cria apontamentos via `store.addApontamento` em paralelo e fecha o modal; se AI falha em um cliente, card exibe textarea vazia com hint de preenchimento manual; coluna `task_ids JSONB DEFAULT '[]'` em `apontamentos` rastreia quais tasks foram usadas em cada apontamento gerado (migration: `ALTER TABLE apontamentos ADD COLUMN IF NOT EXISTS task_ids JSONB DEFAULT '[]';`); ao gerar novamente no mesmo dia, tasks já vinculadas a apontamentos existentes são excluídas da chamada à IA — entries com todas as tasks já lançadas exibem card read-only verde "Já lançada" abaixo de um separador; entries com mix de tasks novas + já lançadas processam apenas as novas na IA e exibem nota "N já lançadas" no card; se todas as tasks do dia já foram lançadas, Toast informa e o modal não abre; `confirmApontamentoGeneration()` passa `task_ids` ao `store.addApontamento` e faz merge de IDs no `store.updateApontamento` (toAppend); novos métodos em `app.js`: `generateApontamentosFromTasks()`, `_renderAptGenContent()`, `_aptGenToggle()`, `_aptGenDescChange()`, `_aptGenTimeChange()`, `_aptGenUpdateConfirmBtn()`, `confirmApontamentoGeneration()`; novo método em `store.js`: `getTasksForApontamento(date)`; novo método em `ai.js`: `generateApontamentoFromTasks(clientName, projectNum, tasks, date)` — gera descrição detalhada (5–12 linhas, prosa corrida); inclui checklist concluído como "Etapas concluídas:", comentários manuais do dia como "Observações do dia:" e descrição da tarefa truncada em 300 chars (não 120); estado `_aptGenEntries` em AppController (null no constructor e no logout); `_updateAIStatusBadge()` atualizado para exibir/ocultar `#btn-generate-apontamentos`
-- **Fase 42** ✅ — RSVP "Você vai?" na Agenda: indicador circular (10px) no canto inferior direito dos blocos de evento para eventos recebidos via convite Google Calendar (`is_invited = true`); bolinha vazia = sem resposta, verde = confirmado, amarelo = talvez, vermelho = declinado; clicar na bolinha abre mini-popup fixo com botões Sim/Talvez/Não; `setRsvpResponse(eventId, status)` faz update otimista no DOM (sem re-render), persiste em `store.updateEventRsvp` e sincroniza de volta ao Google Calendar via `calendarAPI.patchEventRsvp` (fire-and-forget, toast de aviso se falhar); eventos declinados ficam com `opacity: 0.45` e título riscado (`text-decoration: line-through`); botão toggle `eye-off/eye` no header da Agenda oculta/mostra eventos declinados (`_hideDeclinedEvents`), preferência persistida em `user_profiles.hide_declined_events`; detecção de `isInvited` no sync bidirecional: `gEv.organizer?.self !== true && !!selfAttendee`; status local preservado durante sync para evitar sobrescrita por resposta desatualizada do Google; `calendarId` de origem armazenado em `agenda_events.calendar_id` para rotear o patch corretamente a calendários secundários; novos métodos em `app.js`: `_renderRsvpIndicator(ev)`, `openRsvpPopup(eventId, anchorEl, e)`, `closeRsvpPopup()`, `setRsvpResponse(eventId, status)`, `toggleHideDeclined()`, `_updateHideDeclinedBtn()`, `_applyDeclinedVisibility()`; novos métodos em `store.js`: `updateEventRsvp(id, rsvpStatus)`, `getAgendaEventById(id)`, `getHideDeclinedSetting()`, `saveHideDeclinedSetting(hide)`; novo método em `calendar.js`: `patchEventRsvp(calendarId, googleEventId, userEmail, responseStatus)`; estado em AppController: `_hideDeclinedEvents`, `_rsvpPopupEventId`, `_closeRsvpOnOutsideClick`; migration SQL obrigatória: `ALTER TABLE agenda_events ADD COLUMN IF NOT EXISTS rsvp_status TEXT DEFAULT 'needsAction'; ALTER TABLE agenda_events ADD COLUMN IF NOT EXISTS is_invited BOOLEAN DEFAULT FALSE; ALTER TABLE agenda_events ADD COLUMN IF NOT EXISTS calendar_id TEXT DEFAULT 'primary'; ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS hide_declined_events BOOLEAN DEFAULT FALSE;`
-- **Fase 41** ✅ — Cobertura de Agenda: botão "Cobertura" no header da view Clientes abre `modal-agenda-coverage` com panorama de cobertura de agenda vs. contrato mensal por cliente; 4 cards de resumo (clientes ativos, total contratado, total agendado, em risco); tabela ordenada por cobertura% crescente (mais descobertos primeiro) com colunas: contrato/mês, agendado, lançado (records), gap, % cobertura com barra colorida; cores: verde ≥90%, amarelo 50–89%, vermelho <50%; navegação por mês independente via `_coverageNavMonth(delta)`; botão `✨ Análise IA` (visível se `aiClient.isConfigured`) envia dados para `aiClient.complete()` e exibe parágrafo de análise em painel roxo inline; `_calcEventMinutesInMonth(event, yearMonth)` calcula duração de eventos respeitando eventos multi-dia (proporção de dias dentro do mês); eventos dia-inteiro (`startTime===''`) contam como jornada padrão de **510 min/dia** (08:00–12:00 + 13:30–18:00) — nunca 0; novo método `store.getAgendaEventsByMonth(yearMonth)` com overlap detection; estado `_coverageMonth` (YYYY-MM) e `_coverageData` (null) no constructor e resetados no logout; sem migration SQL — usa dados já existentes; novos métodos: `openAgendaCoverage()`, `_loadCoverageData()`, `_calcEventMinutesInMonth()`, `_coverageNavMonth()`, `_renderCoveragePanorama()`, `_coverageAiAnalysis()`; CSS: `.cov-summary-grid`, `.cov-summary-card`, `.cov-summary-value`, `.cov-summary-label`, `.cov-bar`
-- **Fase 37** ✅ — Dashboard: modal "Horas do Mês" — botão "Horas do Mês" no header do Dashboard abre `modal-horas-mes` com ranking de clientes por horas aplicadas no mês selecionado; total geral em destaque no topo; barras horizontais proporcionais ao maior consumidor (100% = cliente com mais horas); cor da barra: roxo (normal), amarelo (≥80% do contrato), vermelho (>100% do contrato); coluna "Contrato / %" exibe cota mensal + percentual consumido; toggle "Mostrar sem horas" filtra clientes sem lançamentos no período; dados via `store.getBatchStats(this._dashboardMonth)` (4 queries paralelas, sem custo extra); sincroniza com o mês selecionado no Dashboard (navegação por mês funciona); estado cacheado em `_horasMesStats` — toggle não faz nova query; `_horasMesStats = null` no constructor e no logout; sem migration, sem novas tabelas; novos métodos: `openHorasMes()`, `_renderHorasMesContent()`, `_horasMesToggle()`
-- **Fase 23** ✅ — Gestão de Treinamentos: biblioteca de materiais didáticos por cliente; tabelas `trainings` + `training_clients` (M:N obrigatório — todo treinamento exige pelo menos um cliente); `attachments JSONB` com discriminador `type`: `'link'` (URL externa com detecção automática de tipo: youtube/drive/pdf/generic) e `'image'` (base64 JPEG comprimido via Canvas); view com cards agrupados por categoria (Geral/SAP/Sistema/Processo/Ferramenta) e filtros por categoria/status/cliente; modal com campo links externos (rótulo + URL + botão adicionar) e prints de tela (Ctrl+V + file picker); botão Excluir visível apenas no modo edição; migration SQL necessária antes do deploy nova tabela `kanban_columns` (id, user_id, client_id, name, color, position, is_done, created_at) com RLS; cada cliente tem seu próprio conjunto de colunas; migration automática na primeira abertura (status antigos 'new'/'doing'/'done' → UUIDs das novas colunas padrão); botão "Gerenciar Colunas" no header da view Tarefas (visível apenas com cliente filtrado); modal com lista reordenável (▲▼), color picker, checkbox "Finalizada", delete com bloqueio se houver tasks; Kanban requer seleção de cliente para exibir board (placeholder quando sem filtro); quick-add usa clientId do filtro; campo Cliente obrigatório no modal de tarefa; `store.getClientStats` detecta colunas "done" dinamicamente
+| Fases | Funcionalidade |
+|-------|---------------|
+| 1–6 | Supabase, auth, store async, loading/toasts, migração localStorage, RLS deploy |
+| 7 | Playwright 48/48 testes E2E; headers de segurança nginx |
+| 8 | Importação Ata PDF SAP (page-by-page, horas centesimais, auto-cliente) |
+| 9 | View Apontamentos — log diário independente para ERP |
+| 10–12 | Agenda: multi-dia (`date_end`), excluir no modal, dia inteiro + banners |
+| 13 | Tarefas: anexos paste/upload (base64 JPEG comprimido via Canvas) |
+| 14 | Agenda: Google Meet + convites por e-mail (`conferenceDataVersion=1`) |
+| 15–16 | Implementações: biblioteca técnica M:N + anexos + tipo relatório |
+| 17–19 | Kanban: reescrita Trello-like, DnD com placeholder, comentários/atividade |
+| 20 | PDF: UI de divergência de horas (painel amarelo + ícone ⚠ por linha) |
+| 21 | Sync Google Calendar robusto (todos calendários + deleção passo 3) |
+| 22 | Kanban: colunas personalizadas por cliente (`kanban_columns`) |
+| 23 | Treinamentos: biblioteca de materiais didáticos M:N |
+| 24 | Saldo de horas: painel acumulado por cliente com saldo inicial |
+| 25–26 | Agendamento automático: regras + meta de horas + mini-cal + edição inline |
+| 27 | Relatório de agenda por cliente (PDF + texto WhatsApp) |
+| 28 | PDF: detecção de duplicatas por `client_id\|date\|start_time\|end_time` |
+| 29 | Chamados OTOBO: cache Supabase + sync lote 10 + modal two-panel |
+| 30 | Kanban: marcar tarefa concluída diretamente no card |
+| 31 | Chamados: filtros locais + sync seletiva (tipo/fila/dono) |
+| 32 | Bot WhatsApp via Evolution API (horas/agenda/tarefas/ajuda) |
+| 33–35 | IA: infraestrutura proxy + melhoria de texto + features em 5 pontos |
+| 36 | Agenda: múltiplas tarefas vinculadas + auto-descrição com sentinela |
+| 37 | Dashboard: modal ranking horas do mês com barras coloridas |
+| 38–39 | Chamados: filtros persistidos no banco + sync incremental por timestamp |
+| 40 | Gerador de apontamentos via IA a partir das tarefas concluídas no dia |
+| 41 | Cobertura de agenda: panorama vs contrato mensal por cliente |
+| 42 | RSVP na agenda (Sim/Talvez/Não) + toggle hide declinados |
 
 ---
 
@@ -323,6 +305,7 @@ O `docker-entrypoint.sh` injeta essas vars em `js/config.js` via `envsubst` na i
 - **Agenda: `related_task_ids` é JSONB com fallback para `related_task_id` legado** — `_event()` lê `related_task_ids` (array); se vazio, faz fallback para `[related_task_id]` (UUID único legado). `addAgendaEvent`/`updateAgendaEvent` salvam ambos: `related_task_ids` (array) e `related_task_id` (primeiro elemento ou null). Nunca remover o campo legado sem migration de dados.
 - **Agenda: `_updateDescriptionWithTasks()` usa marcador sentinela fixo** — o marcador é `'\n\nTarefas executadas:\n'`; tudo antes = conteúdo do usuário, tudo a partir = zona gerenciada. Se o usuário digitar exatamente esse texto manualmente, será tratado como sentinela. Chamado apenas em `confirmAgendaTaskPanel()` e `removeAgendaTask()` — não chamar em `openNewAgendaEvent()` (descrição vazia) nem em `editAgendaEvent()` (bloco já persiste do banco e só é recalculado se o usuário mudar as tarefas).
 - **Agenda: painel de tarefas filtra pelo cliente selecionado no modal** — `_renderAgendaTaskPanel()` lê `document.getElementById('agenda-client').value` no momento da abertura; se o cliente mudar depois do painel aberto, o painel não re-renderiza automaticamente. Fechar e reabrir o painel exibe as tarefas do novo cliente.
+- **Agenda: sobreposição de eventos — layout overlay estilo Google Calendar** — eventos com horários sobrepostos são agrupados em clusters por BFS em `_computeEventColumns(events)`: o evento de maior duração vira "base" (`.has-overlays`, largura total) e os demais viram "overlays" (`.event-overlay`, `z-index: 8`, inset de 8px vs 4px). CSS: `.has-overlays::after` usa `background: rgba(0,0,0,0.22)` para escurecer o evento base. **Nunca usar `filter: brightness()` no `.has-overlays`** — qualquer `filter !== none` cria um stacking context que isola os filhos, impedindo que `z-index` do overlay vença o do evento base (mesmo que o valor numérico seja maior). O `.event-block` base tem `z-index: 5`; o `.event-overlay` deve ter `z-index` maior (atual: 8). `createEventBlockHtml(ev, width, clientsMap, left, colInfo)` recebe `colInfo` como 5º parâmetro com `{ isOverlay, hasOverlays }`.
 
 - **Implementações: `renderImplementations()` tem guard `currentView`** — igual a `renderApontamentos()`, só executa se `this.currentView === 'implementations'`. Chamado no `renderAll()` dentro do `Promise.all`; quando a view não está ativa retorna imediatamente sem consultar o banco.
 - **Implementações: `setImplementationClients()` faz DELETE + INSERT** — substituição completa dos vínculos a cada save; não há update parcial. Seguro porque `implementation_clients` não tem dados editáveis além do vínculo.
@@ -427,191 +410,22 @@ O `docker-entrypoint.sh` injeta essas vars em `js/config.js` via `envsubst` na i
 
 ---
 
-## Apontamentos
-
-View de log diário para registrar atividades antes de lançar no ERP. **Independente de clientes** — o número de projeto é texto livre (sem FK para `clients`), mas o campo exibe sugestões autocomplete a partir de `clients.project_num`.
-
-### Fluxo
-1. Usuário navega ao dia desejado com os botões `<` / `>` ou clica "Hoje"
-2. Clica "Novo Apontamento" → modal abre com data do dia atual
-3. Preenche Hora Início + Hora Fim (duração calculada em tempo real) + Nº Projeto + Descrição
-4. Salva → registro aparece na tabela; rodapé mostra total de horas do dia
-
-### Tabela `apontamentos` (Supabase)
-```sql
-id UUID PRIMARY KEY DEFAULT gen_random_uuid()
-user_id UUID REFERENCES auth.users ON DELETE CASCADE NOT NULL
-date DATE NOT NULL
-start_time TEXT NOT NULL
-end_time TEXT NOT NULL DEFAULT ''
-project_num TEXT NOT NULL DEFAULT ''
-description TEXT NOT NULL DEFAULT ''
-created_at TIMESTAMPTZ DEFAULT now()
-```
-RLS policy: `auth.uid() = user_id` (SELECT/INSERT/UPDATE/DELETE).
-
-### Métodos relevantes
-
-| Método | Arquivo | Descrição |
-|--------|---------|-----------|
-| `renderApontamentos()` | `js/app.js` | Render da view; guarda-se em `if (this.currentView !== 'apontamentos') return` |
-| `openNewApontamento()` | `js/app.js` | Abre modal zerado com data = `this.aptCurrentDate` |
-| `openEditApontamento(id)` | `js/app.js` | Busca item do dia atual e pré-preenche modal |
-| `handleApontamentoSubmit(e)` | `js/app.js` | Salva via `store.addApontamento` ou `store.updateApontamento` |
-| `deleteApontamento(id)` | `js/app.js` | Exclui com confirmação |
-| `aptNavigateDay(delta)` | `js/app.js` | Avança/retrocede `this.aptCurrentDate` em `delta` dias |
-| `calcDuration(start, end)` | `js/app.js` | Retorna `{ minutes, label }` — helper reutilizável |
-| `populateAptProjectList()` | `js/app.js` | Preenche `<datalist id="apt-project-list">` com `clients.projectNum` |
-| `getApontamentos(date)` | `js/store.js` | Busca apontamentos de uma data (YYYY-MM-DD) do usuário |
-| `addApontamento(...)` | `js/store.js` | INSERT em `apontamentos` |
-| `updateApontamento(...)` | `js/store.js` | UPDATE por id + user_id |
-| `deleteApontamento(id)` | `js/store.js` | DELETE por id + user_id |
-
-### Estado
-- `this.aptCurrentDate` — string `'YYYY-MM-DD'`, inicializada no constructor com a data de hoje
-- Chamada em `renderAll()` dentro do `Promise.all` junto com as demais views
-
----
-
-## Importação de Ata PDF (SAP)
-
-Funcionalidade na view **Atendimentos**: botão "Importar Ata (PDF)" lê um PDF gerado pelo SAP e cria registros de atendimento automaticamente.
-
-### Fluxo
-1. Usuário seleciona o PDF → `setupPdfImport()` lê página por página com PDF.js
-2. `parsePdfPages(pageTexts[])` detecta páginas de continuação (sem "Descrição do Atendimento") e mescla ao bloco anterior; depois chama `_parseSinglePage()` em cada bloco mesclado
-3. Modal de confirmação (`openPdfConfirmationModal()`) mostra registros identificados; clientes sem cadastro são criados automaticamente com nota "Cadastro incompleto"
-4. Usuário confirma → `confirmPdfImport()` salva via `store.addRecord()`
-
-### Estrutura da Ata SAP (por página) — dois formatos suportados
-
-**Formato A (antigo):** colunas incluem "Horas Aplicadas no Dia" como nome de coluna
-```
-Projeto.: 22851   17 - CASCAVEL MAQUINAS AGRICOLAS LTDA 001 CVEL
-Data......: 09/04/2026
-Horas contratadas.: 1000:00   Horas executadas.: 500:00
-Descrição do Atendimento
-[texto da descrição global]
-Horas Aplicadas no Dia 09/04/2026
-Hora Inicial  Hora Final  Horas Aplicadas no Dia  Analista
-08:00         09:00       01:00                   JORGE HENRIQUE
-09:30         10:15       00:75                   JORGE HENRIQUE
-Total Horas Dia.: 01:75
-```
-
-**Formato B (novo):** 5 colunas, "Horas Aplicadas no Dia" é cabeçalho de seção
-```
-Projeto.: 22851   17 - CASCAVEL MAQUINAS AGRICOLAS LTDA 001 CVEL
-Data......: 22/05/2026
-Horas contratadas.: 20:00   Horas executadas: 340:70
-Descrição do Atendimento
-[texto da descrição global]
-Tarefa Executada  Analista  Hora Inicial  Hora Final  Total Horas
-Horas Aplicadas no Dia 22/05/2026
-Analise/estudo...  JORGE HENRIQUE CORREIA  09:00  12:00  03:00
-Total Horas Dia.: 03:00
-```
-
-- **Código do projeto**: `22851` (4–6 dígitos após `"Projeto.:"`)
-- **ID secundário**: `17` — ignorado pelo parser
-- **Nome do cliente**: tudo após `" - "` até `"Horas contratadas"`, `"Descrição"` ou `"Tarefa Executada"`
-- **PDF.js** pode inverter a ordem: `"22851 Projeto.: 17 - NOME"` — ambos os formatos são suportados
-- **Horas Aplicadas / Total Horas**: formato centesimal (`01:75` = 1,75 h = 105 min). Hora Inicial/Final são HH:MM normais.
-- **Âncora da tabela**: parser usa `"Horas Aplicadas no Dia DD/MM/YYYY"` (seção) como âncora primária para delimitar as linhas de dados; fallback para `"Hora Inicial Hora Final"`. Isso suporta ambos os formatos e é robusto a extração coluna-a-coluna pelo PDF.js.
-- **Validação**: `_parseSinglePage` compara soma das linhas com `Total Horas Dia` (divergências → `console.warn`)
-
-### Métodos relevantes em `js/app.js`
-| Método | Descrição |
-|--------|-----------|
-| `setupPdfImport()` | Configura listener do input de arquivo; coleta `pageTexts[]` |
-| `parsePdfPages(pageTexts)` | Mescla páginas de continuação; itera blocos mesclados; agrega records e warnings |
-| `_parseSinglePage(text, pageNum)` | Extrai projeto, data, descrição, linhas da tabela e valida total |
-| `openPdfConfirmationModal()` | Mapeia projetos → clientes; cria cliente auto se não encontrado |
-| `confirmPdfImport()` | Salva records confirmados pelo usuário com progress feedback |
-
----
-
 ## Testes automatizados (Playwright)
 
-Suite de testes end-to-end em `C:\Users\jorge\AppData\Local\Temp\playwright-test-tsp-v2.js`.
+Suite de testes E2E — 48/48 ✅ (auth, RLS isolamento, CRUD, dashboard, backup, segurança, UX).
 
-**Rodar:**
 ```powershell
 cd "d:\GerenciadorTSP\skills\playwright-skill"
 node run.js "C:\Users\jorge\AppData\Local\Temp\playwright-test-tsp-v2.js"
 ```
 
-**Resultado esperado:** 48/48 ✅ — dividido em 7 blocos:
-
-| Bloco | Cobertura | Testes |
-|-------|-----------|--------|
-| 1 — Autenticação | Login correto/errado, logout, troca de usuário | 4 |
-| 2 — RLS Isolamento | user_a e user_b não veem dados um do outro (clients, records, events, tasks) | 10 |
-| 3 — CRUD | Criar/editar clientes, atendimentos, tarefas, Kanban, agenda | 20 |
-| 4 — Dashboard | Cards, filtros, drilldown mensal | 4 |
-| 5 — Backup | Exportar JSON, botão migração oculto | 2 |
-| 6 — Segurança | Headers HTTP, config.js, skills/ e nginx.conf bloqueados | 6 |
-| 7 — UX/Loading | Toast, spinner, validação de campos | 4 |
-
-**Usuários de teste:**
-- user_a: `jorjaocorreia@gmail.com` / `Jhc1881//`
-- user_b: `testes@teste.com` / `123testes`
+**Usuários de teste:** user_a: `jorjaocorreia@gmail.com` / `Jhc1881//` — user_b: `testes@teste.com` / `123testes`
 
 ---
 
-## Animações de UI
+## Animações de UI — armadilhas
 
-Animações CSS/JS implementadas em `styles/main.css` e `js/app.js` para dar vida à plataforma. Todas respeitam `animation-play-state: paused` no hover para não interferir com cliques.
-
-### Sidebar — botões permanentes
-- **Botão IA (`#btn-ai-config`)**: `@keyframes sparkle-burst` faz o SVG escalar até 1.35× com rotação de 18° a cada 3.5s; `@keyframes ai-glow-pulse` pulsa o box-shadow roxo a cada 2.5s.
-- **Botão WhatsApp (`#btn-whatsapp-config`)**: `@keyframes whatsapp-shake` simula vibração lateral a cada 4.5s (delay 1.2s); `::after` pseudo-element verde com `@keyframes ping-dot` cria dot de status pulsante.
-- **Ícones nav (`#btn-ai-config svg`, `.nav-item svg`)**: `transition: transform 0.2s ease` + `scale(1.18) translateX(2px)` no hover.
-
-### Toasts
-- `@keyframes toast-in`: entrada com slide da direita + slight scale bounce (0% → 60% → 80% → 100%).
-
-### Toggle de valores monetários
-- `.money-value`: `transition: filter 0.35s ease, opacity 0.35s ease`; no estado `body.money-hidden`, `filter: blur(8px); opacity: 0.4`.
-
-### Dashboard — cards e contadores
-- `.stat-card-animate` + `@keyframes card-cascade-in`: cards entram em cascata com `animationDelay = idx * 0.07s` e translateY de 18px → 0.
-- Barras de progresso: começam em `width: 0%` no innerHTML; duplo `requestAnimationFrame` dispara o `transition: width 1s ease-out` existente para o valor real.
-- `_animateCounter(el, target, hoursTotal, delay)`: contador de horas sobe de 0 ao valor real em 800ms com easing `1 - (1-t)^3`; delay sincronizado com a cascata de cards.
-
-### Estado vazio — botão primário
-- `.btn-pulse-empty` + `@keyframes btn-pulse-empty`: pulsa o botão principal quando a view não tem registros; usa multi-shadow para preservar o `box-shadow: 0 4px 15px rgba(139,92,246,0.3)` do `.btn-primary` e adiciona ring de ping como segundo valor. Adicionado por JS em `renderRecords()` e `renderTasks()` quando `records.length === 0` / `tasks.length === 0`.
-- IDs necessários: `id="btn-new-record"` no botão "Lançar Horas" (index.html), `id="btn-new-task"` no botão "Nova Tarefa" (index.html).
-
-### Kanban — drop bounce
-- `.kb-card-dropped` + `@keyframes kb-card-drop`: card recém-solto faz bounce elástico (scaleY 0.88 → 1.04 → 0.98 → 1) via `cubic-bezier(0.34,1.56,0.64,1)`; classe adicionada em `_handleDrop()` e removida no `animationend` com `{ once: true }`.
-
-### T2 — hover curtain (implementado 2026-06-04)
-- **Tabelas** (`.data-table tbody tr`): `background-image: linear-gradient(90deg, rgba(139,92,246,0.055) 0%, transparent 70%)` no `tr`; `background-size` transiciona de `0% 100%` → `100% 100%` no hover. **Obrigatório**: `.data-table tbody td { background-color: transparent !important }` — sem isso, os `<td>` mascariam o gradiente do `<tr>` e o efeito ficaria dividido em células.
-- **Apontamentos** (`.apt-row`): mesmo padrão de `background-image`/`background-size` diretamente no `div` — os filhos são `<span>` e não têm background próprio, então não precisa do `transparent !important`.
-- **Não se aplica a cards** — gradiente horizontal faz sentido em row de tabela, não em card de grid.
-
-### T3 — delete animation + two-step confirm (implementado 2026-06-04)
-- `@keyframes row-delete-out`: `translateX(0) → -6px → +8px → +24px` com fade; 0.38s ease-out.
-- Classes de acionamento: `.row-deleting td` (tabelas), `.kb-card.row-deleting`, `.event-block.row-deleting`, `.event-allday-banner.row-deleting`, `.apt-row.row-deleting`.
-- **`_twostepDelete(btn, onConfirm)`** — helper compartilhado em `AppController`: 1º clique → botão vira vermelho + "⚠ Confirmar?" por 3 segundos via `setTimeout`; 2º clique → executa `onConfirm()`. Usado em `handleDeleteClient`, `handleDeleteTask`, `handleDeleteTaskFromModal`, `deleteAgendaEventFromModal`, `handleDeleteImplementation`, `handleDeleteTraining`, `handleDeleteSchedulingRule`. Ações de baixo risco (atendimentos, apontamentos, blocos de agenda inline) usam delete direto sem two-step.
-- **Não usar `window.confirm()`** em nenhum delete — substituído inteiramente por `_twostepDelete` + animação.
-
-### `.clickable-card` — hover unificado para cards (implementado 2026-06-04)
-- Classe CSS base: `transform: translateY(-2px)`, `box-shadow: 0 6px 20px rgba(139,92,246,0.18)`, `border-color: rgba(139,92,246,0.45) !important`, `transition: 0.18s ease`.
-- Aplicada em: cards de **Implementações** (`div.glass.clickable-card`), **Treinamentos** (`div.glass.training-card.clickable-card`), **Chamados** (`div.ticket-card.clickable-card`).
-- Todo novo card clicável deve receber essa classe — nunca adicionar `transition:border-color` inline.
-
-### Rodada 1 — Quick wins implementados (2026-06-04) ✅
-
-**Login:** L1 (`login-card-in` no `.glass`), L2 (logo `activity` rotaciona), L3+F1 (barra roxa deslizante no `focus` via `background-image` trick em `.form-control`).
-**Sidebar:** S4 (`nav-active-pulse` no `border-left` do item ativo), S5 (`brand-glow` no `text-shadow` do `.brand`).
-**Modais:** V2 (spring bounce `scale(0.93) → scale(1)` no `.modal`), V5 (shake em `:invalid` + classe `input-shake` via JS capture-phase + `void el.offsetWidth` reflow).
-**Dashboard:** D4 (`card-danger-pulse` em `.stat-card.over-limit` — usa longhand `animation-name` para rodar cascade + pulse em paralelo).
-**Kanban:** K2 (`kb-column-cascade` com stagger 70ms), K3 (`kb-card-new` pop-in via `_lastAddedTaskId` tracking), K4 (`priority-high-pulse`), K5 (`.kb-complete-btn` scale+glow), K6 (`.kb-dropzone.drag-over` glow lateral).
-**Agenda:** A1 (`event-block-in` com 9 regras nth-child), A3 (`agenda-fade-in` em `#agenda-container > *`), A4 (`#btn-agenda-sync.syncing svg` gira via classe JS + `try/finally`).
-**Badges:** B1 (`badge-ativo::before` ponto verde), B2 (`badge-danger-pulse::before` ponto vermelho).
-**Empty state:** E2 (`icon-float` em `.kb-empty-state svg, .empty-state svg`).
+Padrões implementados em `styles/main.css` + `js/app.js`. Regras de UI ativas: `_twostepDelete(btn, onConfirm)` para deletes destrutivos (nunca `window.confirm()`); `.clickable-card` para hover de cards; `@keyframes row-delete-out` para animação de remoção; duplo `requestAnimationFrame` para animar props CSS definidas no innerHTML.
 
 ### Armadilhas de animação
 - **Lucide substitui `<i>` por `<svg>` em runtime** — seletores de ícone devem usar `#btn-ai-config svg`, nunca `i[data-lucide="sparkles"]`.
@@ -628,128 +442,10 @@ Animações CSS/JS implementadas em `styles/main.css` e `js/app.js` para dar vid
 
 ## Backlog (planejado, não implementado)
 
-- **Optimistic updates na Agenda** — aplicar a mesma abordagem de cache em memória implementada no Kanban (Fase perf/kanban de 2026-06-09) para a view Agenda: `_agendaEventsCache`, `_renderAgendaFromCache()`, e optimistic updates em criar/editar/excluir eventos. Hoje cada operação chama `renderAll()` causando 1–3s de espera. Referência de implementação: ver `_tasksCache`, `_renderTasksFromCache()` e `_renderTasksDashboardSync()` em `js/app.js`.
-
-- **Monitorar no OTOBO** — opção nos chamados para marcar um ticket como "monitorado"; tickets monitorados seriam destacados na view Chamados (ex.: badge ou seção separada) para facilitar o acompanhamento de tickets importantes sem precisar lembrar o número. Detalhes de implementação a definir (pode ser coluna `monitored BOOLEAN` em `tickets` ou lista local por usuário).
-
-- **Lançar chamado OTOBO como Implementação** — botão "Criar Implementação" no modal de detalhe do chamado (`modal-chamado`) que pré-preenche o `modal-implementation` com os dados do ticket: `title` → nome da implementação, `raw_data` (descrição do artigo mais recente) → campo descrição, `linked_client_id` → cliente vinculado, status padrão `planned`, tipo padrão `feature`. O usuário complementa os demais campos (código, versão, notas) e salva normalmente. Não requer migration — usa tabela `implementations` + `implementation_clients` já existentes. Ponto de entrada: botão secundário no footer do `modal-chamado` (ao lado de "Abrir no OTOBO"), visível apenas quando o ticket tem `linked_client_id` definido.
-
-### Fase 38 — Painel de Posição de Projeto por Cliente (planejado em 2026-06-05)
-
-**Objetivo**: tela unificada que consolida, em uma única visão, a posição completa de um cliente — chamados OTOBO, tarefas Kanban, atendimentos, agenda e saldo de horas — equivalente a uma planilha de acompanhamento de projeto, mas viva e automática.
-
-**Motivação**: hoje o usuário precisa navegar entre 4–5 views para ter a visão completa de um cliente. A planilha de referência (Tickets/Prioridade/Status/Responsável/Data Entrega) mostra o padrão mental esperado: uma linha por item de trabalho, com coluna de status, responsável e data.
-
-#### Estrutura da view
-
-**Ponto de acesso**: botão "Posição do Projeto" no modal do cliente (nova aba) OU novo item no sidebar (ícone `layout-dashboard`).
-
-**Layout sugerido**: página dividida em painéis por categoria, todos filtrados pelo cliente selecionado:
-
-| Painel | Fonte de dados | Colunas exibidas |
-|--------|---------------|-----------------|
-| **Saldo de Horas** | `clients` + `records` | Cota mensal, horas usadas, % consumido, saldo acumulado |
-| **Chamados OTOBO** | `tickets` | Nº ticket, solicitação, responsável T5, status, data criação, data atualização |
-| **Tarefas (Kanban)** | `tasks` | Título, coluna (status), prioridade, data limite, % checklist |
-| **Próximos Agendamentos** | `agenda_events` | Data, tipo, título, horário, Google Meet |
-| **Últimos Atendimentos** | `records` | Data, início, fim, duração, descrição |
-
-**Seletor de cliente**: dropdown no header da view (ou usa o cliente aberto no modal); não exige navegação por cliente individual.
-
-#### Campos inspirados na planilha de referência
-
-- **Item**: numeração sequencial por categoria
-- **Prioridade**: herdada do chamado/tarefa (alta/média/baixa) — `?` para sem prioridade, igual à planilha
-- **Ticket/Referência**: número do chamado OTOBO ou ID interno
-- **Resp. SIGMA / Resp. T5**: responsável interno (coluna `owner` do ticket) e responsável T5 (campo livre — pode vir de `tasks.description` ou campo novo `assignee`)
-- **Solicitação/Título**: descrição curta do item
-- **Status**: badge colorido (Pendente / Em desenvolvimento / Resolvido / Concluído)
-- **Informações Complementares**: campo de observação livre — para chamados vem de `raw_data`; para tarefas vem de `description`
-- **Data Entrega**: `due_date` da tarefa ou campo `date_delivery` a criar em `tickets`
-- **Última Atualização**: `updated_at` do registro
-- **Data Criação**: `created_at`
-
-#### Interações
-
-- Clicar em um chamado → abre `modal-chamado` (reutiliza o existente)
-- Clicar em uma tarefa → abre `modal-task` (reutiliza o existente)
-- Clicar em um agendamento → abre `modal-agenda` (reutiliza o existente)
-- Botão "Exportar PDF" → jsPDF com todos os painéis em tabela (mesmo padrão do relatório de agenda)
-- Botão "Exportar Excel-like" → copiar para área de transferência em formato TSV (colar no Excel/Sheets)
-
-#### IA (se configurada)
-
-- Botão `✨ Resumo do Projeto` → `aiClient.complete()` recebe todos os dados do cliente e retorna parágrafo de situação atual, pontos de atenção e próximos passos; exibido em painel roxo colapsável no topo.
-
-#### Decisões de arquitetura
-
-- **Sem nova tabela**: todos os dados já existem; a view é puramente de leitura e agregação
-- **Sem nova rota de store**: usar métodos existentes (`getTicketsByClient`, `getTasks`, `getAgendaEventsByClientAndRange`, `getRecords`) com Promise.all para carregar em paralelo
-- **`renderProjectDashboard(clientId)`** — método em `app.js`; guarded por `currentView === 'project-dashboard'`; chamado pelo seletor de cliente
-- **Estado**: `this._projectDashboardClientId` — cliente selecionado; `this._projectDashboardData` — cache dos dados para o export sem re-fetch
-- **Filtro de chamados**: apenas tickets do cliente (match por `linked_client_id` já existente na tabela `tickets`)
-- **Filtro de tarefas**: `client_id` da tarefa
-- **Filtro de agenda**: próximos 30 dias a partir de hoje
-- **Filtro de atendimentos**: últimos 90 dias (configurável futuramente)
-
-#### Migration SQL necessária
-
-Nenhuma — a view usa apenas dados e colunas já existentes. Caso se queira o campo "Data de Entrega" nos chamados OTOBO: `ALTER TABLE tickets ADD COLUMN IF NOT EXISTS date_delivery DATE;`
-
-#### Itens a decidir antes da execução
-
-1. Ponto de acesso principal: aba no modal de cliente vs. item do sidebar?
-2. O painel deve ter filtro de período configurável ou usa janelas fixas (30d agenda, 90d atendimentos)?
-3. "Exportar PDF" deve gerar um único PDF com todos os painéis ou um PDF por painel?
-4. Campo "Responsável T5" nos chamados: usar `owner` do OTOBO ou criar campo novo no app?
-
-### Backlog de Animações e Visuais (planejado em 2026-06-03)
-
-Plano completo de ~35 animações novas dividido em 3 rodadas de implementação. Princípio geral: `animation-play-state: paused` no hover, multi-shadow para preservar shadows existentes, duplo rAF para animar props definidas via innerHTML.
-
-**Rodada 1 — Quick wins (puro CSS, alto impacto): ✅ IMPLEMENTADA em 2026-06-04**
-- **L1** ✅ — Login: card entra com slide-up + fade
-- **L2** ✅ — Login: logo `activity` rotaciona uma volta ao carregar
-- **L3** ✅ — Login: input focus com barra inferior animada deslizando da esquerda
-- **S4** ✅ — Sidebar: item ativo pulsa levemente ao trocar de view (`border-left` roxa)
-- **S5** ✅ — Sidebar: marca "TSP Manager" com glow roxo pulse suave contínuo
-- **V2** ✅ — Modal abre com spring bounce (scale 0.93 → overshoot → 1)
-- **V5** ✅ — Campo inválido: shake horizontal ao tentar salvar com erro de validação
-- **D4** ✅ — Dashboard: card com consumo esgotado ganha borda vermelha pulsante
-- **K2** ✅ — Kanban: colunas entram em cascata ao carregar o board (slide da esquerda, stagger 70ms)
-- **K3** ✅ — Kanban: card criado via quick-add faz pop-in com spring
-- **K4** ✅ — Kanban: badge de prioridade Alta pisca suavemente em vermelho
-- **K5** ✅ — Kanban: botão de conclusão (✓) tem escala + brilho verde ao marcar
-- **K6** ✅ — Kanban: coluna recebe card no drag com borda lateral glow colorida
-- **A1** ✅ — Agenda: blocos de evento fade-in escalonado ao carregar view diária/semanal
-- **A3** ✅ — Agenda: troca de view (dia/semana/mês) com crossfade suave
-- **A4** ✅ — Agenda: ícone do botão sync Google gira enquanto sincroniza
-- **F1** ✅ — Formulários (global): input focus com barra roxa animada na borda inferior
-- **B1** ✅ — Badges: status "Ativo" em implementações/treinamentos com ponto verde pulsante
-- **B2** ✅ — Badges: badge "Estourado" com ponto vermelho pulsante
-- **E2** ✅ — Empty state: ícone central flutua em loop suave (keyframe translateY)
-
-**Rodada 2 — JS simples + médio esforço: ✅ IMPLEMENTADA em 2026-06-04**
-- **L4** ✅ — Login: botão "Entrar" com ripple ao clicar (`.btn-primary:active::after` + `@keyframes btn-ripple`)
-- **V3** ✅ — Modal fecha com animação de saída (shrink + fade): classe `modal-overlay--exiting` por 200ms ease-in
-- **V4** ~~✅~~ — Modal overlay backdrop-filter 0→4px — **REMOVIDO** 2026-06-04: `backdrop-filter` na classe base `.modal-overlay` forçava compositing em todos os overlays mesmo com `opacity:0`, causando repaints e piscadas ao carregar views
-- **T1** ✅ — Tabelas (todas): linhas entram em cascata (`@keyframes row-in`, `.data-table tbody tr { animation: row-in 0.22s }`)
-- **T2** ✅ — Tabelas + Apontamentos: hover curtain da esquerda; cards clicáveis com `.clickable-card` (lift + glow roxo)
-- **T3** ✅ — Delete com shake/fade via `.row-deleting`; botões destrutivos com `_twostepDelete` two-step confirm
-- **D5** ✅ — Dashboard: card hover com glow dinâmico vazando da cor da barra de progresso (`.stat-card:hover` usa `var(--card-glow-color)` e `var(--card-glow-shadow)`)
-- **D6** ✅ — Dashboard: troca de mês com cards deslizando para fora/dentro conforme direção (prev=esquerda, next=direita)
-- **A2** ✅ — Agenda: ripple circular roxo no clique do dia na view mensal
-- **B3** ✅ — Badge "Estourado" faz shake periódico a cada 4s com escala
-
-**Rodada 3 — Mais complexo (polish final): ✅ IMPLEMENTADA em 2026-06-04**
-
-- **V1** ✅ — Views: slide vem da direita ao avançar, da esquerda ao voltar (baseado na posição no menu)
-- **S6** ✅ — Sidebar: ícones giram 360° ao colapsar/expandir (`sidebar--icon-spin`)
-- **S7** ✅ — Sidebar: nav items aparecem em cascata no primeiro login (`.sidebar--nav-cascade` + `@keyframes nav-item-in`, stagger 60ms por item, classe removida após 900ms)
-- **T4** ✅ — Tabelas: célula de horas faz flip vertical ao renderizar (`class="hours-flip"` nas tds de minutos em `renderRecords` e `renderMonthRecords`; `@keyframes hours-flip` com `perspective(400px) rotateX`)
-- **A5** ✅ — Agenda: grid desliza left/right ao navegar prev/next
-- **F2** ✅ — Formulários: float label JS-driven via `_initFloatLabels(container)` — label sobe ao focar/preencher
-- **E3** ✅ — Skeleton loading com shimmer — já implementado antes das rodadas 2/3 (`.sk`, `sk-shimmer`, `.sk-stat-card`, `.sk-row`)
+- **Optimistic updates na Agenda** — cache em memória `_agendaEventsCache` + `_renderAgendaFromCache()` igual ao Kanban. Hoje cada operação chama `renderAll()` causando 1–3s de espera. Referência: `_tasksCache`, `_renderTasksFromCache()` em `js/app.js`.
+- **Monitorar no OTOBO** — coluna `monitored BOOLEAN` em `tickets`; tickets monitorados destacados na view Chamados com badge/seção separada.
+- **Lançar chamado OTOBO como Implementação** — botão no footer do `modal-chamado` (só quando `linked_client_id` existe) que pré-preenche `modal-implementation` com dados do ticket. Sem migration necessária.
+- **Painel de Posição de Projeto por Cliente** — ver spec em [Documentation/fase43-painel-posicao-projeto.md](Documentation/fase43-painel-posicao-projeto.md).
 
 ---
 
