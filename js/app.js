@@ -3988,9 +3988,9 @@ class AppController {
     }
 
     getTopPositionForTime(timeStr) {
-        // Assume agenda starts at 08:00
+        // Agenda starts at 00:00 and covers the full 24h day
         const [h, m] = timeStr.split(':').map(Number);
-        const startHour = 8;
+        const startHour = 0;
         const totalMinutes = ((h - startHour) * 60) + m;
         // 1 hour = 60px height
         return Math.max(0, totalMinutes);
@@ -4004,9 +4004,17 @@ class AppController {
         return Math.max(30, diffMins); // min 30px height = 30min
     }
 
+    _scrollAgendaToNow(container) {
+        const scroller = container.querySelector('.agenda-body-scroll');
+        if (!scroller) return;
+        const now = new Date();
+        const targetTop = Math.max(0, (now.getHours() * 60) - 120);
+        scroller.scrollTop = targetTop;
+    }
+
     generateTimeSlots() {
         let html = '';
-        for (let i = 8; i <= 20; i++) {
+        for (let i = 0; i <= 23; i++) {
             html += `<div class="agenda-time-slot">${String(i).padStart(2, '0')}:00</div>`;
         }
         return html;
@@ -4058,16 +4066,19 @@ class AppController {
                     <div class="agenda-day-header active">${this.formatDateBR(this.agendaCurrentDate)}</div>
                 </div>
                 ${allDaySection}
-                <div class="agenda-time-column">
-                    ${this.generateTimeSlots()}
-                </div>
-                <div class="events-container" style="cursor: pointer;"
-                     onclick="app.openNewAgendaEvent('${isoDate}')">
-                    <div class="agenda-grid-lines"></div>
-                    ${eventsHtml}
+                <div class="agenda-body-scroll">
+                    <div class="agenda-time-column">
+                        ${this.generateTimeSlots()}
+                    </div>
+                    <div class="events-container" style="cursor: pointer;"
+                         onclick="app.openNewAgendaEvent('${isoDate}')">
+                        <div class="agenda-grid-lines"></div>
+                        ${eventsHtml}
+                    </div>
                 </div>
             </div>
         `;
+        this._scrollAgendaToNow(container);
     }
 
     async renderAgendaWeekly(container) {
@@ -4134,15 +4145,18 @@ class AppController {
                     <div class="agenda-allday-time-slot">DIA INTEIRO</div>
                     <div class="agenda-allday-week-grid" style="grid-template-columns: repeat(7, 1fr);">${allDayRowHtml}</div>
                 ` : ''}
-                <div class="agenda-time-column">
-                    ${this.generateTimeSlots()}
-                </div>
-                <div class="events-container" style="display: grid; grid-template-columns: repeat(7, 1fr); gap: 8px;">
-                    <div class="agenda-grid-lines"></div>
-                    ${columnsHtml}
+                <div class="agenda-body-scroll">
+                    <div class="agenda-time-column">
+                        ${this.generateTimeSlots()}
+                    </div>
+                    <div class="events-container" style="display: grid; grid-template-columns: repeat(7, 1fr); gap: 8px;">
+                        <div class="agenda-grid-lines"></div>
+                        ${columnsHtml}
+                    </div>
                 </div>
             </div>
         `;
+        this._scrollAgendaToNow(container);
     }
 
     async renderAgendaMonthly(container) {

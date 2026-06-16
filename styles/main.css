@@ -1459,9 +1459,18 @@ h4 {
 
 .events-container {
   position: relative;
-  height: 780px;
-  /* 13h (8h to 20h = 13 slots of 60px) */
+  height: 1440px;
+  /* 24h (00h to 23h = 24 slots of 60px) */
   min-width: 100%;
+}
+
+/* Scrollable body wrapper: keeps day headers/all-day row fixed while time grid scrolls */
+.agenda-body-scroll {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: 60px 1fr;
+  max-height: 600px;
+  overflow-y: auto;
 }
 
 /* All-day events banner row (daily/weekly views) */
@@ -1498,13 +1507,15 @@ h4 {
   flex-direction: column;
   gap: 3px;
   min-height: 8px;
+  min-width: 0;
+  overflow: hidden;
 }
 
 /* Weekly all-day grid — spans full content column width, no label offset */
 .agenda-allday-week-grid {
   display: grid;
-  gap: 4px;
-  padding: 4px 4px 6px;
+  gap: 8px;
+  padding: 4px 0 6px;
   border-top: 1px solid var(--surface-border);
   border-bottom: 1px solid var(--surface-border);
 }
