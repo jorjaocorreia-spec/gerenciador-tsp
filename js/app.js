@@ -102,6 +102,8 @@ class AppController {
         // Sync Google Calendar automático
         this._lastGoogleSync = 0;
         this._googleSyncInterval = null;
+        // Linha "agora" na agenda (diária/semanal)
+        this._nowLineInterval = null;
         // Relatório de agenda
         this._reportEvents = [];
         this._reportClient = null;
@@ -374,6 +376,11 @@ class AppController {
         // Auto-sync Google Calendar ao entrar na view agenda
         if (viewName === 'agenda' && prevView !== 'agenda' && calendarAPI.isAuthenticated) {
             this._autoSyncGoogle().catch(() => {});
+        }
+
+        // Linha "agora" da agenda só faz sentido na própria view
+        if (prevView === 'agenda' && viewName !== 'agenda') {
+            this._stopNowLineInterval();
         }
     }
 
@@ -4012,6 +4019,44 @@ class AppController {
         scroller.scrollTop = targetTop;
     }
 
+    _getNowLineTopPx() {
+        const now = new Date();
+        return now.getHours() * 60 + now.getMinutes();
+    }
+
+    _nowLineHtml() {
+        return `<div class="agenda-now-line" style="top: ${this._getNowLineTopPx()}px;"><div class="agenda-now-line-dot"></div></div>`;
+    }
+
+    // Insere a linha "agora" apenas na coluna referente ao dia atual (daySelector === null = coluna única, ex.: view diária)
+    _injectNowLine(container, daySelector = null) {
+        const target = daySelector ? container.querySelector(daySelector) : container.querySelector('.events-container');
+        if (!target) return;
+        target.insertAdjacentHTML('beforeend', this._nowLineHtml());
+        this._startNowLineInterval(container);
+    }
+
+    _startNowLineInterval(container) {
+        if (this._nowLineInterval) clearInterval(this._nowLineInterval);
+        this._nowLineInterval = setInterval(() => {
+            const lines = container.querySelectorAll('.agenda-now-line');
+            if (lines.length === 0) {
+                clearInterval(this._nowLineInterval);
+                this._nowLineInterval = null;
+                return;
+            }
+            const top = this._getNowLineTopPx();
+            lines.forEach(line => { line.style.top = `${top}px`; });
+        }, 60000);
+    }
+
+    _stopNowLineInterval() {
+        if (this._nowLineInterval) {
+            clearInterval(this._nowLineInterval);
+            this._nowLineInterval = null;
+        }
+    }
+
     generateTimeSlots() {
         let html = '';
         for (let i = 0; i <= 23; i++) {
@@ -4079,6 +4124,10 @@ class AppController {
             </div>
         `;
         this._scrollAgendaToNow(container);
+        this._stopNowLineInterval();
+        if (isoDate === new Date().toISOString().split('T')[0]) {
+            this._injectNowLine(container);
+        }
     }
 
     async renderAgendaWeekly(container) {
@@ -4126,7 +4175,7 @@ class AppController {
                 return this.createEventBlockHtml(ev, `calc(100% - ${inset * 2}px)`, clientsMap, `${inset}px`, colInfo);
             }).join('');
             columnsHtml += `
-                <div style="position: relative; height: 100%; cursor: pointer;"
+                <div style="position: relative; height: 100%; cursor: pointer;" data-day-col="${isoCurrentDay}"
                      onclick="app.openNewAgendaEvent('${isoCurrentDay}')">
                     ${dayEventsHtml}
                 </div>
@@ -4157,6 +4206,11 @@ class AppController {
             </div>
         `;
         this._scrollAgendaToNow(container);
+        this._stopNowLineInterval();
+        const todayIso = new Date().toISOString().split('T')[0];
+        if (todayIso >= isoStart && todayIso <= isoEnd) {
+            this._injectNowLine(container, `[data-day-col="${todayIso}"]`);
+        }
     }
 
     async renderAgendaMonthly(container) {
@@ -9164,6 +9218,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 window.app._googleSyncInterval = null;
             }
             window.app._lastGoogleSync = 0;
+            window.app._stopNowLineInterval();
             calendarAPI.isAuthenticated = false;
             calendarAPI.clearSavedToken();
             if (window.app) window.app._updateGoogleSyncStatus();

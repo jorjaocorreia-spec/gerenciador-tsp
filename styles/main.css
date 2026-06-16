@@ -1561,6 +1561,28 @@ h4 {
 .allday-event-banner.type-task       { border-left: none; }
 .allday-event-banner.type-reminder   { border-left: none; }
 
+/* Linha indicadora da hora atual (estilo Google Calendar) */
+.agenda-now-line {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: #ea4335;
+  z-index: 12;
+  pointer-events: none;
+}
+
+.agenda-now-line-dot {
+  position: absolute;
+  top: 50%;
+  left: 0;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #ea4335;
+  transform: translate(-50%, -50%);
+}
+
 .agenda-grid-lines {
   position: absolute;
   top: 0;
