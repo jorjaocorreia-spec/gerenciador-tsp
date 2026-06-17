@@ -85,6 +85,7 @@ Conteúdo:
 - Gráfico de barras renderizado em canvas e inserido como imagem
 - Tabela detalhada dos apontamentos do período
 - Rodapé: saldo acumulado total na data de geração
+- **Nota**: o gráfico de barras foi propositalmente omitido na primeira versão (decisão do usuário após revisão final do branch); pode ser adicionado depois se sentir falta.
 
 ## Casos de borda
 
