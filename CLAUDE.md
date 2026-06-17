@@ -190,6 +190,7 @@ Todas têm `user_id uuid references auth.users` + RLS ativa (`auth.uid() = user_
 | 40 | Gerador de apontamentos via IA a partir das tarefas concluídas no dia |
 | 41 | Cobertura de agenda: panorama vs contrato mensal por cliente |
 | 42 | RSVP na agenda (Sim/Talvez/Não) + toggle hide declinados |
+| 43 | Produtividade: meta semanal vs apontamentos, feriados nacionais/manuais, saldo acumulado, export PDF |
 
 ---
 
@@ -379,6 +380,8 @@ O `docker-entrypoint.sh` injeta essas vars em `js/config.js` via `envsubst` na i
 - **Gerador de Apontamentos: `alreadyLaunched: true` não entra no `Promise.allSettled` de IA** — a chamada usa `e.alreadyLaunched ? Promise.resolve(null) : aiClient.generateApontamentoFromTasks(...)`. O índice é preservado (não se usa `filter` antes de mapear), então `aiResults[idx]` sempre corresponde a `_aptGenEntries[idx]`. O handler pula com `if (_aptGenEntries[idx].alreadyLaunched) return`.
 - **Painel `#agenda-ai-assistant` é HTML estático** — diferente das views dinâmicas, o painel do assistente existe em `index.html` e é mostrado/ocultado via `toggleAgendaAssistant()`. `switchView('agenda')` não reseta o painel; se o usuário navegar para outra view e voltar, o painel continua no estado anterior.
 - **Deploy da Edge Function `ai-proxy` requer `SUPABASE_ACCESS_TOKEN` válido** — o token expira. Se o deploy retornar 401, gerar novo token em app.supabase.com → Account → Access Tokens. Comando: `$env:SUPABASE_ACCESS_TOKEN='sbp_xxx'; npx supabase@latest functions deploy ai-proxy --project-ref klimkamnydfnzqetqlqm`
+- **Produtividade: hoje nunca entra no saldo acumulado** — `computeAccumulatedBalance` em `js/productivity-calc.js` sempre calcula até ontem; o card de saldo acumulado nunca reflete o dia em andamento. Para alterar esse comportamento, mudar `computeAccumulatedBalance`, não `renderProdutividade`.
+- **Produtividade: feriados nacionais nunca são persistidos** — `js/holidays.js` calcula fixos e móveis (Páscoa via Meeus/Jones/Butcher) em memória, cacheados por ano; a tabela `holidays` no Supabase guarda só os extras manuais. Nunca tentar popular `holidays` com feriados nacionais — duplicaria a lógica e quebraria o cache de `getNationalHolidays`.
 
 ### Cálculos automáticos
 - Comissão do consultor = 43% do valor pago pelo cliente (`clientPays * 0.43`)
@@ -401,6 +404,7 @@ O `docker-entrypoint.sh` injeta essas vars em `js/config.js` via `envsubst` na i
 | **Apontamentos** | Log diário: horário início/fim, nº projeto (texto livre + autocomplete de clientes), descrição; navegação por dia; total do dia calculado |
 | **Implementações** | Biblioteca de recursos técnicos vinculados a clientes (M:N); tipos: trigger, procedure, feature, customization, integration; filtros por tipo/status/cliente; cards agrupados por tipo; modal com código monospace |
 | **Chamados** | Tickets OTOBO em aberto, cacheados no Supabase; sync manual via botão; agrupados por cliente TSP; modal de detalhe com artigos carregados on-demand; configuração via modal (URL + usuário + senha) |
+| **Produtividade** | Meta de horas (apontamentos) vs realizado por dia/semana/mês; feriados nacionais calculados + manuais; saldo acumulado desde data configurável; exportação PDF |
 
 ### Sidebar
 - **Recolhível**: botão chevron no cabeçalho (`#btn-sidebar-toggle`) alterna entre expandido (260px) e colapsado (70px)
