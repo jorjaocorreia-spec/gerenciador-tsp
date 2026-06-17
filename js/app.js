@@ -1845,7 +1845,8 @@ class AppController {
                 this.renderApontamentos(),
                 this.renderImplementations(),
                 this.renderTrainings(),
-                this.renderChamados()
+                this.renderChamados(),
+                this.renderProdutividade()
             ]);
             lucide.createIcons();
         } finally {
@@ -5782,6 +5783,151 @@ class AppController {
         } catch (err) {
             Toast.show('Erro ao salvar: ' + err.message, 'error');
         }
+    }
+
+    _prodFmtAbs(totalMin) {
+        const abs = Math.round(Math.abs(totalMin));
+        const h = Math.floor(abs / 60);
+        const m = abs % 60;
+        return `${h}h ${String(m).padStart(2, '0')}min`;
+    }
+
+    async renderProdutividade() {
+        if (this.currentView !== 'produtividade') return;
+        const container = document.getElementById('produtividade-container');
+        if (!container) return;
+        container.innerHTML = spinnerHtml;
+
+        document.querySelectorAll('#prod-period-tabs button[data-period]').forEach(btn => {
+            btn.classList.toggle('active-mode', btn.dataset.period === this.prodPeriod);
+        });
+
+        try {
+            const summary = await store.getProductivitySummary(this.prodPeriod, this.prodRefDate);
+            this._prodSummary = summary;
+            container.innerHTML = '';
+            container.appendChild(this._buildProdBalanceCard(summary));
+            container.appendChild(this._buildProdPeriodCard(summary));
+            container.appendChild(this._buildProdChart(summary));
+            container.appendChild(this._buildProdTable(summary));
+            lucide.createIcons();
+            requestAnimationFrame(() => requestAnimationFrame(() => {
+                document.querySelectorAll('#produtividade-container .prod-bar-fill').forEach(bar => {
+                    bar.style.width = bar.dataset.w + '%';
+                });
+            }));
+        } catch (err) {
+            container.innerHTML = `<div class="glass" style="padding:24px;"><p class="text-muted">Erro ao carregar: ${err.message}</p></div>`;
+        }
+    }
+
+    _buildProdBalanceCard(summary) {
+        const card = document.createElement('div');
+        card.className = 'glass stat-card';
+        card.style.marginBottom = '16px';
+        if (!summary.accumulated) {
+            card.innerHTML = `
+                <div class="stat-header"><span class="client-name">Saldo Acumulado</span></div>
+                <p class="text-muted" style="margin:8px 0 0;">Configure a data de início para acompanhar o saldo acumulado.</p>
+                <button class="btn btn-secondary btn-sm" style="margin-top:12px;align-self:flex-start;" onclick="app.openProdutividadeConfig()">Configurar</button>
+            `;
+            return card;
+        }
+        const bal = summary.accumulated.balanceMinutes;
+        const color = bal >= 0 ? '#4ade80' : '#f87171';
+        const [sy, sm, sd] = summary.config.startDate.split('-');
+        const [ly, lm, ld] = summary.accumulated.lastDate.split('-');
+        card.innerHTML = `
+            <div class="stat-header">
+                <span class="client-name">Saldo Acumulado</span>
+                <span style="font-weight:700;font-size:1.4rem;color:${color};">${TSPProductivity.fmtMinutes(bal)}</span>
+            </div>
+            <p class="text-muted" style="margin:4px 0 0;font-size:0.8rem;">Desde ${sd}/${sm}/${sy} até ${ld}/${lm}/${ly}</p>
+        `;
+        return card;
+    }
+
+    _buildProdPeriodCard(summary) {
+        const p = summary.period;
+        const isTodayInProgress = (this.prodPeriod === 'day' && this.prodRefDate === summary.todayStr);
+        const pct = p.targetMinutes > 0 ? Math.round(p.actualMinutes / p.targetMinutes * 100) : 0;
+        const deltaColor = isTodayInProgress ? 'var(--text-muted)' : (p.deltaMinutes >= 0 ? '#4ade80' : '#f87171');
+        const barColor = isTodayInProgress ? 'linear-gradient(90deg,#a855f7,#7c3aed)' : (p.deltaMinutes >= 0 ? 'linear-gradient(90deg,#22c55e,#16a34a)' : '#f87171');
+        const periodLabel = { day: 'Dia', week: 'Semana', month: 'Mês' }[this.prodPeriod];
+        const deltaLabel = isTodayInProgress ? 'em andamento' : TSPProductivity.fmtMinutes(p.deltaMinutes);
+        const card = document.createElement('div');
+        card.className = 'glass stat-card';
+        card.style.marginBottom = '16px';
+        card.innerHTML = `
+            <div class="stat-header">
+                <span class="client-name">${periodLabel}: ${this._prodFmtAbs(p.actualMinutes)} / ${this._prodFmtAbs(p.targetMinutes)}</span>
+                <span style="font-weight:600;color:${deltaColor}">${deltaLabel}</span>
+            </div>
+            <div class="progress-container">
+                <div class="progress-bar" style="width:${Math.min(100, pct)}%; background:${barColor};"></div>
+            </div>
+            <div style="font-size:0.85rem;margin-top:8px;">
+                <span class="text-muted">${pct}% da meta</span>
+            </div>
+        `;
+        return card;
+    }
+
+    _buildProdChart(summary) {
+        const wrap = document.createElement('div');
+        wrap.className = 'glass';
+        wrap.style.padding = '20px 24px';
+        wrap.style.marginBottom = '16px';
+        const days = summary.period.days;
+        const maxMin = Math.max(...days.map(d => Math.max(d.targetMinutes, d.actualMinutes)), 1);
+        const rows = days.map(d => {
+            const [, m, dd] = d.date.split('-');
+            const label = `${dd}/${m}`;
+            const actualPct = Math.round(d.actualMinutes / maxMin * 100);
+            const targetPct = Math.round(d.targetMinutes / maxMin * 100);
+            const barColor = d.deltaMinutes >= 0 ? 'linear-gradient(90deg,#22c55e,#16a34a)' : '#f87171';
+            return `
+                <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">
+                    <span style="width:46px;font-size:0.75rem;color:var(--text-muted);flex-shrink:0;">${label}</span>
+                    <div style="flex:1;position:relative;height:14px;background:rgba(255,255,255,0.07);border-radius:4px;overflow:hidden;">
+                        <div style="position:absolute;top:0;left:0;height:100%;width:${targetPct}%;border-right:2px dashed rgba(255,255,255,0.35);"></div>
+                        <div class="prod-bar-fill" data-w="${actualPct}" style="height:100%;width:0;background:${barColor};border-radius:4px;transition:width 0.55s ease;"></div>
+                    </div>
+                    <span style="width:90px;text-align:right;font-size:0.78rem;color:var(--text-muted);flex-shrink:0;">${this._prodFmtAbs(d.actualMinutes)}</span>
+                </div>`;
+        }).join('');
+        wrap.innerHTML = `<h3 style="margin:0 0 16px;font-size:1rem;">Realizado vs Meta por dia</h3>${rows}`;
+        return wrap;
+    }
+
+    _buildProdTable(summary) {
+        const wrap = document.createElement('div');
+        wrap.className = 'glass';
+        wrap.style.padding = '0';
+        const items = [...summary.items]
+            .filter(it => it.date >= summary.period.startDate && it.date <= summary.period.endDate)
+            .sort((a, b) => a.date === b.date ? a.startTime.localeCompare(b.startTime) : a.date.localeCompare(b.date));
+        if (items.length === 0) {
+            wrap.innerHTML = `<p class="text-muted" style="text-align:center;padding:24px;">Nenhum apontamento neste período.</p>`;
+            return wrap;
+        }
+        const rows = items.map(it => {
+            const [y, m, d] = it.date.split('-');
+            const dur = TSPProductivity.minutesBetween(it.startTime, it.endTime);
+            return `<tr>
+                <td>${d}/${m}/${y}</td>
+                <td>${escapeHtml(it.startTime)} – ${escapeHtml(it.endTime)}</td>
+                <td>${escapeHtml(it.projectNum)}</td>
+                <td>${escapeHtml(it.description)}</td>
+                <td style="text-align:right;">${this._prodFmtAbs(dur)}</td>
+            </tr>`;
+        }).join('');
+        wrap.innerHTML = `
+            <table class="data-table" style="margin:0;">
+                <thead><tr><th>Data</th><th>Horário</th><th>Proj.</th><th>Descrição</th><th style="text-align:right;">Duração</th></tr></thead>
+                <tbody>${rows}</tbody>
+            </table>`;
+        return wrap;
     }
 
     async renderApontamentos() {
