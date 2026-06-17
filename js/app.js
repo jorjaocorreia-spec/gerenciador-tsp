@@ -5930,6 +5930,52 @@ class AppController {
         return wrap;
     }
 
+    async exportProdutividadePDF() {
+        const summary = this._prodSummary;
+        if (!summary) { Toast.show('Carregue o período antes de exportar.', 'info'); return; }
+        const { jsPDF } = window.jspdf;
+        const doc = new jsPDF();
+        const periodLabel = { day: 'Dia', week: 'Semana', month: 'Mês' }[this.prodPeriod];
+        const fmtDate = iso => iso.split('-').reverse().join('/');
+
+        doc.setFontSize(16);
+        doc.text('Relatório de Produtividade', 14, 18);
+        doc.setFontSize(10);
+        doc.text(`Período (${periodLabel}): ${fmtDate(summary.period.startDate)} a ${fmtDate(summary.period.endDate)}`, 14, 26);
+        doc.text(`Gerado em: ${fmtDate(new Date().toISOString().split('T')[0])}`, 14, 32);
+
+        doc.setFontSize(11);
+        doc.text(`Meta: ${this._prodFmtAbs(summary.period.targetMinutes)}`, 14, 42);
+        doc.text(`Realizado: ${this._prodFmtAbs(summary.period.actualMinutes)}`, 14, 48);
+        doc.text(`Saldo do período: ${TSPProductivity.fmtMinutes(summary.period.deltaMinutes)}`, 14, 54);
+        let nextY = 60;
+        if (summary.accumulated) {
+            doc.text(`Saldo acumulado (até ${fmtDate(summary.accumulated.lastDate)}): ${TSPProductivity.fmtMinutes(summary.accumulated.balanceMinutes)}`, 14, nextY);
+            nextY += 6;
+        }
+
+        const items = [...summary.items]
+            .filter(it => it.date >= summary.period.startDate && it.date <= summary.period.endDate)
+            .sort((a, b) => a.date === b.date ? a.startTime.localeCompare(b.startTime) : a.date.localeCompare(b.date));
+
+        const rows = items.map(it => [
+            fmtDate(it.date),
+            `${it.startTime} – ${it.endTime}`,
+            it.projectNum,
+            it.description.substring(0, 60)
+        ]);
+
+        doc.autoTable({
+            startY: nextY + 6,
+            head: [["Data", "Horário", "Projeto", "Descrição"]],
+            body: rows,
+            styles: { fontSize: 8 },
+            headStyles: { fillColor: [79, 70, 229] },
+        });
+
+        doc.save(`produtividade_${this.prodPeriod}_${new Date().getTime()}.pdf`);
+    }
+
     async renderApontamentos() {
         if (this.currentView !== 'apontamentos') return;
         const container = document.getElementById('apontamentos-container');
