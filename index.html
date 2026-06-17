@@ -102,6 +102,9 @@
             <li class="nav-item" data-view="chamados" title="Chamados">
                 <i data-lucide="headphones"></i><span class="nav-label">Chamados</span>
             </li>
+            <li class="nav-item" data-view="produtividade" title="Produtividade">
+                <i data-lucide="trending-up"></i><span class="nav-label">Produtividade</span>
+            </li>
         </ul>
         <div class="sidebar-bottom">
             <p class="text-muted sidebar-section-label">SISTEMA</p>
@@ -699,6 +702,38 @@
                 </button>
             </div>
             <div id="chamados-content"></div>
+        </section>
+
+        <!-- VIEW: PRODUTIVIDADE -->
+        <section class="view-section" id="view-produtividade">
+            <div class="view-header">
+                <div class="view-header-left">
+                    <h1>Produtividade</h1>
+                    <div class="apontamentos-date-nav" id="prod-period-tabs">
+                        <button type="button" class="btn btn-secondary btn-sm" data-period="day" onclick="app.prodSetPeriod('day')">Dia</button>
+                        <button type="button" class="btn btn-secondary btn-sm" data-period="week" onclick="app.prodSetPeriod('week')">Semana</button>
+                        <button type="button" class="btn btn-secondary btn-sm" data-period="month" onclick="app.prodSetPeriod('month')">Mês</button>
+                        <button id="btn-prod-prev" class="btn-icon" title="Anterior" onclick="app.prodNavigate(-1)">
+                            <i data-lucide="chevron-left"></i>
+                        </button>
+                        <button id="btn-prod-next" class="btn-icon" title="Próximo" onclick="app.prodNavigate(1)">
+                            <i data-lucide="chevron-right"></i>
+                        </button>
+                        <button id="btn-prod-today" class="btn btn-secondary btn-sm" onclick="app.prodGoToToday()">Hoje</button>
+                    </div>
+                </div>
+                <div class="view-header-actions">
+                    <button class="btn btn-secondary" onclick="app.openProdutividadeConfig()">
+                        <i data-lucide="settings-2"></i>
+                        <span class="nav-label">Configurar</span>
+                    </button>
+                    <button class="btn btn-primary" onclick="app.exportProdutividadePDF()">
+                        <i data-lucide="file-down"></i>
+                        <span class="nav-label">Exportar PDF</span>
+                    </button>
+                </div>
+            </div>
+            <div id="produtividade-container"></div>
         </section>
 
     </main>
@@ -1860,6 +1895,36 @@
         </div>
     </div>
 
+    <!-- MODAL: CONFIGURAÇÃO DE PRODUTIVIDADE -->
+    <div class="modal-overlay" id="modal-produtividade-config">
+        <div class="modal glass" style="max-width: 520px;">
+            <div class="modal-header">
+                <h3>Configurar Produtividade</h3>
+                <button class="close-modal" onclick="app.closeModal('modal-produtividade-config')"><i data-lucide="x"></i></button>
+            </div>
+            <form id="form-produtividade-config">
+                <div class="form-group">
+                    <label for="prod-weekly-hours">Meta semanal (horas)</label>
+                    <input type="number" id="prod-weekly-hours" class="form-control" step="0.1" min="1" value="44" required>
+                </div>
+                <div class="form-group">
+                    <label for="prod-start-date">Início do saldo acumulado</label>
+                    <input type="date" id="prod-start-date" class="form-control">
+                </div>
+                <button type="submit" class="btn btn-primary" style="width:100%; justify-content:center; margin-top:8px;">Salvar</button>
+            </form>
+            <div style="margin-top: 20px; padding-top: 16px; border-top: 1px solid rgba(255,255,255,0.08);">
+                <h4 style="margin:0 0 10px;font-size:0.95rem;">Feriados extras</h4>
+                <div style="display:flex; gap:8px; margin-bottom:12px;">
+                    <input type="date" id="prod-holiday-date" class="form-control" style="flex:1;">
+                    <input type="text" id="prod-holiday-name" class="form-control" placeholder="Nome do feriado" style="flex:2;">
+                    <button type="button" class="btn btn-secondary btn-sm" onclick="app.addProdHoliday()">Adicionar</button>
+                </div>
+                <div id="prod-holidays-list"></div>
+            </div>
+        </div>
+    </div>
+
     <!-- SCRIPTS -->
     <script src="js/config.js"></script>
     <script src="js/auth.js?v=1"></script>
@@ -2316,9 +2381,11 @@
     </div>
 
     <script src="js/calendar.js?v=21"></script>
-    <script src="js/store.js?v=25"></script>
+    <script src="js/holidays.js?v=1"></script>
+    <script src="js/productivity-calc.js?v=1"></script>
+    <script src="js/store.js?v=26"></script>
     <script src="js/ai.js?v=1"></script>
-    <script src="js/app.js?v=33"></script>
+    <script src="js/app.js?v=34"></script>
 </body>
 
 </html>
