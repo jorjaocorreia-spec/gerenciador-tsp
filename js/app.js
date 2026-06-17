@@ -64,6 +64,10 @@ class AppController {
         this.agendaCurrentDate = new Date();
         this.agendaViewMode = localStorage.getItem('agendaViewMode') || 'schedule'; // daily, weekly, monthly or schedule
         this.aptCurrentDate = new Date().toISOString().split('T')[0]; // 'YYYY-MM-DD'
+        this.prodPeriod = 'week'; // 'day' | 'week' | 'month'
+        this.prodRefDate = new Date().toISOString().split('T')[0];
+        this._prodSummary = null;
+        this._prodConfigHolidays = [];
         this.taskAttachments = []; // [{name, data}] — imagens em base64 do modal de tarefa
         this.implAttachments = []; // [{name, data}] — imagens em base64 do modal de implementação
         this.trainingAttachments = []; // [{name, data}] — imagens do modal de treinamento
@@ -155,6 +159,8 @@ class AppController {
                 this.switchView(view);
             });
         });
+
+        document.getElementById('form-produtividade-config')?.addEventListener('submit', (e) => this.handleProdutividadeConfigSubmit(e));
 
         // Configurar Formulários
         document.getElementById('form-client').addEventListener('submit', this.handleClientSubmit.bind(this));
@@ -343,7 +349,7 @@ class AppController {
         this.currentView = viewName;
 
         // V1: direção do slide baseada na ordem do menu
-        const VIEW_ORDER = ['dashboard','clients','records','tasks','agenda','apontamentos','implementations','trainings','chamados'];
+        const VIEW_ORDER = ['dashboard','clients','records','tasks','agenda','apontamentos','implementations','trainings','chamados','produtividade'];
         const prevIdx = VIEW_ORDER.indexOf(prevView);
         const newIdx  = VIEW_ORDER.indexOf(viewName);
         const slideDir = (prevIdx >= 0 && newIdx >= 0 && prevIdx !== newIdx)
@@ -381,6 +387,10 @@ class AppController {
         // Linha "agora" da agenda só faz sentido na própria view
         if (prevView === 'agenda' && viewName !== 'agenda') {
             this._stopNowLineInterval();
+        }
+
+        if (viewName === 'produtividade') {
+            this.renderProdutividade();
         }
     }
 
@@ -5682,6 +5692,96 @@ class AppController {
         d.setDate(d.getDate() + delta);
         this.aptCurrentDate = d.toISOString().split('T')[0];
         this.renderApontamentos();
+    }
+
+    prodSetPeriod(period) {
+        this.prodPeriod = period;
+        this.renderProdutividade();
+    }
+
+    prodNavigate(delta) {
+        const d = new Date(this.prodRefDate + 'T12:00:00');
+        if (this.prodPeriod === 'day') d.setDate(d.getDate() + delta);
+        else if (this.prodPeriod === 'week') d.setDate(d.getDate() + delta * 7);
+        else d.setMonth(d.getMonth() + delta);
+        this.prodRefDate = d.toISOString().split('T')[0];
+        this.renderProdutividade();
+    }
+
+    prodGoToToday() {
+        this.prodRefDate = new Date().toISOString().split('T')[0];
+        this.renderProdutividade();
+    }
+
+    async openProdutividadeConfig() {
+        const [config, holidays] = await Promise.all([
+            store.getProductivityConfig(),
+            store.getHolidays()
+        ]);
+        document.getElementById('prod-weekly-hours').value = config.weeklyHours;
+        document.getElementById('prod-start-date').value = config.startDate || '';
+        this._prodConfigHolidays = holidays;
+        this._renderProdHolidaysList();
+        this.openModal('modal-produtividade-config');
+    }
+
+    _renderProdHolidaysList() {
+        const list = document.getElementById('prod-holidays-list');
+        if (!list) return;
+        if (this._prodConfigHolidays.length === 0) {
+            list.innerHTML = `<p class="text-muted" style="font-size:0.85rem;">Nenhum feriado manual cadastrado.</p>`;
+            return;
+        }
+        list.innerHTML = this._prodConfigHolidays.map(h => {
+            const [y, m, d] = h.date.split('-');
+            return `<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid rgba(255,255,255,0.06);">
+                <span style="font-size:0.85rem;">${d}/${m}/${y} — ${escapeHtml(h.name)}</span>
+                <button type="button" class="btn-icon" onclick="app.removeProdHoliday('${h.id}')" title="Remover"><i data-lucide="trash-2" style="width:14px;height:14px;"></i></button>
+            </div>`;
+        }).join('');
+        lucide.createIcons();
+    }
+
+    async addProdHoliday() {
+        const dateInput = document.getElementById('prod-holiday-date');
+        const nameInput = document.getElementById('prod-holiday-name');
+        const date = dateInput.value;
+        const name = nameInput.value.trim();
+        if (!date || !name) { Toast.show('Informe data e nome do feriado.', 'error'); return; }
+        try {
+            const created = await store.addHoliday(date, name);
+            this._prodConfigHolidays.push(created);
+            this._prodConfigHolidays.sort((a, b) => a.date.localeCompare(b.date));
+            dateInput.value = '';
+            nameInput.value = '';
+            this._renderProdHolidaysList();
+        } catch (err) {
+            Toast.show('Erro ao adicionar feriado: ' + err.message, 'error');
+        }
+    }
+
+    async removeProdHoliday(id) {
+        try {
+            await store.deleteHoliday(id);
+            this._prodConfigHolidays = this._prodConfigHolidays.filter(h => h.id !== id);
+            this._renderProdHolidaysList();
+        } catch (err) {
+            Toast.show('Erro ao remover feriado: ' + err.message, 'error');
+        }
+    }
+
+    async handleProdutividadeConfigSubmit(e) {
+        e.preventDefault();
+        const weeklyHours = parseFloat(document.getElementById('prod-weekly-hours').value) || 44;
+        const startDate = document.getElementById('prod-start-date').value || null;
+        try {
+            await store.saveProductivityConfig(startDate, weeklyHours);
+            Toast.show('Configuração salva.', 'success');
+            this.closeModal('modal-produtividade-config');
+            this.renderProdutividade();
+        } catch (err) {
+            Toast.show('Erro ao salvar: ' + err.message, 'error');
+        }
     }
 
     async renderApontamentos() {
