@@ -3586,6 +3586,14 @@ class AppController {
         document.getElementById('agenda-date-end').value = dateStr;
         document.getElementById('btn-delete-agenda-event').style.display = 'none';
         this.toggleAllDayAgenda(false);
+        // Pré-preenche hora atual arredondada para o quarto de hora mais próximo
+        const _now = new Date();
+        const _rawMins = Math.round(_now.getMinutes() / 15) * 15;
+        const _startH = _rawMins >= 60 ? (_now.getHours() + 1) % 24 : _now.getHours();
+        const _startM = _rawMins >= 60 ? 0 : _rawMins;
+        const _endH = (_startH + 1) % 24;
+        document.getElementById('agenda-start').value = `${String(_startH).padStart(2,'0')}:${String(_startM).padStart(2,'0')}`;
+        document.getElementById('agenda-end').value = `${String(_endH).padStart(2,'0')}:${String(_startM).padStart(2,'0')}`;
         // Reseta campos de Meet/participantes
         document.getElementById('agenda-meet-link').value = '';
         document.getElementById('agenda-attendees').value = '';
