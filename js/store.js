@@ -725,6 +725,27 @@ class TSPStore {
         if (error) throw error;
     }
 
+    async getProductivityConfig() {
+        const { data, error } = await this.db.from('user_profiles')
+            .select('productivity_start_date, productivity_weekly_hours')
+            .eq('user_id', this.userId).maybeSingle();
+        if (error) throw error;
+        return {
+            startDate: data?.productivity_start_date || null,
+            weeklyHours: data ? (parseFloat(data.productivity_weekly_hours) || 44) : 44
+        };
+    }
+
+    async saveProductivityConfig(startDate, weeklyHours) {
+        const { error } = await this.db.from('user_profiles').upsert({
+            user_id: this.userId,
+            productivity_start_date: startDate || null,
+            productivity_weekly_hours: weeklyHours,
+            updated_at: new Date().toISOString()
+        }, { onConflict: 'user_id' });
+        if (error) throw error;
+    }
+
     // ── KANBAN COLUMNS ────────────────────────────────────────────
 
     async getColumns(clientId) {
