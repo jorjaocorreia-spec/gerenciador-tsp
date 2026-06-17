@@ -667,6 +667,15 @@ class TSPStore {
 
     // ── APONTAMENTOS ─────────────────────────────────────────────
 
+    async getApontamentosByRange(startDate, endDate) {
+        const { data, error } = await this.db.from('apontamentos')
+            .select('*').eq('user_id', this.userId)
+            .gte('date', startDate).lte('date', endDate)
+            .order('date').order('start_time');
+        if (error) throw error;
+        return (data || []).map(r => this._apontamento(r));
+    }
+
     async getApontamentos(date) {
         const { data, error } = await this.db.from('apontamentos')
             .select('*')
@@ -744,6 +753,43 @@ class TSPStore {
             updated_at: new Date().toISOString()
         }, { onConflict: 'user_id' });
         if (error) throw error;
+    }
+
+    async getProductivitySummary(period, refDateStr) {
+        const config = await this.getProductivityConfig();
+        const manualHolidays = await this.getHolidays();
+        const manualHolidayDates = new Set(manualHolidays.map(h => h.date));
+
+        const todayStr = new Date().toISOString().split('T')[0];
+        const periodRange = TSPProductivity.getPeriodRange(period, refDateStr);
+
+        let queryStart = periodRange.startDate;
+        if (config.startDate && config.startDate < queryStart) queryStart = config.startDate;
+        let queryEnd = periodRange.endDate;
+        if (todayStr > queryEnd) queryEnd = todayStr;
+
+        const items = await this.getApontamentosByRange(queryStart, queryEnd);
+        const apontamentosByDate = {};
+        items.forEach(it => {
+            if (!apontamentosByDate[it.date]) apontamentosByDate[it.date] = [];
+            apontamentosByDate[it.date].push(it);
+        });
+
+        const periodResult = TSPProductivity.computeRange(
+            periodRange.startDate, periodRange.endDate, apontamentosByDate, config.weeklyHours, manualHolidayDates
+        );
+
+        let accumulated = null;
+        if (config.startDate) {
+            accumulated = TSPProductivity.computeAccumulatedBalance(
+                config.startDate, todayStr, apontamentosByDate, config.weeklyHours, manualHolidayDates
+            );
+        }
+
+        const todayItems = apontamentosByDate[todayStr] || [];
+        const todayProgress = TSPProductivity.computeDay(todayStr, todayItems, config.weeklyHours, manualHolidayDates);
+
+        return { config, todayStr, period: periodResult, accumulated, todayProgress, items };
     }
 
     // ── KANBAN COLUMNS ────────────────────────────────────────────
