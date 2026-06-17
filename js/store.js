@@ -67,6 +67,10 @@ class TSPStore {
             createdAt: r.created_at };
     }
 
+    _holiday(r) {
+        return { id: r.id, date: r.date, name: r.name, createdAt: r.created_at };
+    }
+
     _column(r) {
         return { id: r.id, clientId: r.client_id || null,
             name: r.name, color: r.color || '#6366f1',
@@ -696,6 +700,27 @@ class TSPStore {
 
     async deleteApontamento(id) {
         const { error } = await this.db.from('apontamentos').delete()
+            .eq('id', id).eq('user_id', this.userId);
+        if (error) throw error;
+    }
+
+    async getHolidays() {
+        const { data, error } = await this.db.from('holidays')
+            .select('*').eq('user_id', this.userId).order('date');
+        if (error) throw error;
+        return (data || []).map(r => this._holiday(r));
+    }
+
+    async addHoliday(date, name) {
+        const { data, error } = await this.db.from('holidays').insert({
+            user_id: this.userId, date, name
+        }).select().single();
+        if (error) throw error;
+        return this._holiday(data);
+    }
+
+    async deleteHoliday(id) {
+        const { error } = await this.db.from('holidays').delete()
             .eq('id', id).eq('user_id', this.userId);
         if (error) throw error;
     }
