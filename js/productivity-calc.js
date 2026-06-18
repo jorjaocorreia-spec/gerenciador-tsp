@@ -35,10 +35,19 @@
         return Math.round((weeklyHours / 5) * 60);
     }
 
+    function getHolidayName(dateStr, manualHolidayDates) {
+        const year = parseInt(dateStr.slice(0, 4), 10);
+        const national = Holidays.getNationalHolidays(year)[dateStr];
+        if (national) return national;
+        if (manualHolidayDates && manualHolidayDates.get) return manualHolidayDates.get(dateStr) || null;
+        return null;
+    }
+
     function computeDay(dateStr, apontamentosForDay, weeklyHours, manualHolidayDates) {
         const targetMinutes = dailyTargetMinutes(dateStr, weeklyHours, manualHolidayDates);
         const actualMinutes = (apontamentosForDay || []).reduce((s, a) => s + minutesBetween(a.startTime, a.endTime), 0);
-        return { date: dateStr, targetMinutes, actualMinutes, deltaMinutes: actualMinutes - targetMinutes };
+        const holidayName = getHolidayName(dateStr, manualHolidayDates);
+        return { date: dateStr, targetMinutes, actualMinutes, deltaMinutes: actualMinutes - targetMinutes, holidayName };
     }
 
     function computeRange(startDate, endDate, apontamentosByDate, weeklyHours, manualHolidayDates) {
@@ -93,7 +102,7 @@
     }
 
     global.TSPProductivity = {
-        minutesBetween, isWorkday, dailyTargetMinutes, computeDay, computeRange,
+        minutesBetween, isWorkday, dailyTargetMinutes, getHolidayName, computeDay, computeRange,
         computeAccumulatedBalance, getPeriodRange, fmtMinutes, toIsoLocal, addDaysLocal
     };
 })(typeof window !== 'undefined' ? window : globalThis);

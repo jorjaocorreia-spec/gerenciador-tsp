@@ -758,7 +758,7 @@ class TSPStore {
     async getProductivitySummary(period, refDateStr) {
         const config = await this.getProductivityConfig();
         const manualHolidays = await this.getHolidays();
-        const manualHolidayDates = new Set(manualHolidays.map(h => h.date));
+        const manualHolidayDates = new Map(manualHolidays.map(h => [h.date, h.name]));
 
         const todayStr = new Date().toISOString().split('T')[0];
         const periodRange = TSPProductivity.getPeriodRange(period, refDateStr);

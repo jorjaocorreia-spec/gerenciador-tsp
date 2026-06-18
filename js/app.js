@@ -5880,6 +5880,16 @@ class AppController {
         const barColor = isTodayInProgress ? 'linear-gradient(90deg,#a855f7,#7c3aed)' : (p.deltaMinutes >= 0 ? 'linear-gradient(90deg,#22c55e,#16a34a)' : '#f87171');
         const periodLabel = { day: 'Dia', week: 'Semana', month: 'Mês' }[this.prodPeriod];
         const deltaLabel = isTodayInProgress ? 'em andamento' : TSPProductivity.fmtMinutes(p.deltaMinutes);
+        const holidayDays = p.days.filter(d => d.holidayName);
+        const holidayNote = holidayDays.length > 0
+            ? `<div style="font-size:0.78rem;margin-top:6px;color:#fbbf24;display:flex;align-items:center;gap:6px;">
+                <i data-lucide="calendar-x" style="width:13px;height:13px;flex-shrink:0;"></i>
+                <span>${holidayDays.length} feriado${holidayDays.length > 1 ? 's' : ''} considerado${holidayDays.length > 1 ? 's' : ''} na meta: ${holidayDays.map(d => {
+                    const [, m, dd] = d.date.split('-');
+                    return `${dd}/${m} (${escapeHtml(d.holidayName)})`;
+                }).join(', ')}</span>
+            </div>`
+            : '';
         const card = document.createElement('div');
         card.className = 'glass stat-card';
         card.style.marginBottom = '16px';
@@ -5894,6 +5904,7 @@ class AppController {
             <div style="font-size:0.85rem;margin-top:8px;">
                 <span class="text-muted">${pct}% da meta</span>
             </div>
+            ${holidayNote}
         `;
         return card;
     }
@@ -5911,9 +5922,15 @@ class AppController {
             const actualPct = Math.round(d.actualMinutes / maxMin * 100);
             const targetPct = Math.round(d.targetMinutes / maxMin * 100);
             const barColor = d.deltaMinutes >= 0 ? 'linear-gradient(90deg,#22c55e,#16a34a)' : '#f87171';
+            const isHoliday = !!d.holidayName;
+            const rowBg = isHoliday ? 'background:rgba(251,191,36,0.08);border-radius:6px;' : '';
+            const holidayTag = isHoliday
+                ? `<i data-lucide="calendar-x" title="Feriado: ${escapeHtml(d.holidayName)}" style="width:13px;height:13px;color:#fbbf24;flex-shrink:0;"></i>`
+                : `<span style="width:13px;flex-shrink:0;"></span>`;
             return `
-                <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">
-                    <span style="width:46px;font-size:0.75rem;color:var(--text-muted);flex-shrink:0;">${label}</span>
+                <div style="display:flex;align-items:center;gap:6px;margin-bottom:10px;padding:2px 4px;${rowBg}">
+                    ${holidayTag}
+                    <span style="width:42px;font-size:0.75rem;color:var(--text-muted);flex-shrink:0;">${label}</span>
                     <div style="flex:1;position:relative;height:14px;background:rgba(255,255,255,0.07);border-radius:4px;overflow:hidden;">
                         <div style="position:absolute;top:0;left:0;height:100%;width:${targetPct}%;border-right:2px dashed rgba(255,255,255,0.35);"></div>
                         <div class="prod-bar-fill" data-w="${actualPct}" style="height:100%;width:0;background:${barColor};border-radius:4px;transition:width 0.55s ease;"></div>
