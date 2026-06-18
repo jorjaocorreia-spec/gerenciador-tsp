@@ -3959,6 +3959,7 @@ kbd {
 .sidebar--nav-cascade .nav-item:nth-child(7) { animation-delay: 0.40s; }
 .sidebar--nav-cascade .nav-item:nth-child(8) { animation-delay: 0.46s; }
 .sidebar--nav-cascade .nav-item:nth-child(9) { animation-delay: 0.52s; }
+.sidebar--nav-cascade .nav-item:nth-child(10) { animation-delay: 0.58s; }
 
 /* S6 — Sidebar: ícones giram ao colapsar/expandir */
 @keyframes icon-spin-in {
