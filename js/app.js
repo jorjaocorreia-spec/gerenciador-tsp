@@ -5890,6 +5890,24 @@ class AppController {
                 }).join(', ')}</span>
             </div>`
             : '';
+
+        const isMultiDay = this.prodPeriod !== 'day';
+        const periodInProgress = isMultiDay && summary.todayStr >= p.startDate && summary.todayStr <= p.endDate;
+        let paceMarkerHtml = '';
+        let paceNoteHtml = '';
+        if (periodInProgress) {
+            const expectedToDate = p.days.filter(d => d.date <= summary.todayStr).reduce((s, d) => s + d.targetMinutes, 0);
+            const pacePct = p.targetMinutes > 0 ? Math.min(100, Math.round(expectedToDate / p.targetMinutes * 100)) : 0;
+            const paceDelta = p.actualMinutes - expectedToDate;
+            const paceColor = paceDelta >= 0 ? '#4ade80' : '#f87171';
+            const paceVerb = paceDelta >= 0 ? 'acima do ritmo esperado' : 'abaixo do ritmo esperado';
+            paceMarkerHtml = `<div title="Meta esperada até hoje: ${this._prodFmtAbs(expectedToDate)}" style="position:absolute;top:-3px;bottom:-3px;left:${pacePct}%;width:2px;background:rgba(255,255,255,0.65);"></div>`;
+            paceNoteHtml = `<div style="font-size:0.85rem;margin-top:6px;">
+                <span style="font-weight:600;color:${paceColor};">${TSPProductivity.fmtMinutes(paceDelta)}</span>
+                <span class="text-muted"> ${paceVerb} (meta até hoje: ${this._prodFmtAbs(expectedToDate)})</span>
+            </div>`;
+        }
+
         const card = document.createElement('div');
         card.className = 'glass stat-card';
         card.style.marginBottom = '16px';
@@ -5898,12 +5916,14 @@ class AppController {
                 <span class="client-name">${periodLabel}: ${this._prodFmtAbs(p.actualMinutes)} / ${this._prodFmtAbs(p.targetMinutes)}</span>
                 <span style="font-weight:600;color:${deltaColor}">${deltaLabel}</span>
             </div>
-            <div class="progress-container">
+            <div class="progress-container" style="position:relative;">
                 <div class="progress-bar" style="width:${Math.min(100, pct)}%; background:${barColor};"></div>
+                ${paceMarkerHtml}
             </div>
             <div style="font-size:0.85rem;margin-top:8px;">
                 <span class="text-muted">${pct}% da meta</span>
             </div>
+            ${paceNoteHtml}
             ${holidayNote}
         `;
         return card;
