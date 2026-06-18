@@ -760,7 +760,7 @@ class TSPStore {
         const manualHolidays = await this.getHolidays();
         const manualHolidayDates = new Map(manualHolidays.map(h => [h.date, h.name]));
 
-        const todayStr = new Date().toISOString().split('T')[0];
+        const todayStr = TSPProductivity.toIsoLocal(new Date());
         const periodRange = TSPProductivity.getPeriodRange(period, refDateStr);
 
         let queryStart = periodRange.startDate;

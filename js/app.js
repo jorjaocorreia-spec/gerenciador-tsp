@@ -65,7 +65,7 @@ class AppController {
         this.agendaViewMode = localStorage.getItem('agendaViewMode') || 'schedule'; // daily, weekly, monthly or schedule
         this.aptCurrentDate = new Date().toISOString().split('T')[0]; // 'YYYY-MM-DD'
         this.prodPeriod = 'week'; // 'day' | 'week' | 'month'
-        this.prodRefDate = new Date().toISOString().split('T')[0];
+        this.prodRefDate = TSPProductivity.toIsoLocal(new Date());
         this._prodSummary = null;
         this._prodConfigHolidays = [];
         this.taskAttachments = []; // [{name, data}] — imagens em base64 do modal de tarefa
@@ -5710,7 +5710,7 @@ class AppController {
     }
 
     prodGoToToday() {
-        this.prodRefDate = new Date().toISOString().split('T')[0];
+        this.prodRefDate = TSPProductivity.toIsoLocal(new Date());
         this.renderProdutividade();
     }
 
