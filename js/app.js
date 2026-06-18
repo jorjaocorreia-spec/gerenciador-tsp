@@ -5877,10 +5877,7 @@ class AppController {
         const p = summary.period;
         const isTodayInProgress = (this.prodPeriod === 'day' && this.prodRefDate === summary.todayStr);
         const pct = p.targetMinutes > 0 ? Math.round(p.actualMinutes / p.targetMinutes * 100) : 0;
-        const deltaColor = isTodayInProgress ? 'var(--text-muted)' : (p.deltaMinutes >= 0 ? '#4ade80' : '#f87171');
-        const barColor = isTodayInProgress ? 'linear-gradient(90deg,#a855f7,#7c3aed)' : (p.deltaMinutes >= 0 ? 'linear-gradient(90deg,#22c55e,#16a34a)' : '#f87171');
         const periodLabel = { day: 'Dia', week: 'Semana', month: 'Mês' }[this.prodPeriod];
-        const deltaLabel = isTodayInProgress ? 'em andamento' : TSPProductivity.fmtMinutes(p.deltaMinutes);
         const holidayDays = p.days.filter(d => d.holidayName);
         const holidayNote = holidayDays.length > 0
             ? `<div style="font-size:0.78rem;margin-top:6px;color:#fbbf24;display:flex;align-items:center;gap:6px;">
@@ -5894,19 +5891,49 @@ class AppController {
 
         const isMultiDay = this.prodPeriod !== 'day';
         const periodInProgress = isMultiDay && summary.todayStr >= p.startDate && summary.todayStr <= p.endDate;
-        let paceMarkerHtml = '';
-        let paceNoteHtml = '';
-        if (periodInProgress) {
+
+        let barColor, deltaColor, deltaLabel, legendHtml;
+        let paceMarkerHtml = '', youMarkerHtml = '', paceNoteHtml = '';
+
+        if (isTodayInProgress) {
+            barColor = 'linear-gradient(90deg,#a855f7,#7c3aed)';
+            deltaColor = 'var(--text-muted)';
+            deltaLabel = 'em andamento';
+            legendHtml = `<span class="text-muted">${pct}% da meta</span>`;
+        } else if (periodInProgress) {
             const expectedToDate = p.days.filter(d => d.date <= summary.todayStr).reduce((s, d) => s + d.targetMinutes, 0);
             const pacePct = p.targetMinutes > 0 ? Math.min(100, Math.round(expectedToDate / p.targetMinutes * 100)) : 0;
+            const youPct = Math.min(100, pct);
             const paceDelta = p.actualMinutes - expectedToDate;
-            const paceColor = paceDelta >= 0 ? '#4ade80' : '#f87171';
-            const paceVerb = paceDelta >= 0 ? 'acima do ritmo esperado' : 'abaixo do ritmo esperado';
-            paceMarkerHtml = `<div title="Meta esperada até hoje: ${this._prodFmtAbs(expectedToDate)}" style="position:absolute;top:-3px;bottom:-3px;left:${pacePct}%;width:2px;background:rgba(255,255,255,0.65);"></div>`;
-            paceNoteHtml = `<div style="font-size:0.85rem;margin-top:6px;">
-                <span style="font-weight:600;color:${paceColor};">${TSPProductivity.fmtMinutes(paceDelta)}</span>
-                <span class="text-muted"> ${paceVerb} (meta até hoje: ${this._prodFmtAbs(expectedToDate)})</span>
+
+            let tierColor, tierMessage;
+            if (p.actualMinutes >= p.targetMinutes) {
+                tierColor = '#4ade80';
+                tierMessage = `Parabéns! Meta do período já foi atingida (${TSPProductivity.fmtMinutes(p.deltaMinutes)}).`;
+                barColor = 'linear-gradient(90deg,#22c55e,#16a34a)';
+            } else if (p.actualMinutes >= expectedToDate) {
+                tierColor = '#38bdf8';
+                tierMessage = `${TSPProductivity.fmtMinutes(paceDelta)} acima do ritmo esperado. Continue assim!`;
+                barColor = 'linear-gradient(90deg,#38bdf8,#0ea5e9)';
+            } else {
+                tierColor = '#f87171';
+                tierMessage = `${TSPProductivity.fmtMinutes(paceDelta)} abaixo do ritmo esperado — acelere o ritmo para não ficar devendo no fim do período.`;
+                barColor = '#f87171';
+            }
+            deltaColor = p.deltaMinutes >= 0 ? '#4ade80' : '#f87171';
+            deltaLabel = TSPProductivity.fmtMinutes(p.deltaMinutes);
+
+            paceMarkerHtml = `<div title="Meta esperada até hoje: ${this._prodFmtAbs(expectedToDate)}" style="position:absolute;top:-3px;bottom:-3px;left:${pacePct}%;width:3px;background:rgba(255,255,255,0.9);border-radius:1px;box-shadow:0 0 0 1px rgba(0,0,0,0.4);"></div>`;
+            youMarkerHtml = `<div title="Você está aqui: ${this._prodFmtAbs(p.actualMinutes)}" style="position:absolute;left:${youPct}%;top:-20px;transform:translateX(-50%);display:flex;flex-direction:column;align-items:center;">
+                <i data-lucide="arrow-down" style="width:16px;height:16px;color:${tierColor};"></i>
             </div>`;
+            paceNoteHtml = `<div style="font-size:0.85rem;margin-top:6px;font-weight:600;color:${tierColor};">${tierMessage}</div>`;
+            legendHtml = `<span class="text-muted">${pct}% realizado · ${pacePct}% esperado até hoje</span>`;
+        } else {
+            barColor = p.deltaMinutes >= 0 ? 'linear-gradient(90deg,#22c55e,#16a34a)' : '#f87171';
+            deltaColor = p.deltaMinutes >= 0 ? '#4ade80' : '#f87171';
+            deltaLabel = TSPProductivity.fmtMinutes(p.deltaMinutes);
+            legendHtml = `<span class="text-muted">${pct}% da meta</span>`;
         }
 
         const card = document.createElement('div');
@@ -5917,12 +5944,15 @@ class AppController {
                 <span class="client-name">${periodLabel}: ${this._prodFmtAbs(p.actualMinutes)} / ${this._prodFmtAbs(p.targetMinutes)}</span>
                 <span style="font-weight:600;color:${deltaColor}">${deltaLabel}</span>
             </div>
-            <div class="progress-container" style="position:relative;">
-                <div class="progress-bar" style="width:${Math.min(100, pct)}%; background:${barColor};"></div>
-                ${paceMarkerHtml}
+            <div style="position:relative;${youMarkerHtml ? 'margin-top:22px;' : ''}">
+                ${youMarkerHtml}
+                <div class="progress-container" style="position:relative;">
+                    <div class="progress-bar" style="width:${Math.min(100, pct)}%; background:${barColor};"></div>
+                    ${paceMarkerHtml}
+                </div>
             </div>
             <div style="font-size:0.85rem;margin-top:8px;">
-                <span class="text-muted">${pct}% da meta</span>
+                ${legendHtml}
             </div>
             ${paceNoteHtml}
             ${holidayNote}
