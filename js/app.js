@@ -64,7 +64,7 @@ class AppController {
         this.agendaCurrentDate = new Date();
         this.agendaViewMode = localStorage.getItem('agendaViewMode') || 'schedule'; // daily, weekly, monthly or schedule
         this.aptCurrentDate = new Date().toISOString().split('T')[0]; // 'YYYY-MM-DD'
-        this.prodPeriod = 'week'; // 'day' | 'week' | 'month'
+        this.prodPeriod = localStorage.getItem('prodPeriod') || 'week'; // 'day' | 'week' | 'month'
         this.prodRefDate = TSPProductivity.toIsoLocal(new Date());
         this._prodSummary = null;
         this._prodConfigHolidays = [];
@@ -5697,6 +5697,7 @@ class AppController {
 
     prodSetPeriod(period) {
         this.prodPeriod = period;
+        localStorage.setItem('prodPeriod', period);
         this.renderProdutividade();
     }
 
