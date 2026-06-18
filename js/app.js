@@ -5901,7 +5901,7 @@ class AppController {
             deltaLabel = 'em andamento';
             legendHtml = `<span class="text-muted">${pct}% da meta</span>`;
         } else if (periodInProgress) {
-            const expectedToDate = p.days.filter(d => d.date <= summary.todayStr).reduce((s, d) => s + d.targetMinutes, 0);
+            const expectedToDate = TSPProductivity.computeExpectedToDate(p.days, summary.todayStr);
             const pacePct = p.targetMinutes > 0 ? Math.min(100, Math.round(expectedToDate / p.targetMinutes * 100)) : 0;
             const youPct = Math.min(100, pct);
             const paceDelta = p.actualMinutes - expectedToDate;
@@ -5923,12 +5923,12 @@ class AppController {
             deltaColor = p.deltaMinutes >= 0 ? '#4ade80' : '#f87171';
             deltaLabel = TSPProductivity.fmtMinutes(p.deltaMinutes);
 
-            paceMarkerHtml = `<div title="Meta esperada até hoje: ${this._prodFmtAbs(expectedToDate)}" style="position:absolute;top:-3px;bottom:-3px;left:${pacePct}%;width:3px;background:rgba(255,255,255,0.9);border-radius:1px;box-shadow:0 0 0 1px rgba(0,0,0,0.4);"></div>`;
+            paceMarkerHtml = `<div title="Meta esperada até ontem: ${this._prodFmtAbs(expectedToDate)}" style="position:absolute;top:-3px;bottom:-3px;left:${pacePct}%;width:3px;background:rgba(255,255,255,0.9);border-radius:1px;box-shadow:0 0 0 1px rgba(0,0,0,0.4);"></div>`;
             youMarkerHtml = `<div title="Você está aqui: ${this._prodFmtAbs(p.actualMinutes)}" style="position:absolute;left:${youPct}%;top:-20px;transform:translateX(-50%);display:flex;flex-direction:column;align-items:center;">
                 <i data-lucide="arrow-down" style="width:16px;height:16px;color:${tierColor};"></i>
             </div>`;
             paceNoteHtml = `<div style="font-size:0.85rem;margin-top:6px;font-weight:600;color:${tierColor};">${tierMessage}</div>`;
-            legendHtml = `<span class="text-muted">${pct}% realizado · ${pacePct}% esperado até hoje</span>`;
+            legendHtml = `<span class="text-muted">${pct}% realizado · ${pacePct}% esperado até ontem</span>`;
         } else {
             barColor = p.deltaMinutes >= 0 ? 'linear-gradient(90deg,#22c55e,#16a34a)' : '#f87171';
             deltaColor = p.deltaMinutes >= 0 ? '#4ade80' : '#f87171';
