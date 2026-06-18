@@ -5792,6 +5792,28 @@ class AppController {
         return `${h}h ${String(m).padStart(2, '0')}min`;
     }
 
+    _prodFormatPeriodLabel(period, refDateStr) {
+        const monthNames = ['janeiro','fevereiro','março','abril','maio','junho','julho','agosto','setembro','outubro','novembro','dezembro'];
+        const parseLocal = (iso) => new Date(iso + 'T12:00:00');
+        const range = TSPProductivity.getPeriodRange(period, refDateStr);
+        const start = parseLocal(range.startDate);
+        if (period === 'day') {
+            return `${start.getDate()} de ${monthNames[start.getMonth()]} de ${start.getFullYear()}`;
+        }
+        if (period === 'month') {
+            const name = monthNames[start.getMonth()];
+            return `${name.charAt(0).toUpperCase() + name.slice(1)} de ${start.getFullYear()}`;
+        }
+        const end = parseLocal(range.endDate);
+        if (start.getFullYear() !== end.getFullYear()) {
+            return `${start.getDate()} de ${monthNames[start.getMonth()]} de ${start.getFullYear()} a ${end.getDate()} de ${monthNames[end.getMonth()]} de ${end.getFullYear()}`;
+        }
+        if (start.getMonth() !== end.getMonth()) {
+            return `${start.getDate()} de ${monthNames[start.getMonth()]} a ${end.getDate()} de ${monthNames[end.getMonth()]} de ${end.getFullYear()}`;
+        }
+        return `${start.getDate()} a ${end.getDate()} de ${monthNames[start.getMonth()]} de ${start.getFullYear()}`;
+    }
+
     async renderProdutividade() {
         if (this.currentView !== 'produtividade') return;
         const container = document.getElementById('produtividade-container');
@@ -5801,6 +5823,9 @@ class AppController {
         document.querySelectorAll('#prod-period-tabs button[data-period]').forEach(btn => {
             btn.classList.toggle('active-mode', btn.dataset.period === this.prodPeriod);
         });
+
+        const labelEl = document.getElementById('prod-period-label');
+        if (labelEl) labelEl.textContent = this._prodFormatPeriodLabel(this.prodPeriod, this.prodRefDate);
 
         try {
             const summary = await store.getProductivitySummary(this.prodPeriod, this.prodRefDate);

@@ -2598,6 +2598,7 @@ kbd {
 
 .apontamentos-date-nav { display: flex; align-items: center; gap: 8px; }
 .apt-date-label { font-weight: 600; min-width: 160px; text-align: center; font-size: 0.95rem; }
+.prod-period-label { min-width: 220px; }
 
 .apt-table { border-radius: var(--radius); overflow: hidden; }
 .apt-table-header,
