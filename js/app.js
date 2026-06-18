@@ -5947,13 +5947,18 @@ class AppController {
             const holidayTag = isHoliday
                 ? `<i data-lucide="calendar-x" title="Feriado: ${escapeHtml(d.holidayName)}" style="width:13px;height:13px;color:#fbbf24;flex-shrink:0;"></i>`
                 : `<span style="width:13px;flex-shrink:0;"></span>`;
+            const targetMarker = d.targetMinutes > 0
+                ? `<div title="Meta do dia: ${this._prodFmtAbs(d.targetMinutes)}" style="position:absolute;top:-3px;bottom:-3px;left:${targetPct}%;width:3px;background:rgba(255,255,255,0.9);border-radius:1px;box-shadow:0 0 0 1px rgba(0,0,0,0.4);"></div>`
+                : '';
             return `
                 <div style="display:flex;align-items:center;gap:6px;margin-bottom:10px;padding:2px 4px;${rowBg}">
                     ${holidayTag}
                     <span style="width:42px;font-size:0.75rem;color:var(--text-muted);flex-shrink:0;">${label}</span>
-                    <div style="flex:1;position:relative;height:14px;background:rgba(255,255,255,0.07);border-radius:4px;overflow:hidden;">
-                        <div style="position:absolute;top:0;left:0;height:100%;width:${targetPct}%;border-right:2px dashed rgba(255,255,255,0.35);"></div>
-                        <div class="prod-bar-fill" data-w="${actualPct}" style="height:100%;width:0;background:${barColor};border-radius:4px;transition:width 0.55s ease;"></div>
+                    <div style="flex:1;position:relative;">
+                        <div style="position:relative;height:14px;background:rgba(255,255,255,0.07);border-radius:4px;overflow:hidden;">
+                            <div class="prod-bar-fill" data-w="${actualPct}" style="height:100%;width:0;background:${barColor};border-radius:4px;transition:width 0.55s ease;"></div>
+                        </div>
+                        ${targetMarker}
                     </div>
                     <span style="width:90px;text-align:right;font-size:0.78rem;color:var(--text-muted);flex-shrink:0;">${this._prodFmtAbs(d.actualMinutes)}</span>
                 </div>`;
