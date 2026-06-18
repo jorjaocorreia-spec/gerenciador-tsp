@@ -50,4 +50,27 @@ assert.deepStrictEqual(P.getPeriodRange('month', '2026-06-17'), { startDate: '20
 assert.strictEqual(P.fmtMinutes(90), '+1h 30min');
 assert.strictEqual(P.fmtMinutes(-45), '-0h 45min');
 
+// computeExpectedToDate — exclui o dia de hoje do esperado
+const daysForExpected = [
+    { date: '2026-06-15', targetMinutes: 528 },
+    { date: '2026-06-16', targetMinutes: 528 },
+    { date: '2026-06-17', targetMinutes: 528 },
+    { date: '2026-06-18', targetMinutes: 528 },
+    { date: '2026-06-19', targetMinutes: 528 },
+];
+// hoje = 17/06: soma só 15/06 e 16/06 (dias antes de hoje), nunca o próprio dia 17
+assert.strictEqual(P.computeExpectedToDate(daysForExpected, '2026-06-17'), 528 * 2);
+// hoje = 15/06 (primeiro dia do período): nenhum dia anterior -> 0
+assert.strictEqual(P.computeExpectedToDate(daysForExpected, '2026-06-15'), 0);
+// hoje = 20/06 (depois do período inteiro): soma todos os 5 dias
+assert.strictEqual(P.computeExpectedToDate(daysForExpected, '2026-06-20'), 528 * 5);
+// dias sem meta (fim de semana/feriado, targetMinutes=0) não somam nada
+const daysWithWeekend = [
+    { date: '2026-06-19', targetMinutes: 528 },
+    { date: '2026-06-20', targetMinutes: 0 }, // sábado
+    { date: '2026-06-21', targetMinutes: 0 }, // domingo
+    { date: '2026-06-22', targetMinutes: 528 },
+];
+assert.strictEqual(P.computeExpectedToDate(daysWithWeekend, '2026-06-22'), 528);
+
 console.log('productivity-calc.test.js: todos os testes passaram');
