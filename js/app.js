@@ -5681,11 +5681,40 @@ class AppController {
         return { minutes, label };
     }
 
+    // Almoço fixo 12:00-13:30; apontamentos que cruzam totalmente esse intervalo
+    // são lançados como dois registros (manhã + tarde) para já excluir o almoço do total.
+    splitApontamentoForLunch(startTime, endTime) {
+        const LUNCH_START = '12:00', LUNCH_END = '13:30';
+        if (startTime && endTime && startTime < LUNCH_START && endTime > LUNCH_END) {
+            return [
+                { startTime, endTime: LUNCH_START },
+                { startTime: LUNCH_END, endTime }
+            ];
+        }
+        return [{ startTime, endTime }];
+    }
+
     updateAptDuration() {
         const start = document.getElementById('apt-start')?.value;
         const end = document.getElementById('apt-end')?.value;
         const el = document.getElementById('apt-duration');
-        if (el) el.textContent = this.calcDuration(start, end).label;
+        const hint = document.getElementById('apt-lunch-split-hint');
+        const segments = this.splitApontamentoForLunch(start, end);
+        if (el) {
+            const totalMinutes = segments.reduce((sum, s) => sum + this.calcDuration(s.startTime, s.endTime).minutes, 0);
+            const h = Math.floor(totalMinutes / 60);
+            const m = totalMinutes % 60;
+            el.textContent = totalMinutes > 0 ? (h > 0 ? `${h}h${m > 0 ? String(m).padStart(2, '0') : ''}` : `${m}min`) : '--';
+        }
+        if (hint) {
+            if (segments.length === 2) {
+                hint.style.display = 'block';
+                hint.textContent = `Será lançado como 2 apontamentos: ${segments[0].startTime}–${segments[0].endTime} e ${segments[1].startTime}–${segments[1].endTime} (almoço de 12:00–13:30 já excluído).`;
+            } else {
+                hint.style.display = 'none';
+                hint.textContent = '';
+            }
+        }
     }
 
     aptNavigateDay(delta) {
@@ -6193,8 +6222,11 @@ class AppController {
         document.getElementById('apt-project').value = '';
         document.getElementById('apt-description').value = '';
         document.getElementById('apt-duration').textContent = '--';
+        this._editingAptTaskIds = null;
         await this.populateAptProjectList();
         this.openModal('modal-apontamento');
+        const hint = document.getElementById('apt-lunch-split-hint');
+        if (hint) { hint.style.display = 'none'; hint.textContent = ''; }
         setTimeout(() => this.onAptDescInput(), 50);
     }
 
@@ -6209,9 +6241,10 @@ class AppController {
         document.getElementById('apt-end').value = item.endTime;
         document.getElementById('apt-project').value = item.projectNum;
         document.getElementById('apt-description').value = item.description;
-        document.getElementById('apt-duration').textContent = this.calcDuration(item.startTime, item.endTime).label;
+        this._editingAptTaskIds = item.taskIds || [];
         await this.populateAptProjectList();
         this.openModal('modal-apontamento');
+        this.updateAptDuration();
         setTimeout(() => this.onAptDescInput(), 50);
     }
 
@@ -6229,17 +6262,26 @@ class AppController {
             return;
         }
 
+        const segments = this.splitApontamentoForLunch(startTime, endTime);
+        const taskIds = (id && this._editingAptTaskIds) || [];
+
         const btn = e.target.querySelector('[type="submit"]');
         btn.disabled = true;
         try {
-            if (id) {
-                await store.updateApontamento(id, date, startTime, endTime, projectNum, description);
+            if (segments.length === 2) {
+                if (id) await store.deleteApontamento(id);
+                for (const seg of segments) {
+                    await store.addApontamento(date, seg.startTime, seg.endTime, projectNum, description, taskIds);
+                }
+            } else if (id) {
+                await store.updateApontamento(id, date, startTime, endTime, projectNum, description, taskIds);
             } else {
                 await store.addApontamento(date, startTime, endTime, projectNum, description);
             }
+            this._editingAptTaskIds = null;
             this.closeModal('modal-apontamento');
             await this.renderApontamentos();
-            Toast.show(id ? 'Apontamento atualizado.' : 'Apontamento salvo.', 'success');
+            Toast.show(segments.length === 2 ? '2 apontamentos salvos (manhã e tarde, almoço excluído).' : (id ? 'Apontamento atualizado.' : 'Apontamento salvo.'), 'success');
         } catch (err) {
             Toast.show('Erro ao salvar: ' + err.message, 'error');
         } finally {
