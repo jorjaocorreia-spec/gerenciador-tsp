@@ -1979,6 +1979,9 @@ class AppController {
                     const isCritical = b.totalAppliedH > b.totalContractedH ? 'over-limit' : '';
                     const startLabel = new Date(client.balanceStartDate + 'T00:00:00')
                         .toLocaleDateString('pt-BR', { month: '2-digit', year: 'numeric' });
+                    const totalBillingLineHtml = client.billingModel === 'hourly'
+                        ? `<div style="font-size: 0.78rem; margin-top: 4px;"><span class="money-value" style="color: #4ade80; font-weight: 600;">R$ ${(b.totalAppliedH * (client.hourlyRate || 0)).toFixed(2).replace('.', ',')}</span> <span class="text-muted">faturado (total acumulado)</span></div>`
+                        : '';
                     card.innerHTML = `
                         <div class="stat-header">
                             <span class="client-name">${escapeHtml(client.name)}</span>
@@ -1992,12 +1995,16 @@ class AppController {
                             <span class="text-muted">${client.hoursTotal}h mensais contratadas</span>
                         </div>
                         <div style="font-size: 0.78rem; color: var(--text-muted); margin-top: 4px;">Controle na plataforma desde ${startLabel} · ${b.monthsCount} ${b.monthsCount === 1 ? 'mês' : 'meses'}</div>
+                        ${totalBillingLineHtml}
                     `;
                 } else {
                     // Sem balanceStartDate: exibe total histórico sem cálculo de saldo
                     const totalApplied = allRecords
                         .filter(r => r.clientId === client.id)
                         .reduce((s, r) => s + r.minutes, 0) / 60;
+                    const totalBillingLineHtml = client.billingModel === 'hourly'
+                        ? `<div style="font-size: 0.78rem; margin-top: 4px;"><span class="money-value" style="color: #4ade80; font-weight: 600;">R$ ${(totalApplied * (client.hourlyRate || 0)).toFixed(2).replace('.', ',')}</span> <span class="text-muted">faturado (total histórico)</span></div>`
+                        : '';
                     card.innerHTML = `
                         <div class="stat-header">
                             <span class="client-name">${escapeHtml(client.name)}</span>
@@ -2005,6 +2012,7 @@ class AppController {
                         </div>
                         <div style="border-top: 1px solid rgba(255,255,255,0.06); margin: 10px 0;"></div>
                         <div style="font-size: 0.85rem; color: var(--text-muted);">${totalApplied.toFixed(1)}h aplicadas (total histórico)</div>
+                        ${totalBillingLineHtml}
                     `;
                 }
                 container.appendChild(card);
@@ -2071,6 +2079,10 @@ class AppController {
             // para evitar a ilusão de "dois carregamentos" (cards vazios → dados aparecem)
             const barWidth = slideDir ? `${stat.percentage}%` : '0%';
             const hoursLabel = slideDir ? `${stat.hoursUsed}h / ${stat.hoursTotal}h` : `0h / ${stat.hoursTotal}h`;
+            const dashBillingLineHtml = stat.client.billingModel === 'hourly'
+                ? `<div style="font-size: 0.8rem; margin-top: 6px;"><span class="money-value" style="color: #4ade80; font-weight: 600;">R$ ${(stat.hoursUsed * (stat.client.hourlyRate || 0)).toFixed(2).replace('.', ',')}</span> <span class="text-muted">faturado no mês</span></div>`
+                : '';
+
             card.innerHTML = `
                 <div class="stat-header">
                     <span class="client-name">${escapeHtml(stat.client.name)}</span>
@@ -2083,6 +2095,7 @@ class AppController {
                     <span class="text-muted">${stat.percentage}% utilizado</span>
                     <span class="text-muted">${stat.hoursRemaining}h restantes</span>
                 </div>
+                ${dashBillingLineHtml}
             `;
             container.appendChild(card);
 
