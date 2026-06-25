@@ -2875,6 +2875,28 @@ class AppController {
         }
     }
 
+    // Agrupa registros consecutivos do mesmo cliente/data/descrição (ex.: ata com múltiplos horários
+    // mas uma única descrição do dia) para exibição sem repetir o texto longo em cada linha.
+    _groupRecordsByDescription(records) {
+        const sorted = [...records].sort((a, b) => {
+            const d = new Date(b.date) - new Date(a.date);
+            if (d !== 0) return d;
+            return (a.startTime || '').localeCompare(b.startTime || '');
+        });
+        const groups = [];
+        let current = null;
+        sorted.forEach(r => {
+            const key = `${r.clientId}|${r.date}|${(r.description || '').trim()}`;
+            if (current && current.key === key) {
+                current.records.push(r);
+            } else {
+                current = { key, records: [r] };
+                groups.push(current);
+            }
+        });
+        return groups;
+    }
+
     async renderRecords(preloadedClients) {
         const tbody = document.querySelector('#records-table tbody');
         this._skTable(tbody, 5, 6);
@@ -2911,33 +2933,42 @@ class AppController {
         const clientsMap = {};
         clientsList.forEach(c => { clientsMap[c.id] = c; });
 
-        records.forEach(r => {
-            const client = clientsMap[r.clientId];
-            const clientName = client ? escapeHtml(client.name) : '&lt;Deletado&gt;';
-            const hoursStr = (r.minutes / 60).toFixed(2) + 'h';
-            const timeRange = (r.startTime && r.endTime) ? `<br><small class="text-muted">${r.startTime} às ${r.endTime}</small>` : '';
+        const groups = this._groupRecordsByDescription(records);
+        groups.forEach(group => {
+            const groupSize = group.records.length;
+            group.records.forEach((r, idx) => {
+                const client = clientsMap[r.clientId];
+                const clientName = client ? escapeHtml(client.name) : '&lt;Deletado&gt;';
+                const hoursStr = (r.minutes / 60).toFixed(2) + 'h';
+                const timeRange = (r.startTime && r.endTime) ? `<br><small class="text-muted">${r.startTime} às ${r.endTime}</small>` : '';
+                const partLabel = groupSize > 1 ? `<br><small class="text-muted" style="opacity:.7">Parte ${idx + 1}/${groupSize}</small>` : '';
 
-            const tr = document.createElement('tr');
-            tr.innerHTML = `
-                <td>${r.date.split('-').reverse().join('/')}${timeRange}</td>
-                <td><strong>${clientName}</strong></td>
-                <td>${escapeHtml(r.description)}</td>
-                <td class="hours-flip">${r.minutes} min <span class="text-muted">(${hoursStr})</span></td>
-                <td>
-                    <div style="display: flex; gap: 8px;">
-                        <button class="btn btn-secondary" onclick="app.handleViewRecord('${r.id}')" style="padding: 6px 10px; font-size: 0.8rem;" title="Visualizar">
-                            <i data-lucide="eye" style="width: 16px; height: 16px;"></i>
-                        </button>
-                        <button class="btn btn-primary" onclick="app.handleEditRecord('${r.id}')" style="padding: 6px 10px; font-size: 0.8rem;" title="Editar">
-                            <i data-lucide="pencil" style="width: 16px; height: 16px;"></i>
-                        </button>
-                        <button class="btn btn-danger" onclick="app.handleDeleteRecord('${r.id}', this)" style="padding: 6px 10px; font-size: 0.8rem;" title="Apagar">
-                            <i data-lucide="trash-2" style="width: 16px; height: 16px;"></i>
-                        </button>
-                    </div>
-                </td>
-            `;
-            tbody.appendChild(tr);
+                const tr = document.createElement('tr');
+                if (idx === 0 && groupSize > 1) tr.classList.add('record-group-start');
+                const descCell = idx === 0
+                    ? `<td rowspan="${groupSize}" class="grouped-desc-cell">${escapeHtml(r.description)}</td>`
+                    : '';
+                tr.innerHTML = `
+                    <td>${r.date.split('-').reverse().join('/')}${timeRange}${partLabel}</td>
+                    <td><strong>${clientName}</strong></td>
+                    ${descCell}
+                    <td class="hours-flip">${r.minutes} min <span class="text-muted">(${hoursStr})</span></td>
+                    <td>
+                        <div style="display: flex; gap: 8px;">
+                            <button class="btn btn-secondary" onclick="app.handleViewRecord('${r.id}')" style="padding: 6px 10px; font-size: 0.8rem;" title="Visualizar">
+                                <i data-lucide="eye" style="width: 16px; height: 16px;"></i>
+                            </button>
+                            <button class="btn btn-primary" onclick="app.handleEditRecord('${r.id}')" style="padding: 6px 10px; font-size: 0.8rem;" title="Editar">
+                                <i data-lucide="pencil" style="width: 16px; height: 16px;"></i>
+                            </button>
+                            <button class="btn btn-danger" onclick="app.handleDeleteRecord('${r.id}', this)" style="padding: 6px 10px; font-size: 0.8rem;" title="Apagar">
+                                <i data-lucide="trash-2" style="width: 16px; height: 16px;"></i>
+                            </button>
+                        </div>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
         });
 
         // Totalizador
@@ -3056,21 +3087,26 @@ class AppController {
         const clientsMap = {};
         allClients.forEach(c => { clientsMap[c.id] = c; });
 
-        records.forEach(r => {
-            const client = clientsMap[r.clientId];
-            const clientName = client ? client.name : '<Deletado>';
-            const hoursStr = (r.minutes / 60).toFixed(2) + 'h';
-            const timeRange = (r.startTime && r.endTime) ? `\n${r.startTime} às ${r.endTime}` : '';
+        const groups = this._groupRecordsByDescription(records);
+        groups.forEach(group => {
+            const groupSize = group.records.length;
+            group.records.forEach((r, idx) => {
+                const client = clientsMap[r.clientId];
+                const clientName = client ? client.name : '<Deletado>';
+                const hoursStr = (r.minutes / 60).toFixed(2) + 'h';
+                const timeRange = (r.startTime && r.endTime) ? `\n${r.startTime} às ${r.endTime}` : '';
+                const partLabel = groupSize > 1 ? `\nParte ${idx + 1}/${groupSize}` : '';
 
-            const dateText = `${r.date.split('-').reverse().join('/')}${timeRange}`;
-            const timeText = `${r.minutes} min\n(${hoursStr})`;
+                const dateText = `${r.date.split('-').reverse().join('/')}${timeRange}${partLabel}`;
+                const timeText = `${r.minutes} min\n(${hoursStr})`;
 
-            tableRows.push([
-                dateText,
-                clientName,
-                r.description,
-                timeText
-            ]);
+                const row = [dateText, clientName];
+                if (idx === 0) {
+                    row.push(groupSize > 1 ? { content: r.description, rowSpan: groupSize, styles: { valign: 'top' } } : r.description);
+                }
+                row.push(timeText);
+                tableRows.push(row);
+            });
         });
 
         doc.autoTable({
@@ -3168,30 +3204,39 @@ class AppController {
 
         const records = monthData.records.sort((a, b) => new Date(b.date) - new Date(a.date));
 
-        records.forEach(r => {
-            const hoursStr = (r.minutes / 60).toFixed(2) + 'h';
-            const timeRange = (r.startTime && r.endTime) ? `<br><small class="text-muted">${r.startTime} às ${r.endTime}</small>` : '';
+        const groups = this._groupRecordsByDescription(records);
+        groups.forEach(group => {
+            const groupSize = group.records.length;
+            group.records.forEach((r, idx) => {
+                const hoursStr = (r.minutes / 60).toFixed(2) + 'h';
+                const timeRange = (r.startTime && r.endTime) ? `<br><small class="text-muted">${r.startTime} às ${r.endTime}</small>` : '';
+                const partLabel = groupSize > 1 ? `<br><small class="text-muted" style="opacity:.7">Parte ${idx + 1}/${groupSize}</small>` : '';
 
-            const tr = document.createElement('tr');
-            tr.innerHTML = `
-                <td>${r.date.split('-').reverse().join('/')}${timeRange}</td>
-                <td>${escapeHtml(r.description)}</td>
-                <td class="hours-flip">${r.minutes} min <span class="text-muted">(${hoursStr})</span></td>
-                <td>
-                    <div style="display: flex; gap: 8px;">
-                        <button class="btn btn-secondary" onclick="app.handleViewRecord('${r.id}')" style="padding: 6px 10px; font-size: 0.8rem;" title="Visualizar">
-                            <i data-lucide="eye" style="width: 16px; height: 16px;"></i>
-                        </button>
-                        <button class="btn btn-primary" onclick="app.handleEditRecord('${r.id}')" style="padding: 6px 10px; font-size: 0.8rem;" title="Editar">
-                            <i data-lucide="pencil" style="width: 16px; height: 16px;"></i>
-                        </button>
-                        <button class="btn btn-danger" onclick="app.handleDeleteRecord('${r.id}', this)" style="padding: 6px 10px; font-size: 0.8rem;" title="Apagar">
-                            <i data-lucide="trash-2" style="width: 16px; height: 16px;"></i>
-                        </button>
-                    </div>
-                </td>
-            `;
-            tbody.appendChild(tr);
+                const tr = document.createElement('tr');
+                if (idx === 0 && groupSize > 1) tr.classList.add('record-group-start');
+                const descCell = idx === 0
+                    ? `<td rowspan="${groupSize}" class="grouped-desc-cell">${escapeHtml(r.description)}</td>`
+                    : '';
+                tr.innerHTML = `
+                    <td>${r.date.split('-').reverse().join('/')}${timeRange}${partLabel}</td>
+                    ${descCell}
+                    <td class="hours-flip">${r.minutes} min <span class="text-muted">(${hoursStr})</span></td>
+                    <td>
+                        <div style="display: flex; gap: 8px;">
+                            <button class="btn btn-secondary" onclick="app.handleViewRecord('${r.id}')" style="padding: 6px 10px; font-size: 0.8rem;" title="Visualizar">
+                                <i data-lucide="eye" style="width: 16px; height: 16px;"></i>
+                            </button>
+                            <button class="btn btn-primary" onclick="app.handleEditRecord('${r.id}')" style="padding: 6px 10px; font-size: 0.8rem;" title="Editar">
+                                <i data-lucide="pencil" style="width: 16px; height: 16px;"></i>
+                            </button>
+                            <button class="btn btn-danger" onclick="app.handleDeleteRecord('${r.id}', this)" style="padding: 6px 10px; font-size: 0.8rem;" title="Apagar">
+                                <i data-lucide="trash-2" style="width: 16px; height: 16px;"></i>
+                            </button>
+                        </div>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
         });
     }
 

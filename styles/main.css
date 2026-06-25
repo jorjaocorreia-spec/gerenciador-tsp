@@ -2139,6 +2139,18 @@ h4 {
   vertical-align: middle;
 }
 
+/* Atendimentos: célula de descrição com rowspan (registros agrupados por mesma descrição/dia) */
+.grouped-desc-cell {
+  vertical-align: top !important;
+  background: rgba(99, 102, 241, 0.04);
+  border-left: 2px solid rgba(99, 102, 241, 0.35);
+}
+
+/* Separador visual entre grupos de registros consecutivos */
+tr.record-group-start td {
+  border-top: 1px solid rgba(255, 255, 255, 0.12);
+}
+
 /* Skeleton do kanban */
 .sk-kb-card {
   background: var(--kb-card-bg);
