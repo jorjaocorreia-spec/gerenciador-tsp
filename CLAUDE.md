@@ -158,7 +158,7 @@ Todas têm `user_id uuid references auth.users` + RLS ativa (`auth.uid() = user_
 | `tickets` | id, user_id, ticket_id, ticket_number, title, status, priority, queue, customer_name, owner, created_at_otobo, updated_at_otobo, raw_data JSONB, linked_client_id, synced_at |
 | `user_ai_config` | user_id (PK), provider (openai\|anthropic), api_key TEXT, model TEXT, updated_at |
 
-### Fases implementadas (1–42, todas ✅)
+### Fases implementadas (1–44, todas ✅)
 
 | Fases | Funcionalidade |
 |-------|---------------|
@@ -191,6 +191,7 @@ Todas têm `user_id uuid references auth.users` + RLS ativa (`auth.uid() = user_
 | 41 | Cobertura de agenda: panorama vs contrato mensal por cliente |
 | 42 | RSVP na agenda (Sim/Talvez/Não) + toggle hide declinados |
 | 43 | Produtividade: meta semanal vs apontamentos, feriados nacionais/manuais, saldo acumulado, export PDF |
+| 44 | Cobrança "Por Hora" por cliente: `billing_model`/`hourly_rate`, toggle no modal, exibição em Clientes/Dashboard sem comissão |
 
 ---
 
@@ -341,6 +342,9 @@ O `docker-entrypoint.sh` injeta essas vars em `js/config.js` via `envsubst` na i
 - **Saldo de horas: `openSaldoPanel()` carrega `store.getRecords()` inteiro** — busca todos os registros do usuário de uma vez para evitar N queries. Com muitos registros isso pode ser lento; filtragem por `clientId` é feita em memória via `Array.filter`. Botão `#btn-open-saldo` está no header da view Clientes.
 - **`_computeClientStats` retorna `hoursUsed` em HORAS, não minutos** — `hoursUsed = totalMinutesUsed / 60`. Qualquer código que consome `batchStats` e exibe tempo deve usar uma função `fmtHours(hours)` que converte internamente via `Math.round(hours * 60)` → h + min. `client.hoursTotal` também está em horas. Nunca fazer `hoursUsed / (hoursTotal * 60)` para percentual — o correto é `hoursUsed / hoursTotal`.
 
+- **Cobrança Por Hora: migration obrigatória antes do deploy** — sem `billing_model` e `hourly_rate` na tabela `clients`, `addClient`/`updateClient` lançarão erro 400. Rodar: `ALTER TABLE clients ADD COLUMN IF NOT EXISTS billing_model TEXT DEFAULT 'fixed', ADD COLUMN IF NOT EXISTS hourly_rate NUMERIC DEFAULT 0;`. Clientes existentes ficam automaticamente em `billing_model = 'fixed'` — nenhuma mudança de comportamento para eles.
+- **Cobrança Por Hora: sem comissão** — diferente do modelo Valor Fixo (43% + bônus), o modelo Por Hora (`billing_model === 'hourly'`) calcula apenas `hoursUsed × hourlyRate` como valor faturado; não há cálculo de comissão do consultor para esse modelo. `toggleBillingModel()` em `js/app.js` esconde/mostra os blocos de campos no modal de cliente; chamado no `onchange` dos radios, em `openEditClientModal()` e em `closeModal('modal-client')` (este último porque `form.reset()` não desfaz `style.display` setado via JS).
+
 - **Kanban: `position` deve ser migrado antes do deploy** — sem a migration SQL (`ADD COLUMN position INTEGER DEFAULT 0` + `ADD COLUMN labels JSONB DEFAULT '[]'` + `ADD COLUMN checklist JSONB DEFAULT '[]'` + `ADD COLUMN cover_color TEXT`), o `getTasks()` retorna erro 400 e a view Tarefas fica em branco. Rodar no Supabase SQL Editor antes de qualquer deploy da Fase 17.
 - **Kanban: `reorderTasks()` usa `Promise.all` de `UPDATE` individuais** — não usar `upsert`: o `upsert` com RLS no Supabase verifica política de INSERT mesmo para linhas existentes, causando erro silencioso. Cada task recebe seu próprio `.update({ status, position }).eq('id', ...).eq('user_id', ...)`.
 - **Kanban DnD: placeholder intercepta seus próprios eventos** — `kb-drag-placeholder` precisa de `dragover` com `stopPropagation` para evitar que o evento borbulhe até a dropzone. Sem isso, `allowDrop` (dropzone) move o placeholder para o final da coluna toda vez que o mouse passa sobre ele, causando flickering em loop.
@@ -457,7 +461,6 @@ Padrões implementados em `styles/main.css` + `js/app.js`. Regras de UI ativas: 
 - **Monitorar no OTOBO** — coluna `monitored BOOLEAN` em `tickets`; tickets monitorados destacados na view Chamados com badge/seção separada.
 - **Lançar chamado OTOBO como Implementação** — botão no footer do `modal-chamado` (só quando `linked_client_id` existe) que pré-preenche `modal-implementation` com dados do ticket. Sem migration necessária.
 - **Painel de Posição de Projeto por Cliente** — ver spec em [Documentation/fase43-painel-posicao-projeto.md](Documentation/fase43-painel-posicao-projeto.md).
-- **Cobrança "Por Hora" por cliente** — novo modelo de cobrança (coexistindo com o "Valor Fixo" atual): campo `hourly_rate` por cliente, valor faturado no mês calculado a partir de `hoursUsed × hourly_rate` (mesma fonte de horas do Dashboard/Clientes, sem comissão). Design completo aprovado em [docs/superpowers/specs/2026-06-25-cobranca-por-hora-design.md](docs/superpowers/specs/2026-06-25-cobranca-por-hora-design.md); falta apenas o plano de implementação.
 
 ---
 
