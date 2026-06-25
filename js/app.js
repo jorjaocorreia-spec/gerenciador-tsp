@@ -444,6 +444,7 @@ class AppController {
             document.getElementById('client-id').value = '';
             document.getElementById('modal-client-title').innerText = 'Novo Cliente';
             this.switchClientModalTab('dados');
+            this.toggleBillingModel();
         }
         if (modalId === 'modal-scheduling-rule') {
             document.getElementById('form-scheduling-rule').reset();
@@ -550,6 +551,8 @@ class AppController {
         const csName = document.getElementById('client-cs').value;
         const clientPays = document.getElementById('client-pays').value;
         const consultantBonus = document.getElementById('consultant-bonus').value;
+        const billingModel = document.getElementById('billing-model-hourly').checked ? 'hourly' : 'fixed';
+        const hourlyRate = document.getElementById('client-hourly-rate').value;
         const notes = document.getElementById('client-notes').value;
         const status = document.getElementById('client-status').value;
         const otoboCustomerId = document.getElementById('client-otobo-id').value.trim();
@@ -570,9 +573,9 @@ class AppController {
         this._btnPending(btn);
         try {
             if (id) {
-                await store.updateClient(id, name, hours, csName, projectNum, clientPays, consultantBonus, notes, status, initialBalanceMinutes, balanceStartDate || null, otoboCustomerId || null);
+                await store.updateClient(id, name, hours, csName, projectNum, clientPays, consultantBonus, notes, status, initialBalanceMinutes, balanceStartDate || null, otoboCustomerId || null, billingModel, hourlyRate);
             } else {
-                await store.addClient(name, hours, csName, projectNum, clientPays, consultantBonus, notes, status, initialBalanceMinutes, balanceStartDate || null, otoboCustomerId || null);
+                await store.addClient(name, hours, csName, projectNum, clientPays, consultantBonus, notes, status, initialBalanceMinutes, balanceStartDate || null, otoboCustomerId || null, billingModel, hourlyRate);
             }
             await this._btnSuccess(btn);
             e.target.reset();
@@ -601,6 +604,13 @@ class AppController {
             inputReceives.value = '';
             inputTotal.value = '';
         }
+    }
+
+    toggleBillingModel() {
+        const isHourly = document.getElementById('billing-model-hourly').checked;
+        document.getElementById('field-client-pays').style.display = isHourly ? 'none' : '';
+        document.getElementById('row-consultant-fields').style.display = isHourly ? 'none' : '';
+        document.getElementById('field-hourly-rate').style.display = isHourly ? '' : 'none';
     }
 
     onCentesimalToggle() {
@@ -2347,6 +2357,10 @@ class AppController {
         document.getElementById('client-cs').value = client.csName || '';
         document.getElementById('client-pays').value = client.clientPays || '';
         document.getElementById('consultant-bonus').value = client.consultantBonus || '';
+        document.getElementById('client-hourly-rate').value = client.hourlyRate || '';
+        document.getElementById('billing-model-hourly').checked = client.billingModel === 'hourly';
+        document.getElementById('billing-model-fixed').checked = client.billingModel !== 'hourly';
+        this.toggleBillingModel();
         document.getElementById('client-notes').value = client.notes || '';
         document.getElementById('client-status').value = client.status || 'active';
         document.getElementById('client-otobo-id').value = client.otoboCustomerId || '';
