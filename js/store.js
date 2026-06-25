@@ -9,6 +9,8 @@ class TSPStore {
             csName: r.cs_name || '', projectNum: r.project_num || '',
             clientPays: parseFloat(r.client_pays) || 0,
             consultantBonus: parseFloat(r.consultant_bonus) || 0,
+            billingModel: r.billing_model || 'fixed',
+            hourlyRate: parseFloat(r.hourly_rate) || 0,
             notes: r.notes || '', status: r.status || 'active',
             initialBalanceMinutes: parseInt(r.initial_balance_minutes) || 0,
             balanceStartDate: r.balance_start_date || null,
@@ -94,7 +96,7 @@ class TSPStore {
         return this._client(data);
     }
 
-    async addClient(name, hoursTotal, csName, projectNum, clientPays, consultantBonus, notes, status, initialBalanceMinutes, balanceStartDate, otoboCustomerId) {
+    async addClient(name, hoursTotal, csName, projectNum, clientPays, consultantBonus, notes, status, initialBalanceMinutes, balanceStartDate, otoboCustomerId, billingModel, hourlyRate) {
         const { data, error } = await this.db.from('clients').insert({
             user_id: this.userId, name,
             hours_total: parseFloat(hoursTotal) || 0, cs_name: csName || '',
@@ -103,13 +105,15 @@ class TSPStore {
             notes: notes || '', status: status || 'active',
             initial_balance_minutes: parseInt(initialBalanceMinutes) || 0,
             balance_start_date: balanceStartDate || null,
-            otobo_customer_id: otoboCustomerId || null
+            otobo_customer_id: otoboCustomerId || null,
+            billing_model: billingModel || 'fixed',
+            hourly_rate: parseFloat(hourlyRate) || 0
         }).select().single();
         if (error) throw error;
         return this._client(data);
     }
 
-    async updateClient(id, name, hoursTotal, csName, projectNum, clientPays, consultantBonus, notes, status, initialBalanceMinutes, balanceStartDate, otoboCustomerId) {
+    async updateClient(id, name, hoursTotal, csName, projectNum, clientPays, consultantBonus, notes, status, initialBalanceMinutes, balanceStartDate, otoboCustomerId, billingModel, hourlyRate) {
         const { data, error } = await this.db.from('clients').update({
             name, hours_total: parseFloat(hoursTotal) || 0, cs_name: csName || '',
             project_num: projectNum || '', client_pays: parseFloat(clientPays) || 0,
@@ -117,7 +121,9 @@ class TSPStore {
             notes: notes || '', status: status || 'active',
             initial_balance_minutes: parseInt(initialBalanceMinutes) || 0,
             balance_start_date: balanceStartDate || null,
-            otobo_customer_id: otoboCustomerId || null
+            otobo_customer_id: otoboCustomerId || null,
+            billing_model: billingModel || 'fixed',
+            hourly_rate: parseFloat(hourlyRate) || 0
         }).eq('id', id).select().single();
         if (error) throw error;
         return this._client(data);
