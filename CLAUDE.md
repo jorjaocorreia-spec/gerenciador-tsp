@@ -457,6 +457,7 @@ Padrões implementados em `styles/main.css` + `js/app.js`. Regras de UI ativas: 
 - **Monitorar no OTOBO** — coluna `monitored BOOLEAN` em `tickets`; tickets monitorados destacados na view Chamados com badge/seção separada.
 - **Lançar chamado OTOBO como Implementação** — botão no footer do `modal-chamado` (só quando `linked_client_id` existe) que pré-preenche `modal-implementation` com dados do ticket. Sem migration necessária.
 - **Painel de Posição de Projeto por Cliente** — ver spec em [Documentation/fase43-painel-posicao-projeto.md](Documentation/fase43-painel-posicao-projeto.md).
+- **Cobrança "Por Hora" por cliente** — novo modelo de cobrança (coexistindo com o "Valor Fixo" atual): campo `hourly_rate` por cliente, valor faturado no mês calculado a partir de `hoursUsed × hourly_rate` (mesma fonte de horas do Dashboard/Clientes, sem comissão). Design completo aprovado em [docs/superpowers/specs/2026-06-25-cobranca-por-hora-design.md](docs/superpowers/specs/2026-06-25-cobranca-por-hora-design.md); falta apenas o plano de implementação.
 
 ---
 
