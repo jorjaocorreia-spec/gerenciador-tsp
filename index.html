@@ -797,13 +797,32 @@
                             <option value="finished">Finalizado</option>
                         </select>
                     </div>
-                    <div class="form-group" style="flex: 1;">
+                    <div class="form-group" style="flex: 1;" id="field-client-pays">
                         <label>Cliente Paga (R$)</label>
                         <input type="number" step="0.01" id="client-pays" class="form-control money-value" placeholder="Ex: 5000" oninput="app.calculateConsultantValue()">
                     </div>
                 </div>
 
-                <div style="display: flex; gap: 16px; align-items: flex-end; margin-bottom: 16px;">
+                <div class="form-group">
+                    <label>Modelo de Cobrança</label>
+                    <div style="display: flex; gap: 20px; margin-top: 6px;">
+                        <label style="display: flex; align-items: center; gap: 6px; font-weight: normal; cursor: pointer;">
+                            <input type="radio" name="client-billing-model" id="billing-model-fixed" value="fixed" checked onchange="app.toggleBillingModel()">
+                            Valor Fixo
+                        </label>
+                        <label style="display: flex; align-items: center; gap: 6px; font-weight: normal; cursor: pointer;">
+                            <input type="radio" name="client-billing-model" id="billing-model-hourly" value="hourly" onchange="app.toggleBillingModel()">
+                            Por Hora
+                        </label>
+                    </div>
+                </div>
+
+                <div class="form-group" id="field-hourly-rate" style="display: none;">
+                    <label>Valor por Hora (R$)</label>
+                    <input type="number" step="0.01" id="client-hourly-rate" class="form-control money-value" placeholder="Ex: 150">
+                </div>
+
+                <div style="display: flex; gap: 16px; align-items: flex-end; margin-bottom: 16px;" id="row-consultant-fields">
                     <div class="form-group" style="flex: 1; margin-bottom: 0;">
                         <label style="white-space: nowrap;">Recebe 43%</label>
                         <input type="text" id="consultant-receives" class="form-control money-value"
