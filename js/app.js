@@ -2308,17 +2308,32 @@ class AppController {
             const stat = stats[i];
             const overLimitBadge = stat && stat.isOverLimit ? `<span class="badge-danger-pulse">Estourado</span>` : '';
 
-            const clientPaysStr = formatMoney(c.clientPays);
-            const base43 = (c.clientPays && !isNaN(c.clientPays)) ? c.clientPays * 0.43 : 0;
-            const bonus = c.consultantBonus || 0;
-            const totalConsultant = base43 + bonus;
-            const consultantReceives = formatMoney(totalConsultant);
+            const isHourlyBilling = c.billingModel === 'hourly';
+            const hoursUsedThisMonth = stat ? stat.hoursUsed : 0;
+
+            let billingLineHtml;
+            if (isHourlyBilling) {
+                const hourlyRateStr = formatMoney(c.hourlyRate);
+                const monthlyValueStr = formatMoney(hoursUsedThisMonth * (c.hourlyRate || 0));
+                billingLineHtml = `
+                    <span><strong>Valor/hora:</strong> <span class="money-value">${hourlyRateStr}</span></span> |
+                    <span><strong>Faturado no mês:</strong> <span class="money-value">${monthlyValueStr}</span></span>
+                    <span class="text-muted" style="font-size:0.8rem">(${hoursUsedThisMonth.toFixed(1)}h apontadas)</span>`;
+            } else {
+                const clientPaysStr = formatMoney(c.clientPays);
+                const base43 = (c.clientPays && !isNaN(c.clientPays)) ? c.clientPays * 0.43 : 0;
+                const bonus = c.consultantBonus || 0;
+                const consultantReceives = formatMoney(base43 + bonus);
+                billingLineHtml = `
+                    <span><strong>Paga:</strong> <span class="money-value">${clientPaysStr}</span></span> |
+                    <span><strong>Recebe:</strong> <span class="money-value">${consultantReceives}</span></span>${bonus > 0 ? ` <span class="money-value" style="color: #4ade80; font-size:0.8rem">(+R$ ${bonus.toFixed(2).replace('.',',')} adicional)</span>` : ''}`;
+            }
+
             const detailsHtml = `
                 <div style="font-size: 0.85rem; margin-top: 4px; color: var(--text-muted)">
                     <span><strong>CS:</strong> ${escapeHtml(c.csName) || '-'}</span> |
                     <span><strong>Proj:</strong> ${escapeHtml(c.projectNum) || '-'}</span> <br>
-                    <span><strong>Paga:</strong> <span class="money-value">${clientPaysStr}</span></span> |
-                    <span><strong>Recebe:</strong> <span class="money-value">${consultantReceives}</span></span>${bonus > 0 ? ` <span class="money-value" style="color: #4ade80; font-size:0.8rem">(+R$ ${bonus.toFixed(2).replace('.',',')} adicional)</span>` : ''}
+                    ${billingLineHtml}
                     <div style="margin-top:2px; font-style:italic; font-size: 0.8rem">Obs: ${escapeHtml(c.notes) || '-'}</div>
                 </div>
             `;
