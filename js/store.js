@@ -614,6 +614,76 @@ class TSPStore {
         });
     }
 
+    async getFinancialSummary(year, month) {
+        const uid = this.userId;
+        const monthStr = `${year}-${String(month).padStart(2, '0')}`;
+        const lastDay = new Date(year, month, 0).getDate();
+        const [clientsRes, recordsRes] = await Promise.all([
+            this.db.from('clients').select('*').eq('user_id', uid).order('created_at'),
+            this.db.from('records').select('client_id, minutes, date').eq('user_id', uid)
+                .gte('date', `${monthStr}-01`).lte('date', `${monthStr}-${String(lastDay).padStart(2, '0')}`)
+        ]);
+        if (clientsRes.error) throw clientsRes.error;
+        if (recordsRes.error) throw recordsRes.error;
+
+        const clients = (clientsRes.data || []).map(r => this._client(r));
+        const minutesByClient = {};
+        (recordsRes.data || []).forEach(r => {
+            minutesByClient[r.client_id] = (minutesByClient[r.client_id] || 0) + (parseInt(r.minutes) || 0);
+        });
+
+        const items = [];
+        let totalValor = 0, totalComissao = 0;
+        clients.forEach(client => {
+            const eligible = TSPFinancial.isEligible(client, year, month);
+            const entry = TSPFinancial.computeEntry(client, year, month, minutesByClient[client.id] || 0, eligible);
+            if (entry) {
+                items.push(entry);
+                totalValor += entry.valor;
+                totalComissao += entry.comissao;
+            }
+        });
+
+        return { items, totalValor, totalComissao };
+    }
+
+    async getFinancialHistory(monthsBack, endYear, endMonth) {
+        const uid = this.userId;
+        const monthsArr = TSPFinancial.monthsWindow(monthsBack, endYear, endMonth);
+        const first = monthsArr[0];
+        const last = monthsArr[monthsArr.length - 1];
+        const startDate = `${first.year}-${String(first.month).padStart(2, '0')}-01`;
+        const lastDayOfLast = new Date(last.year, last.month, 0).getDate();
+        const endDate = `${last.year}-${String(last.month).padStart(2, '0')}-${String(lastDayOfLast).padStart(2, '0')}`;
+
+        const [clientsRes, recordsRes] = await Promise.all([
+            this.db.from('clients').select('*').eq('user_id', uid).order('created_at'),
+            this.db.from('records').select('client_id, minutes, date').eq('user_id', uid)
+                .gte('date', startDate).lte('date', endDate)
+        ]);
+        if (clientsRes.error) throw clientsRes.error;
+        if (recordsRes.error) throw recordsRes.error;
+
+        const clients = (clientsRes.data || []).map(r => this._client(r));
+        const minutesByClientMonth = {};
+        (recordsRes.data || []).forEach(r => {
+            const ym = r.date.slice(0, 7);
+            const key = `${r.client_id}|${ym}`;
+            minutesByClientMonth[key] = (minutesByClientMonth[key] || 0) + (parseInt(r.minutes) || 0);
+        });
+
+        return monthsArr.map(({ year, month }) => {
+            let totalValor = 0;
+            clients.forEach(client => {
+                const eligible = TSPFinancial.isEligible(client, year, month);
+                const key = `${client.id}|${year}-${String(month).padStart(2, '0')}`;
+                const entry = TSPFinancial.computeEntry(client, year, month, minutesByClientMonth[key] || 0, eligible);
+                if (entry) totalValor += entry.valor;
+            });
+            return { year, month, totalValor };
+        });
+    }
+
     async getAllStats() {
         const clients = await this.getClients();
         return Promise.all(clients.map(c => this.getClientStats(c.id)));
