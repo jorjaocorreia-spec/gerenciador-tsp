@@ -68,6 +68,12 @@ class AppController {
         this.prodRefDate = TSPProductivity.toIsoLocal(new Date());
         this._prodSummary = null;
         this._prodConfigHolidays = [];
+        this.financeiroYear = new Date().getFullYear();
+        this.financeiroMonth = new Date().getMonth() + 1; // 1-12
+        this.financeiroHistEndYear = this.financeiroYear;
+        this.financeiroHistEndMonth = this.financeiroMonth;
+        this._financeiroSummary = null;
+        this._financeiroHistory = null;
         this.taskAttachments = []; // [{name, data}] — imagens em base64 do modal de tarefa
         this.implAttachments = []; // [{name, data}] — imagens em base64 do modal de implementação
         this.trainingAttachments = []; // [{name, data}] — imagens do modal de treinamento
@@ -349,7 +355,7 @@ class AppController {
         this.currentView = viewName;
 
         // V1: direção do slide baseada na ordem do menu
-        const VIEW_ORDER = ['dashboard','clients','records','tasks','agenda','apontamentos','implementations','trainings','chamados','produtividade'];
+        const VIEW_ORDER = ['dashboard','clients','records','tasks','agenda','apontamentos','implementations','trainings','chamados','produtividade','financeiro'];
         const prevIdx = VIEW_ORDER.indexOf(prevView);
         const newIdx  = VIEW_ORDER.indexOf(viewName);
         const slideDir = (prevIdx >= 0 && newIdx >= 0 && prevIdx !== newIdx)
@@ -1856,7 +1862,8 @@ class AppController {
                 this.renderImplementations(),
                 this.renderTrainings(),
                 this.renderChamados(),
-                this.renderProdutividade()
+                this.renderProdutividade(),
+                this.renderFinanceiro()
             ]);
             lucide.createIcons();
         } finally {
@@ -5829,6 +5836,27 @@ class AppController {
     prodGoToToday() {
         this.prodRefDate = TSPProductivity.toIsoLocal(new Date());
         this.renderProdutividade();
+    }
+
+    financeiroNavigateMonth(delta) {
+        this.financeiroMonth += delta;
+        if (this.financeiroMonth < 1) { this.financeiroMonth = 12; this.financeiroYear -= 1; }
+        else if (this.financeiroMonth > 12) { this.financeiroMonth = 1; this.financeiroYear += 1; }
+        this.renderFinanceiro();
+    }
+
+    financeiroGoToToday() {
+        const now = new Date();
+        this.financeiroYear = now.getFullYear();
+        this.financeiroMonth = now.getMonth() + 1;
+        this.renderFinanceiro();
+    }
+
+    financeiroNavigateHistory(direction) {
+        this.financeiroHistEndMonth += direction * 12;
+        while (this.financeiroHistEndMonth > 12) { this.financeiroHistEndMonth -= 12; this.financeiroHistEndYear += 1; }
+        while (this.financeiroHistEndMonth < 1) { this.financeiroHistEndMonth += 12; this.financeiroHistEndYear -= 1; }
+        this.renderFinanceiro();
     }
 
     async openProdutividadeConfig() {
