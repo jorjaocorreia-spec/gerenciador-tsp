@@ -141,6 +141,7 @@ class AppController {
         this._agendaEventsCache = null;     // null = inválido; [] = vazio válido
         this._agendaClientsMapCache = {};   // { clientId: clientObj }
         this._agendaTasksCache = null;      // tarefas não-concluídas para o seletor "Vincular Tarefa"
+        this._agendaEventsCacheLoading = null; // Promise em andamento — evita fetches concorrentes sobrescreverem o cache
         // Horas do Mês
         this._horasMesStats = null;
         // Cobertura de Agenda
@@ -4034,6 +4035,9 @@ class AppController {
                     }
                 }
                 await store.updateAgendaEvent(eventData);
+                // Aguarda qualquer fetch de cache em andamento ANTES de mutar — evita que ele
+                // sobrescreva esta atualização com uma versão antiga buscada antes do save.
+                if (this._agendaEventsCacheLoading) await this._agendaEventsCacheLoading;
                 if (this._agendaEventsCache) {
                     const idx = this._agendaEventsCache.findIndex(ev => ev.id === id);
                     if (idx >= 0) this._agendaEventsCache[idx] = { ...this._agendaEventsCache[idx], ...eventData };
@@ -4049,7 +4053,10 @@ class AppController {
                 const saved = await store.addAgendaEvent(eventData);
                 if (saved) {
                     eventData.id = saved.id;
-                    if (this._agendaEventsCache) {
+                    // Aguarda qualquer fetch de cache em andamento ANTES de mutar — evita que ele
+                    // sobrescreva o push abaixo com uma versão antiga buscada antes do insert.
+                    if (this._agendaEventsCacheLoading) await this._agendaEventsCacheLoading;
+                    if (this._agendaEventsCache && !this._agendaEventsCache.some(ev => ev.id === saved.id)) {
                         this._agendaEventsCache.push(saved);
                         if (saved.clientId && !this._agendaClientsMapCache[saved.clientId]) {
                             this._agendaClientsMapCache[saved.clientId] = await store.getClient(saved.clientId);
@@ -4149,6 +4156,7 @@ class AppController {
                 await calendarAPI.deleteGoogleEvent(ev.calendarEventId);
             }
             await store.deleteAgendaEvent(id);
+            if (this._agendaEventsCacheLoading) await this._agendaEventsCacheLoading;
             if (this._agendaEventsCache) this._agendaEventsCache = this._agendaEventsCache.filter(e => e.id !== id);
             this._renderAgendaFromCache();
             Toast.show('Agendamento excluído.', 'success');
@@ -4169,6 +4177,7 @@ class AppController {
                     await calendarAPI.deleteGoogleEvent(ev.calendarEventId);
                 }
                 await store.deleteAgendaEvent(id);
+                if (this._agendaEventsCacheLoading) await this._agendaEventsCacheLoading;
                 if (this._agendaEventsCache) this._agendaEventsCache = this._agendaEventsCache.filter(e => e.id !== id);
                 this.closeModal('modal-agenda-event');
                 this._renderAgendaFromCache();
@@ -4177,6 +4186,25 @@ class AppController {
                 Toast.show('Erro ao excluir agendamento: ' + err.message, 'error');
             }
         });
+    }
+
+    // Garante que _agendaEventsCache esteja populado, sem permitir fetches concorrentes
+    // se sobrescreverem uns aos outros (ex.: auto-sync do Google rodando junto com a criação
+    // de um evento). Chamadas concorrentes aguardam a MESMA promise em vez de cada uma buscar
+    // e atribuir o resultado por conta própria.
+    async _ensureAgendaCache() {
+        if (this._agendaEventsCache !== null) return;
+        if (!this._agendaEventsCacheLoading) {
+            this._agendaEventsCacheLoading = (async () => {
+                const allEvents = await store.getAgendaEvents();
+                const clientIds = [...new Set(allEvents.map(e => e.clientId).filter(Boolean))];
+                const entries = await Promise.all(clientIds.map(async id => [id, await store.getClient(id)]));
+                this._agendaEventsCache = allEvents;
+                this._agendaClientsMapCache = Object.fromEntries(entries);
+            })();
+        }
+        await this._agendaEventsCacheLoading;
+        this._agendaEventsCacheLoading = null;
     }
 
     async renderAgenda() {
@@ -4202,14 +4230,8 @@ class AppController {
         });
 
         // Usa cache se disponível (instantâneo); senão busca do banco (mostra spinner durante a espera)
-        if (this._agendaEventsCache === null) {
-            container.innerHTML = spinnerHtml;
-            const allEvents = await store.getAgendaEvents();
-            this._agendaEventsCache = allEvents;
-            const clientIds = [...new Set(allEvents.map(e => e.clientId).filter(Boolean))];
-            const entries = await Promise.all(clientIds.map(async id => [id, await store.getClient(id)]));
-            this._agendaClientsMapCache = Object.fromEntries(entries);
-        }
+        if (this._agendaEventsCache === null) container.innerHTML = spinnerHtml;
+        await this._ensureAgendaCache();
 
         if (this.agendaViewMode === 'daily') {
             await this.renderAgendaDaily(container);
@@ -4693,6 +4715,7 @@ class AppController {
         try {
             await store.updateEventRsvp(eventId, status);
 
+            if (this._agendaEventsCacheLoading) await this._agendaEventsCacheLoading;
             if (this._agendaEventsCache) {
                 const ev = this._agendaEventsCache.find(e => e.id === eventId);
                 if (ev) ev.rsvpStatus = status;
