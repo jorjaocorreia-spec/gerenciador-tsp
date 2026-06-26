@@ -6690,8 +6690,8 @@ class AppController {
             const descHtml = e.loading
                 ? `<div class="apt-gen-loading"><i data-lucide="loader-2" style="animation:spin 1s linear infinite"></i> Gerando com IA...</div>`
                 : e.error
-                    ? `<textarea class="form-control apt-gen-textarea" rows="3" placeholder="Descreva o que foi feito..." data-idx="${idx}" onchange="app._aptGenDescChange(${idx}, this.value)"></textarea><p class="text-muted" style="font-size:0.8rem;margin-top:4px;">⚠ IA indisponível — preencha manualmente.</p>`
-                    : `<textarea class="form-control apt-gen-textarea" rows="3" data-idx="${idx}" onchange="app._aptGenDescChange(${idx}, this.value)">${escapeHtml(e.description)}</textarea>`;
+                    ? `<textarea class="form-control apt-gen-textarea" rows="10" placeholder="Descreva o que foi feito..." data-idx="${idx}" onchange="app._aptGenDescChange(${idx}, this.value)"></textarea><p class="text-muted" style="font-size:0.8rem;margin-top:4px;">⚠ IA indisponível — preencha manualmente.</p>`
+                    : `<textarea class="form-control apt-gen-textarea" rows="10" data-idx="${idx}" onchange="app._aptGenDescChange(${idx}, this.value)">${escapeHtml(e.description)}</textarea>`;
 
             if (e.conflictApt) {
                 // Card com conflito: mostra apontamento existente + opções de rádio

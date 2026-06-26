@@ -2745,7 +2745,7 @@ kbd {
 .apt-gen-client-name { font-weight: 600; font-size: 0.95rem; }
 .apt-gen-tasks-summary { font-size: 0.78rem; padding-left: 26px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .apt-gen-desc-wrap { margin-bottom: 10px; }
-.apt-gen-textarea { font-size: 0.875rem; resize: vertical; min-height: 72px; }
+.apt-gen-textarea { font-size: 0.95rem; line-height: 1.5; resize: vertical; min-height: 220px; }
 .apt-gen-loading {
     display: flex;
     align-items: center;
