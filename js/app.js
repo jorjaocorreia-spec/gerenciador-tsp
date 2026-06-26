@@ -1810,6 +1810,22 @@ class AppController {
         if (current) select.value = current;
     }
 
+    // Normaliza para busca: minúsculas + remove acentos (PT-BR)
+    _normalizeSearch(s) {
+        return (s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+    }
+
+    // term já deve estar normalizado via _normalizeSearch() pelo chamador
+    _taskMatchesSearch(task, term) {
+        if (!term) return true;
+        const haystack = [
+            task.title,
+            task.description,
+            ...(task.comments || []).filter(c => c.type === 'comment').map(c => c.text)
+        ].map(s => this._normalizeSearch(s)).join(' ');
+        return haystack.includes(term);
+    }
+
     // Chamado após login bem-sucedido
     async initAfterAuth() {
         this.checkLocalStorageMigration();
