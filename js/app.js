@@ -137,6 +137,9 @@ class AppController {
         this._tasksCache = null;        // null = inválido; [] = vazio válido
         this._clientsMapCache = {};     // { clientId: clientObj }
         this._overLimitClientsCache = 0; // contagem de clientes sobrecarregados
+        // Cache para optimistic updates da Agenda
+        this._agendaEventsCache = null;     // null = inválido; [] = vazio válido
+        this._agendaClientsMapCache = {};   // { clientId: clientObj }
         // Horas do Mês
         this._horasMesStats = null;
         // Cobertura de Agenda
@@ -1864,6 +1867,7 @@ class AppController {
         this._renderAllPending = false;
         try {
             this._tasksCache = null; // força re-fetch no próximo renderTasks()
+            this._agendaEventsCache = null; // força re-fetch no próximo renderAgenda()
             // Pre-busca tudo em 4 queries (antes: 4×N queries por ciclo)
             const batchStats = await store.getBatchStats();
             const clients = batchStats.map(s => s.client);
@@ -4025,6 +4029,10 @@ class AppController {
                     }
                 }
                 await store.updateAgendaEvent(eventData);
+                if (this._agendaEventsCache) {
+                    const idx = this._agendaEventsCache.findIndex(ev => ev.id === id);
+                    if (idx >= 0) this._agendaEventsCache[idx] = { ...this._agendaEventsCache[idx], ...eventData };
+                }
             } else {
                 if (syncGoogle && calendarAPI.isAuthenticated) {
                     const result = await calendarAPI.createGoogleEvent(eventData);
@@ -4034,7 +4042,15 @@ class AppController {
                     }
                 }
                 const saved = await store.addAgendaEvent(eventData);
-                if (saved) eventData.id = saved.id;
+                if (saved) {
+                    eventData.id = saved.id;
+                    if (this._agendaEventsCache) {
+                        this._agendaEventsCache.push(saved);
+                        if (saved.clientId && !this._agendaClientsMapCache[saved.clientId]) {
+                            this._agendaClientsMapCache[saved.clientId] = await store.getClient(saved.clientId);
+                        }
+                    }
+                }
             }
             const newMeetGenerated = generateMeet && eventData.meetLink;
             if (newMeetGenerated) {
@@ -4054,12 +4070,12 @@ class AppController {
                 btn.classList.add('btn-success');
                 btn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;margin-right:5px"><polyline points="20 6 9 17 4 12"/></svg>Salvo!`;
                 btn.disabled = true;
-                this.renderAgenda();
+                this._renderAgendaFromCache();
                 return;
             } else {
                 await this._btnSuccess(btn);
                 this.closeModal('modal-agenda-event');
-                await this.renderAgenda();
+                this._renderAgendaFromCache();
                 Toast.show(id ? 'Agendamento atualizado.' : 'Agendamento criado.', 'success');
             }
         } catch (err) {
@@ -4127,7 +4143,8 @@ class AppController {
                 await calendarAPI.deleteGoogleEvent(ev.calendarEventId);
             }
             await store.deleteAgendaEvent(id);
-            await this.renderAgenda();
+            if (this._agendaEventsCache) this._agendaEventsCache = this._agendaEventsCache.filter(e => e.id !== id);
+            this._renderAgendaFromCache();
             Toast.show('Agendamento excluído.', 'success');
         } catch (err) {
             if (block) block.classList.remove('row-deleting');
@@ -4146,8 +4163,9 @@ class AppController {
                     await calendarAPI.deleteGoogleEvent(ev.calendarEventId);
                 }
                 await store.deleteAgendaEvent(id);
+                if (this._agendaEventsCache) this._agendaEventsCache = this._agendaEventsCache.filter(e => e.id !== id);
                 this.closeModal('modal-agenda-event');
-                await this.renderAgenda();
+                this._renderAgendaFromCache();
                 Toast.show('Agendamento excluído.', 'success');
             } catch (err) {
                 Toast.show('Erro ao excluir agendamento: ' + err.message, 'error');
@@ -4169,8 +4187,6 @@ class AppController {
             setTimeout(() => container.classList.remove('agenda-nav-right', 'agenda-nav-left'), 400);
         }
 
-        container.innerHTML = spinnerHtml;
-
         this._updateGoogleSyncStatus();
 
         // sincroniza botões de modo com o estado atual (inclui restauração do localStorage)
@@ -4178,6 +4194,16 @@ class AppController {
             const btn = document.getElementById(`btn-agenda-${m}`);
             if (btn) btn.classList.toggle('active-mode', this.agendaViewMode === m);
         });
+
+        // Usa cache se disponível (instantâneo); senão busca do banco (mostra spinner durante a espera)
+        if (this._agendaEventsCache === null) {
+            container.innerHTML = spinnerHtml;
+            const allEvents = await store.getAgendaEvents();
+            this._agendaEventsCache = allEvents;
+            const clientIds = [...new Set(allEvents.map(e => e.clientId).filter(Boolean))];
+            const entries = await Promise.all(clientIds.map(async id => [id, await store.getClient(id)]));
+            this._agendaClientsMapCache = Object.fromEntries(entries);
+        }
 
         if (this.agendaViewMode === 'daily') {
             await this.renderAgendaDaily(container);
@@ -4188,6 +4214,20 @@ class AppController {
         } else {
             await this.renderAgendaWeekly(container);
         }
+        lucide.createIcons();
+    }
+
+    // Render instantâneo da agenda a partir do _agendaEventsCache (zero queries ao banco)
+    _renderAgendaFromCache() {
+        if (this.currentView !== 'agenda') return;
+        if (this._agendaEventsCache === null) { this.renderAgenda(); return; }
+        const container = document.getElementById('agenda-container');
+        if (!container) return;
+
+        if (this.agendaViewMode === 'daily') this.renderAgendaDaily(container);
+        else if (this.agendaViewMode === 'monthly') this.renderAgendaMonthly(container);
+        else if (this.agendaViewMode === 'schedule') this.renderAgendaSchedule(container);
+        else this.renderAgendaWeekly(container);
         lucide.createIcons();
     }
 
@@ -4277,11 +4317,8 @@ class AppController {
         document.getElementById('agenda-current-date-label').innerText = this.formatDateBR(this.agendaCurrentDate);
 
         const isoDate = this.agendaCurrentDate.toISOString().split('T')[0];
-        const events = await store.getEventsByDate(isoDate);
-
-        const clientIds = [...new Set(events.map(e => e.clientId).filter(Boolean))];
-        const clientsMap = {};
-        await Promise.all(clientIds.map(async id => { clientsMap[id] = await store.getClient(id); }));
+        const events = this._agendaEventsCache.filter(e => e.date <= isoDate && (e.dateEnd || e.date) >= isoDate);
+        const clientsMap = this._agendaClientsMapCache;
 
         const allDayEvents = events.filter(ev => !ev.startTime);
         const timedEvents = events.filter(ev => ev.startTime);
@@ -4338,11 +4375,8 @@ class AppController {
         document.getElementById('agenda-current-date-label').innerText =
             `${this.formatDateBR(monday)} - ${this.formatDateBR(sunday)}`;
 
-        const events = await store.getEventsByWeek(isoStart, isoEnd);
-
-        const clientIds = [...new Set(events.map(e => e.clientId).filter(Boolean))];
-        const clientsMap = {};
-        await Promise.all(clientIds.map(async id => { clientsMap[id] = await store.getClient(id); }));
+        const events = this._agendaEventsCache.filter(e => e.date <= isoEnd && (e.dateEnd || e.date) >= isoStart);
+        const clientsMap = this._agendaClientsMapCache;
 
         const days = ['Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado', 'Domingo'];
         let headersHtml = '';
@@ -4433,11 +4467,8 @@ class AppController {
         const isoStart = startGrid.toISOString().split('T')[0];
         const isoEnd = endGrid.toISOString().split('T')[0];
 
-        const events = await store.getEventsByWeek(isoStart, isoEnd);
-
-        const clientIds = [...new Set(events.map(e => e.clientId).filter(Boolean))];
-        const clientsMap = {};
-        await Promise.all(clientIds.map(async id => { clientsMap[id] = await store.getClient(id); }));
+        const events = this._agendaEventsCache.filter(e => e.date <= isoEnd && (e.dateEnd || e.date) >= isoStart);
+        const clientsMap = this._agendaClientsMapCache;
 
         const todayIso = new Date().toISOString().split('T')[0];
         const dayNames = ['Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb', 'Dom'];
@@ -4521,12 +4552,10 @@ class AppController {
                 ? startLabel
                 : `${startLabel} – ${endLabel}`;
 
-        const events = await store.getEventsByWeek(isoStart, isoEnd);
+        const events = this._agendaEventsCache.filter(e => e.date <= isoEnd && (e.dateEnd || e.date) >= isoStart);
         events.sort((a, b) => a.date !== b.date ? a.date.localeCompare(b.date) : a.startTime.localeCompare(b.startTime));
 
-        const clientIds = [...new Set(events.map(e => e.clientId).filter(Boolean))];
-        const clientsMap = {};
-        await Promise.all(clientIds.map(async id => { clientsMap[id] = await store.getClient(id); }));
+        const clientsMap = this._agendaClientsMapCache;
 
         const todayIso = new Date().toISOString().split('T')[0];
 
@@ -4657,6 +4686,11 @@ class AppController {
 
         try {
             await store.updateEventRsvp(eventId, status);
+
+            if (this._agendaEventsCache) {
+                const ev = this._agendaEventsCache.find(e => e.id === eventId);
+                if (ev) ev.rsvpStatus = status;
+            }
 
             const labels = { needsAction: 'Sem resposta', accepted: 'Confirmado', tentative: 'Talvez', declined: 'Declinado' };
             document.querySelectorAll(`.rsvp-dot[data-event-id="${eventId}"]`).forEach(el => {
@@ -5070,6 +5104,8 @@ class AppController {
                 console.error('Erro ao remover evento deletado no Google:', le.title, err);
             }
         }
+
+        this._agendaEventsCache = null; // sync trouxe mudanças do Google — força re-fetch no próximo renderAgenda()
 
         if (syncErrors > 0) throw new Error(`${syncErrors} evento(s) falharam na sincronização`);
     }
@@ -8283,6 +8319,7 @@ class AppController {
             btn.disabled = false;
             this._pendingPreviewEvents = [];
             this._pendingPreviewRuleId = null;
+            this._agendaEventsCache = null; // eventos criados em lote — força re-fetch no próximo renderAgenda()
         }
     }
 
@@ -9980,6 +10017,8 @@ document.addEventListener('DOMContentLoaded', async () => {
             window.app._tasksCache = null;
             window.app._clientsMapCache = {};
             window.app._overLimitClientsCache = 0;
+            window.app._agendaEventsCache = null;
+            window.app._agendaClientsMapCache = {};
         }
         if (window.aiClient) aiClient.reset();
         await Auth.signOut();
