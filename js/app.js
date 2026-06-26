@@ -3328,7 +3328,7 @@ class AppController {
         const btnManage = document.getElementById('btn-manage-columns');
 
         if (!filterClient) {
-            // Sem cliente: placeholder
+            // Sem cliente: placeholder, ou lista de busca se houver termo
             this._currentColumns = [];
             if (btnManage) btnManage.style.display = 'none';
             // Usa cache se disponível, senão busca do banco
@@ -3340,6 +3340,17 @@ class AppController {
                 this._clientsMapCache = Object.fromEntries(entries);
             }
             this._populateLabelFilter(this._tasksCache);
+
+            if (searchTerm) {
+                let results = this._tasksCache.filter(t => this._taskMatchesSearch(t, searchTerm));
+                if (filterPriority) results = results.filter(t => t.priority === filterPriority);
+                if (filterLabel)    results = results.filter(t => (t.labels || []).some(l => l.color === filterLabel));
+                this._renderTaskSearchResultsList(results, this._clientsMapCache);
+                await this.renderTasksDashboard(this._tasksCache, '');
+                lucide.createIcons();
+                return;
+            }
+
             board.innerHTML = `
                 <div class="kb-empty-state">
                     <i data-lucide="columns" style="width:48px;height:48px;opacity:0.25"></i>
@@ -3434,6 +3445,13 @@ class AppController {
         if (!board) return;
 
         if (!filterClient) {
+            if (searchTerm) {
+                let results = this._tasksCache.filter(t => this._taskMatchesSearch(t, searchTerm));
+                if (filterPriority) results = results.filter(t => t.priority === filterPriority);
+                if (filterLabel)    results = results.filter(t => (t.labels || []).some(l => l.color === filterLabel));
+                this._renderTaskSearchResultsList(results, this._clientsMapCache);
+                lucide.createIcons();
+            }
             this._renderTasksDashboardSync(this._tasksCache, '');
             return;
         }
@@ -3551,6 +3569,50 @@ class AppController {
 
             board.appendChild(colEl);
         });
+    }
+
+    // Renderiza lista de resultados de busca quando não há Cliente filtrado
+    _renderTaskSearchResultsList(tasks, clientsMap) {
+        const board = document.getElementById('kanban-board');
+        if (!board) return;
+
+        if (tasks.length === 0) {
+            board.innerHTML = `<div class="kb-empty-state">
+                <i data-lucide="search-x" style="width:48px;height:48px;opacity:0.25"></i>
+                <p>Nenhuma tarefa encontrada para esse termo.</p>
+            </div>`;
+            return;
+        }
+
+        const priMap = { high: ['priority-high', 'Alta'], medium: ['priority-medium', 'Média'], low: ['priority-low', 'Baixa'] };
+
+        const rowsHtml = tasks.map(t => {
+            const clientName = t.clientId ? (clientsMap[t.clientId]?.name || '—') : '—';
+            const [priClass, priLabel] = priMap[t.priority] || priMap.medium;
+            const completedHtml = t.completed
+                ? `<span class="kb-badge kb-badge-completed"><i data-lucide="check-circle" style="width:10px;height:10px"></i> Concluída</span>`
+                : '—';
+            return `
+                <tr onclick="app.handleEditTask('${t.id}')" style="cursor:pointer">
+                    <td>${escapeHtml(t.title)}</td>
+                    <td>${escapeHtml(clientName)}</td>
+                    <td><span class="kb-badge kb-badge-${priClass}">${priLabel}</span></td>
+                    <td>${completedHtml}</td>
+                </tr>`;
+        }).join('');
+
+        board.innerHTML = `
+            <table class="data-table" style="margin:0">
+                <thead>
+                    <tr>
+                        <th>Título</th>
+                        <th>Cliente</th>
+                        <th>Prioridade</th>
+                        <th>Concluída?</th>
+                    </tr>
+                </thead>
+                <tbody>${rowsHtml}</tbody>
+            </table>`;
     }
 
     createKanbanCard(task, clientsMap) {
