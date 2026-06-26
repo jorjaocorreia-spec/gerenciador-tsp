@@ -553,6 +553,15 @@ h4 {
   transition: transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
+.modal.glass {
+  background: rgba(17, 24, 39, 0.97);
+}
+
+.modal-overlay.active .modal.glass {
+  -webkit-backdrop-filter: blur(16px);
+  backdrop-filter: blur(16px);
+}
+
 .modal-overlay.active .modal {
   transform: scale(1) translateY(0);
 }
