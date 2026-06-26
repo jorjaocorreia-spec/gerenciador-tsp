@@ -355,6 +355,18 @@
                         <option value="">Todas</option>
                     </select>
                 </div>
+                <div class="form-group">
+                    <label>Buscar</label>
+                    <div style="position:relative">
+                        <input type="text" id="filter-task-search" class="form-control"
+                               style="padding-left:34px"
+                               placeholder="Título, descrição ou comentário..."
+                               onkeydown="if(event.key==='Enter'){event.preventDefault();app.renderTasks();}">
+                        <i data-lucide="search" style="position:absolute;left:10px;top:50%;
+                           transform:translateY(-50%);width:16px;height:16px;opacity:0.5;
+                           pointer-events:none"></i>
+                    </div>
+                </div>
                 <div class="kanban-filters-actions">
                     <button class="btn btn-ghost" onclick="app.clearKanbanFilters()" title="Limpar filtros">
                         <i data-lucide="x"></i>
