@@ -140,6 +140,7 @@ class AppController {
         // Cache para optimistic updates da Agenda
         this._agendaEventsCache = null;     // null = inválido; [] = vazio válido
         this._agendaClientsMapCache = {};   // { clientId: clientObj }
+        this._agendaTasksCache = null;      // tarefas não-concluídas para o seletor "Vincular Tarefa"
         // Horas do Mês
         this._horasMesStats = null;
         // Cobertura de Agenda
@@ -1868,6 +1869,7 @@ class AppController {
         try {
             this._tasksCache = null; // força re-fetch no próximo renderTasks()
             this._agendaEventsCache = null; // força re-fetch no próximo renderAgenda()
+            this._agendaTasksCache = null; // força re-fetch do seletor "Vincular Tarefa"
             // Pre-busca tudo em 4 queries (antes: 4×N queries por ciclo)
             const batchStats = await store.getBatchStats();
             const clients = batchStats.map(s => s.client);
@@ -3856,10 +3858,13 @@ class AppController {
     }
 
     async updateAgendaTaskSelect() {
-        const allCols = await store.getAllColumns().catch(() => []);
-        const doneIds = new Set(allCols.filter(c => c.isDone).map(c => c.id));
-        doneIds.add('done');
-        this._agendaAllTasks = (await store.getTasks()).filter(t => !doneIds.has(t.status));
+        if (this._agendaTasksCache === null) {
+            const allCols = await store.getAllColumns().catch(() => []);
+            const doneIds = new Set(allCols.filter(c => c.isDone).map(c => c.id));
+            doneIds.add('done');
+            this._agendaTasksCache = (await store.getTasks()).filter(t => !doneIds.has(t.status));
+        }
+        this._agendaAllTasks = this._agendaTasksCache;
     }
 
     openAgendaTaskPanel() {
@@ -4085,7 +4090,8 @@ class AppController {
     }
 
     async editAgendaEvent(id) {
-        const ev = await store.getAgendaEvent(id);
+        let ev = this._agendaEventsCache?.find(e => e.id === id) || null;
+        if (!ev) ev = await store.getAgendaEvent(id); // fallback se o cache ainda não carregou
         if (!ev) return;
 
         document.getElementById('modal-agenda-title').innerText = 'Editar Agendamento';
@@ -10019,6 +10025,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             window.app._overLimitClientsCache = 0;
             window.app._agendaEventsCache = null;
             window.app._agendaClientsMapCache = {};
+            window.app._agendaTasksCache = null;
         }
         if (window.aiClient) aiClient.reset();
         await Auth.signOut();
