@@ -45,6 +45,12 @@ run('isEligible: mês futuro, cliente finalizado -> false', () => {
     assert.strictEqual(TSPFinancial.isEligible(client, 2026, 12, NOW), false);
 });
 
+run('isEligible: cliente criado no dia 1 do mês não é elegível no mês anterior (regressão timezone)', () => {
+    const client = { status: 'active', createdAt: '2026-06-01' };
+    assert.strictEqual(TSPFinancial.isEligible(client, 2026, 5, NOW), false);
+    assert.strictEqual(TSPFinancial.isEligible(client, 2026, 6, NOW), true);
+});
+
 run('computeEntry: não elegível -> null', () => {
     const client = { billingModel: 'fixed', clientPays: 1000 };
     assert.strictEqual(TSPFinancial.computeEntry(client, 2026, 6, 0, false), null);

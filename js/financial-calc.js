@@ -5,8 +5,12 @@
         const currentYM = now.getFullYear() * 12 + now.getMonth();
         let createdYM = -Infinity;
         if (client.createdAt) {
-            const created = new Date(client.createdAt);
-            createdYM = created.getFullYear() * 12 + created.getMonth();
+            const isoStr = String(client.createdAt);
+            const createdYear = parseInt(isoStr.slice(0, 4), 10);
+            const createdMonth = parseInt(isoStr.slice(5, 7), 10); // 1-12
+            if (!isNaN(createdYear) && !isNaN(createdMonth)) {
+                createdYM = createdYear * 12 + (createdMonth - 1);
+            }
         }
         if (selectedYM < createdYM) return false;
         if (selectedYM >= currentYM) {
