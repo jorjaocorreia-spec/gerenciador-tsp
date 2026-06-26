@@ -1792,9 +1792,11 @@ class AppController {
         const fc = document.getElementById('filter-task-client');
         const fp = document.getElementById('filter-task-priority');
         const fl = document.getElementById('filter-task-label');
+        const fs = document.getElementById('filter-task-search');
         if (fc) fc.value = '';
         if (fp) fp.value = '';
         if (fl) fl.value = '';
+        if (fs) fs.value = '';
         this.renderTasks();
     }
 
@@ -3317,6 +3319,7 @@ class AppController {
         const filterClient   = document.getElementById('filter-task-client')?.value;
         const filterPriority = document.getElementById('filter-task-priority')?.value;
         const filterLabel    = document.getElementById('filter-task-label')?.value;
+        const searchTerm     = this._normalizeSearch(document.getElementById('filter-task-search')?.value || '');
 
         const board = document.getElementById('kanban-board');
         if (!board) return;
@@ -3374,6 +3377,7 @@ class AppController {
         let tasks = this._tasksCache.filter(t => t.clientId === filterClient);
         if (filterPriority) tasks = tasks.filter(t => t.priority === filterPriority);
         if (filterLabel)    tasks = tasks.filter(t => (t.labels || []).some(l => l.color === filterLabel));
+        if (searchTerm)     tasks = tasks.filter(t => this._taskMatchesSearch(t, searchTerm));
 
         this._renderKanbanBoard(this._currentColumns, tasks, this._clientsMapCache);
         await this.renderTasksDashboard(tasks, filterClient);
@@ -3422,6 +3426,7 @@ class AppController {
         const filterClient   = document.getElementById('filter-task-client')?.value;
         const filterPriority = document.getElementById('filter-task-priority')?.value;
         const filterLabel    = document.getElementById('filter-task-label')?.value;
+        const searchTerm     = this._normalizeSearch(document.getElementById('filter-task-search')?.value || '');
 
         this._populateLabelFilter(this._tasksCache);
 
@@ -3436,6 +3441,7 @@ class AppController {
         let tasks = this._tasksCache.filter(t => t.clientId === filterClient);
         if (filterPriority) tasks = tasks.filter(t => t.priority === filterPriority);
         if (filterLabel)    tasks = tasks.filter(t => (t.labels || []).some(l => l.color === filterLabel));
+        if (searchTerm)     tasks = tasks.filter(t => this._taskMatchesSearch(t, searchTerm));
 
         this._renderKanbanBoard(this._currentColumns, tasks, this._clientsMapCache);
         this._renderTasksDashboardSync(tasks, filterClient);
