@@ -5991,6 +5991,70 @@ class AppController {
         }
     }
 
+    async renderFinanceiro() {
+        if (this.currentView !== 'financeiro') return;
+        const tbody = document.getElementById('financeiro-tbody');
+        const tfoot = document.getElementById('financeiro-tfoot');
+        const chartContainer = document.getElementById('financeiro-chart-container');
+        if (!tbody || !tfoot || !chartContainer) return;
+
+        const monthNames = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+        const labelEl = document.getElementById('financeiro-month-label');
+        if (labelEl) labelEl.textContent = `${monthNames[this.financeiroMonth - 1]} ${this.financeiroYear}`;
+
+        tbody.innerHTML = `<tr><td colspan="5" class="text-muted">Carregando...</td></tr>`;
+        tfoot.innerHTML = '';
+        chartContainer.innerHTML = spinnerHtml;
+
+        try {
+            const [summary, history] = await Promise.all([
+                store.getFinancialSummary(this.financeiroYear, this.financeiroMonth),
+                store.getFinancialHistory(12, this.financeiroHistEndYear, this.financeiroHistEndMonth)
+            ]);
+            this._financeiroSummary = summary;
+            this._financeiroHistory = history;
+
+            const formatMoney = (val) => (val && !isNaN(val)) ? `R$ ${parseFloat(val).toFixed(2).replace('.', ',')}` : 'R$ 0,00';
+
+            if (summary.items.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="5" class="text-muted">Nenhum cliente elegível neste mês.</td></tr>`;
+            } else {
+                tbody.innerHTML = summary.items.map(({ client, valor, comissao, detalhe }) => {
+                    const modelo = client.billingModel === 'hourly' ? 'Por Hora' : 'Fixo';
+                    const detalheStr = detalhe ? `${detalhe.horas.toFixed(1)}h × ${formatMoney(detalhe.rate)}` : '—';
+                    const comissaoStr = client.billingModel === 'hourly' ? '—' : `<span class="money-value">${formatMoney(comissao)}</span>`;
+                    return `
+                        <tr>
+                            <td>${escapeHtml(client.name)}</td>
+                            <td>${modelo}</td>
+                            <td>${detalheStr}</td>
+                            <td><span class="money-value">${formatMoney(valor)}</span></td>
+                            <td>${comissaoStr}</td>
+                        </tr>`;
+                }).join('');
+            }
+
+            tfoot.innerHTML = `
+                <tr style="font-weight:600;">
+                    <td colspan="3">Total</td>
+                    <td><span class="money-value">${formatMoney(summary.totalValor)}</span></td>
+                    <td><span class="money-value">${formatMoney(summary.totalComissao)}</span></td>
+                </tr>`;
+
+            chartContainer.innerHTML = '';
+            chartContainer.appendChild(this._buildFinanceiroChart(history));
+            lucide.createIcons();
+        } catch (err) {
+            tbody.innerHTML = `<tr><td colspan="5" class="text-muted">Erro ao carregar: ${escapeHtml(err.message)}</td></tr>`;
+            chartContainer.innerHTML = '';
+        }
+    }
+
+    _buildFinanceiroChart(history) {
+        const wrap = document.createElement('div');
+        return wrap; // implementado na Task 6
+    }
+
     _buildProdBalanceCard(summary) {
         const card = document.createElement('div');
         card.className = 'glass stat-card';
