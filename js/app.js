@@ -6052,7 +6052,36 @@ class AppController {
 
     _buildFinanceiroChart(history) {
         const wrap = document.createElement('div');
-        return wrap; // implementado na Task 6
+        wrap.className = 'glass';
+        wrap.style.padding = '20px 24px';
+
+        const monthAbbr = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
+        const maxValor = Math.max(...history.map(h => h.totalValor), 1);
+        const formatMoney = (val) => (val && !isNaN(val)) ? `R$ ${parseFloat(val).toFixed(2).replace('.', ',')}` : 'R$ 0,00';
+
+        const bars = history.map(h => {
+            const pct = Math.round((h.totalValor / maxValor) * 100);
+            const isSelected = h.year === this.financeiroYear && h.month === this.financeiroMonth;
+            const barColor = isSelected ? 'linear-gradient(180deg,#38bdf8,#0ea5e9)' : 'linear-gradient(180deg,#22c55e,#16a34a)';
+            return `
+                <div style="display:flex;flex-direction:column;align-items:center;flex:1;gap:6px;">
+                    <div style="height:140px;width:100%;display:flex;align-items:flex-end;">
+                        <div class="fin-bar-fill money-value" data-h="${pct}" title="${formatMoney(h.totalValor)}"
+                            style="width:60%;margin:0 auto;height:0;background:${barColor};border-radius:4px 4px 0 0;transition:height 0.55s ease;"></div>
+                    </div>
+                    <span style="font-size:0.72rem;color:var(--text-muted);">${monthAbbr[h.month - 1]}/${String(h.year).slice(2)}</span>
+                </div>`;
+        }).join('');
+
+        wrap.innerHTML = `<h3 style="margin:0 0 16px;font-size:1rem;">Total a receber por mês</h3><div style="display:flex;align-items:flex-end;gap:4px;">${bars}</div>`;
+
+        requestAnimationFrame(() => requestAnimationFrame(() => {
+            wrap.querySelectorAll('.fin-bar-fill').forEach(bar => {
+                bar.style.height = bar.dataset.h + '%';
+            });
+        }));
+
+        return wrap;
     }
 
     _buildProdBalanceCard(summary) {
