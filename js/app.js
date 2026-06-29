@@ -6171,7 +6171,7 @@ class AppController {
                 tbody.innerHTML = summary.items.map(({ client, valor, comissao, detalhe }) => {
                     const modelo = client.billingModel === 'hourly' ? 'Por Hora' : 'Fixo';
                     const detalheStr = detalhe ? `${detalhe.horas.toFixed(1)}h × ${formatMoney(detalhe.rate)}` : '—';
-                    const comissaoStr = client.billingModel === 'hourly' ? '—' : `<span class="money-value">${formatMoney(comissao)}</span>`;
+                    const comissaoStr = client.billingModel === 'hourly' ? `<span class="money-value">${formatMoney(valor)}</span>` : `<span class="money-value">${formatMoney(comissao)}</span>`;
                     return `
                         <tr>
                             <td>${escapeHtml(client.name)}</td>
