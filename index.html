@@ -768,6 +768,11 @@
                         <button id="btn-financeiro-today" class="btn btn-secondary btn-sm" onclick="app.financeiroGoToToday()">Hoje</button>
                     </div>
                 </div>
+                <div class="view-header-actions">
+                    <button class="btn btn-secondary" id="btn-toggle-money-fin" onclick="app.toggleMoneyVisibility()" title="Mostrar/ocultar valores monetários" style="padding: 8px 12px;">
+                        <i data-lucide="eye" id="icon-toggle-money-fin" style="width: 18px; height: 18px;"></i>
+                    </button>
+                </div>
             </div>
 
             <table class="data-table" id="financeiro-table">

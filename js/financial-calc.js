@@ -24,7 +24,7 @@
         if (client.billingModel === 'hourly') {
             const horas = (minutesInMonth || 0) / 60;
             const valor = horas * (client.hourlyRate || 0);
-            return { client, valor, comissao: 0, detalhe: { horas, rate: client.hourlyRate || 0 } };
+            return { client, valor, comissao: valor, detalhe: { horas, rate: client.hourlyRate || 0 } };
         }
         const valor = client.clientPays || 0;
         const comissao = (client.clientPays || 0) * 0.43 + (client.consultantBonus || 0);

@@ -2323,7 +2323,7 @@ class AppController {
 
     _applyMoneyIcons(hidden) {
         const lucideName = hidden ? 'eye-off' : 'eye';
-        ['icon-toggle-money', 'icon-toggle-money-modal'].forEach(id => {
+        ['icon-toggle-money', 'icon-toggle-money-modal', 'icon-toggle-money-fin'].forEach(id => {
             const icon = document.getElementById(id);
             if (icon) icon.setAttribute('data-lucide', lucideName);
         });
