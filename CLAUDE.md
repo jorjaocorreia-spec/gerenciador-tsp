@@ -466,6 +466,7 @@ Padrões implementados em `styles/main.css` + `js/app.js`. Regras de UI ativas: 
 - **Monitorar no OTOBO** — coluna `monitored BOOLEAN` em `tickets`; tickets monitorados destacados na view Chamados com badge/seção separada.
 - **Lançar chamado OTOBO como Implementação** — botão no footer do `modal-chamado` (só quando `linked_client_id` existe) que pré-preenche `modal-implementation` com dados do ticket. Sem migration necessária.
 - **Painel de Posição de Projeto por Cliente** — ver spec em [Documentation/fase43-painel-posicao-projeto.md](Documentation/fase43-painel-posicao-projeto.md).
+- **Controle de acesso por níveis de usuário (Portal do Cliente)** — Fechar cadastro livre e criar dois papéis: `consultant` (acesso total, atual) e `client` (somente view Tarefas, read-only). Decisões definidas: (1) clientes apenas visualizam tarefas, sem comentar; (2) haverá painel admin separado dentro do app para gerenciar usuários, papéis e convites; (3) cada usuário-cliente vinculado a exatamente um `client_id`. Pontos técnicos a detalhar na sessão de planejamento: desabilitar signup livre no Supabase + sistema de convite via Edge Function (`inviteUserByEmail`); tabela `user_roles (user_id PK, role, client_id, invited_by)`; RLS nas tasks para papel `client`; `initAfterAuth()` lendo papel antes de renderizar sidebar; UI do cliente: sidebar reduzida + Kanban read-only filtrado pelo `client_id` vinculado.
 
 ---
 
