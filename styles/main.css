@@ -3982,6 +3982,25 @@ kbd {
     isolation: isolate;
 }
 
+/* Fase 45: Portal do Cliente — modal de tarefa somente-leitura */
+.modal-task-readonly .modal-sidebar-actions,
+.modal-task-readonly .modal-checklist-add,
+.modal-task-readonly .attach-zone-hint,
+.modal-task-readonly .attach-remove,
+.modal-task-readonly .modal-sidebar-col-buttons,
+.modal-task-readonly .kb-label-picker,
+.modal-task-readonly .kb-cover-picker,
+.modal-task-readonly #btn-ai-suggest-steps,
+.modal-task-readonly .checklist-item-delete,
+.modal-task-readonly .modal-task-title-edit-icon {
+    display: none !important;
+}
+.modal-task-readonly textarea,
+.modal-task-readonly input:not([type="checkbox"]),
+.modal-task-readonly select {
+    pointer-events: none;
+}
+
 /* D6 — Dashboard: cards deslizam conforme direção do mês */
 @keyframes card-slide-from-right {
     from { opacity: 0; transform: translateX(48px) scale(0.96); }

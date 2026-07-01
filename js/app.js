@@ -899,7 +899,7 @@ class AppController {
         }
     }
 
-    async handleEditTask(id) {
+    async handleEditTask(id, readOnly = false) {
         const t = await store.getTask(id);
         if (!t) return;
 
@@ -941,7 +941,20 @@ class AppController {
         this._renderTaskAttachmentPreviews();
         this._renderTaskComments();
 
+        this._applyTaskModalReadOnlyState(readOnly);
         this.openModal('modal-task');
+    }
+
+    _applyTaskModalReadOnlyState(readOnly) {
+        const modalEl = document.querySelector('#modal-task .modal');
+        if (modalEl) modalEl.classList.toggle('modal-task-readonly', !!readOnly);
+        if (!readOnly) return;
+        document.getElementById('btn-delete-task').style.display = 'none';
+        document.getElementById('btn-add-time-task').style.display = 'none';
+        document.getElementById('modal-task-comments-section').style.display = 'none';
+        ['task-title', 'task-description', 'task-client', 'task-priority', 'task-due-date', 'task-estimated-minutes']
+            .forEach(id => { const el = document.getElementById(id); if (el) el.disabled = true; });
+        document.querySelectorAll('#modal-checklist-items input[type="checkbox"]').forEach(cb => cb.disabled = true);
     }
 
     _renderTaskAttachmentPreviews() {
@@ -1919,6 +1932,51 @@ class AppController {
     // ===================================
     // RENDERS
     // ===================================
+    async enterClientPortalMode() {
+        document.querySelectorAll('.nav-item').forEach(item => {
+            item.style.display = item.getAttribute('data-view') === 'tasks' ? '' : 'none';
+        });
+        ['btn-import-pdf', 'btn-migrate-local', 'btn-ai-config', 'btn-whatsapp-config'].forEach(id => {
+            const el = document.getElementById(id);
+            if (el) el.style.display = 'none';
+        });
+        // View Tarefas: filtros e dashboard de métricas não fazem sentido no portal
+        // (cliente já está fixo no próprio client_id, sem opção de trocar)
+        const filtersBar = document.querySelector('#view-tasks .kanban-filters');
+        if (filtersBar) filtersBar.style.display = 'none';
+        const dashboardBox = document.getElementById('tasks-dashboard-container');
+        if (dashboardBox) dashboardBox.style.display = 'none';
+
+        this.currentView = 'tasks';
+        document.querySelectorAll('.nav-item').forEach(item => {
+            item.classList.toggle('active', item.getAttribute('data-view') === 'tasks');
+        });
+        document.querySelectorAll('.view-section').forEach(section => {
+            section.classList.toggle('active', section.id === 'view-tasks');
+        });
+
+        await this.renderClientPortalTasks();
+        lucide.createIcons();
+    }
+
+    async renderClientPortalTasks() {
+        const board = document.getElementById('kanban-board');
+        if (!board) return;
+        const btnManage = document.getElementById('btn-manage-columns');
+        if (btnManage) btnManage.style.display = 'none';
+        const btnNewTask = document.getElementById('btn-new-task');
+        if (btnNewTask) btnNewTask.style.display = 'none';
+
+        const [columns, tasks] = await Promise.all([
+            store.getClientPortalColumns(this.userClientId),
+            store.getClientPortalTasks(this.userClientId),
+        ]);
+        this._currentColumns = columns;
+        this._tasksCache = tasks;
+        this._renderKanbanBoard(columns, tasks, {}, true);
+        lucide.createIcons();
+    }
+
     async renderAll() {
         if (this._renderAllRunning) {
             this._renderAllPending = true;
@@ -3583,7 +3641,7 @@ class AppController {
         `;
     }
 
-    _renderKanbanBoard(columns, tasks, clientsMap) {
+    _renderKanbanBoard(columns, tasks, clientsMap, readOnly = false) {
         const board = document.getElementById('kanban-board');
         if (!board) return;
         board.innerHTML = '';
@@ -3602,20 +3660,12 @@ class AppController {
             colEl.style.animationDelay = `${colIdx * 0.07}s`;
             colEl.dataset.status = colId;
 
-            colEl.innerHTML = `
-                <div class="kb-column-header">
-                    <div class="kb-column-title">
-                        <span class="kb-column-dot" style="background:${escapeHtml(col.color)}"></span>
-                        <h3>${escapeHtml(col.name)}</h3>
-                        ${col.isDone ? '<span class="kb-done-badge" title="Finalizada">✓</span>' : ''}
-                        <span class="kb-count" id="kb-count-${colId}">${colTasks.length}</span>
-                    </div>
+            const headerAddBtn = readOnly ? '' : `
                     <button class="kb-header-add" onclick="app.openQuickAdd('${colId}')" title="Adicionar card">
                         <i data-lucide="plus"></i>
-                    </button>
-                </div>
-                <div class="kb-dropzone" id="kb-col-${colId}" data-status="${colId}"
-                     ondragover="app.allowDrop(event)" ondrop="app.dropTask(event)"></div>
+                    </button>`;
+            const dropzoneAttrs = readOnly ? '' : `ondragover="app.allowDrop(event)" ondrop="app.dropTask(event)"`;
+            const quickAddHtml = readOnly ? '' : `
                 <div class="kb-quick-add" id="kb-quick-add-${colId}" style="display:none">
                     <textarea class="kb-quick-add-input" id="kb-quick-input-${colId}" rows="3"
                               placeholder="Título do card..." spellcheck="true"
@@ -3624,14 +3674,29 @@ class AppController {
                         <button class="btn btn-primary" onclick="app.submitQuickAdd('${colId}')">Adicionar</button>
                         <button class="btn btn-ghost" onclick="app.closeQuickAdd('${colId}')"><i data-lucide="x"></i></button>
                     </div>
-                </div>
+                </div>`;
+            const addCardBtn = readOnly ? '' : `
                 <button class="kb-add-card-btn" id="kb-add-btn-${colId}" onclick="app.openQuickAdd('${colId}')">
                     <i data-lucide="plus"></i> Adicionar card
-                </button>
+                </button>`;
+
+            colEl.innerHTML = `
+                <div class="kb-column-header">
+                    <div class="kb-column-title">
+                        <span class="kb-column-dot" style="background:${escapeHtml(col.color)}"></span>
+                        <h3>${escapeHtml(col.name)}</h3>
+                        ${col.isDone ? '<span class="kb-done-badge" title="Finalizada">✓</span>' : ''}
+                        <span class="kb-count" id="kb-count-${colId}">${colTasks.length}</span>
+                    </div>
+                    ${headerAddBtn}
+                </div>
+                <div class="kb-dropzone" id="kb-col-${colId}" data-status="${colId}" ${dropzoneAttrs}></div>
+                ${quickAddHtml}
+                ${addCardBtn}
             `;
 
             const dropzone = colEl.querySelector('.kb-dropzone');
-            colTasks.forEach(task => dropzone.appendChild(this.createKanbanCard(task, clientsMap)));
+            colTasks.forEach(task => dropzone.appendChild(this.createKanbanCard(task, clientsMap, readOnly)));
 
             board.appendChild(colEl);
         });
@@ -3681,33 +3746,35 @@ class AppController {
             </table>`;
     }
 
-    createKanbanCard(task, clientsMap) {
+    createKanbanCard(task, clientsMap, readOnly = false) {
         const card = document.createElement('div');
         card.className = 'kb-card' + (task.id === this._lastAddedTaskId ? ' kb-card-new' : '');
-        card.draggable = true;
+        card.draggable = !readOnly;
         card.dataset.id = task.id;
 
-        card.addEventListener('dragstart', this.dragStart.bind(this));
-        card.addEventListener('dragend', this.dragEnd.bind(this));
+        if (!readOnly) {
+            card.addEventListener('dragstart', this.dragStart.bind(this));
+            card.addEventListener('dragend', this.dragEnd.bind(this));
+            card.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                if (!this._dragPlaceholder || card === this._draggedCard) return;
+                const rect = card.getBoundingClientRect();
+                const mid = rect.top + rect.height / 2;
+                if (e.clientY < mid) {
+                    card.parentNode.insertBefore(this._dragPlaceholder, card);
+                } else {
+                    card.insertAdjacentElement('afterend', this._dragPlaceholder);
+                }
+            });
+            card.addEventListener('drop', async (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                await this._handleDrop(e, card.closest('.kb-dropzone'));
+            });
+        }
         card.addEventListener('click', (e) => {
-            if (!e.target.closest('button')) this.handleEditTask(task.id);
-        });
-        card.addEventListener('dragover', (e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            if (!this._dragPlaceholder || card === this._draggedCard) return;
-            const rect = card.getBoundingClientRect();
-            const mid = rect.top + rect.height / 2;
-            if (e.clientY < mid) {
-                card.parentNode.insertBefore(this._dragPlaceholder, card);
-            } else {
-                card.insertAdjacentElement('afterend', this._dragPlaceholder);
-            }
-        });
-        card.addEventListener('drop', async (e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            await this._handleDrop(e, card.closest('.kb-dropzone'));
+            if (!e.target.closest('button')) this.handleEditTask(task.id, readOnly);
         });
 
         const client = clientsMap[task.clientId];
