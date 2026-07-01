@@ -1410,6 +1410,11 @@ class AppController {
         // (que pode ter mudado entre a abertura da caixa e o submit).
         const qa = document.getElementById(`kb-quick-add-${colId}`);
         const clientId = qa?.dataset.clientId || null;
+        if (!clientId) {
+            Toast.show('Selecione um cliente no filtro antes de adicionar um card.', 'error');
+            this.closeQuickAdd(colId);
+            return;
+        }
 
         // Optimistic: insere card temporário no cache e renderiza imediatamente
         const tempId = `temp-${Date.now()}`;

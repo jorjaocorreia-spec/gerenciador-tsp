@@ -229,6 +229,7 @@ class TSPStore {
     }
 
     async addTask(taskData) {
+        if (!taskData.clientId) throw new Error('Cliente é obrigatório para gravar a tarefa.');
         const targetStatus = taskData.status || 'new';
         const { data: existing } = await this.db.from('tasks')
             .select('position').eq('user_id', this.userId).eq('status', targetStatus)
@@ -254,8 +255,9 @@ class TSPStore {
     }
 
     async updateTask(taskData) {
+        if (!taskData.clientId) throw new Error('Cliente é obrigatório para gravar a tarefa.');
         const { data, error } = await this.db.from('tasks').update({
-            client_id: taskData.clientId || null, title: taskData.title,
+            client_id: taskData.clientId, title: taskData.title,
             description: taskData.description || '', status: taskData.status,
             priority: taskData.priority, due_date: taskData.dueDate || null,
             estimated_minutes: parseInt(taskData.estimatedMinutes) || 0,
