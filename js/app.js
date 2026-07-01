@@ -169,6 +169,10 @@ class AppController {
         document.querySelectorAll('.nav-item').forEach(item => {
             item.addEventListener('click', (e) => {
                 const view = e.currentTarget.getAttribute('data-view');
+                if (this.userRole === 'client') {
+                    this.renderClientPortalTasks();
+                    return;
+                }
                 this.switchView(view);
             });
         });
