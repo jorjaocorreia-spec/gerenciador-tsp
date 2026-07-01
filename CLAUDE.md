@@ -158,7 +158,7 @@ Todas têm `user_id uuid references auth.users` + RLS ativa (`auth.uid() = user_
 | `tickets` | id, user_id, ticket_id, ticket_number, title, status, priority, queue, customer_name, owner, created_at_otobo, updated_at_otobo, raw_data JSONB, linked_client_id, synced_at |
 | `user_ai_config` | user_id (PK), provider (openai\|anthropic), api_key TEXT, model TEXT, updated_at |
 
-### Fases implementadas (1–44, todas ✅)
+### Fases implementadas (1–45, todas ✅)
 
 | Fases | Funcionalidade |
 |-------|---------------|
@@ -192,6 +192,7 @@ Todas têm `user_id uuid references auth.users` + RLS ativa (`auth.uid() = user_
 | 42 | RSVP na agenda (Sim/Talvez/Não) + toggle hide declinados |
 | 43 | Produtividade: meta semanal vs apontamentos, feriados nacionais/manuais, saldo acumulado, export PDF |
 | 44 | Cobrança "Por Hora" por cliente: `billing_model`/`hourly_rate`, toggle no modal, exibição em Clientes/Dashboard sem comissão |
+| 45 | Controle de acesso por níveis de usuário (Portal do Cliente): tabela `user_roles`, RLS cross-user em `tasks`/`kanban_columns`, Edge Function `manage-users` (convite/listagem/revogação), view "Usuários", modo portal do cliente (Kanban read-only) |
 
 ---
 
@@ -377,6 +378,11 @@ O `docker-entrypoint.sh` injeta essas vars em `js/config.js` via `envsubst` na i
 - **Kanban Fase 22: `reorderColumns` usa mesmo padrão de `reorderTasks`** — `Promise.all` de `UPDATE` individuais, nunca `upsert` (conflita com RLS).
 - **Kanban Fase 22: `mc-color-palette` fecha via re-render** — `_mcPickColor(idx, color)` chama `_renderManageColumnsList()` que recria o DOM; todas as palettes ficam `display:none` novamente. `_mcToggleColorPicker` fecha todos antes de abrir o selecionado.
 - **Kanban: `_mcDelete` e `store.deleteColumn` bloqueiam exclusão de coluna com tarefas vinculadas** — a checagem em `_mcDelete()` conta `tasks.filter(t => t.status === col.id)`, **sem** exigir também `t.clientId === clientId` (isso existia antes e era o bug real): uma tarefa órfã (`client_id` nulo) que ainda usasse aquela coluna não batia com `t.clientId === clientId` e passava despercebida, permitindo excluir a coluna e deixar a tarefa duplamente órfã (sem cliente E sem coluna válida — foi exatamente assim que apareceram tarefas antigas com `status` apontando para uma `kanban_columns` já deletada). `store.deleteColumn(id)` tem a mesma checagem como segunda camada de defesa (`SELECT count... WHERE status = id`), para o caso de qualquer chamada futura não passar pela checagem da UI. Nunca reintroduzir o filtro por `clientId` nessa contagem — o `col.id` já é único por coluna, então não precisa (e não deve) ser combinado com o cliente do filtro.
+- **Portal do Cliente: `initAfterAuth()` sempre resolve o papel antes de renderizar** — `store.getUserRole()` roda antes de qualquer `renderAll()`; sem linha em `user_roles`, o usuário é deslogado automaticamente com toast de erro. Nunca mover a chamada de `getUserRole()` para depois do primeiro render.
+- **Portal do Cliente: `getClientPortalTasks`/`getClientPortalColumns` nunca filtram por `user_id`** — dependem inteiramente das policies RLS `clients_read_own_tasks`/`clients_read_own_columns` (que casam `user_roles.client_id` com `tasks.client_id`/`kanban_columns.client_id`). Adicionar `.eq('user_id', this.userId)` nesses métodos quebraria o acesso cross-user do papel `client` (o dono real da tarefa é o consultor, não o cliente logado).
+- **Portal do Cliente: `manage-users` só aceita chamadas de `role === 'consultant'`** — a checagem é feita no backend (Edge Function), não só na UI; qualquer novo `action` adicionado à function deve manter essa checagem antes de tocar em `user_roles`/`auth.admin`.
+- **Portal do Cliente: revogação sempre deleta o usuário do Supabase Auth, não só a role** — evita login "zumbi" sem `user_roles`. Se um dia for necessário suspender sem deletar, isso é uma mudança de comportamento deliberada, não um bug a corrigir.
+- **Portal do Cliente: `_renderKanbanBoard`/`createKanbanCard`/`handleEditTask` aceitam `readOnly` como último parâmetro opcional** — `enterClientPortalMode()`/`renderClientPortalTasks()` são o único caminho que passa `readOnly=true`; qualquer novo ponto de entrada do Kanban precisa decidir explicitamente esse valor, o default é `false` (comportamento normal do consultor).
 
 ### Integração de IA — armadilhas conhecidas
 
@@ -471,7 +477,6 @@ Padrões implementados em `styles/main.css` + `js/app.js`. Regras de UI ativas: 
 - **Monitorar no OTOBO** — coluna `monitored BOOLEAN` em `tickets`; tickets monitorados destacados na view Chamados com badge/seção separada.
 - **Lançar chamado OTOBO como Implementação** — botão no footer do `modal-chamado` (só quando `linked_client_id` existe) que pré-preenche `modal-implementation` com dados do ticket. Sem migration necessária.
 - **Painel de Posição de Projeto por Cliente** — ver spec em [Documentation/fase43-painel-posicao-projeto.md](Documentation/fase43-painel-posicao-projeto.md).
-- **Controle de acesso por níveis de usuário (Portal do Cliente)** — Fechar cadastro livre e criar dois papéis: `consultant` (acesso total, atual) e `client` (somente view Tarefas, read-only). Decisões definidas: (1) clientes apenas visualizam tarefas, sem comentar; (2) haverá painel admin separado dentro do app para gerenciar usuários, papéis e convites; (3) cada usuário-cliente vinculado a exatamente um `client_id`. Pontos técnicos a detalhar na sessão de planejamento: desabilitar signup livre no Supabase + sistema de convite via Edge Function (`inviteUserByEmail`); tabela `user_roles (user_id PK, role, client_id, invited_by)`; RLS nas tasks para papel `client`; `initAfterAuth()` lendo papel antes de renderizar sidebar; UI do cliente: sidebar reduzida + Kanban read-only filtrado pelo `client_id` vinculado.
 
 ---
 
