@@ -1044,6 +1044,7 @@ class AppController {
         this._modalComments = this._modalComments.filter(c => c.id !== commentId);
         try {
             await store.updateTask({ id: this._modalTaskId, comments: this._modalComments,
+                clientId: document.getElementById('task-client').value,
                 title: document.getElementById('task-title').value,
                 description: document.getElementById('task-description').value,
                 status: this._modalStatus, priority: document.getElementById('task-priority').value,
@@ -1090,6 +1091,7 @@ class AppController {
         if (entry) entry.text = newText;
         try {
             await store.updateTask({ id: this._modalTaskId, comments: this._modalComments,
+                clientId: document.getElementById('task-client').value,
                 title: document.getElementById('task-title').value,
                 description: document.getElementById('task-description').value,
                 status: this._modalStatus, priority: document.getElementById('task-priority').value,
