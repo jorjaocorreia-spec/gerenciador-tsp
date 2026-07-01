@@ -9704,6 +9704,26 @@ class AppController {
         return res.json();
     }
 
+    async _manageUsersFetch(action, params = {}) {
+        const { data: { session } } = await window.supabaseClient.auth.getSession();
+        if (!session) throw new Error('Sessão expirada. Faça login novamente.');
+        const res = await fetch(
+            `${window.TSP_CONFIG.SUPABASE_URL}/functions/v1/manage-users`,
+            {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${session.access_token}`,
+                    'apikey': window.TSP_CONFIG.SUPABASE_ANON_KEY,
+                },
+                body: JSON.stringify({ action, ...params })
+            }
+        );
+        const json = await res.json().catch(() => ({}));
+        if (!res.ok || json.error) throw new Error(json.error || `manage-users retornou ${res.status}`);
+        return json;
+    }
+
     async _fetchTicketsFromOtobo(config, onProgress, lastSyncAt = null) {
         const syncFilters = this._otoboConfig?.syncFilters || {};
         const isIncremental = !!lastSyncAt;
