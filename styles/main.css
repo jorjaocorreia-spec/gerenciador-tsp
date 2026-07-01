@@ -1102,10 +1102,14 @@ h4 {
   display: block;
   margin-bottom: 4px;
 }
+.modal-task-title-wrap {
+  position: relative;
+}
 .modal-task-title-input {
   width: 100%;
   background: transparent;
-  border: none;
+  border: 1px solid transparent;
+  border-radius: 6px;
   color: var(--text-primary);
   font-size: 18px;
   font-weight: 600;
@@ -1113,7 +1117,32 @@ h4 {
   resize: none;
   outline: none;
   font-family: inherit;
-  padding: 0;
+  padding: 4px 30px 4px 6px;
+  margin: -4px -6px;
+  cursor: text;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+.modal-task-title-wrap:hover .modal-task-title-input {
+  background: var(--bg-glass, rgba(255, 255, 255, 0.05));
+  border-color: rgba(255, 255, 255, 0.12);
+}
+.modal-task-title-input:focus {
+  background: var(--bg-glass, rgba(255, 255, 255, 0.05));
+  border-color: var(--primary);
+}
+.modal-task-title-edit-icon {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 15px;
+  height: 15px;
+  color: var(--text-secondary);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.15s ease;
+}
+.modal-task-title-wrap:hover .modal-task-title-edit-icon {
+  opacity: 0.7;
 }
 .modal-task-body {
   display: flex;

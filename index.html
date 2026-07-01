@@ -1279,8 +1279,12 @@
             <div class="modal-header" style="padding: 20px 24px 0; border-bottom: none; align-items: flex-start; gap: 12px;">
                 <div class="modal-task-header-info">
                     <span class="modal-task-column-label" id="modal-task-column-label">Novas</span>
-                    <textarea class="modal-task-title-input" id="task-title" rows="2"
-                              placeholder="Título da tarefa..." spellcheck="true"></textarea>
+                    <div class="modal-task-title-wrap">
+                        <textarea class="modal-task-title-input" id="task-title" rows="2"
+                                  placeholder="Título da tarefa..." spellcheck="true"
+                                  title="Clique para editar o título"></textarea>
+                        <i data-lucide="pencil" class="modal-task-title-edit-icon"></i>
+                    </div>
                 </div>
                 <button class="close-modal" onclick="app.closeModal('modal-task')" style="margin-top: 20px;">
                     <i data-lucide="x"></i>
