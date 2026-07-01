@@ -54,6 +54,11 @@ serve(async (req) => {
     if (action === "search") {
       const sf = (syncFilters || {}) as Record<string, unknown>;
       const hasOwnerFilter = typeof sf.ownerLogin === "string" && (sf.ownerLogin as string).trim().length > 0;
+      // OwnerIDs é o único parâmetro de proprietário que a operação TicketSearch do OTOBO
+      // realmente suporta (Owners/OwnerLogin como string não existem no backend e são
+      // silenciosamente ignorados — confirmado com o admin do OTOBO). Cada usuário tem um
+      // ID de agente diferente, informado manualmente na config (não há como descobrir via API).
+      const hasOwnerId = typeof sf.ownerId === "number" && Number.isFinite(sf.ownerId) && sf.ownerId > 0;
       const isIncremental = typeof lastSyncAt === "string" && lastSyncAt.trim().length > 0;
 
       const searchBody: Record<string, unknown> = {
@@ -61,17 +66,18 @@ serve(async (req) => {
         SortBy: "Changed",
         OrderBy: "Down",
         // Sync incremental: limite baixo pois só busca tickets recentemente alterados.
-        // Sync completa com owner (agora funciona server-side): 500 suficiente para a carteira do usuário.
-        // Sem owner: 500 para comportamento padrão.
+        // Com OwnerIDs, a busca já é exata (só os tickets do agente) — o limite é só um teto de segurança.
         Limit: isIncremental ? 200 : ((typeof sf.limit === "number" && sf.limit > 0) ? sf.limit : 500),
       };
       // Só adiciona filtros se o array não estiver vazio (array vazio = retorna 0 resultados no OTOBO)
       if (Array.isArray(sf.queues) && sf.queues.length > 0) searchBody.Queues = sf.queues;
       if (Array.isArray(sf.states) && sf.states.length > 0) searchBody.States = sf.states;
       if (Array.isArray(sf.types) && sf.types.length > 0) searchBody.Types = sf.types;
-      if (hasOwnerFilter) {
+      if (hasOwnerId) {
+        searchBody.OwnerIDs = [sf.ownerId];
+      } else if (hasOwnerFilter) {
         const login = (sf.ownerLogin as string).trim();
-        // Enviar nos dois formatos para máxima compatibilidade com versões do OTOBO
+        // Mantido por compatibilidade, mas o OTOBO ignora estes parâmetros na prática.
         searchBody.Owners = [login];
         searchBody.OwnerLogin = login;
       }

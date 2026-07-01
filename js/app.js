@@ -9817,6 +9817,7 @@ class AppController {
         document.getElementById('sync-filter-only-mine').checked = onlyMine;
         document.getElementById('sync-filter-owner').value   = onlyMine ? '' : (sf.ownerLogin || '');
         document.getElementById('owner-filter-row').style.display = onlyMine ? 'none' : '';
+        document.getElementById('sync-filter-owner-id').value = sf.ownerId || '';
         document.getElementById('sync-filter-limit').value   = sf.limit || 100;
         this.switchOtoboTab('conexao');
         this.openModal('modal-otobo-config');
@@ -9834,11 +9835,13 @@ class AppController {
         const parseLines = id => document.getElementById(id).value
             .split('\n').map(s => s.trim()).filter(Boolean);
         const onlyMine = document.getElementById('sync-filter-only-mine').checked;
+        const ownerIdRaw = document.getElementById('sync-filter-owner-id').value.trim();
         const syncFilters = {
             queues:     parseLines('sync-filter-queues'),
             states:     parseLines('sync-filter-states'),
             types:      parseLines('sync-filter-types'),
             ownerLogin: onlyMine ? username : document.getElementById('sync-filter-owner').value.trim(),
+            ownerId:    ownerIdRaw ? parseInt(ownerIdRaw) : null,
             onlyMine,
             limit:      parseInt(document.getElementById('sync-filter-limit').value) || 100
         };

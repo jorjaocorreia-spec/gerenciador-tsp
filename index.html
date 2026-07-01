@@ -2326,8 +2326,16 @@
                     <input type="text" id="sync-filter-owner" class="form-control" placeholder="(vazio = todos)">
                 </div>
                 <div class="form-group" style="margin-bottom:0;">
+                    <label class="form-label">Meu ID numérico de agente no OTOBO</label>
+                    <input type="number" id="sync-filter-owner-id" class="form-control" placeholder="ex: 42">
+                    <p style="font-size:0.8rem; color:var(--text-muted); margin:6px 0 0;">
+                        Cada usuário tem um ID diferente (Admin → Usuários no OTOBO). Preenchendo este campo, a busca traz
+                        TODOS os tickets em que você é proprietário, direto no servidor — não só os mais recentes.
+                    </p>
+                </div>
+                <div class="form-group" style="margin-bottom:0;">
                     <label class="form-label">Limite de tickets por sync</label>
-                    <input type="number" id="sync-filter-limit" class="form-control" min="10" max="500" value="100">
+                    <input type="number" id="sync-filter-limit" class="form-control" min="10" max="2000" value="100">
                 </div>
                 <p style="font-size:0.8rem; color:var(--text-muted); margin:0;">
                     Campos em branco = sem restrição (sincroniza tudo). Tickets fora dos filtros são removidos do cache ao sincronizar.
