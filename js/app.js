@@ -438,7 +438,16 @@ class AppController {
         this._initFloatLabels(document.getElementById(modalId));
     }
 
-    closeModal(modalId) {
+    _hasUnsavedTaskComment() {
+        const el = document.getElementById('task-comment-input');
+        return !!(el && el.value.trim() !== '');
+    }
+
+    closeModal(modalId, force) {
+        if (modalId === 'modal-task' && !force && this._hasUnsavedTaskComment()) {
+            Toast.show('Você digitou um comentário mas não clicou em "Comentar". Envie o comentário ou apague o texto para fechar.', 'error');
+            return;
+        }
         const overlay = document.getElementById(modalId);
         // Only animate out if the modal is currently open; otherwise clean up immediately
         // (prevents the 200ms timeout from closing a modal that was just re-opened)
@@ -786,6 +795,10 @@ class AppController {
     // ===================================
     async handleTaskSubmit(e) {
         if (e) e.preventDefault();
+        if (this._hasUnsavedTaskComment()) {
+            Toast.show('Você digitou um comentário mas não clicou em "Comentar". Envie o comentário ou apague o texto para salvar.', 'error');
+            return;
+        }
         const id = document.getElementById('task-id').value;
         const title = document.getElementById('task-title').value.trim();
         if (!title) { Toast.show('Informe o título da tarefa.', 'error'); return; }
@@ -1239,7 +1252,7 @@ class AppController {
         this._twostepDelete(btn, async () => {
             try {
                 await store.deleteTask(id);
-                this.closeModal('modal-task');
+                this.closeModal('modal-task', true);
                 // Remove do cache e re-renderiza
                 if (this._tasksCache) {
                     this._tasksCache = this._tasksCache.filter(t => t.id !== id);
