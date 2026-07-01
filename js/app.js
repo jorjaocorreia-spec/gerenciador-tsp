@@ -9625,10 +9625,6 @@ class AppController {
     }
 
     async syncChamados(force = false) {
-        // TODO: remover quando o admin concluir os ajustes no webservice OTOBO (mapeamento OwnerLogin + TicketLastChangeTimeNewerDate)
-        Toast.show('Sincronização em manutenção. Aguarde a liberação pelo administrador.', 'warning', 6000);
-        return;
-
         const btn = document.getElementById('btn-sync-chamados');
         const info = document.getElementById('chamados-sync-info');
         const setInfo = (txt) => { if (info) { info.textContent = txt; info.style.display = ''; } };
