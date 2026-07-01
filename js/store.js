@@ -922,6 +922,11 @@ class TSPStore {
     }
 
     async deleteColumn(id) {
+        const { count } = await this.db.from('tasks')
+            .select('id', { count: 'exact', head: true })
+            .eq('user_id', this.userId).eq('status', id);
+        if (count > 0) throw new Error(`Esta coluna possui ${count} tarefa(s) vinculada(s). Mova-as antes de excluir.`);
+
         const { error } = await this.db.from('kanban_columns').delete()
             .eq('id', id).eq('user_id', this.userId);
         if (error) throw error;

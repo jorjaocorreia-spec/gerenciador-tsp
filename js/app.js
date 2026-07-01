@@ -1735,10 +1735,12 @@ class AppController {
             this._renderManageColumnsList();
             return;
         }
-        // Verifica tasks na coluna
-        const clientId = document.getElementById('filter-task-client')?.value;
+        // Verifica tasks na coluna — checa apenas o status (col.id já é único por
+        // coluna); exigir também t.clientId === clientId deixava passar tarefas
+        // órfãs (client_id nulo) que ainda usavam essa coluna, permitindo excluí-la
+        // e deixando essas tarefas duplamente órfãs (sem cliente E sem coluna).
         const tasks = await store.getTasks();
-        const count = tasks.filter(t => t.status === col.id && t.clientId === clientId).length;
+        const count = tasks.filter(t => t.status === col.id).length;
         if (count > 0) {
             Toast.show(`"${col.name}" possui ${count} tarefa(s). Mova-as antes de excluir.`, 'error', 4000);
             return;
