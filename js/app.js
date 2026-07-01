@@ -59,6 +59,8 @@ class AppController {
         this.currentView = 'dashboard';
         this.selectedClient = null;
         this.selectedMonth = null;
+        this.userRole = null;       // 'consultant' | 'client' — setado em initAfterAuth()
+        this.userClientId = null;   // client_id vinculado, só para role 'client'
         this.pendingPdfRecords = [];
         this.pendingPdfWarnings = [];
         this.agendaCurrentDate = new Date();
@@ -1879,6 +1881,19 @@ class AppController {
 
     // Chamado após login bem-sucedido
     async initAfterAuth() {
+        const roleRow = await store.getUserRole();
+        if (!roleRow) {
+            Toast.show('Seu acesso ainda não foi configurado. Contate o consultor responsável.', 'error', 8000);
+            await Auth.signOut();
+            return;
+        }
+        this.userRole = roleRow.role;
+        this.userClientId = roleRow.clientId;
+
+        if (this.userRole === 'client') {
+            return this.enterClientPortalMode();
+        }
+
         this.checkLocalStorageMigration();
         this.applySidebarState();
         this.applyMoneyVisibility();
