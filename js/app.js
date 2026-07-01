@@ -362,7 +362,7 @@ class AppController {
         this.currentView = viewName;
 
         // V1: direção do slide baseada na ordem do menu
-        const VIEW_ORDER = ['dashboard','clients','records','tasks','agenda','apontamentos','implementations','trainings','chamados','produtividade','financeiro'];
+        const VIEW_ORDER = ['dashboard','clients','records','tasks','agenda','apontamentos','implementations','trainings','chamados','produtividade','financeiro','users'];
         const prevIdx = VIEW_ORDER.indexOf(prevView);
         const newIdx  = VIEW_ORDER.indexOf(viewName);
         const slideDir = (prevIdx >= 0 && newIdx >= 0 && prevIdx !== newIdx)
@@ -2005,7 +2005,8 @@ class AppController {
                 this.renderTrainings(),
                 this.renderChamados(),
                 this.renderProdutividade(),
-                this.renderFinanceiro()
+                this.renderFinanceiro(),
+                this.renderUsers()
             ]);
             lucide.createIcons();
         } finally {
@@ -9326,6 +9327,91 @@ class AppController {
             btn.disabled = false;
             btn.innerHTML = origHtml;
         }
+    }
+
+    // ===================================
+    // USUÁRIOS (admin — convite/listagem/revogação)
+    // ===================================
+
+    async renderUsers() {
+        if (this.currentView !== 'users') return;
+        const container = document.getElementById('users-content');
+        if (!container) return;
+        let result;
+        try {
+            result = await this._manageUsersFetch('list');
+        } catch (err) {
+            container.innerHTML = `<p class="text-muted">Erro ao carregar usuários: ${escapeHtml(err.message)}</p>`;
+            return;
+        }
+        const roleLabel = { consultant: 'Consultor', client: 'Cliente' };
+        const rowsHtml = result.users.map(u => `
+            <tr>
+                <td>${escapeHtml(u.email)}</td>
+                <td>${roleLabel[u.role] || u.role}</td>
+                <td>${u.clientName ? escapeHtml(u.clientName) : '—'}</td>
+                <td>${new Date(u.createdAt).toLocaleDateString('pt-BR')}</td>
+                <td>
+                    <button class="btn btn-danger btn-sm" onclick="app.revokeUserAccess('${u.userId}', this)">
+                        <i data-lucide="user-x" style="width:13px;height:13px"></i> Remover acesso
+                    </button>
+                </td>
+            </tr>`).join('');
+        container.innerHTML = `
+            <table class="data-table">
+                <thead><tr><th>E-mail</th><th>Papel</th><th>Cliente</th><th>Convidado em</th><th></th></tr></thead>
+                <tbody>${rowsHtml || '<tr><td colspan="5" class="text-muted">Nenhum usuário cadastrado.</td></tr>'}</tbody>
+            </table>`;
+        lucide.createIcons();
+    }
+
+    async openInviteUserModal() {
+        const clients = await store.getClients();
+        const select = document.getElementById('invite-client-id');
+        select.innerHTML = clients.map(c => `<option value="${c.id}">${escapeHtml(c.name)}</option>`).join('');
+        document.getElementById('form-invite-user').reset();
+        this.toggleInviteRoleFields();
+        this.openModal('modal-invite-user');
+    }
+
+    toggleInviteRoleFields() {
+        const role = document.getElementById('invite-role').value;
+        const group = document.getElementById('invite-client-group');
+        const clientSelect = document.getElementById('invite-client-id');
+        const isClient = role === 'client';
+        group.style.display = isClient ? '' : 'none';
+        clientSelect.required = isClient;
+    }
+
+    async handleInviteUserSubmit(e) {
+        e.preventDefault();
+        const email = document.getElementById('invite-email').value.trim();
+        const role = document.getElementById('invite-role').value;
+        const clientId = role === 'client' ? document.getElementById('invite-client-id').value : null;
+        const btn = e.target.querySelector('button[type="submit"]');
+        btn.disabled = true;
+        try {
+            await this._manageUsersFetch('invite', { email, role, clientId });
+            Toast.show('Convite enviado com sucesso.', 'success');
+            this.closeModal('modal-invite-user');
+            await this.renderUsers();
+        } catch (err) {
+            Toast.show(`Erro ao convidar: ${err.message}`, 'error', 6000);
+        } finally {
+            btn.disabled = false;
+        }
+    }
+
+    revokeUserAccess(userId, btn) {
+        this._twostepDelete(btn, async () => {
+            try {
+                await this._manageUsersFetch('revoke', { userId });
+                Toast.show('Acesso removido.', 'success');
+                await this.renderUsers();
+            } catch (err) {
+                Toast.show(`Erro ao remover acesso: ${err.message}`, 'error', 6000);
+            }
+        });
     }
 
     // ===================================
