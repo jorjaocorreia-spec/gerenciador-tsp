@@ -40,11 +40,14 @@ serve(async (req) => {
     const admin = getAdminClient();
 
     // Só consultores podem chamar qualquer action desta function.
-    const { data: callerRole } = await admin
+    const { data: callerRole, error: callerRoleError } = await admin
       .from("user_roles")
       .select("role")
       .eq("user_id", caller.id)
       .single();
+    if (callerRoleError) {
+      console.error("Erro ao consultar user_roles do caller:", callerRoleError.message);
+    }
     if (!callerRole || callerRole.role !== "consultant") {
       return jsonResponse({ error: "Apenas consultores podem gerenciar usuários." }, 403);
     }
@@ -101,7 +104,8 @@ serve(async (req) => {
 
     if (action === "revoke") {
       if (!userId || typeof userId !== "string") return jsonResponse({ error: "userId é obrigatório." }, 400);
-      await admin.from("user_roles").delete().eq("user_id", userId);
+      const { error: roleDeleteError } = await admin.from("user_roles").delete().eq("user_id", userId);
+      if (roleDeleteError) return jsonResponse({ error: roleDeleteError.message }, 400);
       const { error: deleteError } = await admin.auth.admin.deleteUser(userId);
       if (deleteError) return jsonResponse({ error: deleteError.message }, 400);
       return jsonResponse({ ok: true });
