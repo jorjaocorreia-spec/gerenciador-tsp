@@ -902,6 +902,34 @@ class TSPStore {
         return (data || []).map(r => this._column(r)).sort((a, b) => a.position - b.position);
     }
 
+    // ── PAPÉIS DE USUÁRIO (Portal do Cliente) ──────────────────────
+
+    async getUserRole() {
+        const { data, error } = await this.db.from('user_roles')
+            .select('role, client_id').eq('user_id', this.userId).single();
+        if (error) return null;
+        return { role: data.role, clientId: data.client_id };
+    }
+
+    // Tarefas do portal do cliente: SEM filtro por user_id — a RLS
+    // (policy clients_read_own_tasks) já restringe ao client_id vinculado
+    // ao usuário logado, mesmo que o dono real da linha seja outro user_id
+    // (o consultor). Nunca adicionar .eq('user_id', this.userId) aqui.
+    async getClientPortalTasks(clientId) {
+        const { data, error } = await this.db.from('tasks').select('*')
+            .eq('client_id', clientId).order('status').order('position');
+        if (error) throw error;
+        return data.map(r => this._task(r));
+    }
+
+    // Mesma lógica: sem filtro por user_id, depende de clients_read_own_columns.
+    async getClientPortalColumns(clientId) {
+        const { data, error } = await this.db.from('kanban_columns').select('*')
+            .eq('client_id', clientId).order('position');
+        if (error) throw error;
+        return (data || []).map(r => this._column(r));
+    }
+
     async addColumn(clientId, name, color, isDone) {
         const existing = await this.getColumns(clientId);
         const position = existing.length > 0 ? Math.max(...existing.map(c => c.position)) + 1 : 0;
