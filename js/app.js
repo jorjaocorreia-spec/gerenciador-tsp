@@ -1420,28 +1420,43 @@ class AppController {
         }
         this.closeQuickAdd(colId);
 
+        const trySave = () => store.addTask({ title, status: colId, clientId, priority: 'medium' });
+
+        let newTask;
         try {
-            const newTask = await store.addTask({ title, status: colId, clientId, priority: 'medium' });
-            // Substitui o temp pelo registro real
-            if (this._tasksCache) {
-                const idx = this._tasksCache.findIndex(t => t.id === tempId);
-                if (idx >= 0) this._tasksCache[idx] = newTask;
-                else this._tasksCache.push(newTask);
-                this._lastAddedTaskId = newTask?.id || null;
-                this._renderTasksFromCache();
-                this._lastAddedTaskId = null;
-            } else {
-                this._lastAddedTaskId = newTask?.id || null;
-                await this.renderAll();
-                this._lastAddedTaskId = null;
-            }
+            newTask = await trySave();
         } catch (err) {
-            // Reverte: remove o temp do cache
-            if (this._tasksCache) {
-                this._tasksCache = this._tasksCache.filter(t => t.id !== tempId);
-                this._renderTasksFromCache();
+            // Retry automático uma vez: cobre blips transitórios de rede/sessão,
+            // que são a causa mais provável de falha nesse INSERT simples.
+            try {
+                newTask = await trySave();
+            } catch (err2) {
+                // Nunca descartar o card em silêncio: reverte o temp do cache,
+                // reabre o quick-add com o título preservado e avisa com destaque.
+                if (this._tasksCache) {
+                    this._tasksCache = this._tasksCache.filter(t => t.id !== tempId);
+                    this._renderTasksFromCache();
+                }
+                this.openQuickAdd(colId);
+                const input2 = document.getElementById(`kb-quick-input-${colId}`);
+                if (input2) input2.value = title;
+                Toast.show(`Não foi possível salvar "${title}": ${err2.message}. O texto foi mantido no campo — clique em Adicionar para tentar de novo.`, 'error', 10000);
+                return;
             }
-            Toast.show('Erro ao criar tarefa: ' + err.message, 'error');
+        }
+
+        // Substitui o temp pelo registro real
+        if (this._tasksCache) {
+            const idx = this._tasksCache.findIndex(t => t.id === tempId);
+            if (idx >= 0) this._tasksCache[idx] = newTask;
+            else this._tasksCache.push(newTask);
+            this._lastAddedTaskId = newTask?.id || null;
+            this._renderTasksFromCache();
+            this._lastAddedTaskId = null;
+        } else {
+            this._lastAddedTaskId = newTask?.id || null;
+            await this.renderAll();
+            this._lastAddedTaskId = null;
         }
     }
 
