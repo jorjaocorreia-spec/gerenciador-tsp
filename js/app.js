@@ -1385,6 +1385,10 @@ class AppController {
         const qa = document.getElementById(`kb-quick-add-${colId}`);
         const btn = document.getElementById(`kb-add-btn-${colId}`);
         if (!qa) return;
+        // Congela o cliente filtrado no momento da abertura — evita que uma mudança de
+        // filtro (ex.: "Limpar filtros") entre a abertura e o submit desvincule a tarefa
+        // do cliente, mesmo com o colId (coluna) correto.
+        qa.dataset.clientId = document.getElementById('filter-task-client')?.value || '';
         qa.style.display = 'block';
         if (btn) btn.style.display = 'none';
         const input = document.getElementById(`kb-quick-input-${colId}`);
@@ -1402,7 +1406,10 @@ class AppController {
         const input = document.getElementById(`kb-quick-input-${colId}`);
         const title = input?.value.trim();
         if (!title) { this.closeQuickAdd(colId); return; }
-        const clientId = document.getElementById('filter-task-client')?.value || null;
+        // Usa o cliente congelado em openQuickAdd, não o valor ao vivo do filtro
+        // (que pode ter mudado entre a abertura da caixa e o submit).
+        const qa = document.getElementById(`kb-quick-add-${colId}`);
+        const clientId = qa?.dataset.clientId || null;
 
         // Optimistic: insere card temporário no cache e renderiza imediatamente
         const tempId = `temp-${Date.now()}`;
