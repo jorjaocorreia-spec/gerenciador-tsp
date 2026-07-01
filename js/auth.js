@@ -1,7 +1,6 @@
 const Auth = {
     client: null,
     currentUser: null,
-    mode: 'login', // 'login' | 'register'
 
     init() {
         const { createClient } = supabase;
@@ -23,12 +22,6 @@ const Auth = {
         if (error) throw error;
         this.currentUser = data.user;
         return data.user;
-    },
-
-    async signUp(email, password) {
-        const { data, error } = await this.client.auth.signUp({ email, password });
-        if (error) throw error;
-        return data;
     },
 
     async signOut() {
@@ -61,24 +54,6 @@ const Auth = {
         if (emailEl) emailEl.textContent = this.getUserEmail();
     },
 
-    switchTab(tab) {
-        this.mode = tab;
-        this.clearMessage();
-        const loginBtn = document.getElementById('auth-tab-login');
-        const registerBtn = document.getElementById('auth-tab-register');
-        const submitBtn = document.getElementById('auth-submit');
-
-        if (tab === 'login') {
-            loginBtn.className = 'btn btn-primary';
-            registerBtn.className = 'btn btn-secondary';
-            submitBtn.textContent = 'Entrar';
-        } else {
-            loginBtn.className = 'btn btn-secondary';
-            registerBtn.className = 'btn btn-primary';
-            submitBtn.textContent = 'Criar Conta';
-        }
-    },
-
     showMessage(text, isError = true) {
         const el = document.getElementById('auth-message');
         el.textContent = text;
@@ -105,24 +80,18 @@ const Auth = {
         this.clearMessage();
 
         try {
-            if (this.mode === 'login') {
-                await this.signIn(email, password);
-                this.hideAuthScreen();
-                if (window.app) window.app.initAfterAuth();
-            } else {
-                await this.signUp(email, password);
-                this.showMessage('Conta criada! Verifique seu e-mail para confirmar o cadastro.', false);
-            }
+            await this.signIn(email, password);
+            this.hideAuthScreen();
+            if (window.app) window.app.initAfterAuth();
         } catch (err) {
             const msgs = {
                 'Invalid login credentials': 'E-mail ou senha incorretos.',
                 'Email not confirmed': 'Confirme seu e-mail antes de entrar.',
-                'User already registered': 'Este e-mail já está cadastrado.',
             };
             this.showMessage(msgs[err.message] || err.message);
         } finally {
             btn.disabled = false;
-            btn.textContent = this.mode === 'login' ? 'Entrar' : 'Criar Conta';
+            btn.textContent = 'Entrar';
         }
     }
 };
