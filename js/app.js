@@ -9366,12 +9366,16 @@ class AppController {
     }
 
     async openInviteUserModal() {
-        const clients = await store.getClients();
-        const select = document.getElementById('invite-client-id');
-        select.innerHTML = clients.map(c => `<option value="${c.id}">${escapeHtml(c.name)}</option>`).join('');
-        document.getElementById('form-invite-user').reset();
-        this.toggleInviteRoleFields();
-        this.openModal('modal-invite-user');
+        try {
+            const clients = await store.getClients();
+            const select = document.getElementById('invite-client-id');
+            select.innerHTML = clients.map(c => `<option value="${c.id}">${escapeHtml(c.name)}</option>`).join('');
+            document.getElementById('form-invite-user').reset();
+            this.toggleInviteRoleFields();
+            this.openModal('modal-invite-user');
+        } catch (err) {
+            Toast.show('Erro ao carregar clientes: ' + err.message, 'error');
+        }
     }
 
     toggleInviteRoleFields() {
