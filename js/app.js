@@ -904,7 +904,12 @@ class AppController {
     }
 
     async handleEditTask(id, readOnly = false) {
-        const t = await store.getTask(id);
+        // Modo portal do cliente: store.getTask() filtra por .eq('user_id', this.userId),
+        // que nunca bate (a tarefa pertence ao consultor, não ao cliente logado) — usar
+        // o cache já carregado por renderClientPortalTasks() em vez de reconsultar o banco.
+        const t = readOnly
+            ? (this._tasksCache || []).find(task => task.id === id)
+            : await store.getTask(id);
         if (!t) return;
 
         // Garante colunas carregadas para o cliente desta tarefa
