@@ -10007,12 +10007,17 @@ class AppController {
         const normalize = s => (s || '').toLowerCase().trim();
         return otoboTickets.map(t => {
             const customerId = normalize(t.CustomerID || '');
+            // OTOBO retorna o CustomerID às vezes como "código - Nome da Empresa"
+            // (ex: "00668 - BSAutocenter"), não só o código puro. O cliente costuma
+            // estar cadastrado só com o código ("00668"), então comparamos os dois.
+            const customerIdCode = customerId.split(/\s*-\s*/)[0].trim();
             const customerUserNorm = normalize(t.CustomerUserID || t.CustomerID || '');
             // Prioridade 1: match exato por otobo_customer_id (suporta múltiplos separados por vírgula)
             let linked = customerId
                 ? clients.find(c => {
                     if (!c.otoboCustomerId) return false;
-                    return c.otoboCustomerId.split(',').map(s => normalize(s)).includes(customerId);
+                    const codes = c.otoboCustomerId.split(',').map(s => normalize(s));
+                    return codes.includes(customerId) || codes.includes(customerIdCode);
                 })
                 : null;
             // Prioridade 2: fallback fuzzy por nome
