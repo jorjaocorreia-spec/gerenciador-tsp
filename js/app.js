@@ -173,7 +173,7 @@ class AppController {
             item.addEventListener('click', (e) => {
                 const view = e.currentTarget.getAttribute('data-view');
                 if (this.userRole === 'client') {
-                    this.renderClientPortalTasks();
+                    this.switchClientPortalView(view);
                     return;
                 }
                 this.switchView(view);
@@ -1958,7 +1958,8 @@ class AppController {
     // ===================================
     async enterClientPortalMode() {
         document.querySelectorAll('.nav-item').forEach(item => {
-            item.style.display = item.getAttribute('data-view') === 'tasks' ? '' : 'none';
+            const view = item.getAttribute('data-view');
+            item.style.display = ['tasks', 'indicadores'].includes(view) ? '' : 'none';
         });
         ['btn-import-pdf', 'btn-migrate-local', 'btn-ai-config', 'btn-whatsapp-config'].forEach(id => {
             const el = document.getElementById(id);
@@ -1981,6 +1982,24 @@ class AppController {
 
         await this.renderClientPortalTasks();
         lucide.createIcons();
+    }
+
+    // Navegação dentro do Portal do Cliente — só 'tasks' e 'indicadores'
+    // são liberados (ver filtro de visibilidade em enterClientPortalMode).
+    switchClientPortalView(view) {
+        if (!['tasks', 'indicadores'].includes(view)) return;
+        this.currentView = view;
+        document.querySelectorAll('.nav-item').forEach(item => {
+            item.classList.toggle('active', item.getAttribute('data-view') === view);
+        });
+        document.querySelectorAll('.view-section').forEach(section => {
+            section.classList.toggle('active', section.id === `view-${view}`);
+        });
+        if (view === 'tasks') {
+            this.renderClientPortalTasks();
+        } else {
+            this.renderIndicadores();
+        }
     }
 
     async renderClientPortalTasks() {
