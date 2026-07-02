@@ -975,7 +975,9 @@ class TSPStore {
         doneIds.add('done'); // fallback legado (status pré-Kanban Fase 22)
 
         const completedTasks = tasks.filter(t => t.completed || doneIds.has(t.status));
-        const thisMonth = new Date().toISOString().slice(0, 7);
+        const now0 = new Date();
+        const todayIsoLocal = `${now0.getFullYear()}-${String(now0.getMonth() + 1).padStart(2, '0')}-${String(now0.getDate()).padStart(2, '0')}`;
+        const thisMonth = todayIsoLocal.slice(0, 7);
         const tasksCompletedThisMonth = completedTasks.filter(t => t.completedAt && t.completedAt.startsWith(thisMonth)).length;
 
         const totalMinutesUsed = records.reduce((acc, r) => acc + r.minutes, 0);
@@ -1023,7 +1025,7 @@ class TSPStore {
         completedTasks.forEach(t => {
             if (t.completedAt) timelineItems.push({ type: 'task', date: t.completedAt.slice(0, 10), title: t.title, description: t.description || '' });
         });
-        const todayIso = new Date().toISOString().slice(0, 10);
+        const todayIso = todayIsoLocal;
         events.filter(e => e.date <= todayIso).forEach(e => {
             timelineItems.push({ type: 'event', date: e.date, title: e.title, description: e.description || '' });
         });
@@ -1032,8 +1034,13 @@ class TSPStore {
         });
         timelineItems.sort((a, b) => b.date.localeCompare(a.date));
 
+        // Whitelist: nunca expor dados financeiros (clientPays, consultantBonus,
+        // hourlyRate) neste retorno — será exibido a usuário-cliente (Portal do
+        // Cliente) e futuramente enviado a um prompt de IA.
+        const safeClient = { id: client.id, name: client.name, hoursTotal: client.hoursTotal, status: client.status };
+
         return {
-            client,
+            client: safeClient,
             kpis: {
                 tasksCompletedTotal: completedTasks.length,
                 tasksCompletedThisMonth,
