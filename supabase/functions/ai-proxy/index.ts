@@ -35,11 +35,38 @@ serve(async (req) => {
       return new Response(JSON.stringify({ error: "Invalid action" }), { status: 400, headers: corsHeaders });
     }
 
-    // Busca config de IA do usuário
-    const { data: config, error: configError } = await supabase
+    // Resolve de qual usuário buscar a config de IA: o próprio (papel
+    // 'consultant') ou o consultor dono do client_id vinculado (papel
+    // 'client' — Painel de Indicadores no Portal do Cliente). Usa
+    // service_role porque RLS normal bloqueia o cliente de ler a config
+    // do consultor.
+    const adminClient = createClient(
+      Deno.env.get("SUPABASE_URL") ?? "",
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
+      { auth: { persistSession: false } }
+    );
+
+    let configOwnerId = user.id;
+    const { data: roleRow } = await adminClient
+      .from("user_roles")
+      .select("role, client_id")
+      .eq("user_id", user.id)
+      .single();
+
+    if (roleRow?.role === "client" && roleRow.client_id) {
+      const { data: clientRow } = await adminClient
+        .from("clients")
+        .select("user_id")
+        .eq("id", roleRow.client_id)
+        .single();
+      if (clientRow?.user_id) configOwnerId = clientRow.user_id;
+    }
+
+    // Busca config de IA do usuário resolvido acima
+    const { data: config, error: configError } = await adminClient
       .from("user_ai_config")
       .select("provider, api_key, model")
-      .eq("user_id", user.id)
+      .eq("user_id", configOwnerId)
       .single();
 
     if (configError || !config?.api_key) {
