@@ -6488,8 +6488,27 @@ class AppController {
                 </div>
             </div>`).join('') || '<p class="text-muted">Nenhum evento registrado ainda.</p>';
 
+        const aiSummarySection = aiClient.isConfigured ? `
+            <div class="glass" style="padding:20px 24px;margin-bottom:16px;" id="indicadores-ai-summary-box">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+                    <h3 style="margin:0;font-size:1rem;">Resumo (IA)</h3>
+                    <button class="btn btn-secondary btn-sm" onclick="app.generateIndicadoresSummary()"><i data-lucide="sparkles"></i> Gerar resumo</button>
+                </div>
+                <div id="indicadores-ai-summary-text" class="text-muted">Clique em "Gerar resumo" para uma análise do andamento do projeto.</div>
+            </div>` : '';
+
+        const aiChatSection = aiClient.isConfigured ? `
+            <div class="glass" style="padding:20px 24px;" id="indicadores-ai-chat-box">
+                <h3 style="margin:0 0 10px;font-size:1rem;">Tire suas dúvidas</h3>
+                <div id="indicadores-chat-messages" class="indicadores-chat-messages"></div>
+                <div style="display:flex;gap:8px;margin-top:10px;">
+                    <input type="text" id="indicadores-chat-input" class="form-control" placeholder="Pergunte sobre o projeto..." onkeydown="if(event.key==='Enter') app.sendIndicadoresChatMessage();">
+                    <button class="btn btn-primary" onclick="app.sendIndicadoresChatMessage()"><i data-lucide="send"></i></button>
+                </div>
+            </div>` : '';
+
         return `
-            <div id="indicadores-ai-section"></div>
+            ${aiSummarySection}
             ${kpiCards}
             <div class="glass" style="padding:20px 24px;margin-bottom:16px;">
                 <h3 style="margin:0 0 16px;font-size:1rem;">Tarefas concluídas por mês</h3>
@@ -6509,6 +6528,7 @@ class AppController {
                 <h3 style="margin:0 0 16px;font-size:1rem;">Linha do tempo do projeto</h3>
                 <div class="indicadores-timeline">${timelineRows}</div>
             </div>
+            ${aiChatSection}
         `;
     }
 
@@ -6517,6 +6537,54 @@ class AppController {
             const w = el.dataset.w;
             requestAnimationFrame(() => requestAnimationFrame(() => { el.style.width = w + '%'; }));
         });
+    }
+
+    async generateIndicadoresSummary() {
+        if (!this._indicadoresData) return;
+        const box = document.getElementById('indicadores-ai-summary-text');
+        if (!box) return;
+        box.textContent = 'Gerando resumo...';
+        try {
+            const summary = await aiClient.generateClientIndicatorsSummary(this._indicadoresData);
+            box.textContent = summary;
+        } catch (err) {
+            box.textContent = 'Erro ao gerar resumo: ' + err.message;
+        }
+    }
+
+    async sendIndicadoresChatMessage() {
+        const input = document.getElementById('indicadores-chat-input');
+        const messagesBox = document.getElementById('indicadores-chat-messages');
+        if (!input || !messagesBox || !this._indicadoresData) return;
+        const question = input.value.trim();
+        if (!question) return;
+        input.value = '';
+
+        this._indicadoresChatHistory.push({ role: 'user', content: question });
+        this._appendIndicadoresChatBubble('user', question);
+
+        const loadingId = 'indicadores-chat-loading-' + Date.now();
+        messagesBox.insertAdjacentHTML('beforeend', `<div id="${loadingId}" class="indicadores-chat-bubble indicadores-chat-bubble-ai">Pensando...</div>`);
+        messagesBox.scrollTop = messagesBox.scrollHeight;
+
+        try {
+            const historyBeforeQuestion = this._indicadoresChatHistory.slice(0, -1);
+            const answer = await aiClient.chatAboutClientIndicators(this._indicadoresData, question, historyBeforeQuestion);
+            document.getElementById(loadingId)?.remove();
+            this._indicadoresChatHistory.push({ role: 'assistant', content: answer });
+            this._appendIndicadoresChatBubble('ai', answer);
+        } catch (err) {
+            document.getElementById(loadingId)?.remove();
+            this._appendIndicadoresChatBubble('ai', 'Erro ao responder: ' + err.message);
+        }
+    }
+
+    _appendIndicadoresChatBubble(who, text) {
+        const messagesBox = document.getElementById('indicadores-chat-messages');
+        if (!messagesBox) return;
+        const cls = who === 'user' ? 'indicadores-chat-bubble-user' : 'indicadores-chat-bubble-ai';
+        messagesBox.insertAdjacentHTML('beforeend', `<div class="indicadores-chat-bubble ${cls}">${escapeHtml(text)}</div>`);
+        messagesBox.scrollTop = messagesBox.scrollHeight;
     }
 
     _buildFinanceiroChart(history) {
@@ -10515,6 +10583,9 @@ document.addEventListener('DOMContentLoaded', async () => {
             window.app._agendaEventsCache = null;
             window.app._agendaClientsMapCache = {};
             window.app._agendaTasksCache = null;
+            window.app.indicadoresClientId = null;
+            window.app._indicadoresData = null;
+            window.app._indicadoresChatHistory = [];
         }
         if (window.aiClient) aiClient.reset();
         await Auth.signOut();
