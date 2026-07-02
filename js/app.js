@@ -1881,11 +1881,19 @@ class AppController {
         const fp = document.getElementById('filter-task-priority');
         const fl = document.getElementById('filter-task-label');
         const fs = document.getElementById('filter-task-search');
+        const fcs = document.getElementById('filter-task-created-start');
+        const fce = document.getElementById('filter-task-created-end');
+        const fds = document.getElementById('filter-task-completed-start');
+        const fde = document.getElementById('filter-task-completed-end');
         // Portal do Cliente: Cliente vem travado, nunca deve ser limpo
         if (fc && this.userRole !== 'client') fc.value = '';
         if (fp) fp.value = '';
         if (fl) fl.value = '';
         if (fs) fs.value = '';
+        if (fcs) fcs.value = '';
+        if (fce) fce.value = '';
+        if (fds) fds.value = '';
+        if (fde) fde.value = '';
         this.refreshTaskFilters();
     }
 
@@ -1915,6 +1923,37 @@ class AppController {
             ...(task.comments || []).filter(c => c.type === 'comment').map(c => c.text)
         ].map(s => this._normalizeSearch(s)).join(' ');
         return haystack.includes(term);
+    }
+
+    // Lê os 4 campos de filtro por data (criação/finalização) do DOM
+    _readTaskDateFilters() {
+        return {
+            createdStart:   document.getElementById('filter-task-created-start')?.value || '',
+            createdEnd:     document.getElementById('filter-task-created-end')?.value || '',
+            completedStart: document.getElementById('filter-task-completed-start')?.value || '',
+            completedEnd:   document.getElementById('filter-task-completed-end')?.value || '',
+        };
+    }
+
+    // isoDateTime: timestamp ISO (createdAt/completedAt); startStr/endStr: 'YYYY-MM-DD' ou ''
+    _dateInRange(isoDateTime, startStr, endStr) {
+        if (!isoDateTime) return false;
+        const d = isoDateTime.slice(0, 10);
+        if (startStr && d < startStr) return false;
+        if (endStr && d > endStr) return false;
+        return true;
+    }
+
+    // Aplica os filtros de data de criação/finalização sobre uma lista de tarefas
+    _applyTaskDateFilters(tasks, f) {
+        let result = tasks;
+        if (f.createdStart || f.createdEnd) {
+            result = result.filter(t => this._dateInRange(t.createdAt, f.createdStart, f.createdEnd));
+        }
+        if (f.completedStart || f.completedEnd) {
+            result = result.filter(t => this._dateInRange(t.completedAt, f.completedStart, f.completedEnd));
+        }
+        return result;
     }
 
     // Chamado após login bem-sucedido
@@ -2033,11 +2072,14 @@ class AppController {
         const filterPriority = document.getElementById('filter-task-priority')?.value;
         const filterLabel    = document.getElementById('filter-task-label')?.value;
         const searchTerm     = this._normalizeSearch(document.getElementById('filter-task-search')?.value || '');
+        const dateFilters    = this._readTaskDateFilters();
+        const hasDateFilter  = !!(dateFilters.createdStart || dateFilters.createdEnd || dateFilters.completedStart || dateFilters.completedEnd);
 
         let tasks = this._tasksCache;
         if (filterPriority) tasks = tasks.filter(t => t.priority === filterPriority);
         if (filterLabel)    tasks = tasks.filter(t => (t.labels || []).some(l => l.color === filterLabel));
         if (searchTerm)     tasks = tasks.filter(t => this._taskMatchesSearch(t, searchTerm));
+        if (hasDateFilter)  tasks = this._applyTaskDateFilters(tasks, dateFilters);
 
         this._renderKanbanBoard(this._currentColumns, tasks, {}, true);
         lucide.createIcons();
@@ -3521,6 +3563,8 @@ class AppController {
         const filterPriority = document.getElementById('filter-task-priority')?.value;
         const filterLabel    = document.getElementById('filter-task-label')?.value;
         const searchTerm     = this._normalizeSearch(document.getElementById('filter-task-search')?.value || '');
+        const dateFilters    = this._readTaskDateFilters();
+        const hasDateFilter  = !!(dateFilters.createdStart || dateFilters.createdEnd || dateFilters.completedStart || dateFilters.completedEnd);
 
         const board = document.getElementById('kanban-board');
         if (!board) return;
@@ -3529,7 +3573,7 @@ class AppController {
         const btnManage = document.getElementById('btn-manage-columns');
 
         if (!filterClient) {
-            // Sem cliente: placeholder, ou lista de busca se houver termo
+            // Sem cliente: placeholder, ou lista de busca se houver termo/filtro de data
             this._currentColumns = [];
             if (btnManage) btnManage.style.display = 'none';
             // Usa cache se disponível, senão busca do banco
@@ -3542,10 +3586,12 @@ class AppController {
             }
             this._populateLabelFilter(this._tasksCache);
 
-            if (searchTerm) {
-                let results = this._tasksCache.filter(t => this._taskMatchesSearch(t, searchTerm));
+            if (searchTerm || hasDateFilter) {
+                let results = this._tasksCache;
+                if (searchTerm)    results = results.filter(t => this._taskMatchesSearch(t, searchTerm));
                 if (filterPriority) results = results.filter(t => t.priority === filterPriority);
                 if (filterLabel)    results = results.filter(t => (t.labels || []).some(l => l.color === filterLabel));
+                if (hasDateFilter)  results = this._applyTaskDateFilters(results, dateFilters);
                 this._renderTaskSearchResultsList(results, this._clientsMapCache);
                 await this.renderTasksDashboard(this._tasksCache, '');
                 lucide.createIcons();
@@ -3590,6 +3636,7 @@ class AppController {
         if (filterPriority) tasks = tasks.filter(t => t.priority === filterPriority);
         if (filterLabel)    tasks = tasks.filter(t => (t.labels || []).some(l => l.color === filterLabel));
         if (searchTerm)     tasks = tasks.filter(t => this._taskMatchesSearch(t, searchTerm));
+        if (hasDateFilter)  tasks = this._applyTaskDateFilters(tasks, dateFilters);
 
         this._renderKanbanBoard(this._currentColumns, tasks, this._clientsMapCache);
         await this.renderTasksDashboard(tasks, filterClient);
@@ -3639,6 +3686,8 @@ class AppController {
         const filterPriority = document.getElementById('filter-task-priority')?.value;
         const filterLabel    = document.getElementById('filter-task-label')?.value;
         const searchTerm     = this._normalizeSearch(document.getElementById('filter-task-search')?.value || '');
+        const dateFilters    = this._readTaskDateFilters();
+        const hasDateFilter  = !!(dateFilters.createdStart || dateFilters.createdEnd || dateFilters.completedStart || dateFilters.completedEnd);
 
         this._populateLabelFilter(this._tasksCache);
 
@@ -3646,10 +3695,12 @@ class AppController {
         if (!board) return;
 
         if (!filterClient) {
-            if (searchTerm) {
-                let results = this._tasksCache.filter(t => this._taskMatchesSearch(t, searchTerm));
+            if (searchTerm || hasDateFilter) {
+                let results = this._tasksCache;
+                if (searchTerm)    results = results.filter(t => this._taskMatchesSearch(t, searchTerm));
                 if (filterPriority) results = results.filter(t => t.priority === filterPriority);
                 if (filterLabel)    results = results.filter(t => (t.labels || []).some(l => l.color === filterLabel));
+                if (hasDateFilter)  results = this._applyTaskDateFilters(results, dateFilters);
                 this._renderTaskSearchResultsList(results, this._clientsMapCache);
                 lucide.createIcons();
             }
@@ -3661,6 +3712,7 @@ class AppController {
         if (filterPriority) tasks = tasks.filter(t => t.priority === filterPriority);
         if (filterLabel)    tasks = tasks.filter(t => (t.labels || []).some(l => l.color === filterLabel));
         if (searchTerm)     tasks = tasks.filter(t => this._taskMatchesSearch(t, searchTerm));
+        if (hasDateFilter)  tasks = this._applyTaskDateFilters(tasks, dateFilters);
 
         this._renderKanbanBoard(this._currentColumns, tasks, this._clientsMapCache);
         this._renderTasksDashboardSync(tasks, filterClient);
