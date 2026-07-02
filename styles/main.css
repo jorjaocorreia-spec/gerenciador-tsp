@@ -760,10 +760,24 @@ h4 {
   flex: 1;
   overflow-y: auto;
   scrollbar-width: thin;
+  scrollbar-color: rgba(139, 92, 246, 0.35) transparent;
   transition: background 0.15s;
 }
 .kb-dropzone.drag-over {
   background: rgba(74, 158, 255, 0.06);
+}
+.kb-dropzone::-webkit-scrollbar {
+  width: 6px;
+}
+.kb-dropzone::-webkit-scrollbar-track {
+  background: transparent;
+}
+.kb-dropzone::-webkit-scrollbar-thumb {
+  background: rgba(139, 92, 246, 0.35);
+  border-radius: 4px;
+}
+.kb-dropzone::-webkit-scrollbar-thumb:hover {
+  background: rgba(139, 92, 246, 0.55);
 }
 
 /* Card */
