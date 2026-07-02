@@ -135,6 +135,9 @@
             <li class="nav-item" data-view="financeiro" title="Financeiro">
                 <i data-lucide="wallet"></i><span class="nav-label">Financeiro</span>
             </li>
+            <li class="nav-item" data-view="indicadores" title="Indicadores">
+                <i data-lucide="line-chart"></i><span class="nav-label">Indicadores</span>
+            </li>
             <li class="nav-item" data-view="users" title="Usuários">
                 <i data-lucide="user-cog"></i><span class="nav-label">Usuários</span>
             </li>
@@ -850,6 +853,25 @@
                 </button>
             </div>
             <div id="users-content"></div>
+        </section>
+
+        <!-- VIEW: INDICADORES -->
+        <section class="view-section" id="view-indicadores">
+            <div class="view-header">
+                <div class="view-header-left">
+                    <h1>Indicadores</h1>
+                    <div id="indicadores-client-selector-wrap" style="display:none;">
+                        <select id="indicadores-client-select" class="form-control" onchange="app.onIndicadoresClientChange(this.value)"></select>
+                    </div>
+                </div>
+                <div class="view-header-actions">
+                    <button id="btn-indicadores-pdf" class="btn btn-secondary" onclick="app.exportIndicadoresPDF()">
+                        <i data-lucide="file-down"></i>
+                        <span class="nav-label">Exportar PDF</span>
+                    </button>
+                </div>
+            </div>
+            <div id="indicadores-container"></div>
         </section>
 
     </main>
