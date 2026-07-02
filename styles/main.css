@@ -680,6 +680,20 @@ h4 {
 }
 
 /* Board */
+/* #view-tasks vira flex-column quando ativa: header/dashboard/filtros ficam
+   com altura de conteúdo e o board ocupa todo o espaço restante da tela,
+   eliminando o cálculo fixo `calc(100vh - 300px)` (que sobrava/faltava
+   espaço dependendo da resolução do usuário). */
+#view-tasks.active {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+#view-tasks.active > .header-actions,
+#view-tasks.active > #tasks-dashboard-container,
+#view-tasks.active > .kanban-filters {
+  flex-shrink: 0;
+}
 .kanban-board {
   display: flex;
   gap: 16px;
@@ -687,7 +701,8 @@ h4 {
   overflow-x: auto;
   overflow-y: hidden;
   padding-bottom: 24px;
-  height: calc(100vh - 300px);
+  flex: 1;
+  min-height: 0;
   scrollbar-width: thin;
   scrollbar-color: rgba(139, 92, 246, 0.35) transparent;
 }
