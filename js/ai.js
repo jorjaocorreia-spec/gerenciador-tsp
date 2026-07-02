@@ -252,6 +252,59 @@ Escreva o relatório mensal.`;
 
         return this.complete(system, user);
     }
+
+    // ── PAINEL DE INDICADORES ────────────────────────────────────────
+
+    // Contexto textual compacto reaproveitado pelo resumo e pelo chat.
+    // Nunca inclui client_pays/hourly_rate/consultant_bonus — esses
+    // campos simplesmente não existem em IndicatorsData (store.js).
+    _buildIndicadoresContext(data) {
+        const { client, kpis, monthly, statusDistribution, priorityDistribution, timeline } = data;
+        const monthlyLines = monthly.map(m => `${m.month}: ${m.completed} concluídas, ${m.created} criadas`).join('\n');
+        const statusLines = statusDistribution.map(s => `${s.columnName}: ${s.count}`).join(', ');
+        const priorityLines = Object.entries(priorityDistribution).map(([p, c]) => `${p}: ${c}`).join(', ');
+        const timelineLines = timeline.slice(0, 20).map(t => `${t.date} [${t.type}] ${t.title}`).join('\n');
+
+        return `Cliente: ${client.name}
+Tarefas concluídas (total): ${kpis.tasksCompletedTotal} (${kpis.tasksCompletedThisMonth} este mês)
+Tarefas em aberto: ${kpis.tasksOpen}
+Horas consumidas: ${kpis.hoursUsed}h de ${kpis.hoursTotal}h contratadas
+Taxa de entrega no prazo: ${kpis.onTimeRate !== null ? kpis.onTimeRate + '%' : 'sem dados suficientes'}
+Tempo médio de conclusão: ${kpis.avgCompletionDays !== null ? kpis.avgCompletionDays + ' dias' : 'sem dados suficientes'}
+
+Evolução mensal (tarefas):
+${monthlyLines}
+
+Tarefas por status: ${statusLines}
+Tarefas abertas por prioridade: ${priorityLines}
+
+Eventos recentes do projeto (mais recente primeiro):
+${timelineLines}`;
+    }
+
+    async generateClientIndicatorsSummary(data) {
+        const system = `Você é um consultor de TI resumindo a evolução de um projeto para quem está acompanhando (pode ser o próprio cliente ou o consultor responsável).
+Escreva um resumo curto (4-6 frases), direto, destacando ritmo de entregas, saúde do consumo de horas e pontos de atenção se houver.
+Nunca mencione valores financeiros, comissão ou preço — esses dados não fazem parte do contexto e não devem ser inventados.
+Responda apenas com o texto do resumo, sem markdown, sem título.`;
+        const user = this._buildIndicadoresContext(data);
+        return this.complete(system, user);
+    }
+
+    async chatAboutClientIndicators(data, question, history = []) {
+        const system = `Você é um assistente que responde dúvidas sobre o andamento de um projeto de consultoria, com base nos dados fornecidos.
+Responda apenas com base nos dados abaixo — se a pergunta não puder ser respondida com esses dados, diga isso claramente em vez de inventar.
+Nunca mencione valores financeiros, comissão ou preço — esses dados não fazem parte do contexto e não devem ser inventados.
+Seja direto e objetivo, poucas frases.
+
+Dados do projeto:
+${this._buildIndicadoresContext(data)}`;
+
+        const historyText = history.map(h => `${h.role === 'user' ? 'Usuário' : 'Assistente'}: ${h.content}`).join('\n');
+        const user = historyText ? `${historyText}\nUsuário: ${question}` : question;
+
+        return this.complete(system, user);
+    }
 }
 
 window.aiClient = new TSPAIClient();
