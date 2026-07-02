@@ -10259,6 +10259,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     // na URL — precisa ser detectado ANTES de decidir se loga normalmente, senão o
     // usuário cai direto no app sem nunca definir a nova senha.
     const isPasswordRecovery = window.location.hash.includes('type=recovery');
+    // Link expirado/inválido: Supabase redireciona com #error=access_denied&error_code=otp_expired...
+    const authLinkError = window.location.hash.includes('error=access_denied') || window.location.hash.includes('error_code=otp_expired');
 
     const user = await Auth.getSession();
 
@@ -10268,6 +10270,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (isPasswordRecovery) {
         Auth.showAuthScreen();
         Auth.showResetPasswordForm();
+    } else if (authLinkError) {
+        history.replaceState(null, '', window.location.pathname);
+        Auth.showAuthScreen();
+        Auth.showMessage('O link expirou ou já foi usado. Solicite um novo link de redefinição de senha.');
     } else if (!user) {
         Auth.showAuthScreen();
     } else {
