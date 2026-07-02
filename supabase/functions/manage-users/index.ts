@@ -104,10 +104,31 @@ serve(async (req) => {
 
     if (action === "revoke") {
       if (!userId || typeof userId !== "string") return jsonResponse({ error: "userId é obrigatório." }, 400);
+
+      // Guarda a role atual antes de apagar, para poder reverter caso o
+      // deleteUser falhe (ex.: usuário ainda possui dados dependentes —
+      // clients/tasks/records referenciando user_id sem ON DELETE CASCADE,
+      // comum para consultores com dados reais). Sem esse rollback, uma
+      // falha no deleteUser deixava o usuário sem role mas com a conta e
+      // os dados intactos — um "meio-revogado" perigoso.
+      const { data: existingRole, error: fetchRoleError } = await admin
+        .from("user_roles")
+        .select("role, client_id, invited_by")
+        .eq("user_id", userId)
+        .single();
+      if (fetchRoleError) return jsonResponse({ error: fetchRoleError.message }, 400);
+
       const { error: roleDeleteError } = await admin.from("user_roles").delete().eq("user_id", userId);
       if (roleDeleteError) return jsonResponse({ error: roleDeleteError.message }, 400);
+
       const { error: deleteError } = await admin.auth.admin.deleteUser(userId);
-      if (deleteError) return jsonResponse({ error: deleteError.message }, 400);
+      if (deleteError) {
+        const { error: rollbackError } = await admin.from("user_roles").insert({ user_id: userId, ...existingRole });
+        if (rollbackError) {
+          return jsonResponse({ error: `Falha ao remover o usuário E ao restaurar a role (usuário ficou sem acesso!). Restaure manualmente. Detalhe original: ${deleteError.message}` }, 500);
+        }
+        return jsonResponse({ error: `Não foi possível remover o usuário (provavelmente possui dados vinculados — clientes, tarefas, etc.). O acesso foi restaurado. Detalhe: ${deleteError.message}` }, 400);
+      }
       return jsonResponse({ ok: true });
     }
 
