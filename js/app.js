@@ -501,6 +501,8 @@ class AppController {
             document.getElementById('task-due-date').value = '';
             document.getElementById('task-estimated-minutes').value = '';
             document.getElementById('task-priority').value = 'medium';
+            document.getElementById('task-hidden-from-client').checked = false;
+            document.getElementById('task-hidden-from-client-section').style.display = '';
             const _delTaskBtn = document.getElementById('btn-delete-task');
             clearTimeout(_delTaskBtn._confirmTimer);
             _delTaskBtn._confirmDelete = false;
@@ -829,7 +831,8 @@ class AppController {
             coverColor: this._modalCoverColor || null,
             attachments: this.taskAttachments,
             completed: this._modalCompleted || false,
-            completedAt: this._modalCompletedAt || null
+            completedAt: this._modalCompletedAt || null,
+            hiddenFromClient: document.getElementById('task-hidden-from-client').checked
         };
 
         const btn = document.querySelector('#form-task [type="submit"]');
@@ -939,6 +942,7 @@ class AppController {
         document.getElementById('task-priority').value = t.priority;
         document.getElementById('task-due-date').value = t.dueDate || '';
         document.getElementById('task-estimated-minutes').value = t.estimatedMinutes || '';
+        document.getElementById('task-hidden-from-client').checked = !!t.hiddenFromClient;
         this.taskAttachments = t.attachments ? [...t.attachments] : [];
         this._modalComments  = t.comments ? [...t.comments] : [];
 
@@ -966,6 +970,10 @@ class AppController {
         if (!readOnly) return;
         document.getElementById('btn-delete-task').style.display = 'none';
         document.getElementById('btn-add-time-task').style.display = 'none';
+        // Configuração interna do consultor — irrelevante no portal (o cliente
+        // nunca recebe uma tarefa oculta para começo, então esconder o controle).
+        const hiddenSection = document.getElementById('task-hidden-from-client-section');
+        if (hiddenSection) hiddenSection.style.display = 'none';
         // Cliente vê o histórico de comentários (acompanhamento do andamento),
         // mas não pode escrever um novo — só a caixa de input fica oculta.
         const commentInputRow = document.querySelector('#modal-task-comments-section .task-comment-input-row');
@@ -3961,6 +3969,9 @@ class AppController {
         }
         if (task.completed) {
             badgesHtml += `<span class="kb-badge kb-badge-completed"><i data-lucide="check-circle" style="width:10px;height:10px"></i> Concluída</span>`;
+        }
+        if (task.hiddenFromClient && !readOnly) {
+            badgesHtml += `<span class="kb-badge" title="Oculto do Portal do Cliente"><i data-lucide="eye-off" style="width:10px;height:10px"></i></span>`;
         }
 
         const completeTitle = task.completed ? 'Marcar como incompleta' : 'Marcar como concluída';

@@ -40,6 +40,7 @@ class TSPStore {
             comments: Array.isArray(r.comments) ? r.comments : [],
             completed: r.completed || false,
             completedAt: r.completed_at || null,
+            hiddenFromClient: r.hidden_from_client || false,
             createdAt: r.created_at, updatedAt: r.updated_at };
     }
 
@@ -248,7 +249,8 @@ class TSPStore {
             estimated_minutes: parseInt(taskData.estimatedMinutes) || 0,
             spent_minutes: 0,
             attachments: taskData.attachments || [],
-            comments: []
+            comments: [],
+            hidden_from_client: taskData.hiddenFromClient || false
         }).select().single();
         if (error) throw error;
         return this._task(data);
@@ -268,6 +270,7 @@ class TSPStore {
             attachments: taskData.attachments || [],
             completed: taskData.completed || false,
             completed_at: taskData.completedAt || null,
+            hidden_from_client: taskData.hiddenFromClient || false,
             ...(taskData.comments !== undefined && { comments: taskData.comments })
         }).eq('id', taskData.id).eq('user_id', this.userId).select().single();
         if (error) throw error;
@@ -915,9 +918,12 @@ class TSPStore {
     // (policy clients_read_own_tasks) já restringe ao client_id vinculado
     // ao usuário logado, mesmo que o dono real da linha seja outro user_id
     // (o consultor). Nunca adicionar .eq('user_id', this.userId) aqui.
+    // hidden_from_client = true exclui o card do portal — regra é opt-out:
+    // por padrão toda tarefa aparece, exceto as marcadas explicitamente.
     async getClientPortalTasks(clientId) {
         const { data, error } = await this.db.from('tasks').select('*')
-            .eq('client_id', clientId).order('status').order('position');
+            .eq('client_id', clientId).eq('hidden_from_client', false)
+            .order('status').order('position');
         if (error) throw error;
         return data.map(r => this._task(r));
     }
