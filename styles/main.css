@@ -683,10 +683,11 @@ h4 {
 .kanban-board {
   display: flex;
   gap: 16px;
-  align-items: flex-start;
+  align-items: stretch;
   overflow-x: auto;
+  overflow-y: hidden;
   padding-bottom: 24px;
-  min-height: calc(100vh - 300px);
+  height: calc(100vh - 300px);
   scrollbar-width: thin;
 }
 
@@ -694,11 +695,13 @@ h4 {
 .kb-column {
   width: var(--kb-column-width);
   min-width: var(--kb-column-width);
+  height: 100%;
   background: var(--kb-column-bg);
   border: var(--kb-column-border);
   border-radius: var(--kb-column-radius);
   display: flex;
   flex-direction: column;
+  overflow: hidden;
 }
 .kb-column-header {
   display: flex;
@@ -755,6 +758,8 @@ h4 {
   gap: var(--kb-card-gap);
   min-height: 60px;
   flex: 1;
+  overflow-y: auto;
+  scrollbar-width: thin;
   transition: background 0.15s;
 }
 .kb-dropzone.drag-over {
