@@ -945,7 +945,7 @@ class TSPStore {
             this.db.from('agenda_events').select('*').eq('client_id', clientId),
             this.db.from('kanban_columns').select('*').eq('client_id', clientId),
             this.db.from('implementation_clients')
-                .select('implementation_id, implementations(*)')
+                .select('implementation_id, implementations(id, name, description, implementation_date)')
                 .eq('client_id', clientId)
         ]);
         if (clientRes.error) throw clientRes.error;
