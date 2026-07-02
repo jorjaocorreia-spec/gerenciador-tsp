@@ -733,7 +733,7 @@ No Supabase Dashboard → Edge Functions → `ai-proxy` → Secrets, confirmar/a
 - [ ] **Step 3: Deploy da função**
 
 ```powershell
-$env:SUPABASE_ACCESS_TOKEN = "PLACEHOLDER_SUPABASE_TOKEN_VER_MEMORIA"
+$env:SUPABASE_ACCESS_TOKEN = "<seu token pessoal Supabase — ver memória reference_supabase_token.md, nunca colar o valor literal aqui>"
 npx supabase@latest functions deploy ai-proxy --project-ref klimkamnydfnzqetqlqm
 ```
 
