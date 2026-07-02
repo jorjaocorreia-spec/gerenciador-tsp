@@ -6389,7 +6389,7 @@ class AppController {
             lucide.createIcons();
             this._animateIndicadoresBars();
         } catch (err) {
-            container.innerHTML = `<p class="text-muted" style="padding:24px;">Erro ao carregar indicadores: ${err.message}</p>`;
+            container.innerHTML = `<p class="text-muted" style="padding:24px;">Erro ao carregar indicadores: ${escapeHtml(err.message)}</p>`;
         }
     }
 
