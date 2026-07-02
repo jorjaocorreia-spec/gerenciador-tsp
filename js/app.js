@@ -61,6 +61,9 @@ class AppController {
         this.selectedMonth = null;
         this.userRole = null;       // 'consultant' | 'client' — setado em initAfterAuth()
         this.userClientId = null;   // client_id vinculado, só para role 'client'
+        this.indicadoresClientId = null;  // cliente selecionado no painel (só papel 'consultant')
+        this._indicadoresData = null;     // cache do último resultado de getClientIndicators()
+        this._indicadoresChatHistory = []; // histórico do chat de IA, só em memória
         this.pendingPdfRecords = [];
         this.pendingPdfWarnings = [];
         this.agendaCurrentDate = new Date();
@@ -366,7 +369,7 @@ class AppController {
         this.currentView = viewName;
 
         // V1: direção do slide baseada na ordem do menu
-        const VIEW_ORDER = ['dashboard','clients','records','tasks','agenda','apontamentos','implementations','trainings','chamados','produtividade','financeiro','users'];
+        const VIEW_ORDER = ['dashboard','clients','records','tasks','agenda','apontamentos','implementations','trainings','chamados','produtividade','financeiro','indicadores','users'];
         const prevIdx = VIEW_ORDER.indexOf(prevView);
         const newIdx  = VIEW_ORDER.indexOf(viewName);
         const slideDir = (prevIdx >= 0 && newIdx >= 0 && prevIdx !== newIdx)
@@ -2027,6 +2030,7 @@ class AppController {
                 this.renderChamados(),
                 this.renderProdutividade(),
                 this.renderFinanceiro(),
+                this.renderIndicadores(),
                 this.renderUsers()
             ]);
             lucide.createIcons();
@@ -6351,6 +6355,149 @@ class AppController {
             tbody.innerHTML = `<tr><td colspan="5" class="text-muted">Erro ao carregar: ${escapeHtml(err.message)}</td></tr>`;
             chartContainer.innerHTML = '';
         }
+    }
+
+    // ── PAINEL DE INDICADORES ────────────────────────────────────────
+
+    async renderIndicadores() {
+        if (this.currentView !== 'indicadores') return;
+        const container = document.getElementById('indicadores-container');
+        if (!container) return;
+
+        const selectorWrap = document.getElementById('indicadores-client-selector-wrap');
+        let clientId = null;
+
+        if (this.userRole === 'client') {
+            clientId = this.userClientId;
+            if (selectorWrap) selectorWrap.style.display = 'none';
+        } else {
+            if (selectorWrap) selectorWrap.style.display = '';
+            await this._ensureIndicadoresClientOptions();
+            clientId = this.indicadoresClientId;
+        }
+
+        if (!clientId) {
+            container.innerHTML = '<p class="text-muted" style="padding:24px;">Selecione um cliente para ver os indicadores.</p>';
+            return;
+        }
+
+        container.innerHTML = spinnerHtml;
+        try {
+            const data = await store.getClientIndicators(clientId);
+            this._indicadoresData = data;
+            container.innerHTML = this._renderIndicadoresContent(data);
+            lucide.createIcons();
+            this._animateIndicadoresBars();
+        } catch (err) {
+            container.innerHTML = `<p class="text-muted" style="padding:24px;">Erro ao carregar indicadores: ${err.message}</p>`;
+        }
+    }
+
+    async _ensureIndicadoresClientOptions() {
+        const select = document.getElementById('indicadores-client-select');
+        if (!select || select.options.length > 0) return;
+        const clients = await store.getClients();
+        select.innerHTML = clients.map(c => `<option value="${c.id}">${escapeHtml(c.name)}</option>`).join('');
+        if (clients.length > 0 && !this.indicadoresClientId) this.indicadoresClientId = clients[0].id;
+    }
+
+    onIndicadoresClientChange(clientId) {
+        this.indicadoresClientId = clientId;
+        this._indicadoresChatHistory = [];
+        this.renderIndicadores();
+    }
+
+    _renderIndicadoresContent(data) {
+        const { kpis, monthly, statusDistribution, priorityDistribution, timeline } = data;
+        const pct = kpis.hoursTotal > 0 ? Math.min(100, Math.round((kpis.hoursUsed / kpis.hoursTotal) * 100)) : 0;
+
+        const kpiCards = `
+            <div class="indicadores-kpi-grid">
+                <div class="glass indicadores-kpi-card">
+                    <span class="indicadores-kpi-label">Tarefas concluídas</span>
+                    <span class="indicadores-kpi-value">${kpis.tasksCompletedTotal}</span>
+                    <span class="indicadores-kpi-sub">${kpis.tasksCompletedThisMonth} este mês</span>
+                </div>
+                <div class="glass indicadores-kpi-card">
+                    <span class="indicadores-kpi-label">Horas consumidas</span>
+                    <span class="indicadores-kpi-value">${kpis.hoursUsed}h</span>
+                    <span class="indicadores-kpi-sub">${kpis.hoursTotal}h contratadas (${pct}%)</span>
+                </div>
+                <div class="glass indicadores-kpi-card">
+                    <span class="indicadores-kpi-label">Entregas no prazo</span>
+                    <span class="indicadores-kpi-value">${kpis.onTimeRate !== null ? kpis.onTimeRate + '%' : '—'}</span>
+                    <span class="indicadores-kpi-sub">${kpis.tasksOpen} tarefas em aberto</span>
+                </div>
+                <div class="glass indicadores-kpi-card">
+                    <span class="indicadores-kpi-label">Tempo médio de conclusão</span>
+                    <span class="indicadores-kpi-value">${kpis.avgCompletionDays !== null ? kpis.avgCompletionDays + ' dias' : '—'}</span>
+                </div>
+            </div>`;
+
+        const maxMonthly = Math.max(...monthly.map(m => Math.max(m.completed, m.created)), 1);
+        const monthlyRows = monthly.map(m => {
+            const [y, mm] = m.month.split('-');
+            const label = `${mm}/${y.slice(2)}`;
+            const completedPct = Math.round(m.completed / maxMonthly * 100);
+            return `
+                <div style="display:flex;align-items:center;gap:6px;margin-bottom:10px;">
+                    <span style="width:42px;font-size:0.75rem;color:var(--text-muted);flex-shrink:0;">${label}</span>
+                    <div style="flex:1;position:relative;height:14px;background:rgba(255,255,255,0.07);border-radius:4px;overflow:hidden;">
+                        <div class="indicadores-bar-fill" data-w="${completedPct}" style="height:100%;width:0;background:linear-gradient(90deg,#22c55e,#16a34a);border-radius:4px;transition:width 0.55s ease;"></div>
+                    </div>
+                    <span style="width:70px;text-align:right;font-size:0.78rem;color:var(--text-muted);flex-shrink:0;">${m.completed} concl.</span>
+                </div>`;
+        }).join('');
+
+        const statusRows = statusDistribution.map(s => `
+            <div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border-color);">
+                <span>${escapeHtml(s.columnName)}</span><span>${s.count}</span>
+            </div>`).join('') || '<p class="text-muted">Sem colunas configuradas.</p>';
+
+        const priorityRows = Object.entries(priorityDistribution).map(([p, count]) => `
+            <div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border-color);">
+                <span>${escapeHtml(p)}</span><span>${count}</span>
+            </div>`).join('') || '<p class="text-muted">Sem tarefas em aberto.</p>';
+
+        const timelineIcons = { task: 'check-circle', event: 'calendar', implementation: 'package' };
+        const timelineRows = timeline.map(item => `
+            <div class="indicadores-timeline-item">
+                <i data-lucide="${timelineIcons[item.type] || 'circle'}"></i>
+                <div>
+                    <div class="indicadores-timeline-title">${escapeHtml(item.title)}</div>
+                    <div class="indicadores-timeline-date">${item.date.split('-').reverse().join('/')}</div>
+                </div>
+            </div>`).join('') || '<p class="text-muted">Nenhum evento registrado ainda.</p>';
+
+        return `
+            <div id="indicadores-ai-section"></div>
+            ${kpiCards}
+            <div class="glass" style="padding:20px 24px;margin-bottom:16px;">
+                <h3 style="margin:0 0 16px;font-size:1rem;">Tarefas concluídas por mês</h3>
+                ${monthlyRows}
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px;">
+                <div class="glass" style="padding:20px 24px;">
+                    <h3 style="margin:0 0 10px;font-size:1rem;">Tarefas por status</h3>
+                    ${statusRows}
+                </div>
+                <div class="glass" style="padding:20px 24px;">
+                    <h3 style="margin:0 0 10px;font-size:1rem;">Tarefas abertas por prioridade</h3>
+                    ${priorityRows}
+                </div>
+            </div>
+            <div class="glass" style="padding:20px 24px;margin-bottom:16px;">
+                <h3 style="margin:0 0 16px;font-size:1rem;">Linha do tempo do projeto</h3>
+                <div class="indicadores-timeline">${timelineRows}</div>
+            </div>
+        `;
+    }
+
+    _animateIndicadoresBars() {
+        document.querySelectorAll('#indicadores-container .indicadores-bar-fill').forEach(el => {
+            const w = el.dataset.w;
+            requestAnimationFrame(() => requestAnimationFrame(() => { el.style.width = w + '%'; }));
+        });
     }
 
     _buildFinanceiroChart(history) {
