@@ -967,6 +967,15 @@ class AppController {
         ['task-title', 'task-description', 'task-client', 'task-priority', 'task-due-date', 'task-estimated-minutes']
             .forEach(id => { const el = document.getElementById(id); if (el) el.disabled = true; });
         document.querySelectorAll('#modal-checklist-items input[type="checkbox"]').forEach(cb => cb.disabled = true);
+        // Descrição/título em modo leitura não podem ser rolados nem redimensionados
+        // (pointer-events:none), então expande a altura para caber o conteúdo inteiro
+        // de uma vez — sem isso, texto longo ficava cortado e inacessível.
+        ['task-title', 'task-description'].forEach(id => {
+            const el = document.getElementById(id);
+            if (!el) return;
+            el.style.height = 'auto';
+            el.style.height = (el.scrollHeight + 4) + 'px';
+        });
     }
 
     _renderTaskAttachmentPreviews() {
