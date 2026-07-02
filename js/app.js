@@ -91,6 +91,7 @@ class AppController {
         this._modalCoverColor  = null;
         this._modalCompleted   = false;
         this._modalCompletedAt = null;
+        this._modalCreatedAt = null;
         this._modalComments  = [];
         // Colunas Kanban do cliente atual
         this._currentColumns     = [];
@@ -488,6 +489,7 @@ class AppController {
             this._modalCoverColor  = null;
             this._modalCompleted   = false;
             this._modalCompletedAt = null;
+            this._modalCreatedAt = null;
             this._modalComments  = [];
             document.getElementById('modal-task-comments-section').style.display = 'none';
             document.getElementById('modal-task-comments-list').innerHTML = '';
@@ -928,6 +930,7 @@ class AppController {
         this._modalCoverColor  = t.coverColor || null;
         this._modalCompleted   = t.completed || false;
         this._modalCompletedAt = t.completedAt || null;
+        this._modalCreatedAt = t.createdAt || null;
 
         document.getElementById('task-id').value = t.id;
         document.getElementById('task-title').value = t.title;
@@ -1013,7 +1016,21 @@ class AppController {
             return col?.name || LEGACY_LABELS[id] || id;
         };
         const sorted = [...this._modalComments].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
-        if (!sorted.length) { list.innerHTML = '<p style="font-size:12px;color:var(--text-secondary);margin:4px 0">Nenhum comentário ainda.</p>'; return; }
+        const createdEntryHtml = this._modalCreatedAt ? (() => {
+            const date = new Date(this._modalCreatedAt);
+            const dateStr = date.toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' }) + ', ' +
+                date.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+            return `<div class="task-activity-item">
+                <i data-lucide="plus-circle" style="width:13px;height:13px;flex-shrink:0"></i>
+                <span>Tarefa criada</span>
+                <span style="margin-left:auto;white-space:nowrap">${dateStr}</span>
+            </div>`;
+        })() : '';
+        if (!sorted.length) {
+            list.innerHTML = createdEntryHtml || '<p style="font-size:12px;color:var(--text-secondary);margin:4px 0">Nenhum comentário ainda.</p>';
+            lucide.createIcons();
+            return;
+        }
         list.innerHTML = sorted.map(entry => {
             const date = new Date(entry.createdAt);
             const dateStr = date.toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' }) + ', ' +
@@ -1061,7 +1078,7 @@ class AppController {
                 </div>`;
             }
             return '';
-        }).join('');
+        }).join('') + createdEntryHtml;
         lucide.createIcons();
     }
 
