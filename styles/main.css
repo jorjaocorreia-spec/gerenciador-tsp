@@ -776,6 +776,7 @@ h4 {
   transition: background 0.15s, box-shadow 0.15s, transform 0.1s;
   overflow: hidden;
   position: relative;
+  flex-shrink: 0; /* sem isso, o flexbox encolhe os cards para caber na altura fixa do dropzone (em vez de rolar), cortando texto de títulos com 2 linhas */
 }
 .kb-card:hover {
   background: var(--kb-card-bg-hover);
