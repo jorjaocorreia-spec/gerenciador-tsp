@@ -930,6 +930,126 @@ class TSPStore {
         return (data || []).map(r => this._column(r));
     }
 
+    // ── PAINEL DE INDICADORES ────────────────────────────────────────
+
+    // Busca todos os dados de um cliente para o painel de Indicadores.
+    // Nunca filtra por user_id — depende da RLS existente (consultor:
+    // auth.uid()=user_id) e da nova RLS cross-user do papel 'client'
+    // (user_roles.client_id = <tabela>.client_id). Funciona identicamente
+    // para consultor e cliente-portal, mesma regra de getClientPortalTasks.
+    async getClientIndicators(clientId) {
+        const [clientRes, tasksRes, recordsRes, eventsRes, columnsRes, implLinksRes] = await Promise.all([
+            this.db.from('clients').select('*').eq('id', clientId).single(),
+            this.db.from('tasks').select('*').eq('client_id', clientId),
+            this.db.from('records').select('minutes, date').eq('client_id', clientId),
+            this.db.from('agenda_events').select('*').eq('client_id', clientId),
+            this.db.from('kanban_columns').select('*').eq('client_id', clientId),
+            this.db.from('implementation_clients')
+                .select('implementation_id, implementations(*)')
+                .eq('client_id', clientId)
+        ]);
+        if (clientRes.error) throw clientRes.error;
+        if (tasksRes.error) throw tasksRes.error;
+        if (recordsRes.error) throw recordsRes.error;
+        if (eventsRes.error) throw eventsRes.error;
+        if (columnsRes.error) throw columnsRes.error;
+        if (implLinksRes.error) throw implLinksRes.error;
+
+        const client = this._client(clientRes.data);
+        const tasks = (tasksRes.data || []).map(r => this._task(r));
+        const records = (recordsRes.data || []).map(r => ({ minutes: parseInt(r.minutes) || 0, date: r.date }));
+        const events = (eventsRes.data || []).map(r => this._event(r));
+        const columns = (columnsRes.data || []).map(r => this._column(r));
+        const implementations = (implLinksRes.data || [])
+            .map(l => l.implementations)
+            .filter(Boolean)
+            .map(r => this._implementation(r));
+
+        return this._computeClientIndicators(client, tasks, records, events, columns, implementations);
+    }
+
+    // Cálculo puro (sem DB) — separado para poder ser testado isoladamente
+    // no console do navegador sem depender de sessão/Supabase.
+    _computeClientIndicators(client, tasks, records, events, columns, implementations) {
+        const doneIds = new Set(columns.filter(c => c.isDone).map(c => c.id));
+        doneIds.add('done'); // fallback legado (status pré-Kanban Fase 22)
+
+        const completedTasks = tasks.filter(t => t.completed || doneIds.has(t.status));
+        const thisMonth = new Date().toISOString().slice(0, 7);
+        const tasksCompletedThisMonth = completedTasks.filter(t => t.completedAt && t.completedAt.startsWith(thisMonth)).length;
+
+        const totalMinutesUsed = records.reduce((acc, r) => acc + r.minutes, 0);
+        const hoursUsed = parseFloat((totalMinutesUsed / 60).toFixed(2));
+
+        const tasksWithDueAndCompletion = completedTasks.filter(t => t.dueDate && t.completedAt);
+        const onTimeCount = tasksWithDueAndCompletion.filter(t => t.completedAt.slice(0, 10) <= t.dueDate).length;
+        const onTimeRate = tasksWithDueAndCompletion.length > 0
+            ? Math.round((onTimeCount / tasksWithDueAndCompletion.length) * 100)
+            : null;
+
+        const durations = completedTasks
+            .filter(t => t.createdAt && t.completedAt)
+            .map(t => (new Date(t.completedAt) - new Date(t.createdAt)) / (1000 * 60 * 60 * 24));
+        const avgCompletionDays = durations.length > 0
+            ? parseFloat((durations.reduce((a, b) => a + b, 0) / durations.length).toFixed(1))
+            : null;
+
+        // Últimos 12 meses (mês corrente incluso), mais antigo primeiro
+        const monthly = [];
+        const now = new Date();
+        for (let i = 11; i >= 0; i--) {
+            const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+            const key = d.toISOString().slice(0, 7);
+            monthly.push({
+                month: key,
+                completed: completedTasks.filter(t => t.completedAt && t.completedAt.startsWith(key)).length,
+                created: tasks.filter(t => t.createdAt && t.createdAt.startsWith(key)).length
+            });
+        }
+
+        const openTasks = tasks.filter(t => !t.completed && !doneIds.has(t.status));
+        const statusDistribution = columns.map(c => ({
+            columnId: c.id,
+            columnName: c.name,
+            count: tasks.filter(t => t.status === c.id).length
+        }));
+
+        const priorityDistribution = {};
+        openTasks.forEach(t => {
+            priorityDistribution[t.priority] = (priorityDistribution[t.priority] || 0) + 1;
+        });
+
+        const timelineItems = [];
+        completedTasks.forEach(t => {
+            if (t.completedAt) timelineItems.push({ type: 'task', date: t.completedAt.slice(0, 10), title: t.title, description: t.description || '' });
+        });
+        const todayIso = new Date().toISOString().slice(0, 10);
+        events.filter(e => e.date <= todayIso).forEach(e => {
+            timelineItems.push({ type: 'event', date: e.date, title: e.title, description: e.description || '' });
+        });
+        implementations.forEach(impl => {
+            if (impl.implementationDate) timelineItems.push({ type: 'implementation', date: impl.implementationDate, title: impl.name, description: impl.description || '' });
+        });
+        timelineItems.sort((a, b) => b.date.localeCompare(a.date));
+
+        return {
+            client,
+            kpis: {
+                tasksCompletedTotal: completedTasks.length,
+                tasksCompletedThisMonth,
+                tasksOpen: openTasks.length,
+                hoursUsed,
+                hoursTotal: client.hoursTotal,
+                onTimeRate,
+                avgCompletionDays
+            },
+            monthly,
+            statusDistribution,
+            priorityDistribution,
+            timeline: timelineItems.slice(0, 60)
+        };
+    }
+
     async addColumn(clientId, name, color, isDone) {
         const existing = await this.getColumns(clientId);
         const position = existing.length > 0 ? Math.max(...existing.map(c => c.position)) + 1 : 0;
