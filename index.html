@@ -2472,9 +2472,11 @@
     <!-- MODAL: DETALHE DO CHAMADO -->
     <div class="modal-overlay" id="modal-chamado">
         <div class="modal glass modal-task-two-panel" style="max-width:860px; max-height:90vh;">
-            <div class="modal-header">
-                <h3 id="chamado-modal-title">Chamado</h3>
-                <div style="display:flex; gap:8px; align-items:center;">
+            <div class="modal-header modal-chamado-header">
+                <div class="modal-chamado-title-wrap">
+                    <h3 id="chamado-modal-title">Chamado</h3>
+                </div>
+                <div class="modal-chamado-header-actions">
                     <a id="chamado-otobo-link" href="#" target="_blank" rel="noopener" class="btn btn-secondary" style="font-size:0.8rem; padding:6px 12px; display:none;">
                         <i data-lucide="external-link" style="width:14px;height:14px;"></i> Abrir no OTOBO
                     </a>
@@ -2482,13 +2484,15 @@
                 </div>
             </div>
             <div class="modal-task-body">
-                <div class="modal-task-content" style="overflow-y:auto;">
+                <div class="modal-task-content">
                     <div id="chamado-articles-content">
                         <div class="spinner-wrap"><div class="spinner"></div></div>
                     </div>
                 </div>
                 <div class="modal-task-sidebar">
-                    <div id="chamado-sidebar-info"></div>
+                    <div class="modal-task-sidebar-scroll">
+                        <div id="chamado-sidebar-info"></div>
+                    </div>
                 </div>
             </div>
         </div>

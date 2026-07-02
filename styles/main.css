@@ -1227,6 +1227,42 @@ h4 {
   gap: 14px;
   padding-bottom: 4px;
 }
+.modal-task-content {
+  flex: 1;
+  overflow-y: auto;
+  min-height: 0;
+  padding-right: 10px;
+}
+/* Scrollbars do modal de dois painéis (Tarefa/Chamado) seguem o padrão
+   thin/roxo já usado no Kanban (.kb-dropzone/.kanban-board) — nunca a
+   scrollbar branca padrão do navegador (::-webkit-scrollbar global). */
+.modal-task-content,
+.modal-task-sidebar-scroll,
+.chamado-article-body {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(139, 92, 246, 0.35) transparent;
+}
+.modal-task-content::-webkit-scrollbar,
+.modal-task-sidebar-scroll::-webkit-scrollbar,
+.chamado-article-body::-webkit-scrollbar {
+  width: 6px;
+}
+.modal-task-content::-webkit-scrollbar-track,
+.modal-task-sidebar-scroll::-webkit-scrollbar-track,
+.chamado-article-body::-webkit-scrollbar-track {
+  background: transparent;
+}
+.modal-task-content::-webkit-scrollbar-thumb,
+.modal-task-sidebar-scroll::-webkit-scrollbar-thumb,
+.chamado-article-body::-webkit-scrollbar-thumb {
+  background: rgba(139, 92, 246, 0.35);
+  border-radius: 4px;
+}
+.modal-task-content::-webkit-scrollbar-thumb:hover,
+.modal-task-sidebar-scroll::-webkit-scrollbar-thumb:hover,
+.chamado-article-body::-webkit-scrollbar-thumb:hover {
+  background: rgba(139, 92, 246, 0.55);
+}
 .modal-task-section { display: flex; flex-direction: column; gap: 8px; }
 .modal-task-section-label {
   font-size: 12px;
@@ -3579,16 +3615,24 @@ kbd {
 /* Modal de detalhe do chamado */
 .chamado-article {
     border: 1px solid rgba(255,255,255,0.07);
-    border-radius: 8px;
-    margin-bottom: 12px;
+    border-radius: 10px;
+    margin-bottom: 14px;
     overflow: hidden;
+    transition: border-color 0.15s ease;
+}
+.chamado-article:last-child {
+    margin-bottom: 0;
+}
+.chamado-article:hover {
+    border-color: rgba(139,92,246,0.3);
 }
 .chamado-article-header {
     display: flex;
     justify-content: space-between;
     align-items: center;
     padding: 10px 14px;
-    background: rgba(255,255,255,0.04);
+    background: rgba(139,92,246,0.08);
+    border-bottom: 1px solid rgba(255,255,255,0.06);
     font-size: 0.8rem;
     gap: 8px;
 }
@@ -3613,8 +3657,15 @@ kbd {
 .chamado-sidebar-row {
     display: flex;
     flex-direction: column;
-    gap: 3px;
-    margin-bottom: 14px;
+    gap: 4px;
+    padding-bottom: 12px;
+    margin-bottom: 12px;
+    border-bottom: 1px solid rgba(255,255,255,0.06);
+}
+.chamado-sidebar-row:last-child {
+    padding-bottom: 0;
+    margin-bottom: 0;
+    border-bottom: none;
 }
 .chamado-sidebar-label {
     font-size: 0.7rem;
@@ -3626,6 +3677,36 @@ kbd {
 .chamado-sidebar-value {
     font-size: 0.85rem;
     color: var(--text-main);
+    word-break: break-word;
+}
+
+/* Header do modal de chamado — o modal-task-two-panel zera o padding do
+   .modal para o layout de 2 colunas; sem esse override o header ficava
+   colado nas bordas (título encostado à esquerda, ações coladas no topo). */
+.modal-chamado-header {
+    padding: 20px 24px;
+    border-bottom: 1px solid rgba(255,255,255,0.07);
+    align-items: flex-start;
+    gap: 16px;
+    flex-wrap: wrap;
+    margin-bottom: 0;
+}
+.modal-chamado-title-wrap {
+    flex: 1;
+    min-width: 0;
+}
+.modal-chamado-title-wrap h3 {
+    font-size: 1.05rem;
+    line-height: 1.4;
+    font-weight: 600;
+    word-break: break-word;
+}
+.modal-chamado-header-actions {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    flex-shrink: 0;
+    padding-top: 2px;
 }
 
 /* Barra de filtros locais da view Chamados */
