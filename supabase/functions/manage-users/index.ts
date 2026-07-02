@@ -65,6 +65,8 @@ serve(async (req) => {
       if (authListError) throw authListError;
       const emailById = new Map(authList.users.map(u => [u.id, u.email]));
 
+      const confirmedById = new Map(authList.users.map(u => [u.id, !!u.confirmed_at]));
+
       const users = (rows || []).map(r => ({
         userId: r.user_id,
         email: emailById.get(r.user_id) || "(desconhecido)",
@@ -73,6 +75,7 @@ serve(async (req) => {
         clientName: (r as unknown as { clients: { name: string } | null }).clients?.name || null,
         invitedBy: r.invited_by,
         createdAt: r.created_at,
+        confirmed: confirmedById.get(r.user_id) ?? true,
       }));
       return jsonResponse({ users });
     }
@@ -130,6 +133,61 @@ serve(async (req) => {
         return jsonResponse({ error: `Não foi possível remover o usuário (provavelmente possui dados vinculados — clientes, tarefas, etc.). O acesso foi restaurado. Detalhe: ${deleteError.message}` }, 400);
       }
       return jsonResponse({ ok: true });
+    }
+
+    if (action === "resend") {
+      if (!userId || typeof userId !== "string") return jsonResponse({ error: "userId é obrigatório." }, 400);
+
+      const { data: userData, error: getUserError } = await admin.auth.admin.getUserById(userId);
+      if (getUserError || !userData?.user) return jsonResponse({ error: getUserError?.message || "Usuário não encontrado." }, 400);
+      const targetUser = userData.user;
+      if (targetUser.confirmed_at) {
+        return jsonResponse({ error: "Usuário já confirmou o convite — não é possível reenviar." }, 400);
+      }
+      const email = targetUser.email;
+      if (!email) return jsonResponse({ error: "Usuário sem e-mail associado." }, 400);
+
+      // Reenviar = recriar o convite preservando role/cliente: o GoTrue recusa
+      // reinvocar inviteUserByEmail para um e-mail já cadastrado (mesmo não
+      // confirmado), então o único jeito de gerar um link novo é apagar o
+      // usuário não-confirmado e recriá-lo com os mesmos dados de role.
+      const { data: existingRole, error: fetchRoleError } = await admin
+        .from("user_roles")
+        .select("role, client_id, invited_by")
+        .eq("user_id", userId)
+        .single();
+      if (fetchRoleError) return jsonResponse({ error: fetchRoleError.message }, 400);
+
+      const { error: roleDeleteError } = await admin.from("user_roles").delete().eq("user_id", userId);
+      if (roleDeleteError) return jsonResponse({ error: roleDeleteError.message }, 400);
+
+      const { error: deleteError } = await admin.auth.admin.deleteUser(userId);
+      if (deleteError) {
+        const { error: rollbackError } = await admin.from("user_roles").insert({ user_id: userId, ...existingRole });
+        if (rollbackError) {
+          return jsonResponse({ error: `Falha ao remover o convite antigo E ao restaurar a role. Detalhe original: ${deleteError.message}` }, 500);
+        }
+        return jsonResponse({ error: `Não foi possível remover o convite antigo para reenviar. Detalhe: ${deleteError.message}` }, 400);
+      }
+
+      const { data: invited, error: inviteError } = await admin.auth.admin.inviteUserByEmail(email);
+      if (inviteError) {
+        return jsonResponse({ error: `Convite antigo removido, mas falha ao reenviar: ${inviteError.message}. Convide o e-mail novamente.` }, 400);
+      }
+
+      const newUserId = invited.user.id;
+      const { error: roleError } = await admin.from("user_roles").insert({
+        user_id: newUserId,
+        role: existingRole.role,
+        client_id: existingRole.client_id,
+        invited_by: existingRole.invited_by,
+      });
+      if (roleError) {
+        await admin.auth.admin.deleteUser(newUserId);
+        return jsonResponse({ error: roleError.message }, 400);
+      }
+
+      return jsonResponse({ userId: newUserId, email });
     }
 
     return jsonResponse({ error: "Invalid action" }, 400);

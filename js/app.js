@@ -9378,7 +9378,11 @@ class AppController {
                 <td>${roleLabel[u.role] || u.role}</td>
                 <td>${u.clientName ? escapeHtml(u.clientName) : '—'}</td>
                 <td>${new Date(u.createdAt).toLocaleDateString('pt-BR')}</td>
-                <td>
+                <td style="display:flex;gap:8px;flex-wrap:wrap;">
+                    ${u.confirmed === false ? `
+                    <button class="btn btn-secondary btn-sm" onclick="app.resendUserInvite('${u.userId}', this)">
+                        <i data-lucide="send" style="width:13px;height:13px"></i> Reenviar link
+                    </button>` : ''}
                     <button class="btn btn-danger btn-sm" onclick="app.revokeUserAccess('${u.userId}', this)">
                         <i data-lucide="user-x" style="width:13px;height:13px"></i> Remover acesso
                     </button>
@@ -9443,6 +9447,21 @@ class AppController {
                 Toast.show(`Erro ao remover acesso: ${err.message}`, 'error', 6000);
             }
         });
+    }
+
+    async resendUserInvite(userId, btn) {
+        const origHtml = btn.innerHTML;
+        btn.disabled = true;
+        btn.innerHTML = '<div class="spinner" style="width:12px;height:12px;"></div> Reenviando...';
+        try {
+            await this._manageUsersFetch('resend', { userId });
+            Toast.show('Convite reenviado com sucesso.', 'success');
+            await this.renderUsers();
+        } catch (err) {
+            Toast.show(`Erro ao reenviar convite: ${err.message}`, 'error', 6000);
+            btn.disabled = false;
+            btn.innerHTML = origHtml;
+        }
     }
 
     // ===================================
