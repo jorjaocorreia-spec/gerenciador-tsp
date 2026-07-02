@@ -973,7 +973,10 @@ class TSPStore {
         if (implLinksRes.error) throw implLinksRes.error;
 
         const client = this._client(clientRes.data);
-        const tasks = (tasksRes.data || []).map(r => this._task(r));
+        // Tarefas ocultas do Portal do Cliente ficam de fora de qualquer métrica
+        // do painel de Indicadores (KPIs, gráfico mensal, distribuição, timeline) —
+        // nunca passar essas tasks para _computeClientIndicators.
+        const tasks = (tasksRes.data || []).map(r => this._task(r)).filter(t => !t.hiddenFromClient);
         const records = (recordsRes.data || []).map(r => ({ minutes: parseInt(r.minutes) || 0, date: r.date }));
         const events = (eventsRes.data || []).map(r => this._event(r));
         const columns = (columnsRes.data || []).map(r => this._column(r));
