@@ -375,7 +375,7 @@
                 </div>
                 <div class="form-group">
                     <label>Prioridade</label>
-                    <select id="filter-task-priority" class="form-control" onchange="app.renderTasks()">
+                    <select id="filter-task-priority" class="form-control" onchange="app.refreshTaskFilters()">
                         <option value="">Todas</option>
                         <option value="high">Alta</option>
                         <option value="medium">Média</option>
@@ -384,7 +384,7 @@
                 </div>
                 <div class="form-group">
                     <label>Label</label>
-                    <select id="filter-task-label" class="form-control" onchange="app.renderTasks()">
+                    <select id="filter-task-label" class="form-control" onchange="app.refreshTaskFilters()">
                         <option value="">Todas</option>
                     </select>
                 </div>
@@ -394,7 +394,7 @@
                         <input type="text" id="filter-task-search" class="form-control"
                                style="padding-left:34px"
                                placeholder="Título, descrição ou comentário..."
-                               onkeydown="if(event.key==='Enter'){event.preventDefault();app.renderTasks();}">
+                               onkeydown="if(event.key==='Enter'){event.preventDefault();app.refreshTaskFilters();}">
                         <i data-lucide="search" style="position:absolute;left:10px;top:50%;
                            transform:translateY(-50%);width:16px;height:16px;opacity:0.5;
                            pointer-events:none"></i>

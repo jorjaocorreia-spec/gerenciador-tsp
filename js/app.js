@@ -1881,11 +1881,12 @@ class AppController {
         const fp = document.getElementById('filter-task-priority');
         const fl = document.getElementById('filter-task-label');
         const fs = document.getElementById('filter-task-search');
-        if (fc) fc.value = '';
+        // Portal do Cliente: Cliente vem travado, nunca deve ser limpo
+        if (fc && this.userRole !== 'client') fc.value = '';
         if (fp) fp.value = '';
         if (fl) fl.value = '';
         if (fs) fs.value = '';
-        this.renderTasks();
+        this.refreshTaskFilters();
     }
 
     _populateLabelFilter(tasks) {
@@ -1965,12 +1966,20 @@ class AppController {
             const el = document.getElementById(id);
             if (el) el.style.display = 'none';
         });
-        // View Tarefas: filtros e dashboard de métricas não fazem sentido no portal
-        // (cliente já está fixo no próprio client_id, sem opção de trocar)
-        const filtersBar = document.querySelector('#view-tasks .kanban-filters');
-        if (filtersBar) filtersBar.style.display = 'none';
+        // View Tarefas: dashboard de métricas não faz sentido no portal.
+        // A barra de filtros permanece visível (busca é útil para achar
+        // tarefas), mas o campo Cliente vem travado no próprio client_id —
+        // nunca pode ser trocado, para o cliente não acessar dados de outros.
         const dashboardBox = document.getElementById('tasks-dashboard-container');
         if (dashboardBox) dashboardBox.style.display = 'none';
+
+        const clientSelect = document.getElementById('filter-task-client');
+        if (clientSelect) {
+            const clientName = await store.getClientPortalName(this.userClientId);
+            clientSelect.innerHTML = `<option value="${this.userClientId}">${escapeHtml(clientName || 'Meu cliente')}</option>`;
+            clientSelect.value = this.userClientId;
+            clientSelect.disabled = true;
+        }
 
         this.currentView = 'tasks';
         document.querySelectorAll('.nav-item').forEach(item => {
@@ -2010,14 +2019,37 @@ class AppController {
         const btnNewTask = document.getElementById('btn-new-task');
         if (btnNewTask) btnNewTask.style.display = 'none';
 
-        const [columns, tasks] = await Promise.all([
-            store.getClientPortalColumns(this.userClientId),
-            store.getClientPortalTasks(this.userClientId),
-        ]);
-        this._currentColumns = columns;
-        this._tasksCache = tasks;
-        this._renderKanbanBoard(columns, tasks, {}, true);
+        if (this._tasksCache === null) {
+            const [columns, tasks] = await Promise.all([
+                store.getClientPortalColumns(this.userClientId),
+                store.getClientPortalTasks(this.userClientId),
+            ]);
+            this._currentColumns = columns;
+            this._tasksCache = tasks;
+        }
+
+        this._populateLabelFilter(this._tasksCache);
+
+        const filterPriority = document.getElementById('filter-task-priority')?.value;
+        const filterLabel    = document.getElementById('filter-task-label')?.value;
+        const searchTerm     = this._normalizeSearch(document.getElementById('filter-task-search')?.value || '');
+
+        let tasks = this._tasksCache;
+        if (filterPriority) tasks = tasks.filter(t => t.priority === filterPriority);
+        if (filterLabel)    tasks = tasks.filter(t => (t.labels || []).some(l => l.color === filterLabel));
+        if (searchTerm)     tasks = tasks.filter(t => this._taskMatchesSearch(t, searchTerm));
+
+        this._renderKanbanBoard(this._currentColumns, tasks, {}, true);
         lucide.createIcons();
+    }
+
+    // Roteia o refresh dos filtros da view Tarefas conforme o papel do
+    // usuário — o Portal do Cliente nunca deve chamar renderTasks(), pois
+    // ele usa store.getTasks() (filtrado por user_id do consultor, não do
+    // cliente-portal) e ignoraria os dados liberados via RLS cross-user.
+    refreshTaskFilters() {
+        if (this.userRole === 'client') return this.renderClientPortalTasks();
+        return this.renderTasks();
     }
 
     async renderAll() {

@@ -930,6 +930,17 @@ class TSPStore {
         return (data || []).map(r => this._column(r));
     }
 
+    // Nome do cliente para exibir travado no filtro do Portal do Cliente.
+    // Select explícito (só id, name) — nunca usar '*' aqui: a RLS libera a
+    // linha inteira (client_pays, hourly_rate, notes, etc.) e o papel
+    // 'client' não deve receber esses campos, mesmo que a UI não os exiba.
+    async getClientPortalName(clientId) {
+        const { data, error } = await this.db.from('clients').select('id, name')
+            .eq('id', clientId).single();
+        if (error) return null;
+        return data?.name || null;
+    }
+
     // ── PAINEL DE INDICADORES ────────────────────────────────────────
 
     // Busca todos os dados de um cliente para o painel de Indicadores.
