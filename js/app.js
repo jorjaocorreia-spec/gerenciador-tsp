@@ -6587,6 +6587,49 @@ class AppController {
         messagesBox.scrollTop = messagesBox.scrollHeight;
     }
 
+    async exportIndicadoresPDF() {
+        const data = this._indicadoresData;
+        if (!data) { Toast.show('Carregue os indicadores antes de exportar.', 'info'); return; }
+        try {
+            const { jsPDF } = window.jspdf;
+            const doc = new jsPDF();
+            const { client, kpis, monthly, timeline } = data;
+
+            doc.setFontSize(16);
+            doc.text(`Indicadores — ${client.name}`, 14, 18);
+            doc.setFontSize(10);
+            doc.text(`Gerado em: ${new Date().toLocaleDateString('pt-BR')}`, 14, 26);
+
+            doc.setFontSize(11);
+            doc.text(`Tarefas concluídas: ${kpis.tasksCompletedTotal} (${kpis.tasksCompletedThisMonth} este mês)`, 14, 38);
+            doc.text(`Horas consumidas: ${kpis.hoursUsed}h de ${kpis.hoursTotal}h contratadas`, 14, 44);
+            doc.text(`Entregas no prazo: ${kpis.onTimeRate !== null ? kpis.onTimeRate + '%' : 'sem dados'}`, 14, 50);
+            doc.text(`Tempo médio de conclusão: ${kpis.avgCompletionDays !== null ? kpis.avgCompletionDays + ' dias' : 'sem dados'}`, 14, 56);
+
+            const monthlyRows = monthly.map(m => [m.month, String(m.completed), String(m.created)]);
+            doc.autoTable({
+                startY: 64,
+                head: [["Mês", "Concluídas", "Criadas"]],
+                body: monthlyRows,
+                styles: { fontSize: 8 },
+                headStyles: { fillColor: [79, 70, 229] },
+            });
+
+            const timelineRows = timeline.slice(0, 30).map(t => [t.date.split('-').reverse().join('/'), t.type, t.title.substring(0, 60)]);
+            doc.autoTable({
+                startY: doc.lastAutoTable.finalY + 10,
+                head: [["Data", "Tipo", "Item"]],
+                body: timelineRows,
+                styles: { fontSize: 8 },
+                headStyles: { fillColor: [79, 70, 229] },
+            });
+
+            doc.save(`indicadores_${client.name.replace(/\s+/g, '_')}_${new Date().getTime()}.pdf`);
+        } catch (err) {
+            Toast.show('Erro ao gerar PDF: ' + err.message, 'error');
+        }
+    }
+
     _buildFinanceiroChart(history) {
         const wrap = document.createElement('div');
         wrap.className = 'glass';

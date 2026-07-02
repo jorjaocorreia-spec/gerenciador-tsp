@@ -4437,3 +4437,77 @@ kbd {
     border-color: rgba(239,68,68,0.4);
     color: #fca5a5;
 }
+
+/* Painel de Indicadores */
+.indicadores-kpi-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 16px;
+    margin-bottom: 16px;
+}
+.indicadores-kpi-card {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding: 18px 20px;
+}
+.indicadores-kpi-label {
+    font-size: 0.78rem;
+    color: var(--text-muted);
+}
+.indicadores-kpi-value {
+    font-size: 1.6rem;
+    font-weight: 700;
+}
+.indicadores-kpi-sub {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+}
+.indicadores-timeline {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    max-height: 420px;
+    overflow-y: auto;
+}
+.indicadores-timeline-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+}
+.indicadores-timeline-item i {
+    width: 16px;
+    height: 16px;
+    flex-shrink: 0;
+    margin-top: 2px;
+    color: var(--primary-color);
+}
+.indicadores-timeline-title {
+    font-size: 0.88rem;
+}
+.indicadores-timeline-date {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+}
+.indicadores-chat-messages {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    max-height: 320px;
+    overflow-y: auto;
+}
+.indicadores-chat-bubble {
+    padding: 8px 12px;
+    border-radius: 10px;
+    font-size: 0.85rem;
+    max-width: 85%;
+}
+.indicadores-chat-bubble-user {
+    align-self: flex-end;
+    background: var(--primary-color);
+    color: #fff;
+}
+.indicadores-chat-bubble-ai {
+    align-self: flex-start;
+    background: rgba(255,255,255,0.07);
+}
