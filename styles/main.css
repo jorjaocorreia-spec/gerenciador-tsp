@@ -3992,7 +3992,8 @@ kbd {
 .modal-task-readonly .kb-cover-picker,
 .modal-task-readonly #btn-ai-suggest-steps,
 .modal-task-readonly .checklist-item-delete,
-.modal-task-readonly .modal-task-title-edit-icon {
+.modal-task-readonly .modal-task-title-edit-icon,
+.modal-task-readonly .task-comment-actions {
     display: none !important;
 }
 .modal-task-readonly textarea,

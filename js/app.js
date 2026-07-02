@@ -955,7 +955,10 @@ class AppController {
         if (!readOnly) return;
         document.getElementById('btn-delete-task').style.display = 'none';
         document.getElementById('btn-add-time-task').style.display = 'none';
-        document.getElementById('modal-task-comments-section').style.display = 'none';
+        // Cliente vê o histórico de comentários (acompanhamento do andamento),
+        // mas não pode escrever um novo — só a caixa de input fica oculta.
+        const commentInputRow = document.querySelector('#modal-task-comments-section .task-comment-input-row');
+        if (commentInputRow) commentInputRow.style.display = 'none';
         ['task-title', 'task-description', 'task-client', 'task-priority', 'task-due-date', 'task-estimated-minutes']
             .forEach(id => { const el = document.getElementById(id); if (el) el.disabled = true; });
         document.querySelectorAll('#modal-checklist-items input[type="checkbox"]').forEach(cb => cb.disabled = true);
@@ -3825,13 +3828,10 @@ class AppController {
         const completeTitle = task.completed ? 'Marcar como incompleta' : 'Marcar como concluída';
         const completeIcon = task.completed ? 'check-circle-2' : 'circle';
 
-        card.innerHTML = `
-            ${coverHtml}
-            ${labelsHtml}
-            <p class="kb-card-title">${escapeHtml(task.title)}</p>
-            <div class="kb-card-badges">${badgesHtml}</div>
-            <div class="kb-card-footer">
-                <span class="kb-card-client">${clientName}</span>
+        // Portal do cliente (readOnly): nenhum botão de ação no card — nem
+        // marcar concluída, nem editar (o lápis chamava handleEditTask sem
+        // o flag readOnly, o que abriria o modal em modo edição), nem excluir.
+        const actionsHtml = readOnly ? '' : `
                 <div class="kb-card-actions">
                     <button type="button" class="kb-action-btn kb-complete-btn${task.completed ? ' kb-complete-btn--done' : ''}"
                         onclick="event.stopPropagation();app.toggleTaskComplete('${task.id}', ${!task.completed})"
@@ -3844,7 +3844,16 @@ class AppController {
                     <button type="button" class="kb-action-btn kb-action-danger" onclick="event.stopPropagation();app.handleDeleteTask('${task.id}', this)" title="Excluir">
                         <i data-lucide="trash-2" style="width:12px;height:12px"></i>
                     </button>
-                </div>
+                </div>`;
+
+        card.innerHTML = `
+            ${coverHtml}
+            ${labelsHtml}
+            <p class="kb-card-title">${escapeHtml(task.title)}</p>
+            <div class="kb-card-badges">${badgesHtml}</div>
+            <div class="kb-card-footer">
+                <span class="kb-card-client">${clientName}</span>
+                ${actionsHtml}
             </div>
         `;
         return card;
