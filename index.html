@@ -56,6 +56,36 @@
                 <button type="submit" id="auth-submit" class="btn btn-primary" style="width:100%; margin-top:8px;">
                     Entrar
                 </button>
+                <p style="text-align:center; margin-top:12px;">
+                    <a href="#" onclick="Auth.showForgotPassword(event)" style="color:var(--primary-color); font-size:0.85rem; text-decoration:none;">Esqueci minha senha</a>
+                </p>
+            </form>
+
+            <form id="auth-forgot-form" style="display:none;" onsubmit="Auth.handleForgotPassword(event)">
+                <div class="form-group">
+                    <label class="form-label">E-mail</label>
+                    <input type="email" id="forgot-email" class="form-control" placeholder="seu@email.com" required>
+                </div>
+                <button type="submit" id="forgot-submit" class="btn btn-primary" style="width:100%; margin-top:8px;">
+                    Enviar link de redefinição
+                </button>
+                <p style="text-align:center; margin-top:12px;">
+                    <a href="#" onclick="Auth.showLoginForm(event)" style="color:var(--primary-color); font-size:0.85rem; text-decoration:none;">Voltar ao login</a>
+                </p>
+            </form>
+
+            <form id="auth-reset-form" style="display:none;" onsubmit="Auth.handleResetPassword(event)">
+                <div class="form-group">
+                    <label class="form-label">Nova senha</label>
+                    <input type="password" id="reset-password" class="form-control" placeholder="••••••••" required minlength="6">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Confirmar nova senha</label>
+                    <input type="password" id="reset-password-confirm" class="form-control" placeholder="••••••••" required minlength="6">
+                </div>
+                <button type="submit" id="reset-submit" class="btn btn-primary" style="width:100%; margin-top:8px;">
+                    Definir nova senha
+                </button>
             </form>
         </div>
     </div>

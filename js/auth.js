@@ -93,6 +93,84 @@ const Auth = {
             btn.disabled = false;
             btn.textContent = 'Entrar';
         }
+    },
+
+    // ── ESQUECI MINHA SENHA ───────────────────────────
+
+    showForgotPassword(e) {
+        e.preventDefault();
+        this.clearMessage();
+        document.getElementById('auth-form').style.display = 'none';
+        document.getElementById('auth-forgot-form').style.display = 'block';
+    },
+
+    showLoginForm(e) {
+        if (e) e.preventDefault();
+        this.clearMessage();
+        document.getElementById('auth-forgot-form').style.display = 'none';
+        document.getElementById('auth-reset-form').style.display = 'none';
+        document.getElementById('auth-form').style.display = 'block';
+    },
+
+    showResetPasswordForm() {
+        document.getElementById('auth-form').style.display = 'none';
+        document.getElementById('auth-forgot-form').style.display = 'none';
+        document.getElementById('auth-reset-form').style.display = 'block';
+    },
+
+    async handleForgotPassword(e) {
+        e.preventDefault();
+        const email = document.getElementById('forgot-email').value.trim();
+        const btn = document.getElementById('forgot-submit');
+
+        btn.disabled = true;
+        btn.textContent = 'Enviando...';
+        this.clearMessage();
+
+        try {
+            const { error } = await this.client.auth.resetPasswordForEmail(email, {
+                redirectTo: window.location.origin
+            });
+            if (error) throw error;
+            this.showMessage('Link de redefinição enviado. Confira seu e-mail.', false);
+        } catch (err) {
+            this.showMessage(err.message || 'Erro ao enviar o link de redefinição.');
+        } finally {
+            btn.disabled = false;
+            btn.textContent = 'Enviar link de redefinição';
+        }
+    },
+
+    async handleResetPassword(e) {
+        e.preventDefault();
+        const password = document.getElementById('reset-password').value;
+        const confirmPassword = document.getElementById('reset-password-confirm').value;
+        const btn = document.getElementById('reset-submit');
+
+        this.clearMessage();
+        if (password !== confirmPassword) {
+            this.showMessage('As senhas não coincidem.');
+            return;
+        }
+
+        btn.disabled = true;
+        btn.textContent = 'Salvando...';
+
+        try {
+            const { error } = await this.client.auth.updateUser({ password });
+            if (error) throw error;
+            history.replaceState(null, '', window.location.pathname);
+            await this.getSession();
+            this.hideAuthScreen();
+            document.getElementById('auth-reset-form').style.display = 'none';
+            document.getElementById('auth-form').style.display = 'block';
+            if (window.app) window.app.initAfterAuth();
+        } catch (err) {
+            this.showMessage(err.message || 'Erro ao redefinir a senha.');
+        } finally {
+            btn.disabled = false;
+            btn.textContent = 'Definir nova senha';
+        }
     }
 };
 

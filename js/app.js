@@ -10255,12 +10255,20 @@ class AppController {
 document.addEventListener('DOMContentLoaded', async () => {
     Auth.init();
 
+    // Link de "Esqueci minha senha" do Supabase redireciona com #...&type=recovery
+    // na URL — precisa ser detectado ANTES de decidir se loga normalmente, senão o
+    // usuário cai direto no app sem nunca definir a nova senha.
+    const isPasswordRecovery = window.location.hash.includes('type=recovery');
+
     const user = await Auth.getSession();
 
     window.app = new AppController();
     window.app._initFloatLabels(document.getElementById('auth-form'));
 
-    if (!user) {
+    if (isPasswordRecovery) {
+        Auth.showAuthScreen();
+        Auth.showResetPasswordForm();
+    } else if (!user) {
         Auth.showAuthScreen();
     } else {
         Auth.hideAuthScreen();
