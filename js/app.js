@@ -6784,12 +6784,18 @@ class AppController {
     }
 
     async generateIndicadoresSummary() {
-        if (!this._indicadoresData) return;
         const box = document.getElementById('indicadores-ai-summary-text');
         if (!box) return;
         box.textContent = 'Gerando resumo...';
         try {
-            const summary = await aiClient.generateClientIndicatorsSummary(this._indicadoresData);
+            let summary;
+            if (this.indicadoresTab === 'mensal') {
+                if (!this._indicadoresMonthlyData) return;
+                summary = await aiClient.generateClientIndicatorsMonthSummary(this._indicadoresMonthlyData, this._formatDashboardMonth(this.indicadoresMonth));
+            } else {
+                if (!this._indicadoresData) return;
+                summary = await aiClient.generateClientIndicatorsSummary(this._indicadoresData);
+            }
             box.textContent = summary;
         } catch (err) {
             box.textContent = 'Erro ao gerar resumo: ' + err.message;
@@ -6799,12 +6805,17 @@ class AppController {
     async sendIndicadoresChatMessage() {
         const input = document.getElementById('indicadores-chat-input');
         const messagesBox = document.getElementById('indicadores-chat-messages');
-        if (!input || !messagesBox || !this._indicadoresData) return;
+        if (!input || !messagesBox) return;
         const question = input.value.trim();
         if (!question) return;
         input.value = '';
 
-        this._indicadoresChatHistory.push({ role: 'user', content: question });
+        const isMensal = this.indicadoresTab === 'mensal';
+        if (isMensal && !this._indicadoresMonthlyData) return;
+        if (!isMensal && !this._indicadoresData) return;
+        const history = isMensal ? this._indicadoresChatHistoryMensal : this._indicadoresChatHistoryGeral;
+
+        history.push({ role: 'user', content: question });
         this._appendIndicadoresChatBubble('user', question);
 
         const loadingId = 'indicadores-chat-loading-' + Date.now();
@@ -6812,10 +6823,12 @@ class AppController {
         messagesBox.scrollTop = messagesBox.scrollHeight;
 
         try {
-            const historyBeforeQuestion = this._indicadoresChatHistory.slice(0, -1);
-            const answer = await aiClient.chatAboutClientIndicators(this._indicadoresData, question, historyBeforeQuestion);
+            const historyBeforeQuestion = history.slice(0, -1);
+            const answer = isMensal
+                ? await aiClient.chatAboutClientIndicatorsMonth(this._indicadoresMonthlyData, this._formatDashboardMonth(this.indicadoresMonth), question, historyBeforeQuestion)
+                : await aiClient.chatAboutClientIndicators(this._indicadoresData, question, historyBeforeQuestion);
             document.getElementById(loadingId)?.remove();
-            this._indicadoresChatHistory.push({ role: 'assistant', content: answer });
+            history.push({ role: 'assistant', content: answer });
             this._appendIndicadoresChatBubble('ai', answer);
         } catch (err) {
             document.getElementById(loadingId)?.remove();
@@ -6832,6 +6845,14 @@ class AppController {
     }
 
     async exportIndicadoresPDF() {
+        if (this.indicadoresTab === 'mensal') {
+            await this._exportIndicadoresMensalPDF();
+        } else {
+            await this._exportIndicadoresGeralPDF();
+        }
+    }
+
+    async _exportIndicadoresGeralPDF() {
         const data = this._indicadoresData;
         if (!data) { Toast.show('Carregue os indicadores antes de exportar.', 'info'); return; }
         try {
@@ -6840,7 +6861,7 @@ class AppController {
             const { client, kpis, monthly, timeline } = data;
 
             doc.setFontSize(16);
-            doc.text(`Indicadores — ${client.name}`, 14, 18);
+            doc.text(`Indicadores (Geral) — ${client.name}`, 14, 18);
             doc.setFontSize(10);
             doc.text(`Gerado em: ${new Date().toLocaleDateString('pt-BR')}`, 14, 26);
 
@@ -6868,7 +6889,42 @@ class AppController {
                 headStyles: { fillColor: [79, 70, 229] },
             });
 
-            doc.save(`indicadores_${client.name.replace(/\s+/g, '_')}_${new Date().getTime()}.pdf`);
+            doc.save(`indicadores_geral_${client.name.replace(/\s+/g, '_')}_${new Date().getTime()}.pdf`);
+        } catch (err) {
+            Toast.show('Erro ao gerar PDF: ' + err.message, 'error');
+        }
+    }
+
+    async _exportIndicadoresMensalPDF() {
+        const data = this._indicadoresMonthlyData;
+        if (!data) { Toast.show('Carregue os indicadores antes de exportar.', 'info'); return; }
+        try {
+            const { jsPDF } = window.jspdf;
+            const doc = new jsPDF();
+            const { client, kpis, timeline, month } = data;
+            const monthLabel = this._formatDashboardMonth(month);
+
+            doc.setFontSize(16);
+            doc.text(`Indicadores (${monthLabel}) — ${client.name}`, 14, 18);
+            doc.setFontSize(10);
+            doc.text(`Gerado em: ${new Date().toLocaleDateString('pt-BR')}`, 14, 26);
+
+            doc.setFontSize(11);
+            doc.text(`Tarefas concluídas no mês: ${kpis.tasksCompletedInMonth}`, 14, 38);
+            doc.text(`Horas consumidas no mês: ${kpis.hoursUsedInMonth}h`, 14, 44);
+            doc.text(`Entregas no prazo no mês: ${kpis.onTimeRateInMonth !== null ? kpis.onTimeRateInMonth + '%' : 'sem dados'}`, 14, 50);
+            doc.text(`Tempo médio de conclusão no mês: ${kpis.avgCompletionDaysInMonth !== null ? kpis.avgCompletionDaysInMonth + ' dias' : 'sem dados'}`, 14, 56);
+
+            const timelineRows = timeline.slice(0, 30).map(t => [t.date.split('-').reverse().join('/'), t.type, t.title.substring(0, 60)]);
+            doc.autoTable({
+                startY: 64,
+                head: [["Data", "Tipo", "Item"]],
+                body: timelineRows,
+                styles: { fontSize: 8 },
+                headStyles: { fillColor: [79, 70, 229] },
+            });
+
+            doc.save(`indicadores_${month}_${client.name.replace(/\s+/g, '_')}_${new Date().getTime()}.pdf`);
         } catch (err) {
             Toast.show('Erro ao gerar PDF: ' + err.message, 'error');
         }
@@ -10872,7 +10928,9 @@ document.addEventListener('DOMContentLoaded', async () => {
             window.app._agendaTasksCache = null;
             window.app.indicadoresClientId = null;
             window.app._indicadoresData = null;
-            window.app._indicadoresChatHistory = [];
+            window.app._indicadoresMonthlyData = null;
+            window.app._indicadoresChatHistoryMensal = [];
+            window.app._indicadoresChatHistoryGeral = [];
         }
         if (window.aiClient) aiClient.reset();
         await Auth.signOut();
