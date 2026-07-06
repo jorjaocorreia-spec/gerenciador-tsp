@@ -2003,6 +2003,7 @@ class AppController {
         this.checkLocalStorageMigration();
         this.applySidebarState();
         this.applyMoneyVisibility();
+        this.applyKanbanFiltersState();
         // S7: cascata de nav items no login
         const sidebar = document.getElementById('sidebar');
         if (sidebar) {
@@ -2057,6 +2058,7 @@ class AppController {
             section.classList.toggle('active', section.id === 'view-tasks');
         });
 
+        this.applyKanbanFiltersState();
         await this.renderClientPortalTasks();
         lucide.createIcons();
     }
@@ -2571,6 +2573,29 @@ class AppController {
         }
         const toggle = document.getElementById('btn-sidebar-toggle');
         if (toggle) toggle.title = collapsed ? 'Expandir menu' : 'Recolher menu';
+    }
+
+    toggleKanbanFilters() {
+        const filters = document.querySelector('.kanban-filters');
+        if (!filters) return;
+        const collapsed = filters.classList.toggle('kf-collapsed');
+        sessionStorage.setItem('kanbanFiltersCollapsed', collapsed ? '1' : '0');
+        this._applyKanbanFiltersButtonState(collapsed);
+    }
+
+    applyKanbanFiltersState() {
+        const filters = document.querySelector('.kanban-filters');
+        if (!filters) return;
+        const collapsed = sessionStorage.getItem('kanbanFiltersCollapsed') === '1';
+        filters.classList.toggle('kf-collapsed', collapsed);
+        this._applyKanbanFiltersButtonState(collapsed);
+    }
+
+    _applyKanbanFiltersButtonState(collapsed) {
+        const btn = document.getElementById('btn-toggle-task-filters');
+        const label = document.getElementById('btn-toggle-task-filters-label');
+        if (label) label.textContent = collapsed ? 'Mostrar Filtros' : 'Ocultar Filtros';
+        if (btn) btn.title = collapsed ? 'Mostrar filtros' : 'Ocultar filtros';
     }
 
     toggleMoneyVisibility() {

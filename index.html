@@ -350,6 +350,10 @@
                     <p class="text-muted">Gestão ágil de requisições e projetos.</p>
                 </div>
                 <div style="display:flex;gap:8px;align-items:center">
+                    <button class="btn btn-ghost" id="btn-toggle-task-filters" onclick="app.toggleKanbanFilters()"
+                            title="Ocultar filtros">
+                        <i data-lucide="sliders-horizontal"></i> <span id="btn-toggle-task-filters-label">Ocultar Filtros</span>
+                    </button>
                     <button class="btn btn-ghost" id="btn-manage-columns" onclick="app.openManageColumns()"
                             style="display:none" title="Personalizar colunas deste cliente">
                         <i data-lucide="columns"></i> Gerenciar Colunas

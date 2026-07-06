@@ -678,6 +678,9 @@ h4 {
   align-items: flex-end;
   padding-bottom: 2px;
 }
+.kanban-filters.kf-collapsed {
+  display: none;
+}
 
 /* Board */
 /* #view-tasks vira flex-column quando ativa: header/dashboard/filtros ficam
