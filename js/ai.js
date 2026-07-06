@@ -305,6 +305,48 @@ ${this._buildIndicadoresContext(data)}`;
 
         return this.complete(system, user);
     }
+
+    // Mesmas regras de _buildIndicadoresContext, mas escopado a um único mês
+    // (usado pela aba Mensal do painel). Nunca inclui client_pays/hourly_rate/
+    // consultant_bonus — mesma garantia estrutural do contexto Geral.
+    _buildIndicadoresMonthContext(data, monthLabel) {
+        const { client, kpis, timeline } = data;
+        const timelineLines = timeline.slice(0, 20).map(t => `${t.date} [${t.type}] ${t.title}`).join('\n');
+
+        return `Cliente: ${client.name}
+Mês de referência: ${monthLabel}
+Tarefas concluídas no mês: ${kpis.tasksCompletedInMonth}
+Horas consumidas no mês: ${kpis.hoursUsedInMonth}h
+Taxa de entrega no prazo no mês: ${kpis.onTimeRateInMonth !== null ? kpis.onTimeRateInMonth + '%' : 'sem dados suficientes'}
+Tempo médio de conclusão no mês: ${kpis.avgCompletionDaysInMonth !== null ? kpis.avgCompletionDaysInMonth + ' dias' : 'sem dados suficientes'}
+
+Eventos do mês (mais recente primeiro):
+${timelineLines}`;
+    }
+
+    async generateClientIndicatorsMonthSummary(data, monthLabel) {
+        const system = `Você é um consultor de TI resumindo o que aconteceu em um mês específico de um projeto, para quem está acompanhando (pode ser o próprio cliente ou o consultor responsável).
+Escreva um resumo curto (3-5 frases), direto, destacando o que foi entregue no mês e pontos de atenção se houver.
+Nunca mencione valores financeiros, comissão ou preço — esses dados não fazem parte do contexto e não devem ser inventados.
+Responda apenas com o texto do resumo, sem markdown, sem título.`;
+        const user = this._buildIndicadoresMonthContext(data, monthLabel);
+        return this.complete(system, user);
+    }
+
+    async chatAboutClientIndicatorsMonth(data, monthLabel, question, history = []) {
+        const system = `Você é um assistente que responde dúvidas sobre o andamento de um projeto de consultoria em um mês específico, com base nos dados fornecidos.
+Responda apenas com base nos dados abaixo — se a pergunta não puder ser respondida com esses dados, diga isso claramente em vez de inventar.
+Nunca mencione valores financeiros, comissão ou preço — esses dados não fazem parte do contexto e não devem ser inventados.
+Seja direto e objetivo, poucas frases.
+
+Dados do mês:
+${this._buildIndicadoresMonthContext(data, monthLabel)}`;
+
+        const historyText = history.map(h => `${h.role === 'user' ? 'Usuário' : 'Assistente'}: ${h.content}`).join('\n');
+        const user = historyText ? `${historyText}\nUsuário: ${question}` : question;
+
+        return this.complete(system, user);
+    }
 }
 
 window.aiClient = new TSPAIClient();
