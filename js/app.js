@@ -62,8 +62,12 @@ class AppController {
         this.userRole = null;       // 'consultant' | 'client' — setado em initAfterAuth()
         this.userClientId = null;   // client_id vinculado, só para role 'client'
         this.indicadoresClientId = null;  // cliente selecionado no painel (só papel 'consultant')
-        this._indicadoresData = null;     // cache do último resultado de getClientIndicators()
-        this._indicadoresChatHistory = []; // histórico do chat de IA, só em memória
+        this.indicadoresTab = 'mensal';   // aba ativa: 'mensal' | 'geral'
+        this.indicadoresMonth = new Date().toISOString().slice(0, 7); // YYYY-MM da aba Mensal
+        this._indicadoresData = null;         // cache do último resultado de getClientIndicators() (inclui .raw)
+        this._indicadoresMonthlyData = null;  // cache do recorte mensal (_computeMonthlyIndicators)
+        this._indicadoresChatHistoryMensal = []; // histórico do chat de IA da aba Mensal, só em memória
+        this._indicadoresChatHistoryGeral = [];  // histórico do chat de IA da aba Geral, só em memória
         this.pendingPdfRecords = [];
         this.pendingPdfWarnings = [];
         this.agendaCurrentDate = new Date();
@@ -6518,9 +6522,7 @@ class AppController {
         try {
             const data = await store.getClientIndicators(clientId);
             this._indicadoresData = data;
-            container.innerHTML = this._renderIndicadoresContent(data);
-            lucide.createIcons();
-            this._animateIndicadoresBars();
+            this._renderIndicadoresPanel();
         } catch (err) {
             container.innerHTML = `<p class="text-muted" style="padding:24px;">Erro ao carregar indicadores: ${escapeHtml(err.message)}</p>`;
         }
@@ -6536,11 +6538,76 @@ class AppController {
 
     onIndicadoresClientChange(clientId) {
         this.indicadoresClientId = clientId;
-        this._indicadoresChatHistory = [];
+        this.indicadoresTab = 'mensal';
+        this.indicadoresMonth = new Date().toISOString().slice(0, 7);
+        this._indicadoresChatHistoryMensal = [];
+        this._indicadoresChatHistoryGeral = [];
         this.renderIndicadores();
     }
 
-    _renderIndicadoresContent(data) {
+    switchIndicadoresTab(tab) {
+        if (this.indicadoresTab === tab) return;
+        this.indicadoresTab = tab;
+        this._renderIndicadoresPanel();
+    }
+
+    indicadoresNavMonth(delta) {
+        const [y, m] = this.indicadoresMonth.split('-').map(Number);
+        const d = new Date(y, m - 1 + delta, 1);
+        const newMonth = d.toISOString().slice(0, 7);
+        const currentMonth = new Date().toISOString().slice(0, 7);
+        if (newMonth > currentMonth) return;
+        this.indicadoresMonth = newMonth;
+        this._indicadoresChatHistoryMensal = [];
+        this._renderIndicadoresPanel();
+    }
+
+    indicadoresGoToCurrentMonth() {
+        this.indicadoresMonth = new Date().toISOString().slice(0, 7);
+        this._indicadoresChatHistoryMensal = [];
+        this._renderIndicadoresPanel();
+    }
+
+    _renderIndicadoresPanel() {
+        const container = document.getElementById('indicadores-container');
+        const data = this._indicadoresData;
+        if (!container || !data) return;
+
+        const tabsHtml = `
+            <div class="indicadores-tabs">
+                <button type="button" class="indicadores-tab ${this.indicadoresTab === 'mensal' ? 'active' : ''}" onclick="app.switchIndicadoresTab('mensal')">Mensal</button>
+                <button type="button" class="indicadores-tab ${this.indicadoresTab === 'geral' ? 'active' : ''}" onclick="app.switchIndicadoresTab('geral')">Geral</button>
+            </div>`;
+
+        let bodyHtml;
+        if (this.indicadoresTab === 'mensal') {
+            this._indicadoresMonthlyData = store._computeMonthlyIndicators(data.raw, this.indicadoresMonth);
+            const currentMonth = new Date().toISOString().slice(0, 7);
+            const isCurrentMonth = this.indicadoresMonth === currentMonth;
+            const monthNavHtml = `
+                <div id="indicadores-month-nav" style="display:flex;align-items:center;gap:6px;margin-bottom:16px;">
+                    <button id="btn-indicadores-prev-month" onclick="app.indicadoresNavMonth(-1)" class="btn btn-ghost" style="padding:6px 10px;" title="Mês anterior">
+                        <i data-lucide="chevron-left" style="width:16px;height:16px;"></i>
+                    </button>
+                    <span id="indicadores-month-label" style="font-weight:600;min-width:120px;text-align:center;font-size:0.95rem;">${this._formatDashboardMonth(this.indicadoresMonth)}</span>
+                    <button id="btn-indicadores-next-month" onclick="app.indicadoresNavMonth(1)" class="btn btn-ghost" style="padding:6px 10px;" title="Próximo mês" ${isCurrentMonth ? 'disabled' : ''}>
+                        <i data-lucide="chevron-right" style="width:16px;height:16px;"></i>
+                    </button>
+                    <button id="btn-indicadores-current-month" onclick="app.indicadoresGoToCurrentMonth()" class="btn btn-ghost" style="display:${isCurrentMonth ? 'none' : ''};font-size:0.8rem;padding:6px 12px;color:var(--primary-color);border:1px solid var(--primary-color);" title="Voltar ao mês atual">
+                        Mês atual
+                    </button>
+                </div>`;
+            bodyHtml = monthNavHtml + this._renderIndicadoresMensalContent(this._indicadoresMonthlyData);
+        } else {
+            bodyHtml = this._renderIndicadoresGeralContent(data);
+        }
+
+        container.innerHTML = tabsHtml + bodyHtml;
+        lucide.createIcons();
+        this._animateIndicadoresBars();
+    }
+
+    _renderIndicadoresGeralContent(data) {
         const { kpis, monthly, statusDistribution, priorityDistribution, timeline } = data;
         const pct = kpis.hoursTotal > 0 ? Math.min(100, Math.round((kpis.hoursUsed / kpis.hoursTotal) * 100)) : 0;
 
@@ -6640,6 +6707,69 @@ class AppController {
             </div>
             <div class="glass" style="padding:20px 24px;margin-bottom:16px;">
                 <h3 style="margin:0 0 16px;font-size:1rem;">Linha do tempo do projeto</h3>
+                <div class="indicadores-timeline">${timelineRows}</div>
+            </div>
+            ${aiChatSection}
+        `;
+    }
+
+    _renderIndicadoresMensalContent(monthlyData) {
+        const { kpis, timeline } = monthlyData;
+
+        const kpiCards = `
+            <div class="indicadores-kpi-grid">
+                <div class="glass indicadores-kpi-card">
+                    <span class="indicadores-kpi-label">Tarefas concluídas no mês</span>
+                    <span class="indicadores-kpi-value">${kpis.tasksCompletedInMonth}</span>
+                </div>
+                <div class="glass indicadores-kpi-card">
+                    <span class="indicadores-kpi-label">Horas consumidas no mês</span>
+                    <span class="indicadores-kpi-value">${kpis.hoursUsedInMonth}h</span>
+                </div>
+                <div class="glass indicadores-kpi-card">
+                    <span class="indicadores-kpi-label">Entregas no prazo</span>
+                    <span class="indicadores-kpi-value">${kpis.onTimeRateInMonth !== null ? kpis.onTimeRateInMonth + '%' : '—'}</span>
+                </div>
+                <div class="glass indicadores-kpi-card">
+                    <span class="indicadores-kpi-label">Tempo médio de conclusão</span>
+                    <span class="indicadores-kpi-value">${kpis.avgCompletionDaysInMonth !== null ? kpis.avgCompletionDaysInMonth + ' dias' : '—'}</span>
+                </div>
+            </div>`;
+
+        const timelineIcons = { task: 'check-circle', event: 'calendar', implementation: 'package' };
+        const timelineRows = timeline.map(item => `
+            <div class="indicadores-timeline-item">
+                <i data-lucide="${timelineIcons[item.type] || 'circle'}"></i>
+                <div>
+                    <div class="indicadores-timeline-title">${escapeHtml(item.title)}</div>
+                    <div class="indicadores-timeline-date">${item.date.split('-').reverse().join('/')}</div>
+                </div>
+            </div>`).join('') || '<p class="text-muted">Nenhum evento registrado neste mês.</p>';
+
+        const aiSummarySection = aiClient.isConfigured ? `
+            <div class="glass" style="padding:20px 24px;margin-bottom:16px;" id="indicadores-ai-summary-box">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+                    <h3 style="margin:0;font-size:1rem;">Resumo do mês (IA)</h3>
+                    <button class="btn btn-secondary btn-sm" onclick="app.generateIndicadoresSummary()"><i data-lucide="sparkles"></i> Gerar resumo</button>
+                </div>
+                <div id="indicadores-ai-summary-text" class="text-muted">Clique em "Gerar resumo" para uma análise do mês selecionado.</div>
+            </div>` : '';
+
+        const aiChatSection = aiClient.isConfigured ? `
+            <div class="glass" style="padding:20px 24px;" id="indicadores-ai-chat-box">
+                <h3 style="margin:0 0 10px;font-size:1rem;">Tire suas dúvidas sobre o mês</h3>
+                <div id="indicadores-chat-messages" class="indicadores-chat-messages"></div>
+                <div style="display:flex;gap:8px;margin-top:10px;">
+                    <input type="text" id="indicadores-chat-input" class="form-control" placeholder="Pergunte sobre o mês..." onkeydown="if(event.key==='Enter') app.sendIndicadoresChatMessage();">
+                    <button class="btn btn-primary" onclick="app.sendIndicadoresChatMessage()"><i data-lucide="send"></i></button>
+                </div>
+            </div>` : '';
+
+        return `
+            ${aiSummarySection}
+            ${kpiCards}
+            <div class="glass" style="padding:20px 24px;margin-bottom:16px;">
+                <h3 style="margin:0 0 16px;font-size:1rem;">Linha do tempo do mês</h3>
                 <div class="indicadores-timeline">${timelineRows}</div>
             </div>
             ${aiChatSection}
