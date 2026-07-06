@@ -1076,7 +1076,67 @@ class TSPStore {
             monthly,
             statusDistribution,
             priorityDistribution,
-            timeline: timelineItems.slice(0, 60)
+            timeline: timelineItems.slice(0, 60),
+            raw: { client: safeClient, tasks, records, events, columns, implementations }
+        };
+    }
+
+    // Cálculo puro (sem DB) para a aba Mensal do painel de Indicadores —
+    // reaproveita os arrays já buscados por getClientIndicators() (data.raw),
+    // sem nova query ao trocar de mês. Testável isoladamente no console do
+    // navegador: store._computeMonthlyIndicators(data.raw, '2026-06').
+    _computeMonthlyIndicators(raw, monthStr) {
+        const { client, tasks, records, events, columns, implementations } = raw;
+        const doneIds = new Set(columns.filter(c => c.isDone).map(c => c.id));
+        doneIds.add('done'); // fallback legado (status pré-Kanban Fase 22)
+
+        const completedTasks = tasks.filter(t => t.completed || doneIds.has(t.status));
+        const completedInMonth = completedTasks.filter(t => t.completedAt && t.completedAt.startsWith(monthStr));
+
+        const hoursUsedInMonth = parseFloat((records
+            .filter(r => r.date && r.date.startsWith(monthStr))
+            .reduce((acc, r) => acc + r.minutes, 0) / 60).toFixed(2));
+
+        const withDueAndCompletion = completedInMonth.filter(t => t.dueDate);
+        const onTimeCount = withDueAndCompletion.filter(t => t.completedAt.slice(0, 10) <= t.dueDate).length;
+        const onTimeRateInMonth = withDueAndCompletion.length > 0
+            ? Math.round((onTimeCount / withDueAndCompletion.length) * 100)
+            : null;
+
+        const durations = completedInMonth
+            .filter(t => t.createdAt)
+            .map(t => (new Date(t.completedAt) - new Date(t.createdAt)) / (1000 * 60 * 60 * 24));
+        const avgCompletionDaysInMonth = durations.length > 0
+            ? parseFloat((durations.reduce((a, b) => a + b, 0) / durations.length).toFixed(1))
+            : null;
+
+        const now0 = new Date();
+        const todayIsoLocal = `${now0.getFullYear()}-${String(now0.getMonth() + 1).padStart(2, '0')}-${String(now0.getDate()).padStart(2, '0')}`;
+
+        const timelineItems = [];
+        completedInMonth.forEach(t => {
+            timelineItems.push({ type: 'task', date: t.completedAt.slice(0, 10), title: t.title, description: t.description || '' });
+        });
+        events.filter(e => e.date && e.date.startsWith(monthStr) && e.date <= todayIsoLocal).forEach(e => {
+            timelineItems.push({ type: 'event', date: e.date, title: e.title, description: e.description || '' });
+        });
+        implementations.forEach(impl => {
+            if (impl.implementationDate && impl.implementationDate.startsWith(monthStr)) {
+                timelineItems.push({ type: 'implementation', date: impl.implementationDate, title: impl.name, description: impl.description || '' });
+            }
+        });
+        timelineItems.sort((a, b) => b.date.localeCompare(a.date));
+
+        return {
+            client,
+            month: monthStr,
+            kpis: {
+                tasksCompletedInMonth: completedInMonth.length,
+                hoursUsedInMonth,
+                onTimeRateInMonth,
+                avgCompletionDaysInMonth
+            },
+            timeline: timelineItems
         };
     }
 
