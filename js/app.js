@@ -2003,7 +2003,7 @@ class AppController {
         const sidebar = document.getElementById('sidebar');
         if (sidebar) {
             sidebar.classList.add('sidebar--nav-cascade');
-            setTimeout(() => sidebar.classList.remove('sidebar--nav-cascade'), 900);
+            setTimeout(() => sidebar.classList.remove('sidebar--nav-cascade'), 1100);
         }
         const settings = await store.getUserSettings();
         if (settings && settings.googleClientId && settings.googleApiKey) {

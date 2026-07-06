@@ -4213,6 +4213,9 @@ kbd {
 .sidebar--nav-cascade .nav-item:nth-child(8) { animation-delay: 0.46s; }
 .sidebar--nav-cascade .nav-item:nth-child(9) { animation-delay: 0.52s; }
 .sidebar--nav-cascade .nav-item:nth-child(10) { animation-delay: 0.58s; }
+.sidebar--nav-cascade .nav-item:nth-child(11) { animation-delay: 0.64s; }
+.sidebar--nav-cascade .nav-item:nth-child(12) { animation-delay: 0.70s; }
+.sidebar--nav-cascade .nav-item:nth-child(13) { animation-delay: 0.76s; }
 
 /* S6 — Sidebar: ícones giram ao colapsar/expandir */
 @keyframes icon-spin-in {
