@@ -678,7 +678,7 @@ h4 {
   align-items: flex-end;
   padding-bottom: 2px;
 }
-.kanban-filters.kf-collapsed {
+.kf-collapsed {
   display: none;
 }
 

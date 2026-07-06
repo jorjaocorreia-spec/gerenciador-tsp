@@ -2580,6 +2580,8 @@ class AppController {
         if (!filters) return;
         const collapsed = filters.classList.toggle('kf-collapsed');
         sessionStorage.setItem('kanbanFiltersCollapsed', collapsed ? '1' : '0');
+        const dashboard = document.getElementById('tasks-dashboard-container');
+        if (dashboard) dashboard.classList.toggle('kf-collapsed', collapsed);
         this._applyKanbanFiltersButtonState(collapsed);
     }
 
@@ -2588,6 +2590,8 @@ class AppController {
         if (!filters) return;
         const collapsed = sessionStorage.getItem('kanbanFiltersCollapsed') === '1';
         filters.classList.toggle('kf-collapsed', collapsed);
+        const dashboard = document.getElementById('tasks-dashboard-container');
+        if (dashboard) dashboard.classList.toggle('kf-collapsed', collapsed);
         this._applyKanbanFiltersButtonState(collapsed);
     }
 
