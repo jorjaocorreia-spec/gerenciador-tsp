@@ -678,14 +678,17 @@ class TSPStore {
         });
 
         return monthsArr.map(({ year, month }) => {
-            let totalValor = 0;
+            let totalValor = 0, totalComissao = 0;
             clients.forEach(client => {
                 const eligible = TSPFinancial.isEligible(client, year, month);
                 const key = `${client.id}|${year}-${String(month).padStart(2, '0')}`;
                 const entry = TSPFinancial.computeEntry(client, year, month, minutesByClientMonth[key] || 0, eligible);
-                if (entry) totalValor += entry.valor;
+                if (entry) {
+                    totalValor += entry.valor;
+                    totalComissao += entry.comissao;
+                }
             });
-            return { year, month, totalValor };
+            return { year, month, totalValor, totalComissao };
         });
     }
 
