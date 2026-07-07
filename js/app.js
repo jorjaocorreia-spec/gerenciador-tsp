@@ -60,6 +60,9 @@ class AppController {
         this.selectedClient = null;
         this.selectedMonth = null;
         this.userRole = null;       // 'consultant' | 'client' — setado em initAfterAuth()
+        this._notifications = [];          // lista cacheada de app_notifications
+        this._notificationsLastSeenAt = null; // ISO string ou null
+        this._closeNotifOnOutsideClick = null;
         this.userClientId = null;   // client_id vinculado, só para role 'client'
         this.indicadoresClientId = null;  // cliente selecionado no painel (só papel 'consultant')
         this.indicadoresTab = 'mensal';   // aba ativa: 'mensal' | 'geral'
@@ -2020,6 +2023,7 @@ class AppController {
             this._hideDeclinedEvents = val;
             this._updateHideDeclinedBtn();
         }).catch(() => {});
+        this._initNotifications().catch(() => {});
         await this.renderAll();
     }
 
@@ -10460,6 +10464,97 @@ class AppController {
         return `há ${diffMonths} ${diffMonths === 1 ? 'mês' : 'meses'}`;
     }
 
+    async _initNotifications() {
+        const bell = document.getElementById('notif-bell');
+        if (!bell) return;
+        const [notifications, lastSeenAt] = await Promise.all([
+            store.getNotifications(),
+            store.getLastSeenAt()
+        ]);
+        this._notifications = notifications;
+        this._notificationsLastSeenAt = lastSeenAt;
+        bell.style.display = 'flex';
+        this._updateNotifBadge();
+    }
+
+    _updateNotifBadge() {
+        const badge = document.getElementById('notif-badge');
+        if (!badge) return;
+        const lastSeenAt = this._notificationsLastSeenAt;
+        const unread = this._notifications.filter(n => !lastSeenAt || n.createdAt > lastSeenAt).length;
+        if (unread > 0) {
+            badge.textContent = unread > 9 ? '9+' : String(unread);
+            badge.style.display = 'flex';
+        } else {
+            badge.style.display = 'none';
+        }
+    }
+
+    toggleNotifPanel() {
+        if (document.getElementById('notif-panel-active')) {
+            this.closeNotifPanel();
+        } else {
+            this.openNotifPanel();
+        }
+    }
+
+    openNotifPanel() {
+        this.closeNotifPanel();
+        const bell = document.getElementById('notif-bell');
+        if (!bell) return;
+
+        const previousLastSeenAt = this._notificationsLastSeenAt;
+
+        const itemsHtml = this._notifications.length
+            ? this._notifications.map(n => {
+                const isNew = !previousLastSeenAt || n.createdAt > previousLastSeenAt;
+                return `
+                    <div class="notif-item ${isNew ? 'notif-item--new' : ''}">
+                        <div class="notif-item-header">
+                            <span class="notif-item-title">${n.title}</span>
+                            <span class="notif-item-date">${this._relativeDate(n.createdAt)}</span>
+                        </div>
+                        <p class="notif-item-desc">${n.description}</p>
+                    </div>`;
+            }).join('')
+            : '<p class="notif-empty">Nenhuma novidade por enquanto.</p>';
+
+        const panel = document.createElement('div');
+        panel.className = 'notif-panel';
+        panel.id = 'notif-panel-active';
+        panel.innerHTML = `
+            <div class="notif-panel-header">Novidades</div>
+            <div class="notif-panel-list">${itemsHtml}</div>
+        `;
+        document.body.appendChild(panel);
+
+        const rect = bell.getBoundingClientRect();
+        panel.style.top = (rect.bottom + 8) + 'px';
+        panel.style.left = rect.left + 'px';
+
+        setTimeout(() => {
+            this._closeNotifOnOutsideClick = (ev) => {
+                if (!panel.contains(ev.target) && !bell.contains(ev.target)) {
+                    this.closeNotifPanel();
+                }
+            };
+            document.addEventListener('click', this._closeNotifOnOutsideClick);
+        }, 0);
+
+        this._notificationsLastSeenAt = new Date().toISOString();
+        this._updateNotifBadge();
+        store.markNotificationsSeen().catch(() => {});
+    }
+
+    closeNotifPanel() {
+        const existing = document.getElementById('notif-panel-active');
+        if (existing) existing.remove();
+        if (this._closeNotifOnOutsideClick) {
+            document.removeEventListener('click', this._closeNotifOnOutsideClick);
+            this._closeNotifOnOutsideClick = null;
+        }
+    }
+
     async syncChamados(force = false) {
         const btn = document.getElementById('btn-sync-chamados');
         const info = document.getElementById('chamados-sync-info');
@@ -10951,6 +11046,11 @@ document.addEventListener('DOMContentLoaded', async () => {
             window.app._coverageMonth = new Date().toISOString().slice(0, 7);
             window.app._aptGenEntries = null;
             window.app._hideDeclinedEvents = false;
+            window.app._notifications = [];
+            window.app._notificationsLastSeenAt = null;
+            window.app.closeNotifPanel();
+            const notifBell = document.getElementById('notif-bell');
+            if (notifBell) notifBell.style.display = 'none';
             window.app._rsvpPopupEventId = null;
             if (window.app._closeRsvpOnOutsideClick) {
                 document.removeEventListener('click', window.app._closeRsvpOnOutsideClick);
