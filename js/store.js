@@ -1567,6 +1567,41 @@ class TSPStore {
             .delete().eq('user_id', this.userId);
         if (error) throw error;
     }
+
+    _notification(r) {
+        return {
+            id: r.id,
+            phaseLabel: r.phase_label || '',
+            title: r.title,
+            description: r.description,
+            createdAt: r.created_at
+        };
+    }
+
+    async getNotifications(limit = 20) {
+        const { data, error } = await this.db.from('app_notifications')
+            .select('*')
+            .order('created_at', { ascending: false })
+            .limit(limit);
+        if (error) throw error;
+        return (data || []).map(r => this._notification(r));
+    }
+
+    async getLastSeenAt() {
+        const { data } = await this.db.from('notification_reads')
+            .select('last_seen_at')
+            .eq('user_id', this.userId)
+            .single();
+        return data ? data.last_seen_at : null;
+    }
+
+    async markNotificationsSeen() {
+        const { error } = await this.db.from('notification_reads').upsert({
+            user_id: this.userId,
+            last_seen_at: new Date().toISOString()
+        }, { onConflict: 'user_id' });
+        if (error) throw error;
+    }
 }
 
 window.store = new TSPStore();
