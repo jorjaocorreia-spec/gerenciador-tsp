@@ -118,16 +118,47 @@ h4 {
 }
 
 .brand {
-  font-size: 1.25rem;
+  font-size: 1.6rem;
   font-weight: 700;
+  letter-spacing: 0.5px;
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 12px;
   color: var(--text-main);
   flex: 1;
   min-width: 0;
   white-space: nowrap;
   overflow: hidden;
+}
+
+.brand-shine {
+  position: relative;
+  display: inline-block;
+  overflow: hidden;
+}
+
+.brand-shine::after {
+  content: '';
+  position: absolute;
+  top: -60%;
+  left: -60%;
+  width: 45%;
+  height: 220%;
+  background: linear-gradient(100deg,
+    transparent 30%,
+    rgba(167, 139, 250, 0.85) 47%,
+    rgba(139, 92, 246, 1) 50%,
+    rgba(167, 139, 250, 0.85) 53%,
+    transparent 70%);
+  transform: translateX(-40%) skewX(-20deg);
+  animation: brand-shine-sweep 6s ease-in-out infinite;
+  pointer-events: none;
+  will-change: transform;
+}
+
+@keyframes brand-shine-sweep {
+  0%, 82%  { transform: translateX(-40%) skewX(-20deg); }
+  100%     { transform: translateX(420%) skewX(-20deg); }
 }
 
 .brand-icon {
