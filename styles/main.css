@@ -123,6 +123,7 @@ h4 {
   letter-spacing: 0.5px;
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: 12px;
   color: var(--text-main);
   flex: 1;
