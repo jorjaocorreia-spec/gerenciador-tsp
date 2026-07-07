@@ -10511,10 +10511,10 @@ class AppController {
                 return `
                     <div class="notif-item ${isNew ? 'notif-item--new' : ''}">
                         <div class="notif-item-header">
-                            <span class="notif-item-title">${n.title}</span>
+                            <span class="notif-item-title">${escapeHtml(n.title)}</span>
                             <span class="notif-item-date">${this._relativeDate(n.createdAt)}</span>
                         </div>
-                        <p class="notif-item-desc">${n.description}</p>
+                        <p class="notif-item-desc">${escapeHtml(n.description)}</p>
                     </div>`;
             }).join('')
             : '<p class="notif-empty">Nenhuma novidade por enquanto.</p>';
