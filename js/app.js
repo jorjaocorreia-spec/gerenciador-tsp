@@ -2224,7 +2224,7 @@ class AppController {
         const monthNav = document.getElementById('dash-month-nav');
         if (monthNav) monthNav.style.display = showTotal ? 'none' : '';
         if (subtitle) subtitle.textContent = showTotal
-            ? 'Totalização de horas acumuladas desde o início do controle.'
+            ? 'Totalização de horas acumuladas desde o início do controle — o mês vigente não entra no cálculo.'
             : (isCurrentMonth
                 ? 'Acompanhe o consumo de horas dos seus contratos.'
                 : `Histórico — ${this._formatDashboardMonth(this._dashboardMonth)}`);
@@ -2260,7 +2260,8 @@ class AppController {
 
             filteredStats.forEach(stat => {
                 const client = stat.client;
-                const b = this._calcClientBalance(client, allRecords);
+                // Totalização considera apenas meses já encerrados — o mês vigente fica de fora
+                const b = this._calcClientBalance(client, allRecords, true);
 
                 const card = document.createElement('div');
                 card.className = 'stat-card glass';
@@ -2271,7 +2272,7 @@ class AppController {
                 if (b.hasTracking) {
                     const balanceColor = b.balanceH >= 0 ? '#4ade80' : '#f87171';
                     const balanceSign = b.balanceH >= 0 ? '+' : '';
-                    const totalTargetH = b.monthsCount * client.hoursTotal;
+                    const totalTargetH = b.completedMonths * client.hoursTotal;
                     const pct = totalTargetH > 0
                         ? Math.min(100, Math.round((b.totalAppliedH / totalTargetH) * 100))
                         : 0;
@@ -2293,13 +2294,13 @@ class AppController {
                             <span class="text-muted">${b.totalAppliedH.toFixed(1)}h aplicadas</span>
                             <span class="text-muted">${client.hoursTotal}h mensais contratadas</span>
                         </div>
-                        <div style="font-size: 0.78rem; color: var(--text-muted); margin-top: 4px;">Controle na plataforma desde ${startLabel} · ${b.monthsCount} ${b.monthsCount === 1 ? 'mês' : 'meses'}</div>
+                        <div style="font-size: 0.78rem; color: var(--text-muted); margin-top: 4px;">Controle na plataforma desde ${startLabel} · ${b.completedMonths} ${b.completedMonths === 1 ? 'mês concluído' : 'meses concluídos'}</div>
                         ${totalBillingLineHtml}
                     `;
                 } else {
-                    // Sem balanceStartDate: exibe total histórico sem cálculo de saldo
+                    // Sem balanceStartDate: exibe total histórico sem cálculo de saldo (mês vigente fora)
                     const totalApplied = allRecords
-                        .filter(r => r.clientId === client.id)
+                        .filter(r => r.clientId === client.id && !r.date.startsWith(currentMonth))
                         .reduce((s, r) => s + r.minutes, 0) / 60;
                     const totalBillingLineHtml = client.billingModel === 'hourly'
                         ? `<div style="font-size: 0.78rem; margin-top: 4px;"><span class="money-value" style="color: #4ade80; font-weight: 600;">R$ ${(totalApplied * (client.hourlyRate || 0)).toFixed(2).replace('.', ',')}</span> <span class="text-muted">faturado (total histórico)</span></div>`
@@ -2310,7 +2311,7 @@ class AppController {
                             <span class="text-muted" style="font-size: 0.82rem;">sem controle</span>
                         </div>
                         <div style="border-top: 1px solid rgba(255,255,255,0.06); margin: 10px 0;"></div>
-                        <div style="font-size: 0.85rem; color: var(--text-muted);">${totalApplied.toFixed(1)}h aplicadas (total histórico)</div>
+                        <div style="font-size: 0.85rem; color: var(--text-muted);">${totalApplied.toFixed(1)}h aplicadas (até o mês anterior)</div>
                         ${totalBillingLineHtml}
                     `;
                 }
@@ -2728,7 +2729,7 @@ class AppController {
 
     // ── SALDO DE HORAS ────────────────────────────────────────────
 
-    _calcClientBalance(client, allRecords) {
+    _calcClientBalance(client, allRecords, excludeCurrentMonth = false) {
         const clientRecords = allRecords.filter(r => r.clientId === client.id);
         const now = new Date();
         const nowYear = now.getFullYear();
@@ -2761,7 +2762,7 @@ class AppController {
         const completedMonths = Math.max(0, monthsCount - 1);
         const totalContractedMinutes = completedMonths * client.hoursTotal * 60;
         const totalAppliedMinutes = clientRecords
-            .filter(r => r.date >= client.balanceStartDate)
+            .filter(r => r.date >= client.balanceStartDate && (!excludeCurrentMonth || !r.date.startsWith(yearMonthStr)))
             .reduce((s, r) => s + r.minutes, 0);
 
         const balanceMinutes = client.initialBalanceMinutes + totalAppliedMinutes - totalContractedMinutes;
@@ -2769,6 +2770,7 @@ class AppController {
         return {
             hasTracking: true,
             monthsCount,
+            completedMonths,
             totalContractedH: totalContractedMinutes / 60,
             totalAppliedH: totalAppliedMinutes / 60,
             balanceH: balanceMinutes / 60,
