@@ -158,7 +158,7 @@ Todas têm `user_id uuid references auth.users` + RLS ativa (`auth.uid() = user_
 | `tickets` | id, user_id, ticket_id, ticket_number, title, status, priority, queue, customer_name, owner, created_at_otobo, updated_at_otobo, raw_data JSONB, linked_client_id, synced_at |
 | `user_ai_config` | user_id (PK), provider (openai\|anthropic), api_key TEXT, model TEXT, updated_at |
 
-### Fases implementadas (1–45, todas ✅)
+### Fases implementadas (1–47, todas ✅)
 
 | Fases | Funcionalidade |
 |-------|---------------|
@@ -194,6 +194,7 @@ Todas têm `user_id uuid references auth.users` + RLS ativa (`auth.uid() = user_
 | 44 | Cobrança "Por Hora" por cliente: `billing_model`/`hourly_rate`, toggle no modal, exibição em Clientes/Dashboard sem comissão |
 | 45 | Controle de acesso por níveis de usuário (Portal do Cliente): tabela `user_roles`, RLS cross-user em `tasks`/`kanban_columns`, Edge Function `manage-users` (convite/listagem/revogação), view "Usuários", modo portal do cliente (Kanban read-only) |
 | 46 | Painel de Indicadores: evolução do cliente (KPIs, gráfico mensal de tarefas, distribuição por status/prioridade, timeline do projeto, resumo + chat de IA, exportação PDF) — consultor com seletor de cliente; cliente via Portal restrito ao próprio `client_id`; sem tabelas novas, tudo calculado sob demanda |
+| 47 | Central de Notificações: aviso in-app de melhorias/novas features, publicado manualmente via script (`app_notifications` + `notification_reads`), sino no sidebar visível só para consultores |
 
 ---
 
@@ -446,6 +447,14 @@ O `docker-entrypoint.sh` injeta essas vars em `js/config.js` via `envsubst` na i
 - **Produtividade: legenda dupla só durante `periodInProgress`** — substitui "62% da meta" por "62% realizado · 57% esperado até ontem"; fora desse caso (Dia, ou período passado/futuro) mantém só "X% da meta".
 - **Produtividade: "hoje" deve ser calculado em data local, nunca `new Date().toISOString()`** — `toISOString()` retorna UTC; como o Brasil é UTC-3, depois das ~21h locais o relógio UTC já virou o dia seguinte, fazendo `todayStr` "vazar" um dia útil extra na meta-até-hoje, no saldo acumulado e no card "Dia em andamento". `store.getProductivitySummary()` usa `TSPProductivity.toIsoLocal(new Date())`; o construtor de `AppController` (`this.prodRefDate`) e `prodGoToToday()` em `js/app.js` fazem o mesmo. Esse mesmo padrão `toISOString().split('T')[0]` existe em dezenas de outros pontos do projeto (Agenda, Apontamentos, Dashboard) — não foram corrigidos por estarem fora do escopo da Produtividade, mas representam o mesmo risco caso alguém os toque.
 - **Financeiro: elegibilidade de cliente "Finalizado" é uma aproximação** — não há histórico de mudança de `status`, só o valor atual. A regra em `js/financial-calc.js` (`isEligible`): para o mês atual/futuro, só conta cliente com `status === 'active'`; para meses passados, conta independente do status atual, desde que `createdAt` seja anterior ao mês. Se o `clientPays`/`hourlyRate` de um cliente mudar, o histórico recalculado usa o valor *atual* desses campos — não há "congelamento" de valores passados.
+
+### Central de Notificações — armadilhas conhecidas
+
+- **Publicação é sempre manual, nunca automática** — não há parsing de commits ou da tabela de fases; toda vez que uma feature for concluída e documentada aqui no CLAUDE.md, rodar `Documentation/publish-notification.ps1` com título/descrição em linguagem amigável ao usuário final (não a redação técnica desta tabela).
+- **`app_notifications` só aceita INSERT via `service_role` key** — não há policy de INSERT para usuários autenticados; qualquer tentativa de inserir pelo client (browser) falha por RLS. Isso é deliberado, para nenhum consultor conseguir forjar uma notificação pelo console do navegador.
+- **Sino só aparece para `app.userRole !== 'client'`** — Portal do Cliente nunca vê notificações do sistema.
+- **Controle de leitura é um único timestamp por usuário (`notification_reads.last_seen_at`)** — não há marcação item-a-item; abrir o painel marca tudo como visto de uma vez.
+- **Falha tolerante**: se `store.getNotifications()`/`getLastSeenAt()` falhar (rede, RLS, tabela ausente), `#notif-bell` permanece com `display:none` — sem toast de erro.
 
 ### Cálculos automáticos
 - Comissão do consultor = 43% do valor pago pelo cliente (`clientPays * 0.43`)
