@@ -188,7 +188,9 @@ Regras:
 A descrição gerada deve:
 - Relatar de forma detalhada TODAS as atividades realizadas, cobrindo cada tarefa trabalhada
 - Transformar os itens de checklist concluídos em etapas concretas do trabalho realizado
+- Se houver etapas do checklist ainda pendentes, você pode mencionar brevemente que permanecem em aberto para uma próxima etapa — nunca as descreva como concluídas
 - Incorporar observações e comentários técnicos registrados durante o dia
+- Usar a etapa/coluna atual da tarefa (ex.: Em Execução, Finalizada) e a prioridade/labels como contexto para o tom e o status do relato, sem citá-los literalmente como jargão de sistema
 - Usar linguagem técnica profissional adequada para consultoria SAP/TI
 - Ser suficientemente detalhada para justificar a hora técnica perante auditoria ou cliente
 - Ter entre 5 e 12 linhas conforme o volume de atividades — nunca menos que isso
@@ -198,9 +200,18 @@ A descrição gerada deve:
 Responda APENAS com o texto do apontamento, sem aspas, sem markdown.`;
 
         const dateLabel = new Date(date + 'T12:00:00').toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: 'long' });
+        const priorityLabels = { low: 'Baixa', medium: 'Média', high: 'Alta' };
 
         const taskLines = tasks.map(t => {
-            const checklist = (t.checklist || []).filter(i => i.done).map(i => `  • ${i.text}`).join('\n');
+            const checklistDone = (t.checklist || []).filter(i => i.done).map(i => `  • ${i.text}`).join('\n');
+            const checklistPending = (t.checklist || []).filter(i => !i.done).map(i => `  • ${i.text}`).join('\n');
+            const labels = (t.labels || []).map(l => l.name).filter(Boolean).join(', ');
+            const meta = [
+                t.columnName ? `Etapa: ${t.columnName}` : '',
+                t.priority ? `Prioridade: ${priorityLabels[t.priority] || t.priority}` : '',
+                labels ? `Labels: ${labels}` : '',
+                t.dueDate ? `Prazo: ${new Date(t.dueDate + 'T12:00:00').toLocaleDateString('pt-BR')}` : ''
+            ].filter(Boolean).join(' | ');
             const manualComments = (t.comments || [])
                 .filter(c => c.createdAt && c.createdAt.startsWith(date) && c.type === 'comment' && c.text)
                 .map(c => `  → ${c.text.substring(0, 200)}`).join('\n');
@@ -212,7 +223,7 @@ Responda APENAS com o texto do apontamento, sem aspas, sem markdown.`;
                     if (c.type === 'completed') return `concluída`;
                     return '';
                 }).filter(Boolean).join(', ');
-            return `- ${t.title}${t.description ? `: ${t.description.substring(0, 300)}` : ''}${checklist ? '\nEtapas concluídas:\n' + checklist : ''}${manualComments ? '\nObservações do dia:\n' + manualComments : ''}${dayActivity ? ` [${dayActivity}]` : ''}`;
+            return `- ${t.title}${meta ? ` (${meta})` : ''}${t.description ? `: ${t.description.substring(0, 300)}` : ''}${checklistDone ? '\nEtapas concluídas:\n' + checklistDone : ''}${checklistPending ? '\nEtapas ainda pendentes:\n' + checklistPending : ''}${manualComments ? '\nObservações do dia:\n' + manualComments : ''}${dayActivity ? ` [${dayActivity}]` : ''}`;
         }).join('\n\n');
 
         const user = `Cliente: ${clientName}${projectNum ? ` (Projeto ${projectNum})` : ''}

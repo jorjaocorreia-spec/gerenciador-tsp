@@ -7444,10 +7444,11 @@ class AppController {
         if (btn) { btn.disabled = true; btn.innerHTML = `<i data-lucide="loader-2" style="animation:spin 1s linear infinite"></i><span class="nav-label">Buscando...</span>`; lucide.createIcons(); }
 
         try {
-            const [tasks, clients, existingApts] = await Promise.all([
+            const [tasks, clients, existingApts, columns] = await Promise.all([
                 store.getTasksForApontamento(this.aptCurrentDate),
                 store.getClients(),
-                store.getApontamentos(this.aptCurrentDate)
+                store.getApontamentos(this.aptCurrentDate),
+                store.getAllColumns()
             ]);
 
             if (tasks.length === 0) {
@@ -7457,6 +7458,11 @@ class AppController {
 
             const clientMap = {};
             clients.forEach(c => { clientMap[c.id] = c; });
+
+            // Nome da coluna/etapa (Kanban) para dar contexto do estágio de cada tarefa à IA
+            const columnMap = {};
+            columns.forEach(c => { columnMap[c.id] = c.name; });
+            tasks.forEach(t => { t.columnName = columnMap[t.status] || null; });
 
             // IDs de tasks já vinculadas a apontamentos de hoje
             const usedTaskIds = new Set(existingApts.flatMap(a => a.taskIds || []));
