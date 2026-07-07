@@ -7451,7 +7451,7 @@ class AppController {
             ]);
 
             if (tasks.length === 0) {
-                Toast.show('Nenhuma tarefa comentada ou concluída hoje. Registre um comentário na tarefa (ou marque-a como concluída) para ela entrar no "Gerar do Dia".', 'info', 8000);
+                Toast.show('Nenhuma tarefa editada, comentada ou concluída hoje.', 'info', 6000);
                 return;
             }
 

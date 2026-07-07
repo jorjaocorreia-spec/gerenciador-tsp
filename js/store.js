@@ -225,6 +225,7 @@ class TSPStore {
         return data.map(r => this._task(r)).filter(t => {
             if (!t.clientId) return false;
             if (t.completedAt && t.completedAt.startsWith(date)) return true;
+            if (t.updatedAt && t.updatedAt.startsWith(date)) return true;
             return t.comments.some(c => c.createdAt && c.createdAt.startsWith(date));
         });
     }
