@@ -135,6 +135,8 @@ h4 {
   position: relative;
   display: inline-block;
   overflow: hidden;
+  line-height: 1;
+  vertical-align: middle;
 }
 
 .brand-shine::after {
