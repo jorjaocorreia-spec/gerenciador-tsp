@@ -131,6 +131,13 @@ h4 {
   overflow: hidden;
 }
 
+.brand-text-wrap {
+  flex: 1;
+  display: flex;
+  justify-content: center;
+  min-width: 0;
+}
+
 .brand-shine {
   position: relative;
   display: inline-block;
