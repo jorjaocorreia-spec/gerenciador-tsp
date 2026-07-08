@@ -64,6 +64,7 @@ class AppController {
         this._notificationsLastSeenAt = null; // ISO string ou null
         this._closeNotifOnOutsideClick = null;
         this.userClientId = null;   // client_id vinculado, só para role 'client'
+        this.clientStatusFilter = 'active'; // 'active' | 'finished' | 'all' — filtro da view Clientes
         this.indicadoresClientId = null;  // cliente selecionado no painel (só papel 'consultant')
         this.indicadoresTab = 'mensal';   // aba ativa: 'mensal' | 'geral'
         this.indicadoresMonth = new Date().toISOString().slice(0, 7); // YYYY-MM da aba Mensal
@@ -2633,8 +2634,20 @@ class AppController {
         const tbody = document.querySelector('#clients-table tbody');
         tbody.innerHTML = `<tr><td colspan="3">${spinnerHtml}</td></tr>`;
 
-        const clients = preloadedClients || await store.getClients();
-        const stats = batchStats || await Promise.all(clients.map(c => store.getClientStats(c.id)));
+        const allClients = preloadedClients || await store.getClients();
+        const allStats = batchStats || await Promise.all(allClients.map(c => store.getClientStats(c.id)));
+
+        // Cache para reaplicar o filtro de status sem re-buscar do banco
+        this._clientsCache = allClients;
+        this._clientsStatsCache = allStats;
+
+        const filter = this.clientStatusFilter || 'active';
+        const indices = allClients.reduce((acc, c, i) => {
+            if (filter === 'all' || (c.status || 'active') === filter) acc.push(i);
+            return acc;
+        }, []);
+        const clients = indices.map(i => allClients[i]);
+        const stats = indices.map(i => allStats[i]);
 
         // A partir daqui tudo é síncrono — sem yields, sem race condition possível
         tbody.innerHTML = '';
@@ -2702,6 +2715,14 @@ class AppController {
             `;
             tbody.appendChild(tr);
         });
+    }
+
+    setClientStatusFilter(status) {
+        this.clientStatusFilter = status;
+        document.querySelectorAll('#client-status-filter-tabs .status-filter-tab').forEach(btn => {
+            btn.classList.toggle('active', btn.dataset.status === status);
+        });
+        this.renderClients(this._clientsCache, this._clientsStatsCache);
     }
 
     async openEditClientModal(id) {
@@ -7060,7 +7081,7 @@ class AppController {
             deltaColor = p.deltaMinutes >= 0 ? '#4ade80' : '#f87171';
             deltaLabel = TSPProductivity.fmtMinutes(p.deltaMinutes);
             legendHtml = isMultiDay
-                ? `<span class="text-muted">${pct}% da meta (dados até ontem)</span>`
+                ? `<span class="text-muted">${pct}% da meta (realizado até ontem)</span>`
                 : `<span class="text-muted">${pct}% da meta</span>`;
         }
 
