@@ -4580,6 +4580,29 @@ kbd {
     color: var(--primary-color);
     border-bottom-color: var(--primary-color);
 }
+.status-filter-tabs {
+    display: flex;
+    gap: 4px;
+    border-bottom: 1px solid rgba(255,255,255,0.08);
+    margin-bottom: 16px;
+}
+.status-filter-tab {
+    background: none;
+    border: none;
+    border-bottom: 2px solid transparent;
+    color: var(--text-secondary);
+    cursor: pointer;
+    font-size: 0.9rem;
+    font-weight: 500;
+    padding: 10px 16px;
+    margin-bottom: -1px;
+    transition: color 0.15s, border-color 0.15s;
+}
+.status-filter-tab:hover { color: var(--text-primary); }
+.status-filter-tab.active {
+    color: var(--primary-color);
+    border-bottom-color: var(--primary-color);
+}
 
 /* ── Tooltip de informação (balãozinho ⓘ) ─────────────────────────── */
 .info-tooltip {

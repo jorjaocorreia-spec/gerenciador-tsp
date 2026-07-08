@@ -277,6 +277,11 @@
             </div>
 
             <div class="glass" style="padding: 24px;">
+                <div class="status-filter-tabs" id="client-status-filter-tabs">
+                    <button type="button" class="status-filter-tab active" data-status="active" onclick="app.setClientStatusFilter('active')">Ativos</button>
+                    <button type="button" class="status-filter-tab" data-status="finished" onclick="app.setClientStatusFilter('finished')">Finalizados</button>
+                    <button type="button" class="status-filter-tab" data-status="all" onclick="app.setClientStatusFilter('all')">Todos</button>
+                </div>
                 <table class="data-table" id="clients-table">
                     <thead>
                         <tr>
