@@ -72,10 +72,6 @@
         return { balanceMinutes: range.deltaMinutes, lastDate: yesterdayIso };
     }
 
-    function computeExpectedToDate(days, todayStr) {
-        return days.filter(d => d.date < todayStr).reduce((s, d) => s + d.targetMinutes, 0);
-    }
-
     function getPeriodRange(period, refDateStr) {
         const ref = new Date(refDateStr + 'T12:00:00');
         if (period === 'day') {
@@ -107,6 +103,6 @@
 
     global.TSPProductivity = {
         minutesBetween, isWorkday, dailyTargetMinutes, getHolidayName, computeDay, computeRange,
-        computeAccumulatedBalance, computeExpectedToDate, getPeriodRange, fmtMinutes, toIsoLocal, addDaysLocal
+        computeAccumulatedBalance, getPeriodRange, fmtMinutes, toIsoLocal, addDaysLocal
     };
 })(typeof window !== 'undefined' ? window : globalThis);

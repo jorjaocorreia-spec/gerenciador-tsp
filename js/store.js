@@ -860,9 +860,21 @@ class TSPStore {
             apontamentosByDate[it.date].push(it);
         });
 
-        const periodResult = TSPProductivity.computeRange(
-            periodRange.startDate, periodRange.endDate, apontamentosByDate, config.weeklyHours, manualHolidayDates
-        );
+        let periodResult;
+        if (period === 'day') {
+            periodResult = TSPProductivity.computeRange(
+                periodRange.startDate, periodRange.endDate, apontamentosByDate, config.weeklyHours, manualHolidayDates
+            );
+        } else {
+            // Semana/Mês nunca consideram o dia atual — apenas dias já fechados (até ontem).
+            const yesterdayIso = TSPProductivity.toIsoLocal(TSPProductivity.addDaysLocal(new Date(todayStr + 'T12:00:00'), -1));
+            const effectiveEnd = periodRange.endDate < yesterdayIso ? periodRange.endDate : yesterdayIso;
+            periodResult = effectiveEnd < periodRange.startDate
+                ? { startDate: periodRange.startDate, endDate: effectiveEnd, days: [], targetMinutes: 0, actualMinutes: 0, deltaMinutes: 0 }
+                : TSPProductivity.computeRange(
+                    periodRange.startDate, effectiveEnd, apontamentosByDate, config.weeklyHours, manualHolidayDates
+                );
+        }
 
         let accumulated = null;
         if (config.startDate) {

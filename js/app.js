@@ -7047,50 +7047,21 @@ class AppController {
             : '';
 
         const isMultiDay = this.prodPeriod !== 'day';
-        const periodInProgress = isMultiDay && summary.todayStr >= p.startDate && summary.todayStr <= p.endDate;
 
         let barColor, deltaColor, deltaLabel, legendHtml;
-        let paceMarkerHtml = '', youMarkerHtml = '', paceNoteHtml = '';
 
         if (isTodayInProgress) {
             barColor = 'linear-gradient(90deg,#a855f7,#7c3aed)';
             deltaColor = 'var(--text-muted)';
             deltaLabel = 'em andamento';
             legendHtml = `<span class="text-muted">${pct}% da meta</span>`;
-        } else if (periodInProgress) {
-            const expectedToDate = TSPProductivity.computeExpectedToDate(p.days, summary.todayStr);
-            const pacePct = p.targetMinutes > 0 ? Math.min(100, Math.round(expectedToDate / p.targetMinutes * 100)) : 0;
-            const youPct = Math.min(100, pct);
-            const paceDelta = p.actualMinutes - expectedToDate;
-
-            let tierColor, tierMessage;
-            if (p.actualMinutes >= p.targetMinutes) {
-                tierColor = '#4ade80';
-                tierMessage = `Parabéns! Meta do período já foi atingida (${TSPProductivity.fmtMinutes(p.deltaMinutes)}).`;
-                barColor = 'linear-gradient(90deg,#22c55e,#16a34a)';
-            } else if (p.actualMinutes >= expectedToDate) {
-                tierColor = '#38bdf8';
-                tierMessage = `${TSPProductivity.fmtMinutes(paceDelta)} acima do ritmo esperado. Continue assim!`;
-                barColor = 'linear-gradient(90deg,#38bdf8,#0ea5e9)';
-            } else {
-                tierColor = '#f87171';
-                tierMessage = `${TSPProductivity.fmtMinutes(paceDelta)} abaixo do ritmo esperado — acelere o ritmo para não ficar devendo no fim do período.`;
-                barColor = '#f87171';
-            }
-            deltaColor = p.deltaMinutes >= 0 ? '#4ade80' : '#f87171';
-            deltaLabel = TSPProductivity.fmtMinutes(p.deltaMinutes);
-
-            paceMarkerHtml = `<div title="Meta esperada até ontem: ${this._prodFmtAbs(expectedToDate)}" style="position:absolute;top:-3px;bottom:-3px;left:${pacePct}%;width:3px;background:rgba(255,255,255,0.9);border-radius:1px;box-shadow:0 0 0 1px rgba(0,0,0,0.4);"></div>`;
-            youMarkerHtml = `<div title="Você está aqui: ${this._prodFmtAbs(p.actualMinutes)}" style="position:absolute;left:${youPct}%;top:-20px;transform:translateX(-50%);display:flex;flex-direction:column;align-items:center;">
-                <i data-lucide="arrow-down" style="width:16px;height:16px;color:${tierColor};"></i>
-            </div>`;
-            paceNoteHtml = `<div style="font-size:0.85rem;margin-top:6px;font-weight:600;color:${tierColor};">${tierMessage}</div>`;
-            legendHtml = `<span class="text-muted">${pct}% realizado · ${pacePct}% esperado até ontem</span>`;
         } else {
             barColor = p.deltaMinutes >= 0 ? 'linear-gradient(90deg,#22c55e,#16a34a)' : '#f87171';
             deltaColor = p.deltaMinutes >= 0 ? '#4ade80' : '#f87171';
             deltaLabel = TSPProductivity.fmtMinutes(p.deltaMinutes);
-            legendHtml = `<span class="text-muted">${pct}% da meta</span>`;
+            legendHtml = isMultiDay
+                ? `<span class="text-muted">${pct}% da meta (dados até ontem)</span>`
+                : `<span class="text-muted">${pct}% da meta</span>`;
         }
 
         const card = document.createElement('div');
@@ -7101,17 +7072,14 @@ class AppController {
                 <span class="client-name">${periodLabel}: ${this._prodFmtAbs(p.actualMinutes)} / ${this._prodFmtAbs(p.targetMinutes)}</span>
                 <span style="font-weight:600;color:${deltaColor}">${deltaLabel}</span>
             </div>
-            <div style="position:relative;${youMarkerHtml ? 'margin-top:22px;' : ''}">
-                ${youMarkerHtml}
+            <div style="position:relative;">
                 <div class="progress-container" style="position:relative;">
                     <div class="progress-bar" style="width:${Math.min(100, pct)}%; background:${barColor};"></div>
-                    ${paceMarkerHtml}
                 </div>
             </div>
             <div style="font-size:0.85rem;margin-top:8px;">
                 ${legendHtml}
             </div>
-            ${paceNoteHtml}
             ${holidayNote}
         `;
         return card;
