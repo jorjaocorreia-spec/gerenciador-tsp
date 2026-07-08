@@ -629,7 +629,7 @@ class TSPStore {
         const lastDay = new Date(year, month, 0).getDate();
         const [clientsRes, recordsRes] = await Promise.all([
             this.db.from('clients').select('*').eq('user_id', uid).order('created_at'),
-            this.db.from('records').select('client_id, minutes, date').eq('user_id', uid)
+            this.db.from('records').select('client_id, minutes, date, is_unavailability').eq('user_id', uid)
                 .gte('date', `${monthStr}-01`).lte('date', `${monthStr}-${String(lastDay).padStart(2, '0')}`)
         ]);
         if (clientsRes.error) throw clientsRes.error;
@@ -638,6 +638,7 @@ class TSPStore {
         const clients = (clientsRes.data || []).map(r => this._client(r));
         const minutesByClient = {};
         (recordsRes.data || []).forEach(r => {
+            if (r.is_unavailability) return;
             minutesByClient[r.client_id] = (minutesByClient[r.client_id] || 0) + (parseInt(r.minutes) || 0);
         });
 
@@ -667,7 +668,7 @@ class TSPStore {
 
         const [clientsRes, recordsRes] = await Promise.all([
             this.db.from('clients').select('*').eq('user_id', uid).order('created_at'),
-            this.db.from('records').select('client_id, minutes, date').eq('user_id', uid)
+            this.db.from('records').select('client_id, minutes, date, is_unavailability').eq('user_id', uid)
                 .gte('date', startDate).lte('date', endDate)
         ]);
         if (clientsRes.error) throw clientsRes.error;
@@ -676,6 +677,7 @@ class TSPStore {
         const clients = (clientsRes.data || []).map(r => this._client(r));
         const minutesByClientMonth = {};
         (recordsRes.data || []).forEach(r => {
+            if (r.is_unavailability) return;
             const ym = r.date.slice(0, 7);
             const key = `${r.client_id}|${ym}`;
             minutesByClientMonth[key] = (minutesByClientMonth[key] || 0) + (parseInt(r.minutes) || 0);
