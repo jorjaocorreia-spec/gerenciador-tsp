@@ -3382,7 +3382,9 @@ class AppController {
                 const client = clientsMap[r.clientId];
                 const clientName = client ? escapeHtml(client.name) : '&lt;Deletado&gt;';
                 const hoursStr = (r.minutes / 60).toFixed(2) + 'h';
-                const timeRange = (r.startTime && r.endTime) ? `<br><small class="text-muted">${r.startTime} às ${r.endTime}</small>` : '';
+                const timeRange = r.isUnavailability
+                    ? '<br><small style="color:#f59e0b;">⚠ Indisponibilidade do Cliente</small>'
+                    : ((r.startTime && r.endTime) ? `<br><small class="text-muted">${r.startTime} às ${r.endTime}</small>` : '');
                 const partLabel = groupSize > 1 ? `<br><small class="text-muted" style="opacity:.7">Parte ${idx + 1}/${groupSize}</small>` : '';
 
                 const tr = document.createElement('tr');
@@ -3536,7 +3538,9 @@ class AppController {
                 const client = clientsMap[r.clientId];
                 const clientName = client ? client.name : '<Deletado>';
                 const hoursStr = (r.minutes / 60).toFixed(2) + 'h';
-                const timeRange = (r.startTime && r.endTime) ? `\n${r.startTime} às ${r.endTime}` : '';
+                const timeRange = r.isUnavailability
+                    ? '\n⚠ Indisponibilidade do Cliente'
+                    : ((r.startTime && r.endTime) ? `\n${r.startTime} às ${r.endTime}` : '');
                 const partLabel = groupSize > 1 ? `\nParte ${idx + 1}/${groupSize}` : '';
 
                 const dateText = `${r.date.split('-').reverse().join('/')}${timeRange}${partLabel}`;
@@ -3651,7 +3655,9 @@ class AppController {
             const groupSize = group.records.length;
             group.records.forEach((r, idx) => {
                 const hoursStr = (r.minutes / 60).toFixed(2) + 'h';
-                const timeRange = (r.startTime && r.endTime) ? `<br><small class="text-muted">${r.startTime} às ${r.endTime}</small>` : '';
+                const timeRange = r.isUnavailability
+                    ? '<br><small style="color:#f59e0b;">⚠ Indisponibilidade do Cliente</small>'
+                    : ((r.startTime && r.endTime) ? `<br><small class="text-muted">${r.startTime} às ${r.endTime}</small>` : '');
                 const partLabel = groupSize > 1 ? `<br><small class="text-muted" style="opacity:.7">Parte ${idx + 1}/${groupSize}</small>` : '';
 
                 const tr = document.createElement('tr');
