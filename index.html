@@ -1242,7 +1242,13 @@
                     <label>Data</label>
                     <input type="date" id="record-date" class="form-control" required>
                 </div>
-                <div style="display: flex; gap: 16px;">
+                <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 12px;">
+                    <input type="checkbox" id="record-unavailability" style="width: auto; cursor: pointer; accent-color: var(--primary-color);" onchange="app.toggleRecordUnavailability(this.checked)">
+                    <label for="record-unavailability" style="cursor: pointer; color: var(--text-muted); font-size: 0.85rem; margin: 0;">
+                        Indisponibilidade do Cliente (horas perdidas)
+                    </label>
+                </div>
+                <div id="record-time-fields" style="display: flex; gap: 16px;">
                     <div class="form-group" style="flex: 1;">
                         <label>Horário Inicial</label>
                         <input type="time" id="record-start" class="form-control" required>
@@ -1251,6 +1257,10 @@
                         <label>Horário Final</label>
                         <input type="time" id="record-end" class="form-control" required>
                     </div>
+                </div>
+                <div class="form-group" id="record-unavailability-hours-group" style="display: none;">
+                    <label>Quantidade de horas perdidas</label>
+                    <input type="number" id="record-unavailability-hours" class="form-control" step="0.25" min="0" placeholder="Ex: 3.5">
                 </div>
                 <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 12px;">
                     <input type="checkbox" id="record-centesimal" style="width: auto; cursor: pointer; accent-color: var(--primary-color);">
@@ -1266,7 +1276,7 @@
                 </div>
                 <div class="form-group">
                     <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:6px;">
-                        <label style="margin:0;">Descrição do que foi feito</label>
+                        <label id="record-desc-label" style="margin:0;">Descrição do que foi feito</label>
                         <button type="button" id="btn-ai-improve-record" onclick="app.improveRecordDescription()" class="btn btn-ghost" style="font-size:0.78rem; padding:3px 10px; color:var(--primary-color); border:1px solid rgba(139,92,246,0.35); display:none;">
                             <i data-lucide="sparkles" style="width:13px;height:13px;"></i> Melhorar com IA
                         </button>
