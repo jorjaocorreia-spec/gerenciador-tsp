@@ -541,6 +541,7 @@ class AppController {
             document.getElementById('record-date').valueAsDate = new Date();
             document.getElementById('record-calculated').value = '';
             document.getElementById('record-calculated').dataset.minutes = 0;
+            this.toggleRecordUnavailability(false);
         }
         if (modalId === 'modal-task-time') {
             document.getElementById('form-task-time').reset();
@@ -711,19 +712,59 @@ class AppController {
         }
     }
 
+    toggleRecordUnavailability(checked) {
+        const timeFields = document.getElementById('record-time-fields');
+        const hoursGroup = document.getElementById('record-unavailability-hours-group');
+        const startInput = document.getElementById('record-start');
+        const endInput = document.getElementById('record-end');
+        const hoursInput = document.getElementById('record-unavailability-hours');
+        const descLabel = document.getElementById('record-desc-label');
+        const calcInput = document.getElementById('record-calculated');
+
+        document.getElementById('record-unavailability').checked = checked;
+        timeFields.style.display = checked ? 'none' : 'flex';
+        hoursGroup.style.display = checked ? 'block' : 'none';
+        startInput.required = !checked;
+        endInput.required = !checked;
+        hoursInput.required = checked;
+        descLabel.innerText = checked ? 'Justificativa' : 'Descrição do que foi feito';
+
+        if (checked) {
+            startInput.value = '';
+            endInput.value = '';
+            calcInput.value = '';
+            calcInput.dataset.minutes = 0;
+        } else {
+            hoursInput.value = '';
+        }
+    }
+
     async handleRecordSubmit(e) {
         e.preventDefault();
         const recordId = document.getElementById('record-id').value;
         const clientId = document.getElementById('record-client').value;
         const date = document.getElementById('record-date').value;
-        const startTime = document.getElementById('record-start').value;
-        const endTime = document.getElementById('record-end').value;
-        const minutes = document.getElementById('record-calculated').dataset.minutes;
+        const isUnavailability = document.getElementById('record-unavailability').checked;
         const desc = document.getElementById('record-desc').value;
 
-        if (!minutes || minutes <= 0) {
-            Toast.show('Preencha horários válidos.', 'error');
-            return;
+        let startTime, endTime, minutes;
+        if (isUnavailability) {
+            const hours = parseFloat(document.getElementById('record-unavailability-hours').value);
+            if (!hours || hours <= 0) {
+                Toast.show('Preencha a quantidade de horas perdidas.', 'error');
+                return;
+            }
+            startTime = '';
+            endTime = '';
+            minutes = Math.round(hours * 60);
+        } else {
+            startTime = document.getElementById('record-start').value;
+            endTime = document.getElementById('record-end').value;
+            minutes = document.getElementById('record-calculated').dataset.minutes;
+            if (!minutes || minutes <= 0) {
+                Toast.show('Preencha horários válidos.', 'error');
+                return;
+            }
         }
 
         const btn = e.target.querySelector('[type="submit"]');
@@ -731,15 +772,16 @@ class AppController {
 
         try {
             if (recordId) {
-                await store.updateRecord(recordId, clientId, date, startTime, endTime, minutes, desc);
+                await store.updateRecord(recordId, clientId, date, startTime, endTime, minutes, desc, isUnavailability);
             } else {
-                await store.addRecord(clientId, date, startTime, endTime, minutes, desc);
+                await store.addRecord(clientId, date, startTime, endTime, minutes, desc, isUnavailability);
             }
             await this._btnSuccess(btn);
             e.target.reset();
             document.getElementById('record-id').value = '';
             document.getElementById('record-calculated').dataset.minutes = 0;
             document.getElementById('record-date').valueAsDate = new Date();
+            this.toggleRecordUnavailability(false);
             this.closeModal('modal-record');
             await this.renderAll();
             Toast.show(recordId ? 'Atendimento atualizado.' : 'Atendimento lançado.', 'success');
@@ -783,12 +825,17 @@ class AppController {
         document.getElementById('record-id').value = r.id;
         document.getElementById('record-client').value = r.clientId;
         document.getElementById('record-date').value = r.date;
-        document.getElementById('record-start').value = r.startTime;
-        document.getElementById('record-end').value = r.endTime;
         document.getElementById('record-desc').value = r.description;
 
-        document.getElementById('record-calculated').value = r.minutes + ' min';
-        document.getElementById('record-calculated').dataset.minutes = r.minutes;
+        this.toggleRecordUnavailability(r.isUnavailability);
+        if (r.isUnavailability) {
+            document.getElementById('record-unavailability-hours').value = (r.minutes / 60).toString();
+        } else {
+            document.getElementById('record-start').value = r.startTime;
+            document.getElementById('record-end').value = r.endTime;
+            document.getElementById('record-calculated').value = r.minutes + ' min';
+            document.getElementById('record-calculated').dataset.minutes = r.minutes;
+        }
 
         this.openModal('modal-record');
         // Exibe botão IA se já há descrição e IA configurada
