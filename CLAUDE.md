@@ -158,7 +158,7 @@ Todas têm `user_id uuid references auth.users` + RLS ativa (`auth.uid() = user_
 | `tickets` | id, user_id, ticket_id, ticket_number, title, status, priority, queue, customer_name, owner, created_at_otobo, updated_at_otobo, raw_data JSONB, linked_client_id, synced_at |
 | `user_ai_config` | user_id (PK), provider (openai\|anthropic), api_key TEXT, model TEXT, updated_at |
 
-### Fases implementadas (1–47, todas ✅)
+### Fases implementadas (1–48, todas ✅)
 
 | Fases | Funcionalidade |
 |-------|---------------|
@@ -195,6 +195,7 @@ Todas têm `user_id uuid references auth.users` + RLS ativa (`auth.uid() = user_
 | 45 | Controle de acesso por níveis de usuário (Portal do Cliente): tabela `user_roles`, RLS cross-user em `tasks`/`kanban_columns`, Edge Function `manage-users` (convite/listagem/revogação), view "Usuários", modo portal do cliente (Kanban read-only) |
 | 46 | Painel de Indicadores: evolução do cliente (KPIs, gráfico mensal de tarefas, distribuição por status/prioridade, timeline do projeto, resumo + chat de IA, exportação PDF) — consultor com seletor de cliente; cliente via Portal restrito ao próprio `client_id`; sem tabelas novas, tudo calculado sob demanda |
 | 47 | Central de Notificações: aviso in-app de melhorias/novas features, publicado manualmente via script (`app_notifications` + `notification_reads`), sino no sidebar visível só para consultores |
+| 48 | Atendimentos: indisponibilidade do cliente — lançamento sem horário com quantidade de horas perdidas, conta em Dashboard/Clientes/Saldo, excluída do Financeiro Por Hora e da Produtividade |
 
 ---
 
@@ -356,6 +357,8 @@ O `docker-entrypoint.sh` injeta essas vars em `js/config.js` via `envsubst` na i
 
 - **Cobrança Por Hora: migration obrigatória antes do deploy** — sem `billing_model` e `hourly_rate` na tabela `clients`, `addClient`/`updateClient` lançarão erro 400. Rodar: `ALTER TABLE clients ADD COLUMN IF NOT EXISTS billing_model TEXT DEFAULT 'fixed', ADD COLUMN IF NOT EXISTS hourly_rate NUMERIC DEFAULT 0;`. Clientes existentes ficam automaticamente em `billing_model = 'fixed'` — nenhuma mudança de comportamento para eles.
 - **Cobrança Por Hora: sem comissão** — diferente do modelo Valor Fixo (43% + bônus), o modelo Por Hora (`billing_model === 'hourly'`) calcula apenas `hoursUsed × hourlyRate` como valor faturado; não há cálculo de comissão do consultor para esse modelo. `toggleBillingModel()` em `js/app.js` esconde/mostra os blocos de campos no modal de cliente; chamado no `onchange` dos radios, em `openEditClientModal()` e em `closeModal('modal-client')` (este último porque `form.reset()` não desfaz `style.display` setado via JS).
+
+- **Indisponibilidade do Cliente: `records.is_unavailability`** — registro de Atendimento sem horário real, usado quando o cliente não disponibiliza a agenda; `start_time`/`end_time` ficam `''` (mesma convenção de "dia inteiro" da Agenda) e `minutes` vem de um campo de horas decimais digitado no modal, não de cálculo de horário. Conta normalmente em `hoursUsed`/Dashboard/Clientes/Saldo (nenhum código especial — já somam `records.minutes` sem distinção). **Excluído deliberadamente** da soma de minutos em `store.getFinancialSummary`/`getFinancialHistory` (`js/store.js`), que é a única consumidora dessa soma para a fórmula de clientes "Por Hora" — clientes Fixos não usam essa soma, então a exclusão não tem efeito neles. **Nunca conta na Produtividade** — `productivity-calc.js` usa exclusivamente a tabela `apontamentos`, sem nenhuma relação com `records`. Migration: `ALTER TABLE records ADD COLUMN IF NOT EXISTS is_unavailability BOOLEAN DEFAULT false;`.
 
 - **Kanban: `position` deve ser migrado antes do deploy** — sem a migration SQL (`ADD COLUMN position INTEGER DEFAULT 0` + `ADD COLUMN labels JSONB DEFAULT '[]'` + `ADD COLUMN checklist JSONB DEFAULT '[]'` + `ADD COLUMN cover_color TEXT`), o `getTasks()` retorna erro 400 e a view Tarefas fica em branco. Rodar no Supabase SQL Editor antes de qualquer deploy da Fase 17.
 - **Kanban: `hidden_from_client` requer migration antes do deploy** — `ALTER TABLE tasks ADD COLUMN IF NOT EXISTS hidden_from_client BOOLEAN DEFAULT FALSE;`. Regra opt-out: por padrão toda tarefa aparece no Portal do Cliente; o checkbox "Ocultar do Portal do Cliente" no modal (`#task-hidden-from-client`, seção `#task-hidden-from-client-section`) marca as exceções. `store.getClientPortalTasks(clientId)` filtra `.eq('hidden_from_client', false)` — é a única barreira contra exibição ao cliente (não há RLS por coluna); `store.addTask`/`updateTask` persistem o campo (`taskData.hiddenFromClient`). `_applyTaskModalReadOnlyState(true)` oculta a seção inteira do checkbox no Portal do Cliente (configuração irrelevante para quem só lê). No board do consultor, `createKanbanCard` exibe um badge com ícone `eye-off` quando `task.hiddenFromClient && !readOnly` — nunca exibir esse badge quando `readOnly` (o cliente nunca recebe uma tarefa oculta para começo, então a badge seria sempre falsa/inútil nesse contexto). Sem a migration, `addTask`/`updateTask` com o campo lançam erro 400 do PostgREST.
