@@ -22,6 +22,7 @@ class TSPStore {
         return { id: r.id, clientId: r.client_id, date: r.date,
             startTime: r.start_time || '', endTime: r.end_time || '',
             minutes: parseInt(r.minutes) || 0, description: r.description || '',
+            isUnavailability: !!r.is_unavailability,
             createdAt: r.created_at };
     }
 
@@ -170,21 +171,23 @@ class TSPStore {
         return (data || []).map(r => this._record(r));
     }
 
-    async addRecord(clientId, date, startTime, endTime, minutes, description) {
+    async addRecord(clientId, date, startTime, endTime, minutes, description, isUnavailability = false) {
         const { data, error } = await this.db.from('records').insert({
             user_id: this.userId, client_id: clientId, date,
             start_time: startTime || '', end_time: endTime || '',
-            minutes: parseInt(minutes) || 0, description: description || ''
+            minutes: parseInt(minutes) || 0, description: description || '',
+            is_unavailability: !!isUnavailability
         }).select().single();
         if (error) throw error;
         return this._record(data);
     }
 
-    async updateRecord(id, clientId, date, startTime, endTime, minutes, description) {
+    async updateRecord(id, clientId, date, startTime, endTime, minutes, description, isUnavailability = false) {
         const { data, error } = await this.db.from('records').update({
             client_id: clientId, date, start_time: startTime || '',
             end_time: endTime || '', minutes: parseInt(minutes) || 0,
-            description: description || ''
+            description: description || '',
+            is_unavailability: !!isUnavailability
         }).eq('id', id).select().single();
         if (error) throw error;
         return this._record(data);
