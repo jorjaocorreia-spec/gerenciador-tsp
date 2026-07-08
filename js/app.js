@@ -5445,6 +5445,10 @@ class AppController {
 
         // 3. Remove eventos locais que foram deletados no Google (dentro da janela de ±30 dias)
         const googleIdSet = new Set(googleEvents.map(g => g.id));
+        // Calendários que falharam ao buscar nesta rodada (rate limit, timeout, blip de rede) —
+        // nunca deletar localmente um evento pertencente a um desses calendários, pois sua ausência
+        // em googleEvents pode ser só falha de fetch, não exclusão real no Google.
+        const failedCalendarIds = new Set(googleEvents._failedCalendarIds || []);
         const syncWindowStart = new Date();
         syncWindowStart.setDate(syncWindowStart.getDate() - 30);
         const syncWindowEnd = new Date();
@@ -5455,6 +5459,7 @@ class AppController {
         for (const le of localEvents) {
             if (!le.calendarEventId) continue; // Nunca foi ao Google, não apagar
             if (le.date < windowStartStr || le.date > windowEndStr) continue; // Fora da janela, não tocar
+            if (failedCalendarIds.has(le.calendarId || 'primary')) continue; // Calendário não pôde ser consultado nesta rodada — não arriscar
             if (googleIdSet.has(le.calendarEventId)) continue; // Ainda existe no Google, ok
             // Evento foi deletado no Google — remover localmente
             try {

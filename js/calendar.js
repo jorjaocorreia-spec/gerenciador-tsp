@@ -224,6 +224,7 @@ const GoogleCalendarAPI = {
             const seen = new Set();
             let allEvents = [];
             let fetchSuccessCount = 0;
+            const failedCalendarIds = [];
             for (const calId of calendarIds) {
                 try {
                     const response = await gapi.client.calendar.events.list({
@@ -241,6 +242,7 @@ const GoogleCalendarAPI = {
                     fetchSuccessCount++;
                 } catch (err) {
                     console.warn(`Falha ao buscar eventos do calendário ${calId}:`, err);
+                    failedCalendarIds.push(calId);
                 }
             }
             // Se todos os calendários falharam, aborta para não deletar eventos locais via passo 3
@@ -248,6 +250,13 @@ const GoogleCalendarAPI = {
                 console.error('Todos os calendários falharam; sync abortado para preservar dados locais.');
                 return null;
             }
+            // failedCalendarIds: calendários que falharam nesta rodada — o passo 3 do sync
+            // (executeBiDirectionalSync em app.js) usa essa lista para NUNCA deletar localmente
+            // um evento cujo calendarId não pôde ser consultado, mesmo que outros calendários
+            // tenham tido sucesso (fetchSuccessCount > 0). Sem essa proteção, uma falha transitória
+            // isolada num único calendário fazia o evento parecer "apagado no Google" e era
+            // removido do Supabase mesmo continuando intacto no Google.
+            allEvents._failedCalendarIds = failedCalendarIds;
             return allEvents;
         } catch (err) {
             console.error('Falha ao buscar eventos do Google.', err);
