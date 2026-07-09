@@ -5365,9 +5365,13 @@ class AppController {
         btn.disabled = true;
 
         try {
-            await this.executeBiDirectionalSync();
+            const result = await this.executeBiDirectionalSync();
             this._lastGoogleSync = Date.now();
-            Toast.show('Sincronização concluída com sucesso!', 'success');
+            if (result && result.calendarFailures && result.calendarFailures.length > 0) {
+                Toast.show(`Sincronização parcial: ${result.calendarFailures.length} calendário(s) não puderam ser consultados agora. Alguns eventos novos podem estar faltando — tente sincronizar novamente em instantes.`, 'warning');
+            } else {
+                Toast.show('Sincronização concluída com sucesso!', 'success');
+            }
         } catch (error) {
             console.error("Erro no sync", error);
             const msg = error.message && error.message.includes('falharam')
@@ -5388,6 +5392,12 @@ class AppController {
 
         const localEvents = await store.getAgendaEvents();
         let syncErrors = 0;
+        // Calendários que falharam ao buscar nesta rodada — eventos novos/atualizados neles
+        // não puderam ser vistos, então podem estar "faltando" localmente sem nenhum erro visível.
+        const calendarFailures = googleEvents._failedCalendarIds || [];
+        if (calendarFailures.length > 0) {
+            console.warn('Calendários que falharam nesta sincronização:', calendarFailures);
+        }
         // Rastreia eventos locais resolvidos no Passo 1 (por ID exato ou fuzzy match).
         // Impede que o Passo 2 empurre de volta ao Google eventos já tratados.
         const processedLocalIds = new Set();
@@ -5522,7 +5532,7 @@ class AppController {
         // Calendários que falharam ao buscar nesta rodada (rate limit, timeout, blip de rede) —
         // nunca deletar localmente um evento pertencente a um desses calendários, pois sua ausência
         // em googleEvents pode ser só falha de fetch, não exclusão real no Google.
-        const failedCalendarIds = new Set(googleEvents._failedCalendarIds || []);
+        const failedCalendarIds = new Set(calendarFailures);
         const syncWindowStart = new Date();
         syncWindowStart.setDate(syncWindowStart.getDate() - 30);
         const syncWindowEnd = new Date();
@@ -5546,6 +5556,7 @@ class AppController {
         this._agendaEventsCache = null; // sync trouxe mudanças do Google — força re-fetch no próximo renderAgenda()
 
         if (syncErrors > 0) throw new Error(`${syncErrors} evento(s) falharam na sincronização`);
+        return { calendarFailures };
     }
 
     // ===================================
