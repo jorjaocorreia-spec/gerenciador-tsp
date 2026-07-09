@@ -4391,8 +4391,13 @@ kbd {
     box-shadow: 0 0 0 3px rgba(255,255,255,0.3);
 }
 .rsvp-dot--needsAction {
-    background: transparent;
-    border: 2px solid rgba(255,255,255,0.7);
+    background: #f59e0b;
+    border: 2px solid #d97706;
+    animation: rsvp-pending-pulse 1.6s ease-in-out infinite;
+}
+@keyframes rsvp-pending-pulse {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(245, 158, 11, 0.55); }
+    50% { box-shadow: 0 0 0 5px rgba(245, 158, 11, 0); }
 }
 .rsvp-dot--accepted {
     background: #22c55e;
@@ -4439,6 +4444,46 @@ kbd {
 .event-block.rsvp-hidden,
 .allday-event-banner.rsvp-hidden {
     display: none !important;
+}
+
+/* Convite aguardando resposta (RSVP needsAction) — precisa ser óbvio à primeira vista,
+   sem depender só do rsvp-dot de 10px que passa despercebido em blocos coloridos */
+.event-block.rsvp-pending {
+    border: 2px dashed rgba(245, 158, 11, 0.9);
+    background-image: repeating-linear-gradient(
+        135deg,
+        rgba(245, 158, 11, 0.14),
+        rgba(245, 158, 11, 0.14) 6px,
+        transparent 6px,
+        transparent 12px
+    );
+}
+.allday-event-banner.rsvp-pending {
+    border: 2px dashed rgba(245, 158, 11, 0.9);
+}
+.agenda-month-event.rsvp-pending {
+    border-left: 3px dashed #f59e0b;
+    padding-left: 4px;
+}
+.schedule-event.rsvp-pending {
+    border-left: 3px dashed #f59e0b;
+}
+.rsvp-pending-badge {
+    position: absolute;
+    left: 4px;
+    bottom: 4px;
+    right: 20px;
+    font-size: 0.62rem;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    color: #fef3c7;
+    background: rgba(217, 119, 6, 0.85);
+    border-radius: 4px;
+    padding: 1px 5px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    pointer-events: none;
 }
 
 /* Mini-popup "Você vai?" */

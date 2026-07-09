@@ -4925,9 +4925,11 @@ class AppController {
             let eventsHtml = '';
             dayEvents.forEach(ev => {
                 const timeLabel = ev.startTime ? `${ev.startTime} - ${ev.endTime}` : 'Dia inteiro';
-                eventsHtml += `<div class="agenda-month-event type-${ev.type}"
+                const isPending = ev.isInvited && (!ev.rsvpStatus || ev.rsvpStatus === 'needsAction');
+                const pendingTitle = isPending ? ' — Convite aguardando resposta' : '';
+                eventsHtml += `<div class="agenda-month-event type-${ev.type}${isPending ? ' rsvp-pending' : ''}"
                      onclick="event.stopPropagation(); app.editAgendaEvent('${ev.id}')"
-                     title="${escapeHtml(ev.title)} (${timeLabel})">
+                     title="${escapeHtml(ev.title)} (${timeLabel})${pendingTitle}">
                     ${escapeHtml(ev.title)}
                 </div>`;
             });
@@ -5039,12 +5041,16 @@ class AppController {
                     const meetBadge = ev.meetLink
                         ? `<a href="${escapeHtml(ev.meetLink)}" target="_blank" rel="noopener" onclick="event.stopPropagation()" title="Entrar no Google Meet" style="color:#34d399; display:inline-flex; align-items:center; gap:3px; font-size:0.75rem; margin-left:6px;"><i data-lucide="video" style="width:12px; height:12px;"></i> Meet</a>`
                         : '';
-                    html += `<div class="schedule-event" onclick="app.editAgendaEvent('${ev.id}')">
+                    const isPending = ev.isInvited && (!ev.rsvpStatus || ev.rsvpStatus === 'needsAction');
+                    const pendingBadge = isPending
+                        ? `<span class="rsvp-pending-badge" style="position:static; margin-left:6px;">Aguardando resposta</span>`
+                        : '';
+                    html += `<div class="schedule-event${isPending ? ' rsvp-pending' : ''}" onclick="app.editAgendaEvent('${ev.id}')">
                         <div class="schedule-event-dot type-${ev.type}"></div>
                         <div class="schedule-event-time">${ev.startTime ? `${ev.startTime} – ${ev.endTime}` : '<span style="font-style:italic; opacity:0.8;">Dia inteiro</span>'}</div>
                         <div class="schedule-event-info">
                             <span class="schedule-event-title">${escapeHtml(ev.title)}</span>
-                            ${clientName}${meetBadge}
+                            ${clientName}${meetBadge}${pendingBadge}
                         </div>
                     </div>`;
                 });
@@ -5193,7 +5199,8 @@ class AppController {
             ? escapeHtml(clientsMap[ev.clientId].name) : '';
         const rsvpDeclinedClass = ev.isInvited && ev.rsvpStatus === 'declined' ? ' rsvp-declined' : '';
         const rsvpHiddenClass   = ev.isInvited && ev.rsvpStatus === 'declined' && this._hideDeclinedEvents ? ' rsvp-hidden' : '';
-        return `<div class="allday-event-banner ${typeClass}${rsvpDeclinedClass}${rsvpHiddenClass}"
+        const rsvpPendingClass  = ev.isInvited && (!ev.rsvpStatus || ev.rsvpStatus === 'needsAction') ? ' rsvp-pending' : '';
+        return `<div class="allday-event-banner ${typeClass}${rsvpDeclinedClass}${rsvpHiddenClass}${rsvpPendingClass}"
                      data-event-id="${ev.id}"
                      data-rsvp="${ev.rsvpStatus || 'needsAction'}"
                      onclick="event.stopPropagation(); app.editAgendaEvent('${ev.id}')"
@@ -5266,9 +5273,10 @@ class AppController {
         const rsvpDeclinedClass = ev.isInvited && ev.rsvpStatus === 'declined' ? ' rsvp-declined' : '';
         const rsvpHiddenClass   = ev.isInvited && ev.rsvpStatus === 'declined' && this._hideDeclinedEvents ? ' rsvp-hidden' : '';
         const hasRsvpClass      = ev.isInvited ? ' has-rsvp' : '';
+        const rsvpPendingClass  = ev.isInvited && (!ev.rsvpStatus || ev.rsvpStatus === 'needsAction') ? ' rsvp-pending' : '';
 
         return `
-            <div class="event-block ${typeClass}${extraClasses}${rsvpDeclinedClass}${rsvpHiddenClass}${hasRsvpClass}"
+            <div class="event-block ${typeClass}${extraClasses}${rsvpDeclinedClass}${rsvpHiddenClass}${hasRsvpClass}${rsvpPendingClass}"
                  data-event-id="${ev.id}"
                  data-rsvp="${ev.rsvpStatus || 'needsAction'}"
                  style="top:${top}px;height:${height}px;width:${width};left:${left};right:auto;"
@@ -5282,6 +5290,7 @@ class AppController {
                     ${metaExtras}
                 </div>
                 ${clientHtml}
+                ${rsvpPendingClass ? '<div class="rsvp-pending-badge">Aguardando resposta</div>' : ''}
                 ${this._renderRsvpIndicator(ev)}
             </div>
         `;
