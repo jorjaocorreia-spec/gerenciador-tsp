@@ -4470,6 +4470,11 @@ class AppController {
             }
         }
 
+        // createGoogleEvent/updateGoogleEvent engolem seus próprios erros de API (token
+        // expirado, etc.) e retornam null/false sem lançar — sem essa flag, o evento é salvo
+        // normalmente na plataforma e o usuário nunca sabe que o push ao Google falhou.
+        let googlePushFailed = false;
+
         try {
             if (id) {
                 eventData.id = id;
@@ -4478,11 +4483,14 @@ class AppController {
                     if (existingCalId) {
                         const upd = await calendarAPI.updateGoogleEvent(existingCalId, eventData);
                         if (upd && upd.meetLink) eventData.meetLink = upd.meetLink;
+                        if (!upd) googlePushFailed = true;
                     } else {
                         const result = await calendarAPI.createGoogleEvent(eventData);
                         if (result) {
                             eventData.calendarEventId = result.id;
                             if (result.meetLink) eventData.meetLink = result.meetLink;
+                        } else {
+                            googlePushFailed = true;
                         }
                     }
                 }
@@ -4500,6 +4508,8 @@ class AppController {
                     if (result) {
                         eventData.calendarEventId = result.id;
                         if (result.meetLink) eventData.meetLink = result.meetLink;
+                    } else {
+                        googlePushFailed = true;
                     }
                 }
                 const saved = await store.addAgendaEvent(eventData);
@@ -4540,7 +4550,11 @@ class AppController {
                 await this._btnSuccess(btn);
                 this.closeModal('modal-agenda-event');
                 this._renderAgendaFromCache();
-                Toast.show(id ? 'Agendamento atualizado.' : 'Agendamento criado.', 'success');
+                if (googlePushFailed) {
+                    Toast.show('Agendamento salvo, mas não foi possível enviar ao Google Calendar (token expirado ou sem acesso). Clique em "Sincronizar" na Agenda para tentar novamente.', 'warning');
+                } else {
+                    Toast.show(id ? 'Agendamento atualizado.' : 'Agendamento criado.', 'success');
+                }
             }
         } catch (err) {
             this._btnError(btn);
@@ -5424,7 +5438,9 @@ class AppController {
         try {
             const result = await this.executeBiDirectionalSync();
             this._lastGoogleSync = Date.now();
-            if (result && result.calendarFailures && result.calendarFailures.length > 0) {
+            if (result && result.pushErrors > 0) {
+                Toast.show(`${result.pushErrors} evento(s) não foram enviados ao Google (token expirado ou sem acesso). Clique em Sincronizar novamente para tentar de novo.`, 'warning');
+            } else if (result && result.calendarFailures && result.calendarFailures.length > 0) {
                 Toast.show(`Sincronização parcial: ${result.calendarFailures.length} calendário(s) não puderam ser consultados agora. Alguns eventos novos podem estar faltando — tente sincronizar novamente em instantes.`, 'warning');
             } else {
                 Toast.show('Sincronização concluída com sucesso!', 'success');
@@ -5568,19 +5584,26 @@ class AppController {
         }
 
         // 2. Empurra eventos locais que NUNCA foram enviados ao Google (sem calendarEventId)
+        let pushErrors = 0;
         for (const le of localEvents) {
             if (le.calendarEventId) continue; // Já existe no Google (mesmo que fora da janela atual)
             if (processedLocalIds.has(le.id)) continue; // Já resolvido via fuzzy match no Passo 1
             try {
+                // createGoogleEvent engole seus próprios erros de API (token expirado, etc.) e
+                // retorna null sem lançar — sem essa checagem, uma falha aqui é 100% invisível:
+                // nenhum erro sobe para o catch abaixo, syncErrors nunca incrementa, o evento
+                // simplesmente permanece sem calendarEventId até a próxima tentativa de sync.
                 const result = await calendarAPI.createGoogleEvent(le);
                 if (result) {
                     le.calendarEventId = result.id;
                     if (result.meetLink) le.meetLink = result.meetLink;
                     await store.updateAgendaEvent(le);
+                } else {
+                    pushErrors++;
                 }
             } catch (err) {
                 console.error('Erro ao empurrar evento para o Google:', le.title, err);
-                syncErrors++;
+                pushErrors++;
             }
         }
 
@@ -5613,7 +5636,7 @@ class AppController {
         this._agendaEventsCache = null; // sync trouxe mudanças do Google — força re-fetch no próximo renderAgenda()
 
         if (syncErrors > 0) throw new Error(`${syncErrors} evento(s) falharam na sincronização`);
-        return { calendarFailures };
+        return { calendarFailures, pushErrors };
     }
 
     // ===================================
@@ -9219,7 +9242,7 @@ class AppController {
             }
         }
 
-        let created = 0, failed = 0;
+        let created = 0, failed = 0, googlePushFailed = 0;
         try {
             for (const ev of events) {
                 try {
@@ -9237,6 +9260,9 @@ class AppController {
                     });
                     if (googleReady) {
                         try {
+                            // createGoogleEvent já engole seus próprios erros de API e retorna
+                            // null — sem essa contagem, um token expirado no meio da geração em
+                            // lote cria todos os eventos localmente sem nenhum aviso ao usuário.
                             const result = await calendarAPI.createGoogleEvent({ ...savedEvent, generateMeet: ev.generateMeet });
                             if (result) {
                                 await store.updateAgendaEvent({
@@ -9244,8 +9270,10 @@ class AppController {
                                     calendarEventId: result.id,
                                     meetLink: result.meetLink || '',
                                 });
+                            } else {
+                                googlePushFailed++;
                             }
-                        } catch (_) {} // Falha no Google não bloqueia
+                        } catch (_) { googlePushFailed++; } // Falha no Google não bloqueia a criação local
                     }
                     created++;
                 } catch (_) { failed++; }
@@ -9257,10 +9285,13 @@ class AppController {
             this.closeModal('modal-schedule-preview');
             const clientId = document.getElementById('client-id').value;
             await this._renderClientSchedulingTab(clientId);
-            const msg = failed > 0
+            let msg = failed > 0
                 ? `${created} evento(s) criado(s), ${failed} falha(s).`
                 : `${created} evento(s) criado(s) com sucesso!`;
-            Toast.show(msg, failed > 0 ? 'info' : 'success');
+            if (googlePushFailed > 0) {
+                msg += ` ${googlePushFailed} não foram enviados ao Google (token expirado ou sem acesso) — use "Sincronizar" na Agenda para reenviar.`;
+            }
+            Toast.show(msg, (failed > 0 || googlePushFailed > 0) ? 'info' : 'success');
         } catch (err) {
             Toast.show('Erro ao gerar agenda: ' + err.message, 'error');
         } finally {

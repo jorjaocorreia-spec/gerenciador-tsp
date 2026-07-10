@@ -36,6 +36,24 @@ const GoogleCalendarAPI = {
         try { localStorage.removeItem(this._STORAGE_KEY); } catch {}
     },
 
+    // Erros 401/403 da API do Google indicam token expirado/revogado — sem isso,
+    // isAuthenticated ficava travado em true para sempre (só é setado false no login
+    // inicial ou numa falha explícita de reauth), e _ensureToken() confiava cegamente
+    // nesse estado sem nunca reverificar com o Google, fazendo todo push/fetch seguinte
+    // falhar em silêncio (catch interno de cada método) enquanto o badge "Conectado"
+    // continuava verde. Chamar isto em qualquer catch de chamada à API força o próximo
+    // _ensureToken()/promptGoogleSync a reautenticar de verdade.
+    _handleAuthError(err) {
+        const status = err?.status || err?.result?.error?.code;
+        if (status === 401 || status === 403) {
+            this.isAuthenticated = false;
+            this.clearSavedToken();
+            if (window.app) app._updateGoogleSyncStatus();
+            return true;
+        }
+        return false;
+    },
+
     // Tenta obter token sem UI — funciona silenciosamente quando o usuário já tem
     // sessão Google ativa e já concedeu consentimento anteriormente.
     // Fire-and-forget: falha silenciosa se não houver sessão.
@@ -242,6 +260,7 @@ const GoogleCalendarAPI = {
                     fetchSuccessCount++;
                 } catch (err) {
                     console.warn(`Falha ao buscar eventos do calendário ${calId}:`, err);
+                    this._handleAuthError(err);
                     failedCalendarIds.push(calId);
                 }
             }
@@ -320,6 +339,7 @@ const GoogleCalendarAPI = {
             };
         } catch (err) {
             console.error('Erro ao criar evento no Google', err);
+            this._handleAuthError(err);
             return null;
         }
     },
@@ -341,6 +361,7 @@ const GoogleCalendarAPI = {
             };
         } catch (err) {
             console.error('Erro ao atualizar evento no Google', err);
+            this._handleAuthError(err);
             return false;
         }
     },
@@ -352,6 +373,7 @@ const GoogleCalendarAPI = {
             return true;
         } catch (err) {
             console.error('Erro ao deletar evento no Google', err);
+            this._handleAuthError(err);
             return false;
         }
     },
@@ -382,6 +404,7 @@ const GoogleCalendarAPI = {
             return true;
         } catch (err) {
             console.error('Erro ao atualizar RSVP no Google', err);
+            this._handleAuthError(err);
             return false;
         }
     },
