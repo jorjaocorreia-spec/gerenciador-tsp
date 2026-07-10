@@ -538,6 +538,11 @@ h4 {
   gap: 8px;
 }
 
+.btn:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px rgba(139,92,246,0.5);
+}
+
 .btn-primary {
   /* Contraste: branco sobre --primary-color (#8b5cf6) fica em ~4.2:1, abaixo do AA (4.5:1).
      --primary-hover (#7c3aed) mantém a identidade violeta com ~5.7:1. */

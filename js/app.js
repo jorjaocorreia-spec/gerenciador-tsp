@@ -2350,7 +2350,16 @@ class AppController {
                 card.className = 'stat-card glass';
                 card.style.cursor = 'pointer';
                 if (client.projectNum) card.title = `Projeto: ${client.projectNum}`;
+                card.tabIndex = 0;
+                card.setAttribute('role', 'button');
+                card.setAttribute('aria-label', client.name);
                 card.onclick = () => app.openClientDashboard(client.id);
+                card.onkeydown = (e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        app.openClientDashboard(client.id);
+                    }
+                };
 
                 if (b.hasTracking) {
                     const balanceColor = b.balanceH >= 0 ? '#4ade80' : '#f87171';
@@ -2371,7 +2380,7 @@ class AppController {
                             <span style="font-weight: 600; color: ${balanceColor}; font-size: 0.95rem;">${balanceSign}${b.balanceH.toFixed(1)}h</span>
                         </div>
                         <div class="progress-container">
-                            <div class="progress-bar ${isCritical}" style="width: ${pct}%; background: linear-gradient(90deg, #a855f7, #7c3aed);"></div>
+                            <div class="progress-bar ${isCritical}" style="width: ${pct}%; background: linear-gradient(90deg, var(--primary-color), var(--secondary-color));"></div>
                         </div>
                         <div style="display: flex; justify-content: space-between; font-size: 0.85rem; margin-top: 8px;">
                             <span class="text-muted">${b.totalAppliedH.toFixed(1)}h aplicadas</span>
@@ -3012,10 +3021,10 @@ class AppController {
                     ? Math.round(s.hoursUsed / s.client.hoursTotal * 100)
                     : null;
                 const barColor = contractPct !== null && contractPct > 100
-                    ? '#f87171'
+                    ? 'var(--danger-color)'
                     : contractPct !== null && contractPct >= 80
-                        ? '#fbbf24'
-                        : 'linear-gradient(90deg,#a855f7,#7c3aed)';
+                        ? 'var(--warning-color)'
+                        : 'linear-gradient(90deg,var(--primary-color),var(--secondary-color))';
                 const proj = s.client.projectNum
                     ? ` <span style="color:var(--text-muted);font-size:0.75rem;">#${escapeHtml(s.client.projectNum)}</span>`
                     : '';
