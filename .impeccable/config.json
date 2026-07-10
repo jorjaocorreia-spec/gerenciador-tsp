@@ -1,0 +1,50 @@
+{
+  "detector": {
+    "ignoreRules": [],
+    "ignoreFiles": [],
+    "ignoreValues": [
+      {
+        "rule": "design-system-color",
+        "value": "#a78bfa",
+        "reason": "AI feature accent, confirmed intentional and consistent app-wide (critique 2026-07-10)",
+        "createdAt": "2026-07-10T01:42:36.317Z"
+      },
+      {
+        "rule": "design-system-color",
+        "value": "rgba(167,139,250,0.3)",
+        "reason": "AI feature accent border, confirmed intentional and consistent app-wide (critique 2026-07-10)",
+        "createdAt": "2026-07-10T01:42:36.380Z"
+      },
+      {
+        "rule": "design-system-color",
+        "value": "rgba(167,139,250,0.25)",
+        "reason": "AI feature accent border, confirmed intentional and consistent app-wide (critique 2026-07-10)",
+        "createdAt": "2026-07-10T01:42:36.442Z"
+      },
+      {
+        "rule": "design-system-color",
+        "value": "rgba(167,139,250,0.2)",
+        "reason": "AI feature accent border, confirmed intentional and consistent app-wide (critique 2026-07-10)",
+        "createdAt": "2026-07-10T01:42:36.502Z"
+      },
+      {
+        "rule": "design-system-color",
+        "value": "#4ade80",
+        "reason": "Financial delta/positive semantic color, confirmed intentional and consistent app-wide (critique 2026-07-10)",
+        "createdAt": "2026-07-10T01:42:36.564Z"
+      },
+      {
+        "rule": "design-system-color",
+        "value": "#f87171",
+        "reason": "Financial delta/negative semantic color, confirmed intentional and consistent app-wide (critique 2026-07-10)",
+        "createdAt": "2026-07-10T01:42:36.626Z"
+      },
+      {
+        "rule": "design-system-color",
+        "value": "#22c55e",
+        "reason": "Financial delta/positive semantic color (bar variant), confirmed intentional and consistent app-wide (critique 2026-07-10)",
+        "createdAt": "2026-07-10T01:42:36.687Z"
+      }
+    ]
+  }
+}

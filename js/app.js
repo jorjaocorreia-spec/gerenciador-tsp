@@ -2242,6 +2242,40 @@ class AppController {
         this.renderDashboard();
     }
 
+    // Estado vazio do Dashboard: distingue "nenhum cliente cadastrado" de "nenhum cliente no filtro atual"
+    _dashboardEmptyStateHtml(totalClientCount, showActive, showFinished) {
+        if (totalClientCount === 0) {
+            return `
+                <div style="grid-column: 1 / -1; text-align: center; padding: 40px;" class="glass">
+                    <p class="text-muted" style="margin-bottom: 16px;">Nenhum cliente cadastrado ainda.</p>
+                    <button class="btn btn-primary" onclick="app.openModal('modal-client')">
+                        <i data-lucide="plus"></i> Novo Cliente
+                    </button>
+                </div>
+            `;
+        }
+        let hiddenLabel;
+        if (showActive && !showFinished) hiddenLabel = `${totalClientCount} finalizado${totalClientCount === 1 ? '' : 's'} oculto${totalClientCount === 1 ? '' : 's'}`;
+        else if (!showActive && showFinished) hiddenLabel = `${totalClientCount} ativo${totalClientCount === 1 ? '' : 's'} oculto${totalClientCount === 1 ? '' : 's'}`;
+        else hiddenLabel = `${totalClientCount} cliente${totalClientCount === 1 ? '' : 's'} oculto${totalClientCount === 1 ? '' : 's'} pelo filtro atual`;
+        return `
+            <div style="grid-column: 1 / -1; text-align: center; padding: 40px;" class="glass">
+                <p class="text-muted" style="margin-bottom: 16px;">Nenhum cliente no filtro atual — ${hiddenLabel}.</p>
+                <button class="btn btn-secondary" onclick="app.dashShowAllClients()">
+                    <i data-lucide="list"></i> Mostrar todos
+                </button>
+            </div>
+        `;
+    }
+
+    dashShowAllClients() {
+        const activeEl = document.getElementById('dash-filter-active');
+        const finishedEl = document.getElementById('dash-filter-finished');
+        if (activeEl) activeEl.checked = true;
+        if (finishedEl) finishedEl.checked = true;
+        this.renderDashboard();
+    }
+
     async renderDashboard(preloadedClients, batchStats) {
         // D6: generation counter — se uma chamada mais nova chegar durante o await, esta é cancelada
         const myGen = ++this._dashRenderGen;
@@ -2300,11 +2334,8 @@ class AppController {
 
             container.innerHTML = '';
             if (filteredStats.length === 0) {
-                container.innerHTML = `
-                    <div style="grid-column: 1 / -1; text-align: center; padding: 40px;" class="glass">
-                        <p class="text-muted">Nenhum cliente cadastrado ainda.</p>
-                    </div>
-                `;
+                const totalCount = allBatchStats.filter(s => s !== null).length;
+                container.innerHTML = this._dashboardEmptyStateHtml(totalCount, showActive, showFinished);
                 return;
             }
 
@@ -2337,7 +2368,7 @@ class AppController {
                     card.innerHTML = `
                         <div class="stat-header">
                             <span class="client-name">${escapeHtml(client.name)}</span>
-                            <span style="font-weight: 700; color: ${balanceColor}; font-size: 1.05rem;">${balanceSign}${b.balanceH.toFixed(1)}h</span>
+                            <span style="font-weight: 600; color: ${balanceColor}; font-size: 0.95rem;">${balanceSign}${b.balanceH.toFixed(1)}h</span>
                         </div>
                         <div class="progress-container">
                             <div class="progress-bar ${isCritical}" style="width: ${pct}%; background: linear-gradient(90deg, #a855f7, #7c3aed);"></div>
@@ -2374,13 +2405,16 @@ class AppController {
 
         // ── Modo normal (mês) ─────────────────────────────────────────────
         let stats;
+        let totalClientCount;
         if (batchStats && isCurrentMonth) {
             stats = filterStats(batchStats);
+            totalClientCount = batchStats.filter(s => s !== null).length;
         } else {
             const allBatchStats = await store.getBatchStats(this._dashboardMonth);
             // D6: se uma chamada mais nova começou enquanto aguardávamos o fetch, abortar esta
             if (myGen !== this._dashRenderGen) return;
             stats = filterStats(allBatchStats);
+            totalClientCount = allBatchStats.filter(s => s !== null).length;
         }
         stats = stats.filter(s => s !== null);
 
@@ -2399,11 +2433,7 @@ class AppController {
         }
 
         if (stats.length === 0) {
-            container.innerHTML = `
-                <div style="grid-column: 1 / -1; text-align: center; padding: 40px;" class="glass">
-                    <p class="text-muted">Nenhum cliente cadastrado ainda.</p>
-                </div>
-            `;
+            container.innerHTML = this._dashboardEmptyStateHtml(totalClientCount, showActive, showFinished);
             return;
         }
 
@@ -2425,7 +2455,16 @@ class AppController {
                 card.style.setProperty('--card-glow-shadow', 'rgba(245,158,11,0.18)');
             }
             if (stat.client.projectNum) card.title = `Projeto: ${stat.client.projectNum}`;
+            card.tabIndex = 0;
+            card.setAttribute('role', 'button');
+            card.setAttribute('aria-label', `${stat.client.name}${stat.isOverLimit ? ' — horas acima do limite' : ''}`);
             card.onclick = () => app.openClientDashboard(stat.client.id);
+            card.onkeydown = (e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    app.openClientDashboard(stat.client.id);
+                }
+            };
 
             // D6: durante slide os cards entram com valores já preenchidos (sem animação de barra/contador)
             // para evitar a ilusão de "dois carregamentos" (cards vazios → dados aparecem)

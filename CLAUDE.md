@@ -532,6 +532,15 @@ Padrões implementados em `styles/main.css` + `js/app.js`. Regras de UI ativas: 
 
 ---
 
+## Contexto de Design (impeccable)
+
+`PRODUCT.md` e `DESIGN.md` na raiz do projeto (+ `.impeccable/design.json` sidecar e `.impeccable/live/config.json`) capturam o contexto estratégico e visual do produto para uso do skill `impeccable`. Resumo:
+
+- **Register**: `product` (ferramenta de trabalho, não marketing). **Platform**: `web`.
+- **North Star visual**: "The Control Room" — ardósia profunda (`#0b0f19`) + violeta elétrico (`#8b5cf6`) como único acento não-funcional; superfícies flat em repouso, glow só no hover; densidade de dados é aceita e priorizada sobre espaço em branco.
+- **Dois públicos**: consultor (primário, controle total) e cliente via Portal (secundário, somente leitura, sem dados financeiros).
+- Antes de qualquer trabalho de UI/design, rodar `/impeccable` (ou o subcomando relevante: `critique`, `audit`, `polish`, `live`, etc.) para carregar esse contexto automaticamente.
+
 ## Comandos úteis
 
 ```powershell

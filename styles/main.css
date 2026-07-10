@@ -2,6 +2,7 @@
    Design System & Variables
    ========================================= */
 :root {
+  color-scheme: dark;
   --bg-color: #0b0f19;
   --surface-color: rgba(30, 41, 59, 0.6);
   --surface-border: rgba(255, 255, 255, 0.08);
@@ -414,6 +415,13 @@ h4 {
   box-shadow: 0 10px 36px var(--card-glow-shadow, rgba(139,92,246,0.18));
 }
 
+.stat-card:focus-visible {
+  outline: none;
+  transform: translateY(-4px);
+  border-color: var(--card-glow-color, rgba(139,92,246,0.35));
+  box-shadow: 0 0 0 2px rgba(139,92,246,0.5), 0 10px 36px var(--card-glow-shadow, rgba(139,92,246,0.18));
+}
+
 .stat-header {
   display: flex;
   justify-content: space-between;
@@ -531,13 +539,15 @@ h4 {
 }
 
 .btn-primary {
-  background: var(--primary-color);
+  /* Contraste: branco sobre --primary-color (#8b5cf6) fica em ~4.2:1, abaixo do AA (4.5:1).
+     --primary-hover (#7c3aed) mantém a identidade violeta com ~5.7:1. */
+  background: var(--primary-hover);
   color: white;
   box-shadow: 0 4px 15px rgba(139, 92, 246, 0.3);
 }
 
 .btn-primary:hover {
-  background: var(--primary-hover);
+  background: #6d28d9;
   transform: translateY(-2px);
   box-shadow: 0 6px 20px rgba(139, 92, 246, 0.4);
 }
@@ -3977,6 +3987,29 @@ kbd {
     animation-timing-function: ease-out, ease-in-out;
     animation-fill-mode: forwards, none;
     animation-iteration-count: 1, infinite;
+}
+
+/* Dashboard: cards de cliente respeitam prefers-reduced-motion — sem cascade de entrada,
+   sem slide de mês e sem o pulso infinito do over-limit (que fica com o alerta visual estático). */
+@media (prefers-reduced-motion: reduce) {
+    .stat-card-animate {
+        animation: none;
+        opacity: 1;
+    }
+    .stat-card.over-limit {
+        animation: none;
+        border-color: rgba(239, 68, 68, 0.5);
+        box-shadow: 0 0 18px rgba(239, 68, 68, 0.12);
+    }
+    #dashboard-container.dash-slide-right .stat-card-animate,
+    #dashboard-container.dash-slide-left .stat-card-animate {
+        animation: none;
+        opacity: 1;
+        transform: none;
+    }
+    .progress-bar {
+        transition: none;
+    }
 }
 
 /* K2 — Kanban: colunas entram em cascata */

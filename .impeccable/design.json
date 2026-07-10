@@ -1,0 +1,142 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-07-09T00:00:00Z",
+  "title": "Design System: GerenciadorTSP",
+  "extensions": {
+    "colorMeta": {
+      "bg": { "role": "neutral", "displayName": "Ardósia Profunda", "canonical": "#0b0f19" },
+      "surface": { "role": "neutral", "displayName": "Vidro Ardósia (surface)", "canonical": "rgba(30, 41, 59, 0.6)" },
+      "surface-glass": { "role": "neutral", "displayName": "Vidro Ardósia (glass)", "canonical": "rgba(30, 41, 59, 0.82)" },
+      "surface-border": { "role": "neutral", "displayName": "Borda Névoa", "canonical": "rgba(255, 255, 255, 0.08)" },
+      "primary": { "role": "primary", "displayName": "Violeta Elétrico", "canonical": "#8b5cf6", "tonalRamp": ["#1a0f2e", "#2e1a4f", "#432570", "#5a3591", "#7248ad", "#8b5cf6", "#a883f8", "#c9b1fb"] },
+      "primary-hover": { "role": "primary", "displayName": "Violeta Elétrico (hover)", "canonical": "#7c3aed" },
+      "secondary": { "role": "secondary", "displayName": "Azul Cobalto", "canonical": "#3b82f6" },
+      "success": { "role": "status", "displayName": "Verde Sucesso", "canonical": "#10b981" },
+      "danger": { "role": "status", "displayName": "Vermelho Perigo", "canonical": "#ef4444" },
+      "warning": { "role": "status", "displayName": "Âmbar Aviso", "canonical": "#eab308" },
+      "text-main": { "role": "neutral", "displayName": "Branco Neblina", "canonical": "#f8fafc" },
+      "text-muted": { "role": "neutral", "displayName": "Cinza Névoa", "canonical": "#94a3b8" },
+      "kb-new": { "role": "status", "displayName": "Kanban — Novas", "canonical": "#4a9eff" },
+      "kb-doing": { "role": "status", "displayName": "Kanban — Em Execução", "canonical": "#ff922b" },
+      "kb-done": { "role": "status", "displayName": "Kanban — Finalizadas", "canonical": "#51cf66" },
+      "ai-accent": { "role": "status", "displayName": "Acento de IA", "canonical": "#a78bfa" },
+      "delta-positive": { "role": "status", "displayName": "Delta Financeiro Positivo", "canonical": "#4ade80" },
+      "delta-negative": { "role": "status", "displayName": "Delta Financeiro Negativo", "canonical": "#f87171" }
+    },
+    "typographyMeta": {
+      "brand": { "displayName": "Brand", "purpose": "Nome do app no cabeçalho da sidebar; único texto com tracking positivo." },
+      "headline": { "displayName": "Headline", "purpose": "Títulos de modal e de seção principal." },
+      "title": { "displayName": "Title", "purpose": "Nome de cliente em card, títulos de card de Kanban." },
+      "body": { "displayName": "Body", "purpose": "Valores de formulário, texto corrido, descrições." },
+      "label": { "displayName": "Label", "purpose": "Rótulos de campo e cabeçalhos de tabela, uppercase, tracking largo." }
+    },
+    "shadows": [
+      { "name": "hover-glow-card", "value": "0 10px 36px rgba(139,92,246,0.18)", "purpose": "Resposta de hover em .stat-card / .clickable-card, junto com borda rgba(139,92,246,0.35)." },
+      { "name": "button-primary", "value": "0 4px 15px rgba(139,92,246,0.3)", "purpose": "Sombra estrutural do botão primário, intensifica para 0 6px 20px rgba(139,92,246,0.4) no hover." },
+      { "name": "brand-icon-glow", "value": "0 0 16px rgba(139,92,246,0.25)", "purpose": "Glow fixo e discreto no ícone de marca da sidebar." },
+      { "name": "kb-card", "value": "0 1px 4px rgba(0,0,0,0.3)", "purpose": "Sombra própria e discreta dos cards de Kanban." }
+    ],
+    "motion": [
+      { "name": "ease-standard", "value": "cubic-bezier(0.4, 0, 0.2, 1)", "purpose": "Transição padrão do sistema (--transition), usada em botões, inputs, nav-items." },
+      { "name": "ease-modal-pop", "value": "cubic-bezier(0.34, 1.56, 0.64, 1)", "purpose": "Entrada de modal — scale 0.93→1 com leve overshoot." },
+      { "name": "duration-fast", "value": "0.2s-0.3s", "purpose": "Hover de botões, nav-items, inputs." },
+      { "name": "duration-modal", "value": "0.35s", "purpose": "Abertura/fechamento de modal." }
+    ],
+    "breakpoints": []
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "Ação principal — violeta sólido, sombra estrutural, eleva no hover.",
+      "html": "<button class=\"ds-btn ds-btn-primary\">Salvar</button>",
+      "css": ".ds-btn { padding: 10px 20px; border: none; border-radius: 8px; font-family: 'Inter', system-ui, sans-serif; font-size: 0.95rem; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; gap: 8px; transition: all 0.3s cubic-bezier(0.4,0,0.2,1); } .ds-btn-primary { background: #8b5cf6; color: #ffffff; box-shadow: 0 4px 15px rgba(139,92,246,0.3); } .ds-btn-primary:hover { background: #7c3aed; transform: translateY(-2px); box-shadow: 0 6px 20px rgba(139,92,246,0.4); } .ds-btn-primary:focus-visible { outline: 2px solid #a883f8; outline-offset: 2px; }"
+    },
+    {
+      "name": "Secondary Button",
+      "kind": "button",
+      "refersTo": "button-secondary",
+      "description": "Ação secundária — fundo translúcido, borda sutil.",
+      "html": "<button class=\"ds-btn ds-btn-secondary\">Cancelar</button>",
+      "css": ".ds-btn-secondary { background: rgba(255,255,255,0.05); color: #f8fafc; border: 1px solid rgba(255,255,255,0.08); padding: 10px 20px; border-radius: 8px; font-family: 'Inter', system-ui, sans-serif; font-weight: 600; cursor: pointer; transition: all 0.3s cubic-bezier(0.4,0,0.2,1); } .ds-btn-secondary:hover { background: rgba(255,255,255,0.1); } .ds-btn-secondary:focus-visible { outline: 2px solid #a883f8; outline-offset: 2px; }"
+    },
+    {
+      "name": "Danger Button",
+      "kind": "button",
+      "refersTo": "button-danger",
+      "description": "Ação destrutiva — vermelho translúcido que solidifica no hover.",
+      "html": "<button class=\"ds-btn ds-btn-danger\">Excluir</button>",
+      "css": ".ds-btn-danger { background: rgba(239,68,68,0.1); color: #ef4444; border: 1px solid rgba(239,68,68,0.2); padding: 10px 20px; border-radius: 8px; font-family: 'Inter', system-ui, sans-serif; font-weight: 600; cursor: pointer; transition: all 0.3s cubic-bezier(0.4,0,0.2,1); } .ds-btn-danger:hover { background: #ef4444; color: #ffffff; }"
+    },
+    {
+      "name": "Text Input",
+      "kind": "input",
+      "refersTo": "input",
+      "description": "Campo de formulário com linha inferior violeta que acende no foco.",
+      "html": "<input class=\"ds-input\" type=\"text\" placeholder=\"Nome do cliente\" />",
+      "css": ".ds-input { width: 100%; padding: 12px; background-color: rgba(15,23,42,0.5); background-image: linear-gradient(#8b5cf6, #8b5cf6); background-size: 0% 2px; background-position: left bottom; background-repeat: no-repeat; border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; color: #f8fafc; font-family: 'Inter', system-ui, sans-serif; font-size: 1rem; transition: all 0.3s cubic-bezier(0.4,0,0.2,1), background-size 0.3s ease; } .ds-input:focus { outline: none; border-color: #8b5cf6; box-shadow: 0 0 0 2px rgba(139,92,246,0.2); background-size: 100% 2px; }"
+    },
+    {
+      "name": "Stat Card",
+      "kind": "card",
+      "refersTo": "card",
+      "description": "Card de dashboard — flat em repouso, eleva com glow roxo no hover.",
+      "html": "<div class=\"ds-stat-card\"><div class=\"ds-stat-header\"><span class=\"ds-client-name\">Cliente Exemplo</span></div><div class=\"ds-progress-container\"><div class=\"ds-progress-bar\" style=\"width:62%\"></div></div></div>",
+      "css": ".ds-stat-card { background: rgba(30,41,59,0.6); border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; padding: 24px; display: flex; flex-direction: column; gap: 12px; transition: transform 0.25s ease, box-shadow 0.3s ease, border-color 0.3s ease; } .ds-stat-card:hover { transform: translateY(-4px); border-color: rgba(139,92,246,0.35); box-shadow: 0 10px 36px rgba(139,92,246,0.18); } .ds-client-name { font-size: 1.1rem; font-weight: 600; color: #f8fafc; } .ds-progress-container { width: 100%; height: 8px; background: rgba(255,255,255,0.1); border-radius: 4px; overflow: hidden; } .ds-progress-bar { height: 100%; background: linear-gradient(90deg, #8b5cf6, #3b82f6); border-radius: 4px; }"
+    },
+    {
+      "name": "Sidebar Nav Item",
+      "kind": "nav",
+      "refersTo": "nav-item",
+      "description": "Item de navegação lateral — hover sutil, estado ativo em gradiente violeta.",
+      "html": "<div class=\"ds-nav-item ds-nav-item-active\">Dashboard</div>",
+      "css": ".ds-nav-item { position: relative; padding: 10px 14px; border-radius: 9px; cursor: pointer; color: #94a3b8; font-weight: 500; font-size: 0.92rem; transition: all 0.3s cubic-bezier(0.4,0,0.2,1); } .ds-nav-item:hover { background: rgba(255,255,255,0.05); color: #f8fafc; } .ds-nav-item-active { background: linear-gradient(90deg, rgba(139,92,246,0.18) 0%, rgba(139,92,246,0.03) 100%); color: #8b5cf6; }"
+    },
+    {
+      "name": "Kanban Card",
+      "kind": "custom",
+      "refersTo": "kb-card",
+      "description": "Card de tarefa do Kanban — componente de assinatura do sistema, densidade máxima.",
+      "html": "<div class=\"ds-kb-card\"><div class=\"ds-kb-label\"></div><div class=\"ds-kb-title\">Título da tarefa</div></div>",
+      "css": ".ds-kb-card { background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.10); border-radius: 8px; padding: 12px; box-shadow: 0 1px 4px rgba(0,0,0,0.3); transition: background 0.2s ease; } .ds-kb-card:hover { background: rgba(255,255,255,0.10); } .ds-kb-label { height: 8px; min-width: 40px; border-radius: 4px; background: #4a9eff; margin-bottom: 8px; } .ds-kb-title { color: #f8fafc; font-size: 0.95rem; font-weight: 500; }"
+    },
+    {
+      "name": "Modal",
+      "kind": "card",
+      "description": "Painel modal — vidro fosco com blur, entrada com leve overshoot.",
+      "html": "<div class=\"ds-modal-overlay\"><div class=\"ds-modal\"><h2>Título do Modal</h2></div></div>",
+      "css": ".ds-modal-overlay { background: rgba(0,0,0,0.6); display: flex; align-items: center; justify-content: center; } .ds-modal { width: 100%; max-width: 500px; padding: 32px; background: rgba(17,24,39,0.97); backdrop-filter: blur(16px); border-radius: 12px; border: 1px solid rgba(255,255,255,0.08); transform: scale(1) translateY(0); transition: transform 0.35s cubic-bezier(0.34,1.56,0.64,1); } .ds-modal h2 { color: #f8fafc; font-size: 1.5rem; font-weight: 600; }"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Control Room",
+    "overview": "GerenciadorTSP é a sala de controle noturna de um consultor: ardósia profunda (#0b0f19) segurando todo o painel, violeta elétrico (#8b5cf6) pontuando exatamente onde a ação acontece. Não é um dashboard de SaaS querendo parecer amigável — é uma ferramenta de trabalho densa, usada por quem já sabe o que está procurando e precisa achar rápido: saldo de um cliente, próximo compromisso, card que ainda não foi movido. O glassmorphism (rgba(30,41,59,0.82) + blur(16px) nos modais) não é decoração; é o vidro fosco da cabine — separa camadas de informação sem esconder o que está atrás.\n\nO sistema rejeita explicitamente o clichê de SaaS genérico: sem gradiente decorativo em texto, sem cards hero-metric, sem ícones fofos. Cada elemento visual carrega uma função — cor de status no Kanban, glow de progresso na barra de horas, badge de prioridade — nunca ornamento puro.",
+    "keyCharacteristics": [
+      "Fundo quase-preto (#0b0f19) como constante; nada compete com ele por atenção de base.",
+      "Um único acento vibrante (violeta #8b5cf6) reservado para ação, foco e identidade — nunca espalhado como enchimento.",
+      "Superfícies flat em repouso; profundidade só aparece como resposta a hover/foco (glow roxo), nunca como sombra ambiente permanente.",
+      "Densidade alta é aceita e assumida: tabelas, Kanban, agenda — a ferramenta prioriza mostrar dado, não respirar espaço em branco."
+    ],
+    "rules": [
+      { "name": "The One Accent Rule", "body": "Violeta é o único acento não-funcional do sistema. Se uma nova tela precisa de mais cor, resolver com peso tipográfico ou contraste de superfície primeiro.", "section": "colors" },
+      { "name": "The Functional Color Rule", "body": "Verde, vermelho e âmbar significam sempre a mesma coisa (sucesso/perigo/aviso) em qualquer tela nova.", "section": "colors" },
+      { "name": "The Single Voice Rule", "body": "Uma família (Inter) carrega toda a hierarquia tipográfica; uma segunda família só entra por propósito distinto, nunca por variedade estética.", "section": "typography" },
+      { "name": "The Flat-Until-Touched Rule", "body": "Nenhuma superfície de conteúdo carrega sombra em repouso. Sombra é sempre resposta a hover, foco, ou o affordance de clique de um botão primário.", "section": "elevation" }
+    ],
+    "dos": [
+      "Do manter o violeta (#8b5cf6) como o único acento não-funcional.",
+      "Do manter superfícies flat em repouso; sombra/glow só como resposta a interação.",
+      "Do usar as cores de status estritamente para o significado que já carregam (sucesso/perigo/aviso).",
+      "Do priorizar densidade de informação com hierarquia clara sobre espaço em branco generoso.",
+      "Do verificar contraste AA em qualquer novo texto sobre o fundo escuro."
+    ],
+    "donts": [
+      "Don't usar background-clip: text com gradiente em texto.",
+      "Don't usar border-left/border-right colorido como stripe decorativo.",
+      "Don't criar cards hero-metric só porque 'parece SaaS profissional'.",
+      "Don't introduzir uma segunda família tipográfica por variedade estética.",
+      "Don't vazar dado financeiro para qualquer superfície visível ao Portal do Cliente."
+    ]
+  }
+}
