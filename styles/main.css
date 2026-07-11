@@ -176,6 +176,13 @@ h4 {
   100%     { transform: translateX(420%) skewX(-20deg); }
 }
 
+@media (prefers-reduced-motion: reduce) {
+  .brand-shine::after {
+    animation: none;
+    display: none;
+  }
+}
+
 .brand-icon {
   display: flex;
   align-items: center;
@@ -201,6 +208,8 @@ h4 {
   border: 1px solid var(--surface-border);
   cursor: pointer;
   color: var(--text-muted);
+  width: 44px;
+  height: 44px;
   padding: 5px;
   border-radius: 6px;
   display: flex;
@@ -213,6 +222,13 @@ h4 {
   color: var(--primary-color);
   background: rgba(139, 92, 246, 0.1);
   border-color: rgba(139, 92, 246, 0.4);
+}
+
+.btn-sidebar-toggle:focus-visible {
+  outline: none;
+  color: var(--primary-color);
+  border-color: rgba(139, 92, 246, 0.6);
+  box-shadow: 0 0 0 2px rgba(139, 92, 246, 0.5);
 }
 
 .sidebar-bottom {
@@ -230,7 +246,9 @@ h4 {
   text-transform: uppercase;
   white-space: nowrap;
   overflow: hidden;
-  opacity: 0.7;
+  /* opacity:0.7 sobre --text-muted derrubava o contraste para ~3.9:1 (abaixo do AA
+     de 4.5:1 exigido para texto pequeno); cor sólida preserva o peso visual sem a falha */
+  color: var(--text-muted);
 }
 
 .sidebar-user {
@@ -289,6 +307,13 @@ h4 {
 .nav-item:hover {
   background: rgba(255, 255, 255, 0.05);
   color: var(--text-main);
+}
+
+.nav-item:focus-visible {
+  outline: none;
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--text-main);
+  box-shadow: 0 0 0 2px rgba(139, 92, 246, 0.7);
 }
 
 .nav-item svg {
@@ -360,6 +385,64 @@ h4 {
 
 .sidebar.collapsed .sidebar-user .btn {
   width: 100%;
+}
+
+/* ---- Sidebar em viewport estreito: força modo ícone, independente do toggle ----
+   Sem isto, a sidebar mantinha 260px fixos em qualquer largura, espremendo
+   .main-content a ~100px em telas de celular. O botão de colapsar some porque
+   o estado já fica travado em ícone-only abaixo do breakpoint. */
+@media (max-width: 768px) {
+  .sidebar {
+    width: 70px;
+    padding: 24px 12px;
+  }
+
+  .sidebar .nav-label,
+  .sidebar .sidebar-section-label {
+    display: none;
+  }
+
+  .sidebar .sidebar-header {
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 28px;
+  }
+
+  .sidebar .brand {
+    justify-content: center;
+    flex: none;
+  }
+
+  .sidebar .nav-item {
+    justify-content: center;
+    padding: 12px;
+    gap: 0;
+  }
+
+  .sidebar .nav-links {
+    margin: 0;
+    padding: 2px 0;
+  }
+
+  .sidebar .sidebar-bottom .btn {
+    justify-content: center;
+    padding: 10px;
+  }
+
+  .sidebar .sidebar-user {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+
+  .sidebar .sidebar-user .btn {
+    width: 100%;
+  }
+
+  #btn-sidebar-toggle {
+    display: none;
+  }
 }
 
 /* =========================================
@@ -5012,7 +5095,7 @@ kbd {
     height: 16px;
     padding: 0 4px;
     border-radius: 8px;
-    background: #ff4d4f;
+    background: var(--danger-color);
     color: #fff;
     font-size: 0.65rem;
     font-weight: 700;

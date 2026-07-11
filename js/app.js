@@ -180,19 +180,39 @@ class AppController {
         this.init();
     }
 
+    // viewName === null desmarca todos (usado em sub-views sem item de menu correspondente, ex.: client-dashboard)
+    _setActiveNavItem(viewName) {
+        document.querySelectorAll('.nav-item').forEach(item => {
+            const isActive = viewName !== null && item.getAttribute('data-view') === viewName;
+            item.classList.toggle('active', isActive);
+            if (isActive) {
+                item.setAttribute('aria-current', 'page');
+            } else {
+                item.removeAttribute('aria-current');
+            }
+        });
+    }
+
     init() {
         // Inicializar ícones
         lucide.createIcons();
 
         // Bind Navegação
         document.querySelectorAll('.nav-item').forEach(item => {
-            item.addEventListener('click', (e) => {
+            const activateNavItem = (e) => {
                 const view = e.currentTarget.getAttribute('data-view');
                 if (this.userRole === 'client') {
                     this.switchClientPortalView(view);
                     return;
                 }
                 this.switchView(view);
+            };
+            item.addEventListener('click', activateNavItem);
+            item.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    activateNavItem(e);
+                }
             });
         });
 
@@ -431,12 +451,7 @@ class AppController {
             ? (newIdx > prevIdx ? 'right' : 'left') : null;
 
         // Update nav UI
-        document.querySelectorAll('.nav-item').forEach(item => {
-            item.classList.remove('active');
-            if (item.getAttribute('data-view') === viewName) {
-                item.classList.add('active');
-            }
-        });
+        this._setActiveNavItem(viewName);
 
         // Update sections
         document.querySelectorAll('.view-section').forEach(section => {
@@ -2188,9 +2203,7 @@ class AppController {
         }
 
         this.currentView = 'tasks';
-        document.querySelectorAll('.nav-item').forEach(item => {
-            item.classList.toggle('active', item.getAttribute('data-view') === 'tasks');
-        });
+        this._setActiveNavItem('tasks');
         document.querySelectorAll('.view-section').forEach(section => {
             section.classList.toggle('active', section.id === 'view-tasks');
         });
@@ -2205,9 +2218,7 @@ class AppController {
     switchClientPortalView(view) {
         if (!['tasks', 'indicadores'].includes(view)) return;
         this.currentView = view;
-        document.querySelectorAll('.nav-item').forEach(item => {
-            item.classList.toggle('active', item.getAttribute('data-view') === view);
-        });
+        this._setActiveNavItem(view);
         document.querySelectorAll('.view-section').forEach(section => {
             section.classList.toggle('active', section.id === `view-${view}`);
         });
@@ -3720,7 +3731,7 @@ class AppController {
         this.selectedClient = clientId;
         this.switchView('client-dashboard');
         // Remove class active de todos os nav-items porque é uma sub-view
-        document.querySelectorAll('.nav-item').forEach(item => item.classList.remove('active'));
+        this._setActiveNavItem(null);
     }
 
     async renderClientDashboard() {
@@ -3771,7 +3782,7 @@ class AppController {
     openMonthRecords(yearMonth) {
         this.selectedMonth = yearMonth;
         this.switchView('month-records');
-        document.querySelectorAll('.nav-item').forEach(item => item.classList.remove('active'));
+        this._setActiveNavItem(null);
     }
 
     async renderMonthRecords() {
