@@ -35,6 +35,13 @@ function escapeHtml(str) {
         .replace(/'/g, '&#039;');
 }
 
+// Nomes acessíveis para as cores de label do Kanban — nunca depender só da cor
+// (dot sem título é ilegível para daltônicos e leitores de tela).
+const KB_LABEL_COLOR_NAMES = {
+    '#4a9eff': 'Azul', '#22d3ee': 'Ciano', '#51cf66': 'Verde', '#a3e635': 'Lima',
+    '#ffd43b': 'Amarelo', '#ff922b': 'Laranja', '#ff6b6b': 'Vermelho', '#cc5de8': 'Magenta',
+};
+
 function compressImageFile(file, maxWidth = 1400) {
     return new Promise((resolve) => {
         const reader = new FileReader();
@@ -1749,7 +1756,8 @@ class AppController {
     _renderCoverPicker() {
         const picker = document.getElementById('kb-cover-picker');
         if (!picker) return;
-        const colors = ['#4a9eff','#ff922b','#51cf66','#ffd43b','#cc5de8','#ff6b6b','#22d3ee','#f97316'];
+        // Restrito às 3 cores de categoria do Kanban (Novas/Em Execução/Finalizadas) — nunca uma paleta decorativa à parte.
+        const colors = ['#4a9eff','#ff922b','#51cf66'];
         picker.innerHTML = `<button type="button" class="kb-cover-swatch kb-cover-none${!this._modalCoverColor ? ' active' : ''}"
             onclick="app.setCoverColor(null)" title="Sem cover"></button>` +
             colors.map(c => `<button type="button" class="kb-cover-swatch${this._modalCoverColor===c?' active':''}"
@@ -1765,16 +1773,29 @@ class AppController {
         const colors = ['#4a9eff','#22d3ee','#51cf66','#a3e635','#ffd43b','#ff922b','#ff6b6b','#cc5de8'];
         picker.innerHTML = colors.map(c => {
             const active = this._modalLabels.some(l => l.color === c);
+            const name = KB_LABEL_COLOR_NAMES[c] || c;
             return `<button type="button" class="kb-label-option${active?' selected':''}"
-                style="background:${c}" onclick="app.toggleLabel('${c}')" title="${c}"></button>`;
+                style="background:${c}" onclick="app.toggleLabel('${c}')" title="${escapeHtml(name)}" aria-label="${escapeHtml(name)}"></button>`;
         }).join('');
     }
 
     toggleLabel(color) {
         const idx = this._modalLabels.findIndex(l => l.color === color);
         if (idx >= 0) this._modalLabels.splice(idx, 1);
-        else this._modalLabels.push({ color, text: '' });
+        // Nome auto-gerado a partir da cor — nunca deixa a label sem um
+        // identificador legível para daltônicos/leitores de tela; o consultor
+        // pode renomear depois clicando na tag aplicada.
+        else this._modalLabels.push({ color, text: KB_LABEL_COLOR_NAMES[color] || '' });
         this._renderLabelPicker();
+        this._renderModalLabels();
+    }
+
+    renameLabel(color) {
+        const label = this._modalLabels.find(l => l.color === color);
+        if (!label) return;
+        const name = window.prompt('Nome da label:', label.text || KB_LABEL_COLOR_NAMES[color] || '');
+        if (name === null) return;
+        label.text = name.trim() || KB_LABEL_COLOR_NAMES[color] || '';
         this._renderModalLabels();
     }
 
@@ -1789,10 +1810,11 @@ class AppController {
             return;
         }
         section.style.display = 'block';
-        container.innerHTML = this._modalLabels.map(l =>
-            `<span class="kb-label-applied-tag" style="background:${l.color}"
-                onclick="app.toggleLabel('${l.color}')">${l.text || '&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;'}</span>`
-        ).join('');
+        container.innerHTML = this._modalLabels.map(l => {
+            const name = l.text || KB_LABEL_COLOR_NAMES[l.color] || l.color;
+            return `<span class="kb-label-applied-tag" style="background:${l.color}" title="Clique para renomear · Alt+clique para remover"
+                onclick="event.altKey ? app.toggleLabel('${l.color}') : app.renameLabel('${l.color}')">${escapeHtml(name)}</span>`;
+        }).join('');
     }
 
     // ===================================
@@ -4178,10 +4200,10 @@ class AppController {
         const coverHtml = task.coverColor
             ? `<div class="kb-card-cover" style="background:${task.coverColor}"></div>` : '';
 
-        // Labels
+        // Labels — título nunca fica vazio: cai no nome da cor quando a label não foi renomeada.
         const labelsHtml = (task.labels || []).length > 0
             ? `<div class="kb-card-labels">${task.labels.map(l =>
-                `<span class="kb-label" style="background:${l.color}" title="${escapeHtml(l.text||'')}"></span>`
+                `<span class="kb-label" style="background:${l.color}" title="${escapeHtml(l.text || KB_LABEL_COLOR_NAMES[l.color] || l.color)}"></span>`
               ).join('')}</div>` : '';
 
         // Badges
@@ -4360,7 +4382,7 @@ class AppController {
         Object.entries(modeButtons).forEach(([key, btn]) => {
             const isActive = key === mode;
             btn.classList.toggle('active-mode', isActive);
-            btn.setAttribute('aria-selected', String(isActive));
+            btn.setAttribute('aria-pressed', String(isActive));
         });
         await this.renderAgenda();
     }
@@ -5232,10 +5254,13 @@ class AppController {
         e.stopPropagation();
         this.closeRsvpPopup();
         this._rsvpPopupEventId = eventId;
+        this._rsvpPopupTrigger = anchorEl;
 
         const popup = document.createElement('div');
         popup.className = 'rsvp-popup';
         popup.id = 'rsvp-popup-active';
+        popup.setAttribute('role', 'dialog');
+        popup.setAttribute('aria-label', 'Você vai?');
         popup.innerHTML = `
             <span class="rsvp-popup-label">Você vai?</span>
             <button class="rsvp-option" data-status="accepted"
@@ -5251,6 +5276,13 @@ class AppController {
         popup.style.top  = (rect.bottom + 6) + 'px';
         popup.style.left = rect.left + 'px';
 
+        popup.querySelector('.rsvp-option')?.focus();
+
+        this._closeRsvpOnEscape = (ev) => {
+            if (ev.key === 'Escape') { ev.stopPropagation(); this.closeRsvpPopup(); }
+        };
+        document.addEventListener('keydown', this._closeRsvpOnEscape);
+
         setTimeout(() => {
             this._closeRsvpOnOutsideClick = (ev) => {
                 if (!popup.contains(ev.target)) this.closeRsvpPopup();
@@ -5265,6 +5297,14 @@ class AppController {
         if (this._closeRsvpOnOutsideClick) {
             document.removeEventListener('click', this._closeRsvpOnOutsideClick);
             this._closeRsvpOnOutsideClick = null;
+        }
+        if (this._closeRsvpOnEscape) {
+            document.removeEventListener('keydown', this._closeRsvpOnEscape);
+            this._closeRsvpOnEscape = null;
+        }
+        if (this._rsvpPopupTrigger) {
+            this._rsvpPopupTrigger.focus();
+            this._rsvpPopupTrigger = null;
         }
         this._rsvpPopupEventId = null;
     }
@@ -6534,11 +6574,46 @@ class AppController {
         return [{ startTime, endTime }];
     }
 
+    _aptRangesOverlap(aStart, aEnd, bStart, bEnd) {
+        return aStart < bEnd && bStart < aEnd;
+    }
+
+    // Lançamentos existentes do mesmo dia cujo horário colide com [startTime, endTime).
+    // excludeId evita que um apontamento em edição conflite consigo mesmo.
+    _findAptOverlaps(items, startTime, endTime, excludeId) {
+        return items.filter(it =>
+            it.id !== excludeId && it.startTime && it.endTime &&
+            this._aptRangesOverlap(startTime, endTime, it.startTime, it.endTime)
+        );
+    }
+
+    _warnAptOverlaps(overlaps) {
+        if (overlaps.length === 0) return;
+        const list = overlaps.map(o => `${o.startTime}–${o.endTime}`).join(', ');
+        Toast.show(`Atenção: horário sobrepõe outro apontamento do dia (${list}). Confira se não há horas duplicadas.`, 'error', 8000);
+    }
+
     updateAptDuration() {
-        const start = document.getElementById('apt-start')?.value;
-        const end = document.getElementById('apt-end')?.value;
+        const startInput = document.getElementById('apt-start');
+        const endInput = document.getElementById('apt-end');
+        const start = startInput?.value;
+        const end = endInput?.value;
         const el = document.getElementById('apt-duration');
         const hint = document.getElementById('apt-lunch-split-hint');
+
+        if (start && end && end <= start) {
+            endInput?.classList.add('apt-time-error');
+            if (el) el.textContent = '--';
+            if (hint) {
+                hint.style.display = 'block';
+                hint.style.color = 'var(--danger-color)';
+                hint.textContent = 'A hora fim precisa ser depois da hora início.';
+            }
+            return;
+        }
+        endInput?.classList.remove('apt-time-error');
+        if (hint) hint.style.color = '';
+
         const segments = this.splitApontamentoForLunch(start, end);
         if (el) {
             const totalMinutes = segments.reduce((sum, s) => sum + this.calcDuration(s.startTime, s.endTime).minutes, 0);
@@ -7523,17 +7598,12 @@ class AppController {
             clients.forEach(c => { if (c.projectNum) projToClient[c.projectNum.trim()] = c.name; });
             container.innerHTML = '';
 
-            if (items.length === 0) {
-                container.innerHTML = `
-                    <div class="glass empty-state" style="text-align:center;padding:40px;display:flex;flex-direction:column;align-items:center;gap:16px;">
-                        <i data-lucide="clipboard-list" style="width:32px;height:32px;opacity:.4"></i>
-                        <p class="text-muted">Nenhum apontamento para este dia.</p>
-                        <button class="btn btn-primary" onclick="app.openNewApontamento()">
-                            + Novo Apontamento
-                        </button>
-                    </div>`;
-                lucide.createIcons();
-                return;
+            const projList = document.getElementById('apt-project-list');
+            if (projList) {
+                projList.innerHTML = clients
+                    .filter(c => c.projectNum)
+                    .map(c => `<option value="${escapeHtml(c.projectNum)}" label="${escapeHtml(c.name)}">`)
+                    .join('');
             }
 
             let totalMinutes = 0;
@@ -7542,41 +7612,61 @@ class AppController {
             table.innerHTML = `
                 <div class="apt-table-header">
                     <span>Horário</span><span>Proj.</span><span>Descrição</span><span>Dur.</span><span></span>
+                </div>
+                <div class="apt-quickadd" id="apt-quickadd-row">
+                    <span class="apt-quickadd-time">
+                        <input type="time" id="apt-qa-start" aria-label="Hora início">
+                        <span>–</span>
+                        <input type="time" id="apt-qa-end" aria-label="Hora fim">
+                    </span>
+                    <input type="text" id="apt-qa-project" list="apt-project-list" placeholder="Nº" aria-label="Número do projeto" autocomplete="off">
+                    <input type="text" id="apt-qa-desc" placeholder="O que foi feito... (Enter para salvar)" aria-label="Descrição">
+                    <span class="apt-quickadd-dur" id="apt-qa-dur">--</span>
+                    <button type="button" class="btn btn-primary apt-quickadd-submit" id="apt-qa-submit-btn" onclick="app.submitAptQuickAdd()">
+                        <i data-lucide="plus"></i> Adicionar
+                    </button>
                 </div>`;
 
-            items.forEach(item => {
-                const dur = this.calcDuration(item.startTime, item.endTime);
-                totalMinutes += dur.minutes;
-                const row = document.createElement('div');
-                row.className = 'apt-row';
-                row.innerHTML = `
-                    <span class="apt-horario">${escapeHtml(item.startTime)} – ${escapeHtml(item.endTime)}</span>
-                    <span class="apt-proj" title="${escapeHtml(projToClient[item.projectNum?.trim()] || '')}">${escapeHtml(item.projectNum)}${projToClient[item.projectNum?.trim()] ? `<span class="apt-proj-name">${escapeHtml(projToClient[item.projectNum.trim()])}</span>` : ''}</span>
-                    <span class="apt-desc">${escapeHtml(item.description)}</span>
-                    <span class="apt-dur">${dur.label}</span>
-                    <span class="apt-actions">
-                        <button class="btn-icon-sm apt-copy-proj-btn" title="Copiar nº projeto" data-value="${escapeHtml(item.projectNum)}">
-                            <i data-lucide="hash"></i>
-                        </button>
-                        <button class="btn-icon-sm apt-copy-desc-btn" title="Copiar descrição" data-value="${escapeHtml(item.description)}">
-                            <i data-lucide="clipboard"></i>
-                        </button>
-                        <button class="btn-icon-sm" title="Editar" onclick="app.openEditApontamento('${item.id}')">
-                            <i data-lucide="pencil"></i>
-                        </button>
-                        <button class="btn-icon-sm btn-danger-sm" title="Excluir" onclick="app.deleteApontamento('${item.id}', this)">
-                            <i data-lucide="trash-2"></i>
-                        </button>
-                    </span>`;
-                table.appendChild(row);
-            });
+            if (items.length === 0) {
+                const emptyHint = document.createElement('div');
+                emptyHint.className = 'apt-quickadd-empty-hint';
+                emptyHint.innerHTML = `<p class="text-muted" style="padding:20px 16px;text-align:center;margin:0;">Nenhum apontamento para este dia — lance um acima ou <a href="#" onclick="event.preventDefault();app.openNewApontamento()">abra o formulário completo</a>.</p>`;
+                table.appendChild(emptyHint);
+            } else {
+                items.forEach(item => {
+                    const dur = this.calcDuration(item.startTime, item.endTime);
+                    totalMinutes += dur.minutes;
+                    const row = document.createElement('div');
+                    row.className = 'apt-row';
+                    row.innerHTML = `
+                        <span class="apt-horario">${escapeHtml(item.startTime)} – ${escapeHtml(item.endTime)}</span>
+                        <span class="apt-proj" title="${escapeHtml(projToClient[item.projectNum?.trim()] || '')}">${escapeHtml(item.projectNum)}${projToClient[item.projectNum?.trim()] ? `<span class="apt-proj-name">${escapeHtml(projToClient[item.projectNum.trim()])}</span>` : ''}</span>
+                        <span class="apt-desc">${escapeHtml(item.description)}</span>
+                        <span class="apt-dur">${dur.label}</span>
+                        <span class="apt-actions">
+                            <button class="btn-icon-sm apt-copy-proj-btn" title="Copiar nº projeto" data-value="${escapeHtml(item.projectNum)}">
+                                <i data-lucide="hash"></i>
+                            </button>
+                            <button class="btn-icon-sm apt-copy-desc-btn" title="Copiar descrição" data-value="${escapeHtml(item.description)}">
+                                <i data-lucide="clipboard"></i>
+                            </button>
+                            <button class="btn-icon-sm" title="Editar" onclick="app.openEditApontamento('${item.id}')">
+                                <i data-lucide="pencil"></i>
+                            </button>
+                            <button class="btn-icon-sm btn-danger-sm" title="Excluir" onclick="app.deleteApontamento('${item.id}', this)">
+                                <i data-lucide="trash-2"></i>
+                            </button>
+                        </span>`;
+                    table.appendChild(row);
+                });
 
-            const h = Math.floor(totalMinutes / 60);
-            const m = totalMinutes % 60;
-            const footer = document.createElement('div');
-            footer.className = 'apt-table-footer';
-            footer.innerHTML = `<span>Total do dia: <strong>${h}h${m > 0 ? String(m).padStart(2, '0') + 'min' : ''}</strong></span>`;
-            table.appendChild(footer);
+                const h = Math.floor(totalMinutes / 60);
+                const m = totalMinutes % 60;
+                const footer = document.createElement('div');
+                footer.className = 'apt-table-footer';
+                footer.innerHTML = `<span>Total do dia: <strong>${h}h${m > 0 ? String(m).padStart(2, '0') + 'min' : ''}</strong></span>`;
+                table.appendChild(footer);
+            }
 
             container.appendChild(table);
             lucide.createIcons();
@@ -7588,8 +7678,88 @@ class AppController {
                     this.copyApontamento(value);
                 });
             });
+            this._bindAptQuickAdd();
         } catch (err) {
             container.innerHTML = `<div class="glass" style="padding:24px;"><p class="text-muted">Erro ao carregar: ${err.message}</p></div>`;
+        }
+    }
+
+    _bindAptQuickAdd() {
+        ['apt-qa-start', 'apt-qa-end', 'apt-qa-project', 'apt-qa-desc'].forEach(id => {
+            document.getElementById(id)?.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); this.submitAptQuickAdd(); }
+            });
+        });
+        ['apt-qa-start', 'apt-qa-end'].forEach(id => {
+            document.getElementById(id)?.addEventListener('change', () => this.updateAptQaDuration());
+        });
+    }
+
+    updateAptQaDuration() {
+        const start = document.getElementById('apt-qa-start')?.value;
+        const end = document.getElementById('apt-qa-end')?.value;
+        const el = document.getElementById('apt-qa-dur');
+        const endInput = document.getElementById('apt-qa-end');
+        if (!el) return;
+        if (start && end && end <= start) {
+            endInput?.classList.add('apt-time-error');
+            el.textContent = '--';
+            el.title = 'A hora fim precisa ser depois da hora início.';
+            return;
+        }
+        endInput?.classList.remove('apt-time-error');
+        if (!start || !end) { el.textContent = '--'; el.title = ''; return; }
+        const segments = this.splitApontamentoForLunch(start, end);
+        const totalMinutes = segments.reduce((sum, s) => sum + this.calcDuration(s.startTime, s.endTime).minutes, 0);
+        if (totalMinutes === 0) { el.textContent = '--'; el.title = ''; return; }
+        const h = Math.floor(totalMinutes / 60);
+        const m = totalMinutes % 60;
+        el.textContent = h > 0 ? `${h}h${m > 0 ? String(m).padStart(2, '0') : ''}` : `${m}min`;
+        el.title = segments.length === 2
+            ? `Será lançado como 2 apontamentos (almoço 12:00–13:30 excluído): ${segments[0].startTime}–${segments[0].endTime} e ${segments[1].startTime}–${segments[1].endTime}`
+            : '';
+    }
+
+    async submitAptQuickAdd() {
+        const startEl = document.getElementById('apt-qa-start');
+        const endEl = document.getElementById('apt-qa-end');
+        const projEl = document.getElementById('apt-qa-project');
+        const descEl = document.getElementById('apt-qa-desc');
+        const btn = document.getElementById('apt-qa-submit-btn');
+
+        const startTime = startEl?.value;
+        const endTime = endEl?.value;
+        const projectNum = projEl?.value.trim();
+        const description = descEl?.value.trim() || '';
+
+        if (!startTime || !endTime || !projectNum) {
+            Toast.show('Preencha horário início, fim e nº do projeto.', 'error');
+            (!startTime ? startEl : !endTime ? endEl : projEl)?.focus();
+            return;
+        }
+        if (endTime <= startTime) {
+            Toast.show('A hora fim precisa ser depois da hora início.', 'error');
+            endEl?.focus();
+            return;
+        }
+
+        const segments = this.splitApontamentoForLunch(startTime, endTime);
+        if (btn) btn.disabled = true;
+        try {
+            const dayItems = await store.getApontamentos(this.aptCurrentDate);
+            const overlaps = this._findAptOverlaps(dayItems, startTime, endTime, null);
+
+            for (const seg of segments) {
+                await store.addApontamento(this.aptCurrentDate, seg.startTime, seg.endTime, projectNum, description);
+            }
+            await this.renderApontamentos();
+            Toast.show(segments.length === 2 ? '2 apontamentos salvos (manhã e tarde, almoço excluído).' : 'Apontamento salvo.', 'success');
+            this._warnAptOverlaps(overlaps);
+            // Mantém o foco pronto para o próximo lançamento (fluxo de registro repetitivo)
+            setTimeout(() => document.getElementById('apt-qa-start')?.focus(), 50);
+        } catch (err) {
+            Toast.show('Erro ao salvar: ' + err.message, 'error');
+            if (btn) btn.disabled = false;
         }
     }
 
@@ -7651,6 +7821,11 @@ class AppController {
             Toast.show('Preencha todos os campos obrigatórios.', 'error');
             return;
         }
+        if (endTime <= startTime) {
+            Toast.show('A hora fim precisa ser depois da hora início.', 'error');
+            document.getElementById('apt-end')?.focus();
+            return;
+        }
 
         const segments = this.splitApontamentoForLunch(startTime, endTime);
         const taskIds = (id && this._editingAptTaskIds) || [];
@@ -7658,6 +7833,9 @@ class AppController {
         const btn = e.target.querySelector('[type="submit"]');
         btn.disabled = true;
         try {
+            const dayItems = await store.getApontamentos(date);
+            const overlaps = this._findAptOverlaps(dayItems, startTime, endTime, id || null);
+
             if (segments.length === 2) {
                 if (id) await store.deleteApontamento(id);
                 for (const seg of segments) {
@@ -7672,6 +7850,7 @@ class AppController {
             this.closeModal('modal-apontamento');
             await this.renderApontamentos();
             Toast.show(segments.length === 2 ? '2 apontamentos salvos (manhã e tarde, almoço excluído).' : (id ? 'Apontamento atualizado.' : 'Apontamento salvo.'), 'success');
+            this._warnAptOverlaps(overlaps);
         } catch (err) {
             Toast.show('Erro ao salvar: ' + err.message, 'error');
         } finally {
@@ -7776,7 +7955,10 @@ class AppController {
                         description: '', startTime: '', endTime: '',
                         checked: true, loading: true, error: false,
                         conflictApt, conflictAction: conflictApt ? 'append' : null,
-                        alreadyLaunched: false
+                        alreadyLaunched: false,
+                        // Colapsado por padrão (resumo de 1 linha) — cards sem conflito não exigem
+                        // decisão imediata; "Revisar" expande para editar horário/descrição.
+                        expanded: false
                     };
                 });
 
@@ -7823,6 +8005,8 @@ class AppController {
                 } else {
                     this._aptGenEntries[idx].loading = false;
                     this._aptGenEntries[idx].error = result.status !== 'fulfilled';
+                    // Card que precisa de atenção manual não fica escondido no resumo colapsado
+                    if (this._aptGenEntries[idx].error) this._aptGenEntries[idx].expanded = true;
                 }
             });
 
@@ -7918,8 +8102,8 @@ class AppController {
                     <div class="apt-gen-desc-wrap" id="apt-gen-desc-wrap-${idx}" style="${isSkip ? 'display:none' : ''}">
                         ${descHtml}
                     </div>`;
-            } else {
-                // Card normal sem conflito
+            } else if (e.expanded) {
+                // Card normal sem conflito, expandido — edição completa de horário/descrição
                 card.className = 'apt-gen-card glass';
                 card.innerHTML = `
                     <div class="apt-gen-card-header">
@@ -7930,6 +8114,9 @@ class AppController {
                         </label>
                         <span class="apt-gen-tasks-summary text-muted">${e.tasks.length} tarefa${e.tasks.length > 1 ? 's' : ''}: ${taskTitles}</span>
                         ${launchedNote}
+                        <button type="button" class="apt-gen-toggle-btn" onclick="app._aptGenToggleExpand(${idx}, false)">
+                            <i data-lucide="chevron-up"></i> Recolher
+                        </button>
                     </div>
                     <div class="apt-gen-desc-wrap">
                         ${descHtml}
@@ -7944,6 +8131,27 @@ class AppController {
                             <input type="time" class="form-control" value="${e.endTime}" onchange="app._aptGenTimeChange(${idx}, 'end', this.value)">
                         </div>
                     </div>`;
+            } else {
+                // Card normal sem conflito, colapsado — resumo de 1 linha; "Revisar" expande
+                const timeLabel = e.startTime && e.endTime ? `${e.startTime}–${e.endTime}` : 'sem horário definido';
+                const durLabel = e.startTime && e.endTime ? this.calcDuration(e.startTime, e.endTime).label : null;
+                card.className = 'apt-gen-card glass apt-gen-card-collapsed';
+                card.innerHTML = `
+                    <label class="apt-gen-check apt-gen-summary-check">
+                        <input type="checkbox" ${e.checked ? 'checked' : ''} onchange="app._aptGenToggle(${idx}, this.checked)">
+                    </label>
+                    <div class="apt-gen-summary-info">
+                        <div class="apt-gen-summary-title">
+                            <span class="apt-gen-client-name">${escapeHtml(e.client.name)}</span>
+                            ${e.client.projectNum ? `<span class="badge badge-outline" style="font-size:0.75rem;">${escapeHtml(e.client.projectNum)}</span>` : ''}
+                            ${e.loading ? `<span class="apt-gen-summary-loading"><i data-lucide="loader-2" style="animation:spin 1s linear infinite"></i>Gerando com IA...</span>` : ''}
+                        </div>
+                        <span class="apt-gen-tasks-summary text-muted">${e.tasks.length} tarefa${e.tasks.length > 1 ? 's' : ''}: ${taskTitles} · ${timeLabel}${durLabel ? ` (${durLabel})` : ''}</span>
+                        ${launchedNote}
+                    </div>
+                    <button type="button" class="apt-gen-toggle-btn" onclick="app._aptGenToggleExpand(${idx}, true)">
+                        <i data-lucide="chevron-down"></i> Revisar
+                    </button>`;
             }
 
             content.appendChild(card);
@@ -7966,6 +8174,12 @@ class AppController {
         if (!this._aptGenEntries) return;
         if (field === 'start') this._aptGenEntries[idx].startTime = value;
         else this._aptGenEntries[idx].endTime = value;
+    }
+
+    _aptGenToggleExpand(idx, expand) {
+        if (!this._aptGenEntries) return;
+        this._aptGenEntries[idx].expanded = expand;
+        this._renderAptGenContent();
     }
 
     _aptGenConflictAction(idx, action) {
@@ -8001,6 +8215,9 @@ class AppController {
         const missingTimes = toCreate.filter(e => !e.startTime || !e.endTime);
         if (missingTimes.length > 0) {
             Toast.show('Preencha o horário de início e fim para todos os apontamentos selecionados.', 'error');
+            // Expande os cards colapsados que faltam horário para o erro ficar visível
+            missingTimes.forEach(e => { e.expanded = true; });
+            this._renderAptGenContent();
             const cards = document.querySelectorAll('.apt-gen-card');
             this._aptGenEntries.forEach((e, idx) => {
                 if (e.conflictApt !== null || !e.checked || e.loading) return;
@@ -10975,8 +11192,9 @@ class AppController {
             else if (foundIds > rows.length) msg += ` (${foundIds} encontrados no OTOBO)`;
             Toast.show(msg, 'success', denied > 0 ? 8000 : 4000);
         } catch (err) {
+            console.error('Erro na sincronização de chamados:', err);
             setInfo('Erro na sincronização');
-            Toast.show(`Erro na sincronização: ${err.message}`, 'error', 6000);
+            Toast.show(`Não foi possível sincronizar: ${err.message || 'tente novamente em instantes.'}`, 'error', 6000);
         } finally {
             if (btn) { btn.disabled = false; btn.classList.remove('syncing'); }
         }
@@ -11285,10 +11503,14 @@ class AppController {
         lucide.createIcons();
 
         // Artigos (carregados on-demand)
-        const artContainer = document.getElementById('chamado-articles-content');
-        artContainer.innerHTML = spinnerHtml;
         this.openModal('modal-chamado');
+        await this._loadChamadoArticles(ticket);
+    }
 
+    async _loadChamadoArticles(ticket) {
+        const artContainer = document.getElementById('chamado-articles-content');
+        if (!artContainer) return;
+        artContainer.innerHTML = spinnerHtml;
         try {
             const articles = await this._fetchTicketArticles(ticket.ticketId);
             if (!articles.length) {
@@ -11305,8 +11527,10 @@ class AppController {
                 </div>
             `).join('');
         } catch (err) {
-            // Se falhar, mostra os dados do cache (raw_data pode ter artigos)
-            artContainer.innerHTML = `<p class="text-muted" style="padding:16px 0;">Não foi possível carregar as mensagens: ${escapeHtml(err.message)}</p>`;
+            console.error('Erro ao carregar mensagens do chamado:', err);
+            artContainer.innerHTML = `
+                <p class="text-muted" style="padding:16px 0;">Não foi possível carregar as mensagens deste chamado.</p>
+                <button class="btn btn-secondary btn-sm" onclick="app._loadChamadoArticles(app._currentTicket)">Tentar novamente</button>`;
         }
     }
 

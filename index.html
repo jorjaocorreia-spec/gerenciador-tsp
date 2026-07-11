@@ -503,11 +503,11 @@
                     <div class="agenda-toolbar-sep"></div>
 
                     <!-- Grupo 3: seletor de view (segmented control) -->
-                    <div class="agenda-view-switcher" role="tablist" aria-label="Modo de visualização da Agenda">
-                        <button class="agenda-view-btn active-mode" id="btn-agenda-schedule" role="tab" aria-selected="true" onclick="app.switchAgendaMode('schedule')">Programação</button>
-                        <button class="agenda-view-btn" id="btn-agenda-monthly" role="tab" aria-selected="false" onclick="app.switchAgendaMode('monthly')">Mensal</button>
-                        <button class="agenda-view-btn" id="btn-agenda-weekly" role="tab" aria-selected="false" onclick="app.switchAgendaMode('weekly')">Semanal</button>
-                        <button class="agenda-view-btn" id="btn-agenda-daily" role="tab" aria-selected="false" onclick="app.switchAgendaMode('daily')">Diário</button>
+                    <div class="agenda-view-switcher" role="group" aria-label="Modo de visualização da Agenda">
+                        <button class="agenda-view-btn active-mode" id="btn-agenda-schedule" aria-pressed="true" onclick="app.switchAgendaMode('schedule')">Programação</button>
+                        <button class="agenda-view-btn" id="btn-agenda-monthly" aria-pressed="false" onclick="app.switchAgendaMode('monthly')">Mensal</button>
+                        <button class="agenda-view-btn" id="btn-agenda-weekly" aria-pressed="false" onclick="app.switchAgendaMode('weekly')">Semanal</button>
+                        <button class="agenda-view-btn" id="btn-agenda-daily" aria-pressed="false" onclick="app.switchAgendaMode('daily')">Diário</button>
                     </div>
 
                     <!-- CTA -->
@@ -744,9 +744,10 @@
                         <span class="nav-label">Configurar OTOBO</span>
                     </button>
                     <button class="btn btn-secondary" id="btn-sync-chamados-full" onclick="app.confirmFullSyncChamados(this)" title="Sincronização completa: rebusca todos os chamados no OTOBO e remove do cache local os que não existem mais lá" style="display:none;">
+                        <i data-lucide="database" style="width:16px;height:16px;"></i>
                         <span class="nav-label">Sincronização completa</span>
                     </button>
-                    <button class="btn btn-primary" id="btn-sync-chamados" onclick="app.syncChamados(event.shiftKey)" title="Sincronizar (atualização incremental)" style="display:none;">
+                    <button class="btn btn-primary" id="btn-sync-chamados" onclick="app.syncChamados()" title="Sincronizar (atualização incremental)" style="display:none;">
                         <i data-lucide="refresh-cw" style="width:16px;height:16px;"></i>
                         <span class="nav-label">Sincronizar</span>
                     </button>
@@ -1540,54 +1541,67 @@
 
                     <div class="modal-task-sidebar-scroll">
 
-                        <div class="modal-sidebar-section">
-                            <h5 class="modal-sidebar-label">Mover para</h5>
-                            <div class="modal-sidebar-col-buttons" id="modal-sidebar-col-buttons">
-                                <!-- Preenchido dinamicamente por _syncModalColumnButtons() -->
+                        <div class="modal-sidebar-group">
+                            <div class="modal-sidebar-group-title">Organização</div>
+
+                            <div class="modal-sidebar-section">
+                                <h5 class="modal-sidebar-label">Mover para</h5>
+                                <div class="modal-sidebar-col-buttons" id="modal-sidebar-col-buttons">
+                                    <!-- Preenchido dinamicamente por _syncModalColumnButtons() -->
+                                </div>
+                            </div>
+
+                            <div class="modal-sidebar-section">
+                                <h5 class="modal-sidebar-label">Cliente</h5>
+                                <select id="task-client" class="form-control"></select>
+                            </div>
+
+                            <div class="modal-sidebar-section">
+                                <h5 class="modal-sidebar-label">Prioridade</h5>
+                                <select id="task-priority" class="form-control">
+                                    <option value="low">Baixa</option>
+                                    <option value="medium" selected>Média</option>
+                                    <option value="high">Alta</option>
+                                </select>
                             </div>
                         </div>
 
-                        <div class="modal-sidebar-section">
-                            <h5 class="modal-sidebar-label">Labels</h5>
-                            <div class="kb-label-picker" id="kb-label-picker"></div>
+                        <div class="modal-sidebar-group">
+                            <div class="modal-sidebar-group-title">Planejamento</div>
+
+                            <div class="modal-sidebar-section">
+                                <h5 class="modal-sidebar-label">Prazo</h5>
+                                <input type="date" id="task-due-date" class="form-control">
+                            </div>
+
+                            <div class="modal-sidebar-section">
+                                <h5 class="modal-sidebar-label">Estimado (min)</h5>
+                                <input type="number" id="task-estimated-minutes" class="form-control" placeholder="Ex: 120">
+                            </div>
                         </div>
 
-                        <div class="modal-sidebar-section">
-                            <h5 class="modal-sidebar-label">Cover</h5>
-                            <div class="kb-cover-picker" id="kb-cover-picker"></div>
-                        </div>
+                        <details class="modal-sidebar-group modal-sidebar-group--collapsible">
+                            <summary class="modal-sidebar-group-title">Aparência e visibilidade</summary>
+                            <div class="modal-sidebar-group-content">
+                                <div class="modal-sidebar-section">
+                                    <h5 class="modal-sidebar-label">Labels</h5>
+                                    <div class="kb-label-picker" id="kb-label-picker"></div>
+                                </div>
 
-                        <div class="modal-sidebar-section">
-                            <h5 class="modal-sidebar-label">Cliente</h5>
-                            <select id="task-client" class="form-control"></select>
-                        </div>
+                                <div class="modal-sidebar-section">
+                                    <h5 class="modal-sidebar-label">Cover</h5>
+                                    <div class="kb-cover-picker" id="kb-cover-picker"></div>
+                                </div>
 
-                        <div class="modal-sidebar-section">
-                            <h5 class="modal-sidebar-label">Prioridade</h5>
-                            <select id="task-priority" class="form-control">
-                                <option value="low">Baixa</option>
-                                <option value="medium" selected>Média</option>
-                                <option value="high">Alta</option>
-                            </select>
-                        </div>
-
-                        <div class="modal-sidebar-section">
-                            <h5 class="modal-sidebar-label">Prazo</h5>
-                            <input type="date" id="task-due-date" class="form-control">
-                        </div>
-
-                        <div class="modal-sidebar-section">
-                            <h5 class="modal-sidebar-label">Estimado (min)</h5>
-                            <input type="number" id="task-estimated-minutes" class="form-control" placeholder="Ex: 120">
-                        </div>
-
-                        <div class="modal-sidebar-section" id="task-hidden-from-client-section">
-                            <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;color:var(--text-secondary)">
-                                <input type="checkbox" id="task-hidden-from-client" style="width:16px;height:16px;cursor:pointer">
-                                <i data-lucide="eye-off" style="width:14px;height:14px"></i>
-                                Ocultar do Portal do Cliente
-                            </label>
-                        </div>
+                                <div class="modal-sidebar-section" id="task-hidden-from-client-section">
+                                    <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;color:var(--text-secondary)">
+                                        <input type="checkbox" id="task-hidden-from-client" style="width:16px;height:16px;cursor:pointer">
+                                        <i data-lucide="eye-off" style="width:14px;height:14px"></i>
+                                        Ocultar do Portal do Cliente
+                                    </label>
+                                </div>
+                            </div>
+                        </details>
 
                     </div>
 

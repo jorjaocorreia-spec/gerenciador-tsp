@@ -689,7 +689,7 @@ h4 {
   overflow-y: auto;
   padding: 32px;
   transform: scale(0.93) translateY(-12px);
-  transition: transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
+  transition: transform 0.35s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .modal.glass {
@@ -981,11 +981,11 @@ h4 {
   background: rgba(255, 255, 255, 0.08);
   color: var(--text-secondary);
 }
-.kb-badge-priority-high   { background: rgba(255, 107, 107, 0.15); color: #ff6b6b; }
-.kb-badge-priority-medium { background: rgba(255, 146, 43, 0.15);  color: #ff922b; }
-.kb-badge-priority-low    { background: rgba(81, 207, 102, 0.15);  color: #51cf66; }
-.kb-badge-due-overdue     { background: rgba(255, 107, 107, 0.2);  color: #ff6b6b; }
-.kb-badge-completed       { background: rgba(81, 207, 102, 0.18);  color: #51cf66; }
+.kb-badge-priority-high   { background: rgba(239, 68, 68, 0.15);  color: var(--danger-color); }
+.kb-badge-priority-medium { background: rgba(234, 179, 8, 0.15);   color: var(--warning-color); }
+.kb-badge-priority-low    { background: rgba(16, 185, 129, 0.15);  color: var(--success-color); }
+.kb-badge-due-overdue     { background: rgba(239, 68, 68, 0.2);    color: var(--danger-color); }
+.kb-badge-completed       { background: rgba(16, 185, 129, 0.18);  color: var(--success-color); }
 
 /* Botão de conclusão do card (no footer, à esquerda do lápis) */
 .kb-complete-btn { color: var(--text-secondary); }
@@ -1363,6 +1363,38 @@ h4 {
   align-items: center;
   gap: 6px;
   margin: 0;
+}
+/* Agrupa as seções da sidebar do modal de tarefa em clusters (Organização /
+   Planejamento / Aparência e visibilidade) — separação generosa entre grupos,
+   compacta dentro do grupo, para reduzir a leitura de 8 seções co-iguais. */
+.modal-sidebar-group {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.modal-sidebar-group + .modal-sidebar-group {
+  padding-top: 14px;
+  border-top: 1px solid var(--surface-border);
+}
+.modal-sidebar-group-title {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-weight: 700;
+  color: var(--text-muted);
+}
+details.modal-sidebar-group summary.modal-sidebar-group-title {
+  cursor: pointer;
+  list-style: revert;
+}
+details.modal-sidebar-group summary.modal-sidebar-group-title::marker {
+  color: var(--text-muted);
+}
+.modal-sidebar-group-content {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 12px;
 }
 .modal-sidebar-section { display: flex; flex-direction: column; gap: 6px; }
 .modal-sidebar-label {
@@ -1995,14 +2027,13 @@ h4 {
   border: 1px solid transparent;
   color: var(--text-muted);
   padding: 6px 11px;
-  min-height: 24px;
   border-radius: 5px;
   font-size: 12.5px;
   font-weight: 500;
   cursor: pointer;
   transition: background 0.15s, color 0.15s;
   white-space: nowrap;
-  height: 26px;
+  min-height: 26px;
   display: flex;
   align-items: center;
   line-height: 1;
@@ -2895,7 +2926,8 @@ kbd {
 
 .apt-table { border-radius: var(--radius); overflow: hidden; }
 .apt-table-header,
-.apt-row {
+.apt-row,
+.apt-quickadd {
     display: grid;
     grid-template-columns: 150px 80px 1fr 60px 148px;
     padding: 10px 16px;
@@ -2932,6 +2964,42 @@ kbd {
     border-top: 1px solid rgba(255,255,255,.12);
     font-size: 0.9rem;
     opacity: .8;
+}
+.apt-quickadd {
+    align-items: center;
+    background: rgba(139,92,246,0.05);
+    border-bottom: 1px solid rgba(255,255,255,.08);
+}
+.apt-quickadd-time { display: flex; align-items: center; gap: 4px; min-width: 0; }
+.apt-quickadd-time input[type="time"],
+.apt-quickadd input[type="text"] {
+    width: 100%;
+    min-width: 0;
+    background: rgba(15,23,42,.5);
+    border: 1px solid rgba(255,255,255,.1);
+    border-radius: 6px;
+    color: var(--text-primary);
+    padding: 6px 8px;
+    font-size: .82rem;
+}
+.apt-quickadd-time input[type="time"] { padding: 6px 2px; font-variant-numeric: tabular-nums; }
+.apt-quickadd-time span { opacity: .4; font-size: .75rem; flex-shrink: 0; }
+.apt-quickadd input[type="text"]::placeholder { color: var(--text-secondary); opacity: .7; }
+.apt-quickadd-time input[type="time"]:focus,
+.apt-quickadd input[type="text"]:focus {
+    outline: none;
+    border-color: var(--primary-color, #8b5cf6);
+    box-shadow: 0 0 0 2px rgba(139,92,246,.2);
+}
+.apt-quickadd-dur { opacity: .55; font-size: .8rem; text-align: center; font-variant-numeric: tabular-nums; cursor: default; }
+.apt-quickadd-submit { padding: 6px 12px; font-size: .82rem; justify-content: center; gap: 6px; }
+.apt-quickadd-empty-hint a { color: var(--primary-color, #8b5cf6); }
+.apt-time-error {
+    border-color: var(--danger-color) !important;
+    box-shadow: 0 0 0 2px rgba(239,68,68,.2) !important;
+}
+@media (max-width: 720px) {
+    .apt-quickadd { grid-template-columns: 1fr; }
 }
 #apt-start::-webkit-calendar-picker-indicator,
 #apt-end::-webkit-calendar-picker-indicator {
@@ -3032,6 +3100,41 @@ kbd {
     border-color: rgba(34,197,94,0.25) !important;
     opacity: 0.75;
 }
+.apt-gen-card-collapsed {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 16px;
+}
+.apt-gen-summary-check { display: flex; flex-shrink: 0; }
+.apt-gen-summary-info { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.apt-gen-summary-title { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.apt-gen-card-collapsed .apt-gen-tasks-summary { padding-left: 0; }
+.apt-gen-summary-loading {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 0.75rem;
+    color: var(--text-muted);
+}
+.apt-gen-toggle-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    flex-shrink: 0;
+    background: none;
+    border: none;
+    color: var(--primary);
+    font-size: 0.8rem;
+    font-weight: 500;
+    cursor: pointer;
+    padding: 4px 6px;
+    border-radius: 4px;
+    transition: background 0.15s;
+}
+.apt-gen-toggle-btn:hover { background: rgba(139,92,246,0.1); }
+.apt-gen-toggle-btn svg { width: 14px; height: 14px; }
+.apt-gen-card-header .apt-gen-toggle-btn { margin-left: auto; }
 .apt-gen-done-badge {
     display: inline-flex;
     align-items: center;
@@ -4046,16 +4149,14 @@ kbd {
     .btn-pulse-empty { animation: none; }
 }
 
-/* Bounce do card Kanban ao ser solto */
+/* Card Kanban assenta suavemente ao ser solto */
 @keyframes kb-card-drop {
-    0%   { transform: scaleY(0.88) scaleX(1.03); }
-    55%  { transform: scaleY(1.04) scaleX(0.98); }
-    80%  { transform: scaleY(0.98) scaleX(1.01); }
+    0%   { transform: scaleY(0.92) scaleX(1.015); }
     100% { transform: scaleY(1) scaleX(1); }
 }
 
 .kb-card-dropped {
-    animation: kb-card-drop 0.35s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+    animation: kb-card-drop 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
     transform-origin: center bottom;
 }
 
@@ -4162,12 +4263,11 @@ kbd {
 
 /* K3 — Kanban: card novo via quick-add com pop-in */
 @keyframes kb-card-pop-in {
-    0%   { opacity: 0; transform: scale(0.78) translateY(-8px); }
-    65%  { transform: scale(1.05) translateY(1px); }
+    0%   { opacity: 0; transform: scale(0.9) translateY(-6px); }
     100% { opacity: 1; transform: scale(1) translateY(0); }
 }
 .kb-card-new {
-    animation: kb-card-pop-in 0.3s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+    animation: kb-card-pop-in 0.3s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
 /* K4 — Kanban: badge prioridade Alta pisca suavemente */
@@ -4196,13 +4296,12 @@ kbd {
     filter: drop-shadow(0 0 8px rgba(16, 185, 129, 0.8)) !important;
 }
 
-/* K6 — Kanban: coluna recebe drag com glow lateral */
+/* K6 — Kanban: coluna recebe drag com realce de fundo */
 .kb-dropzone.drag-over {
-    background: rgba(139, 92, 246, 0.06);
-    box-shadow: inset 3px 0 12px rgba(139, 92, 246, 0.12);
-    border-left: 3px solid rgba(139, 92, 246, 0.5);
+    background: rgba(139, 92, 246, 0.08);
+    border: 1px solid rgba(139, 92, 246, 0.4);
     border-radius: 4px;
-    transition: background 0.2s ease, box-shadow 0.2s ease, border-left 0.2s ease;
+    transition: background 0.2s ease, border-color 0.2s ease;
 }
 
 /* A1 — Agenda: blocos de evento fade-in escalonado */
