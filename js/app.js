@@ -7644,16 +7644,16 @@ class AppController {
                         <span class="apt-desc">${escapeHtml(item.description)}</span>
                         <span class="apt-dur">${dur.label}</span>
                         <span class="apt-actions">
-                            <button class="btn-icon-sm apt-copy-proj-btn" title="Copiar nº projeto" data-value="${escapeHtml(item.projectNum)}">
+                            <button class="btn-icon-sm apt-copy-proj-btn" title="Copiar nº projeto" aria-label="Copiar número do projeto" data-value="${escapeHtml(item.projectNum)}">
                                 <i data-lucide="hash"></i>
                             </button>
-                            <button class="btn-icon-sm apt-copy-desc-btn" title="Copiar descrição" data-value="${escapeHtml(item.description)}">
+                            <button class="btn-icon-sm apt-copy-desc-btn" title="Copiar descrição" aria-label="Copiar descrição do apontamento" data-value="${escapeHtml(item.description)}">
                                 <i data-lucide="clipboard"></i>
                             </button>
-                            <button class="btn-icon-sm" title="Editar" onclick="app.openEditApontamento('${item.id}')">
+                            <button class="btn-icon-sm" title="Editar" aria-label="Editar apontamento" onclick="app.openEditApontamento('${item.id}')">
                                 <i data-lucide="pencil"></i>
                             </button>
-                            <button class="btn-icon-sm btn-danger-sm" title="Excluir" onclick="app.deleteApontamento('${item.id}', this)">
+                            <button class="btn-icon-sm btn-danger-sm" title="Excluir" aria-label="Excluir apontamento" onclick="app.deleteApontamento('${item.id}', this)">
                                 <i data-lucide="trash-2"></i>
                             </button>
                         </span>`;
