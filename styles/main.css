@@ -649,6 +649,13 @@ h4 {
   pointer-events: auto;
 }
 
+/* Modais inativos saem totalmente da árvore de acessibilidade/tab-order —
+   antes ficavam com display:flex mesmo escondidos, permitindo que o Tab
+   vazasse de um modal aberto para dentro de outro modal invisível. */
+.modal-overlay:not(.active) {
+  display: none;
+}
+
 .modal {
   width: 100%;
   max-width: 500px;
@@ -4349,7 +4356,9 @@ kbd {
 .float-group > label.fl-up {
     top: 5px;
     font-size: 0.72rem;
-    color: var(--primary-color);
+    /* Contraste: #8b5cf6 sobre o fundo escuro do modal fica em ~4.2:1, abaixo do AA (4.5:1).
+       Texto sobre fundo escuro precisa de um tom MAIS CLARO (não --primary-hover). */
+    color: #a883f8;
     letter-spacing: 0.03em;
     white-space: nowrap;
 }
@@ -4683,8 +4692,16 @@ kbd {
 }
 .status-filter-tab:hover { color: var(--text-primary); }
 .status-filter-tab.active {
-    color: var(--primary-color);
+    /* Contraste: #8b5cf6 sobre o fundo escuro do painel fica em ~3.7:1, abaixo do AA (4.5:1).
+       Texto sobre fundo escuro precisa de um tom MAIS CLARO do violeta (não --primary-hover,
+       que é mais escuro e serve para texto claro sobre fundo violeta, como no .btn-primary). */
+    color: #a883f8;
     border-bottom-color: var(--primary-color);
+}
+.status-filter-tab:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 2px rgba(139,92,246,0.5);
+    border-radius: 4px;
 }
 
 /* ── Tooltip de informação (balãozinho ⓘ) ─────────────────────────── */

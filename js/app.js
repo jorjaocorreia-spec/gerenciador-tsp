@@ -320,6 +320,45 @@ class AppController {
             }
         });
 
+        // Modal padrão (.modal-overlay): Escape fecha, clique no backdrop fecha,
+        // e Tab fica preso dentro do modal ativo (focus trap). Compartilhado por
+        // todo modal do app — corrige de uma vez a experiência de teclado inteira.
+        document.addEventListener('keydown', (e) => {
+            const overlays = document.querySelectorAll('.modal-overlay.active');
+            if (overlays.length === 0) return;
+            const overlay = overlays[overlays.length - 1];
+            if (e.key === 'Escape') {
+                e.preventDefault();
+                this.closeModal(overlay.id);
+                return;
+            }
+            if (e.key === 'Tab') {
+                const modal = overlay.querySelector('.modal');
+                if (!modal) return;
+                const focusable = Array.from(modal.querySelectorAll(
+                    'a[href], button:not([disabled]), textarea:not([disabled]), input:not([disabled]):not([type="hidden"]), select:not([disabled]), [tabindex]:not([tabindex="-1"])'
+                )).filter(el => el.offsetParent !== null);
+                if (focusable.length === 0) return;
+                const first = focusable[0];
+                const last = focusable[focusable.length - 1];
+                if (e.shiftKey && document.activeElement === first) {
+                    e.preventDefault();
+                    last.focus();
+                } else if (!e.shiftKey && document.activeElement === last) {
+                    e.preventDefault();
+                    first.focus();
+                } else if (!modal.contains(document.activeElement)) {
+                    e.preventDefault();
+                    first.focus();
+                }
+            }
+        });
+        document.addEventListener('click', (e) => {
+            if (e.target.classList?.contains('modal-overlay') && e.target.classList.contains('active')) {
+                this.closeModal(e.target.id);
+            }
+        });
+
         // Seleção de arquivos via input — tarefa (imagens comprimidas; outros tipos lidos como base64)
         document.getElementById('task-attachments')?.addEventListener('change', async (e) => {
             for (const file of e.target.files) {
@@ -426,6 +465,26 @@ class AppController {
     // ===================================
     // MODAIS
     // ===================================
+    // Traduz erros técnicos (rede, Postgrest, auth) para mensagens curtas em pt-br;
+    // mantém err no console para debug. Fallback genérico para o resto.
+    _friendlyErrorMessage(err) {
+        console.error(err);
+        const msg = (err?.message || '').toLowerCase();
+        if (!navigator.onLine || msg.includes('failed to fetch') || msg.includes('networkerror')) {
+            return 'Sem conexão com a internet. Verifique sua rede e tente novamente.';
+        }
+        if (msg.includes('jwt') || msg.includes('401') || msg.includes('unauthorized')) {
+            return 'Sua sessão expirou. Atualize a página e faça login novamente.';
+        }
+        if (msg.includes('duplicate key') || msg.includes('unique constraint')) {
+            return 'Já existe um registro com esses dados.';
+        }
+        if (msg.includes('violates') || msg.includes('constraint') || msg.includes('null value')) {
+            return 'Alguns dados não puderam ser salvos — confira os campos obrigatórios.';
+        }
+        return 'Não foi possível salvar. Tente novamente em instantes.';
+    }
+
     openModal(modalId) {
         document.getElementById(modalId).classList.add('active');
         if (modalId === 'modal-record' || modalId === 'modal-task' || modalId === 'modal-agenda-event') {
@@ -627,7 +686,7 @@ class AppController {
             Toast.show(id ? 'Cliente atualizado.' : 'Cliente cadastrado.', 'success');
         } catch (err) {
             this._btnError(btn);
-            Toast.show('Erro ao salvar cliente: ' + err.message, 'error');
+            Toast.show(this._friendlyErrorMessage(err), 'error');
         }
     }
 
@@ -2984,7 +3043,7 @@ class AppController {
             subtitle.textContent = this._formatDashboardMonth(this._dashboardMonth);
             this._renderHorasMesContent();
         } catch (err) {
-            content.innerHTML = `<p style="color:var(--danger-color); padding:16px;">Erro ao carregar: ${err.message}</p>`;
+            content.innerHTML = `<p style="color:var(--danger-color); padding:16px;">${this._friendlyErrorMessage(err)}</p>`;
         }
     }
 

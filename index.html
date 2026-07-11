@@ -274,6 +274,10 @@
                     <button class="btn btn-secondary" id="btn-open-saldo" onclick="app.openSaldoPanel()" title="Posição de horas por projeto" style="padding: 8px 14px; gap: 6px;">
                         <i data-lucide="scale" style="width: 16px; height: 16px;"></i> Saldo
                     </button>
+                    <span class="info-tooltip" tabindex="0" aria-label="Como o saldo é calculado">
+                        <i data-lucide="info" style="width: 15px; height: 15px; color: var(--primary-color);"></i>
+                        <span class="info-tooltip-text">Saldo = horas aplicadas − horas contratadas acumuladas desde o início do controle de cada cliente.</span>
+                    </span>
                     <button class="btn btn-primary" onclick="app.openModal('modal-client')">
                         <i data-lucide="plus"></i> Novo Cliente
                     </button>
@@ -948,7 +952,7 @@
                         <input type="text" id="client-name" class="form-control" placeholder="Ex: Acme Inc" required>
                     </div>
                     <div class="form-group" style="flex: 1;">
-                        <label>Total de Horas</label>
+                        <label>Horas Mensais</label>
                         <input type="number" step="0.5" id="client-hours" class="form-control" placeholder="Ex: 10"
                             required>
                     </div>
@@ -1002,7 +1006,7 @@
                     <div class="form-group" style="flex: 1; margin-bottom: 0;">
                         <label style="white-space: nowrap;">Recebe 43%</label>
                         <input type="text" id="consultant-receives" class="form-control money-value"
-                            style="background: rgba(0,0,0,0.2); cursor: not-allowed; color: var(--primary-color); font-weight: bold;"
+                            style="background: rgba(15,23,42,0.5); cursor: not-allowed; color: var(--primary-color); font-weight: bold;"
                             readonly>
                     </div>
                     <div class="form-group" style="flex: 1; margin-bottom: 0;">
@@ -1022,7 +1026,7 @@
                     <textarea id="client-notes" class="form-control" rows="2" placeholder="Diversos..." spellcheck="true"></textarea>
                 </div>
 
-                <div class="form-group">
+                <div class="form-group" style="border-top: 1px solid rgba(255,255,255,0.08); margin: 8px 0 16px; padding-top: 16px;">
                     <label>ID Cliente OTOBO <span style="font-size:0.75rem; color: var(--text-muted); font-weight: normal;">(opcional)</span></label>
                     <input type="text" id="client-otobo-id" class="form-control" placeholder="Ex: cascavel001  ou  cascavel001, cascavel002">
                     <p style="font-size: 0.75rem; color: var(--text-muted); margin: 4px 0 0;">CustomerID do OTOBO. Para mais de um, separe por vírgula: <code style="background: rgba(255,255,255,0.07); padding: 1px 5px; border-radius: 4px;">id1, id2</code></p>
