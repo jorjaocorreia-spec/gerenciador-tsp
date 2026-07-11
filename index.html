@@ -32,7 +32,7 @@
 <body>
 
     <!-- TELA DE LOGIN -->
-    <div id="auth-screen" style="display:none; position:fixed; inset:0; z-index:9999; background:var(--bg-primary); display:flex; align-items:center; justify-content:center;">
+    <div id="auth-screen" style="display:none; position:fixed; inset:0; z-index:9999; background:var(--bg-primary); align-items:center; justify-content:center;">
         <div class="glass" style="width:100%; max-width:420px; padding:40px; border-radius:16px;">
             <div style="text-align:center; margin-bottom:32px;">
                 <i data-lucide="activity" style="width:40px; height:40px; color:var(--primary);"></i>
@@ -962,11 +962,11 @@
 
                 <div style="display: flex; gap: 16px;">
                     <div class="form-group" style="flex: 2;">
-                        <label>Nome do Cliente</label>
+                        <label for="client-name">Nome do Cliente</label>
                         <input type="text" id="client-name" class="form-control" placeholder="Ex: Acme Inc" required>
                     </div>
                     <div class="form-group" style="flex: 1;">
-                        <label>Horas Mensais</label>
+                        <label for="client-hours">Horas Mensais</label>
                         <input type="number" step="0.5" id="client-hours" class="form-control" placeholder="Ex: 10"
                             required>
                     </div>
@@ -974,25 +974,25 @@
 
                 <div style="display: flex; gap: 16px;">
                     <div class="form-group" style="flex: 1;">
-                        <label>Projeto (Número)</label>
+                        <label for="client-project">Projeto (Número)</label>
                         <input type="text" id="client-project" class="form-control" placeholder="Ex: 22851, 23000">
                     </div>
                     <div class="form-group" style="flex: 1;">
-                        <label>Responsável CS</label>
+                        <label for="client-cs">Responsável CS</label>
                         <input type="text" id="client-cs" class="form-control" placeholder="Nome do CS">
                     </div>
                 </div>
 
                 <div style="display: flex; gap: 16px;">
                     <div class="form-group" style="flex: 1;">
-                        <label>Status</label>
+                        <label for="client-status">Status</label>
                         <select id="client-status" class="form-control" required>
                             <option value="active" selected>Ativo</option>
                             <option value="finished">Finalizado</option>
                         </select>
                     </div>
                     <div class="form-group" style="flex: 1;" id="field-client-pays">
-                        <label>Cliente Paga (R$)</label>
+                        <label for="client-pays">Cliente Paga (R$)</label>
                         <input type="number" step="0.01" id="client-pays" class="form-control money-value" placeholder="Ex: 5000" oninput="app.calculateConsultantValue()">
                     </div>
                 </div>
@@ -1012,23 +1012,23 @@
                 </div>
 
                 <div class="form-group" id="field-hourly-rate" style="display: none;">
-                    <label>Valor por Hora (R$)</label>
+                    <label for="client-hourly-rate">Valor por Hora (R$)</label>
                     <input type="number" step="0.01" id="client-hourly-rate" class="form-control money-value" placeholder="Ex: 150">
                 </div>
 
                 <div style="display: flex; gap: 16px; align-items: flex-end; margin-bottom: 16px;" id="row-consultant-fields">
                     <div class="form-group" style="flex: 1; margin-bottom: 0;">
-                        <label style="white-space: nowrap;">Recebe 43%</label>
+                        <label for="consultant-receives" style="white-space: nowrap;">Recebe 43%</label>
                         <input type="text" id="consultant-receives" class="form-control money-value"
                             style="background: rgba(15,23,42,0.5); cursor: not-allowed; color: var(--primary-color); font-weight: bold;"
                             readonly>
                     </div>
                     <div class="form-group" style="flex: 1; margin-bottom: 0;">
-                        <label style="white-space: nowrap;">Valor Adicional (R$)</label>
+                        <label for="consultant-bonus" style="white-space: nowrap;">Valor Adicional (R$)</label>
                         <input type="number" step="0.01" id="consultant-bonus" class="form-control money-value" placeholder="Ex: 500" oninput="app.calculateConsultantValue()">
                     </div>
                     <div class="form-group" style="flex: 1; margin-bottom: 0;">
-                        <label style="white-space: nowrap;">Total Consultor</label>
+                        <label for="consultant-total" style="white-space: nowrap;">Total Consultor</label>
                         <input type="text" id="consultant-total" class="form-control money-value"
                             style="background: rgba(0,0,0,0.2); cursor: not-allowed; color: #4ade80; font-weight: bold;"
                             readonly>
@@ -1036,12 +1036,12 @@
                 </div>
 
                 <div class="form-group">
-                    <label>Observações</label>
+                    <label for="client-notes">Observações</label>
                     <textarea id="client-notes" class="form-control" rows="2" placeholder="Diversos..." spellcheck="true"></textarea>
                 </div>
 
                 <div class="form-group" style="border-top: 1px solid rgba(255,255,255,0.08); margin: 8px 0 16px; padding-top: 16px;">
-                    <label>ID Cliente OTOBO <span style="font-size:0.75rem; color: var(--text-muted); font-weight: normal;">(opcional)</span></label>
+                    <label for="client-otobo-id">ID Cliente OTOBO <span style="font-size:0.75rem; color: var(--text-muted); font-weight: normal;">(opcional)</span></label>
                     <input type="text" id="client-otobo-id" class="form-control" placeholder="Ex: cascavel001  ou  cascavel001, cascavel002">
                     <p style="font-size: 0.75rem; color: var(--text-muted); margin: 4px 0 0;">CustomerID do OTOBO. Para mais de um, separe por vírgula: <code style="background: rgba(255,255,255,0.07); padding: 1px 5px; border-radius: 4px;">id1, id2</code></p>
                 </div>
@@ -1050,11 +1050,11 @@
                     <p style="font-size: 0.8rem; color: var(--text-muted); margin: 0 0 12px;">Controle de saldo de horas — preencha para ativar o painel de posição.</p>
                     <div style="display: flex; gap: 16px;">
                         <div class="form-group" style="flex: 1; margin-bottom: 0;">
-                            <label>Saldo inicial (h)</label>
+                            <label for="client-initial-balance">Saldo inicial (h)</label>
                             <input type="number" step="0.5" id="client-initial-balance" class="form-control" placeholder="Ex: -3.5 ou 10">
                         </div>
                         <div class="form-group" style="flex: 1; margin-bottom: 0;" id="client-balance-start-row">
-                            <label>Início do controle</label>
+                            <label for="client-balance-start">Início do controle</label>
                             <input type="date" id="client-balance-start" class="form-control">
                         </div>
                     </div>
@@ -1068,11 +1068,11 @@
             <div id="tab-client-report" style="display:none; padding: 16px 24px 24px;">
                 <div style="display: flex; gap: 12px; align-items: flex-end; margin-bottom: 16px;">
                     <div class="form-group" style="flex: 1; margin-bottom: 0;">
-                        <label>Data início</label>
+                        <label for="report-date-start-inline">Data início</label>
                         <input type="date" id="report-date-start-inline" class="form-control">
                     </div>
                     <div class="form-group" style="flex: 1; margin-bottom: 0;">
-                        <label>Data fim</label>
+                        <label for="report-date-end-inline">Data fim</label>
                         <input type="date" id="report-date-end-inline" class="form-control">
                     </div>
                     <button type="button" class="btn btn-secondary" onclick="app.fetchAgendaReportEvents('inline')" style="flex-shrink: 0;">
@@ -1255,13 +1255,13 @@
             <form id="form-record">
                 <input type="hidden" id="record-id" value="">
                 <div class="form-group">
-                    <label>Selecione o Cliente</label>
+                    <label for="record-client">Selecione o Cliente</label>
                     <select id="record-client" class="form-control" required>
                         <!-- Options carregados via JS -->
                     </select>
                 </div>
                 <div class="form-group">
-                    <label>Data</label>
+                    <label for="record-date">Data</label>
                     <input type="date" id="record-date" class="form-control" required>
                 </div>
                 <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 12px;">
@@ -1272,16 +1272,16 @@
                 </div>
                 <div id="record-time-fields" style="display: flex; gap: 16px;">
                     <div class="form-group" style="flex: 1;">
-                        <label>Horário Inicial</label>
+                        <label for="record-start">Horário Inicial</label>
                         <input type="time" id="record-start" class="form-control" required>
                     </div>
                     <div class="form-group" style="flex: 1;">
-                        <label>Horário Final</label>
+                        <label for="record-end">Horário Final</label>
                         <input type="time" id="record-end" class="form-control" required>
                     </div>
                 </div>
                 <div class="form-group" id="record-unavailability-hours-group" style="display: none;">
-                    <label>Quantidade de horas perdidas</label>
+                    <label for="record-unavailability-hours">Quantidade de horas perdidas</label>
                     <input type="number" id="record-unavailability-hours" class="form-control" step="0.25" min="0" placeholder="Ex: 3.5">
                 </div>
                 <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 12px;">
@@ -1291,14 +1291,14 @@
                     </label>
                 </div>
                 <div class="form-group">
-                    <label>Tempo Gasto Calculado</label>
+                    <label for="record-calculated">Tempo Gasto Calculado</label>
                     <input type="text" id="record-calculated" class="form-control"
                         style="background: rgba(15,23,42,0.5); cursor: not-allowed; color: var(--primary-color); font-weight: bold;"
                         readonly placeholder="Preencha os horários acima...">
                 </div>
                 <div class="form-group">
                     <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:6px;">
-                        <label id="record-desc-label" style="margin:0;">Descrição do que foi feito</label>
+                        <label id="record-desc-label" for="record-desc" style="margin:0;">Descrição do que foi feito</label>
                         <button type="button" id="btn-ai-improve-record" onclick="app.improveRecordDescription()" class="btn btn-ghost btn-sm" style="gap:4px; color:#a78bfa; border:1px solid rgba(167,139,250,0.3); display:none;">
                             <i data-lucide="sparkles" style="width:13px;height:13px;"></i> Melhorar com IA
                         </button>
@@ -1370,7 +1370,7 @@
                     <input type="hidden" id="pdf-client" value="">
                 </div>
 
-                <div id="pdf-warnings" style="display:none; margin-top:16px; padding:10px 14px; border-radius:8px; background:rgba(255,165,0,0.12); border:1px solid rgba(255,165,0,0.4); color:var(--warning-color,#f59e0b); font-size:0.85rem; line-height:1.5;"></div>
+                <div id="pdf-warnings" style="display:none; margin-top:16px; padding:10px 14px; border-radius:8px; background:rgba(234,179,8,0.12); border:1px solid rgba(234,179,8,0.4); color:var(--warning-color); font-size:0.85rem; line-height:1.5;"></div>
                 <h4 style="margin-top: 20px; margin-bottom: 12px;">Atendimentos Encontrados:</h4>
                 <div
                     style="max-height: 300px; overflow-y: auto; background: rgba(0,0,0,0.1); border-radius: 8px; padding: 1px;">
@@ -1410,18 +1410,18 @@
             </div>
             <form id="form-invite-user" onsubmit="app.handleInviteUserSubmit(event)">
                 <div class="form-group">
-                    <label class="form-label">E-mail</label>
+                    <label class="form-label" for="invite-email">E-mail</label>
                     <input type="email" id="invite-email" class="form-control" placeholder="pessoa@empresa.com" required>
                 </div>
                 <div class="form-group">
-                    <label class="form-label">Papel</label>
+                    <label class="form-label" for="invite-role">Papel</label>
                     <select id="invite-role" class="form-control" onchange="app.toggleInviteRoleFields()">
                         <option value="client" selected>Cliente (somente leitura de Tarefas)</option>
                         <option value="consultant">Consultor (acesso total)</option>
                     </select>
                 </div>
                 <div class="form-group" id="invite-client-group">
-                    <label class="form-label">Cliente vinculado</label>
+                    <label class="form-label" for="invite-client-id">Cliente vinculado</label>
                     <select id="invite-client-id" class="form-control" required></select>
                 </div>
                 <button type="submit" class="btn btn-primary" style="width:100%; margin-top:8px;">
@@ -1865,8 +1865,8 @@
                         </div>
 
                         <!-- Passo 6 -->
-                        <div style="display:flex;gap:12px;padding:12px;background:rgba(34,197,94,0.06);border:1px solid rgba(34,197,94,0.2);border-radius:8px;">
-                            <div style="width:28px;height:28px;border-radius:50%;background:#22c55e;display:flex;align-items:center;justify-content:center;font-size:0.8rem;font-weight:700;flex-shrink:0;">6</div>
+                        <div style="display:flex;gap:12px;padding:12px;background:rgba(16,185,129,0.06);border:1px solid rgba(16,185,129,0.2);border-radius:8px;">
+                            <div style="width:28px;height:28px;border-radius:50%;background:var(--success-color);display:flex;align-items:center;justify-content:center;font-size:0.8rem;font-weight:700;flex-shrink:0;">6</div>
                             <div>
                                 <p style="font-weight:600;margin:0 0 4px;">Inserir as credenciais abaixo</p>
                                 <p class="text-muted" style="font-size:0.82rem;margin:0;">Cole o <strong>Client ID</strong> e a <strong>API Key</strong> nos campos abaixo e clique em <strong>Salvar Configurações</strong>.</p>
@@ -1937,8 +1937,8 @@
                 </div>
 
                 <div style="display:flex; gap:14px; align-items:flex-start;">
-                    <div style="background: #f59e0b33; border-radius:50%; min-width:32px; height:32px; display:flex; align-items:center; justify-content:center;">
-                        <i data-lucide="alert-triangle" style="width:16px; height:16px; color:#f59e0b;"></i>
+                    <div style="background: rgba(234,179,8,0.2); border-radius:50%; min-width:32px; height:32px; display:flex; align-items:center; justify-content:center;">
+                        <i data-lucide="alert-triangle" style="width:16px; height:16px; color:var(--warning-color);"></i>
                     </div>
                     <div>
                         <p style="font-weight:600; margin:0 0 4px;">A conexão se renova a cada sessão</p>
@@ -2025,7 +2025,7 @@
                         <span id="apt-duration" class="apt-duration-display">--</span>
                     </div>
                 </div>
-                <small id="apt-lunch-split-hint" style="display:none;color:#a78bfa;margin-top:-8px;margin-bottom:8px;"></small>
+                <small id="apt-lunch-split-hint" style="display:none;color:var(--secondary-color);margin-top:-8px;margin-bottom:8px;"></small>
                 <div class="form-group">
                     <label>Nº Projeto</label>
                     <input type="text" id="apt-project" class="form-control" list="apt-project-list" placeholder="Ex: 2285" required autocomplete="off">
@@ -2476,15 +2476,15 @@
             </div>
             <div id="otobo-tab-conexao" style="padding:24px; display:flex; flex-direction:column; gap:16px;">
                 <div class="form-group" style="margin-bottom:0;">
-                    <label class="form-label">URL do OTOBO</label>
+                    <label class="form-label" for="otobo-url">URL do OTOBO</label>
                     <input type="url" id="otobo-url" class="form-control" placeholder="https://helpdesk.empresa.com">
                 </div>
                 <div class="form-group" style="margin-bottom:0;">
-                    <label class="form-label">Usuário</label>
+                    <label class="form-label" for="otobo-username">Usuário</label>
                     <input type="text" id="otobo-username" class="form-control" placeholder="seu.usuario">
                 </div>
                 <div class="form-group" style="margin-bottom:0;">
-                    <label class="form-label">Senha</label>
+                    <label class="form-label" for="otobo-password">Senha</label>
                     <input type="password" id="otobo-password" class="form-control" placeholder="••••••••">
                 </div>
                 <p style="font-size:0.8rem; color:var(--text-muted); margin:0;">
@@ -2493,15 +2493,15 @@
             </div>
             <div id="otobo-tab-sync" style="padding:24px; display:none; flex-direction:column; gap:16px;">
                 <div class="form-group" style="margin-bottom:0;">
-                    <label class="form-label">Filas (uma por linha)</label>
+                    <label class="form-label" for="sync-filter-queues">Filas (uma por linha)</label>
                     <textarea id="sync-filter-queues" class="form-control" rows="3" placeholder="Support&#10;Development&#10;(vazio = todas as filas)"></textarea>
                 </div>
                 <div class="form-group" style="margin-bottom:0;">
-                    <label class="form-label">Status (um por linha)</label>
+                    <label class="form-label" for="sync-filter-states">Status (um por linha)</label>
                     <textarea id="sync-filter-states" class="form-control" rows="3" placeholder="new&#10;open&#10;(vazio = todos os status)"></textarea>
                 </div>
                 <div class="form-group" style="margin-bottom:0;">
-                    <label class="form-label">Tipos (um por linha)</label>
+                    <label class="form-label" for="sync-filter-types">Tipos (um por linha)</label>
                     <textarea id="sync-filter-types" class="form-control" rows="2" placeholder="Incident&#10;Service Request&#10;(vazio = todos os tipos)"></textarea>
                 </div>
                 <div class="form-group" style="margin-bottom:0;">
@@ -2511,11 +2511,11 @@
                     </label>
                 </div>
                 <div class="form-group" id="owner-filter-row" style="margin-bottom:0;">
-                    <label class="form-label">Proprietário específico (login do agente)</label>
+                    <label class="form-label" for="sync-filter-owner">Proprietário específico (login do agente)</label>
                     <input type="text" id="sync-filter-owner" class="form-control" placeholder="(vazio = todos)">
                 </div>
                 <div class="form-group" style="margin-bottom:0;">
-                    <label class="form-label">Meu ID numérico de agente no OTOBO</label>
+                    <label class="form-label" for="sync-filter-owner-id">Meu ID numérico de agente no OTOBO</label>
                     <input type="number" id="sync-filter-owner-id" class="form-control" placeholder="ex: 42">
                     <p style="font-size:0.8rem; color:var(--text-muted); margin:6px 0 0;">
                         Cada usuário tem um ID diferente (Admin → Usuários no OTOBO). Preenchendo este campo, a busca traz
@@ -2523,7 +2523,7 @@
                     </p>
                 </div>
                 <div class="form-group" style="margin-bottom:0;">
-                    <label class="form-label">Limite de tickets por sync</label>
+                    <label class="form-label" for="sync-filter-limit">Limite de tickets por sync</label>
                     <input type="number" id="sync-filter-limit" class="form-control" min="10" max="2000" value="100">
                 </div>
                 <p style="font-size:0.8rem; color:var(--text-muted); margin:0;">
@@ -2546,7 +2546,7 @@
             </div>
             <div style="padding:24px; display:flex; flex-direction:column; gap:20px;">
                 <div class="form-group" style="margin-bottom:0;">
-                    <label class="form-label">Seu número de WhatsApp</label>
+                    <label class="form-label" for="whatsapp-number">Seu número de WhatsApp</label>
                     <input type="tel" id="whatsapp-number" class="form-control" placeholder="5541999999999"
                         style="font-size:1rem; letter-spacing:0.5px;">
                     <p style="font-size:0.78rem; color:var(--text-muted); margin-top:6px;">
@@ -2568,7 +2568,7 @@
                     </div>
                 </div>
 
-                <div style="background:rgba(99,102,241,0.08); border:1px solid rgba(99,102,241,0.25); border-radius:8px; padding:12px; font-size:0.8rem; color:var(--text-muted);">
+                <div style="background:rgba(139,92,246,0.08); border:1px solid rgba(139,92,246,0.25); border-radius:8px; padding:12px; font-size:0.8rem; color:var(--text-muted);">
                     <strong style="color:var(--primary-color);">Como funciona:</strong> ao enviar uma mensagem para o número do bot, ele identifica você pelo número cadastrado aqui e acessa apenas os seus dados.
                 </div>
             </div>

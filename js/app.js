@@ -507,8 +507,33 @@ class AppController {
         return 'Não foi possível salvar. Tente novamente em instantes.';
     }
 
+    // role=dialog/aria-modal + gestão de foco centralizados aqui propagam para
+    // todos os ~25 .modal-overlay do app de uma vez, sem precisar tocar em cada HTML.
+    _applyModalDialogA11y(overlay, modalId) {
+        const modalEl = overlay.querySelector('.modal') || overlay;
+        modalEl.setAttribute('role', 'dialog');
+        modalEl.setAttribute('aria-modal', 'true');
+        const heading = modalEl.querySelector('h2, h3');
+        if (heading) {
+            if (!heading.id) heading.id = `${modalId}-heading`;
+            modalEl.setAttribute('aria-labelledby', heading.id);
+        }
+        this._lastFocusedBeforeModal = document.activeElement;
+        requestAnimationFrame(() => {
+            const focusTarget = modalEl.querySelector(
+                'input:not([type="hidden"]):not([disabled]), textarea:not([disabled]), select:not([disabled])'
+            ) || heading;
+            if (focusTarget) {
+                if (!focusTarget.hasAttribute('tabindex') && focusTarget === heading) focusTarget.tabIndex = -1;
+                focusTarget.focus();
+            }
+        });
+    }
+
     openModal(modalId) {
-        document.getElementById(modalId).classList.add('active');
+        const overlay = document.getElementById(modalId);
+        overlay.classList.add('active');
+        this._applyModalDialogA11y(overlay, modalId);
         if (modalId === 'modal-record' || modalId === 'modal-task' || modalId === 'modal-agenda-event') {
             this.updateClientSelects();
         }
@@ -555,6 +580,12 @@ class AppController {
             setTimeout(() => {
                 overlay.classList.remove('active', 'modal-overlay--exiting');
             }, 200);
+        }
+        // Devolve o foco para quem abriu o modal (só se nenhum outro modal ficou por baixo)
+        if (document.querySelectorAll('.modal-overlay.active').length <= 1 &&
+            this._lastFocusedBeforeModal && typeof this._lastFocusedBeforeModal.focus === 'function') {
+            this._lastFocusedBeforeModal.focus();
+            this._lastFocusedBeforeModal = null;
         }
         // Trigger cleanup immediately so forms reset while animating out
 
@@ -2903,10 +2934,10 @@ class AppController {
                 <td style="vertical-align: top; padding-top: 20px;">${c.hoursTotal}h</td>
                 <td style="vertical-align: top; padding-top: 16px;">
                     <div style="display: flex; gap: 8px;">
-                        <button class="btn btn-secondary" onclick="app.openEditClientModal('${c.id}')" style="padding: 6px 12px; font-size: 0.8rem;">
+                        <button class="btn btn-secondary" onclick="app.openEditClientModal('${c.id}')" style="padding: 6px 12px; font-size: 0.8rem; min-height: 44px;">
                             <i data-lucide="edit-2" style="width: 16px; height: 16px;"></i> Editar
                         </button>
-                        <button class="btn btn-danger" onclick="app.handleDeleteClient('${c.id}', this)" style="padding: 6px 12px; font-size: 0.8rem;">
+                        <button class="btn btn-danger" onclick="app.handleDeleteClient('${c.id}', this)" style="padding: 6px 12px; font-size: 0.8rem; min-height: 44px;">
                             <i data-lucide="trash-2" style="width: 16px; height: 16px;"></i> Apagar
                         </button>
                     </div>
@@ -4177,6 +4208,9 @@ class AppController {
         card.className = 'kb-card' + (task.id === this._lastAddedTaskId ? ' kb-card-new' : '');
         card.draggable = !readOnly;
         card.dataset.id = task.id;
+        card.tabIndex = 0;
+        card.setAttribute('role', 'button');
+        card.setAttribute('aria-label', task.title ? `Tarefa: ${task.title}` : 'Tarefa sem título');
 
         if (!readOnly) {
             card.addEventListener('dragstart', this.dragStart.bind(this));
@@ -4199,8 +4233,15 @@ class AppController {
                 await this._handleDrop(e, card.closest('.kb-dropzone'));
             });
         }
-        card.addEventListener('click', (e) => {
+        const activateKbCard = (e) => {
             if (!e.target.closest('button')) this.handleEditTask(task.id, readOnly);
+        };
+        card.addEventListener('click', activateKbCard);
+        card.addEventListener('keydown', (e) => {
+            if ((e.key === 'Enter' || e.key === ' ') && !e.target.closest('button')) {
+                e.preventDefault();
+                activateKbCard(e);
+            }
         });
 
         const client = clientsMap[task.clientId];
@@ -5482,13 +5523,15 @@ class AppController {
         const rsvpHiddenClass   = ev.isInvited && ev.rsvpStatus === 'declined' && this._hideDeclinedEvents ? ' rsvp-hidden' : '';
         const hasRsvpClass      = ev.isInvited ? ' has-rsvp' : '';
         const rsvpPendingClass  = ev.isInvited && (!ev.rsvpStatus || ev.rsvpStatus === 'needsAction') ? ' rsvp-pending' : '';
+        const rsvpLabels = { accepted: 'Confirmado', tentative: 'Talvez', declined: 'Recusado', needsAction: 'Aguardando resposta' };
+        const rsvpAriaSuffix = ev.isInvited ? `, ${rsvpLabels[ev.rsvpStatus] || rsvpLabels.needsAction}` : '';
 
         return `
             <div class="event-block ${typeClass}${extraClasses}${rsvpDeclinedClass}${rsvpHiddenClass}${hasRsvpClass}${rsvpPendingClass}"
                  data-event-id="${ev.id}"
                  data-rsvp="${ev.rsvpStatus || 'needsAction'}"
                  style="top:${top}px;height:${height}px;width:${width};left:${left};right:auto;"
-                 tabindex="0" role="button" aria-label="${escapeHtml(ev.title)}, ${ev.startTime}–${ev.endTime}"
+                 tabindex="0" role="button" aria-label="${escapeHtml(ev.title)}, ${ev.startTime}–${ev.endTime}${rsvpAriaSuffix}"
                  onclick="event.stopPropagation();app.editAgendaEvent('${ev.id}')"
                  onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();event.stopPropagation();app.editAgendaEvent('${ev.id}')}">
                 <button class="event-delete-btn"
@@ -7031,7 +7074,7 @@ class AppController {
                 <div style="display:flex;align-items:center;gap:6px;margin-bottom:10px;">
                     <span style="width:42px;font-size:0.75rem;color:var(--text-muted);flex-shrink:0;">${label}</span>
                     <div style="flex:1;position:relative;height:14px;background:rgba(255,255,255,0.07);border-radius:4px;overflow:hidden;">
-                        <div class="indicadores-bar-fill" data-w="${completedPct}" style="height:100%;width:0;background:linear-gradient(90deg,#22c55e,#16a34a);border-radius:4px;transition:width 0.55s ease;"></div>
+                        <div class="indicadores-bar-fill" data-w="${completedPct}" style="height:100%;width:0;background:linear-gradient(90deg,var(--primary-color),var(--secondary-color));border-radius:4px;transition:width 0.55s ease;"></div>
                     </div>
                     <span style="width:70px;text-align:right;font-size:0.78rem;color:var(--text-muted);flex-shrink:0;">${m.completed} concl.</span>
                 </div>`;
@@ -7330,7 +7373,7 @@ class AppController {
         const bars = history.map(h => {
             const pct = Math.round((h.totalComissao / maxValor) * 100);
             const isSelected = h.year === this.financeiroYear && h.month === this.financeiroMonth;
-            const barColor = isSelected ? 'linear-gradient(180deg,#38bdf8,#0ea5e9)' : 'linear-gradient(180deg,#22c55e,#16a34a)';
+            const barColor = isSelected ? 'linear-gradient(180deg,#38bdf8,#0ea5e9)' : 'linear-gradient(180deg,var(--primary-color),var(--secondary-color))';
             return `
                 <div style="display:flex;flex-direction:column;align-items:center;flex:1;gap:6px;">
                     <div style="height:140px;width:100%;display:flex;align-items:flex-end;">
@@ -8357,7 +8400,9 @@ class AppController {
                     const hasCode = impl.codeScript && impl.codeScript.trim().length > 0;
                     const attachCount = impl.attachments ? impl.attachments.length : 0;
 
-                    html += `<div class="glass clickable-card" style="padding:16px;" onclick="app.openEditImplementation('${impl.id}')">
+                    html += `<div class="glass clickable-card" style="padding:16px;" onclick="app.openEditImplementation('${impl.id}')"
+                        tabindex="0" role="button" aria-label="Abrir implementação: ${escapeHtml(impl.name)}"
+                        onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();app.openEditImplementation('${impl.id}')}">
                         <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;margin-bottom:8px;">
                             <span style="font-weight:600;flex:1;">${escapeHtml(impl.name)}</span>
                             ${statusBadge(impl.status)}
@@ -8585,7 +8630,9 @@ class AppController {
                     if (images.length) metaParts.push(`<i data-lucide="image" style="width:12px;height:12px;vertical-align:middle;"></i> ${images.length}`);
                     const metaHtml = metaParts.length ? `<div style="font-size:.75rem;color:var(--text-muted);margin-bottom:8px;">${metaParts.join(' · ')}</div>` : '';
 
-                    html += `<div class="glass training-card clickable-card" data-id="${t.id}" style="padding:16px;" onclick="app.openEditTraining('${t.id}')">
+                    html += `<div class="glass training-card clickable-card" data-id="${t.id}" style="padding:16px;" onclick="app.openEditTraining('${t.id}')"
+                        tabindex="0" role="button" aria-label="Abrir treinamento: ${escapeHtml(t.title)}"
+                        onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();app.openEditTraining('${t.id}')}">
                         <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;margin-bottom:8px;">
                             <span style="font-weight:600;flex:1;">${escapeHtml(t.title)}</span>
                             ${statusBadge(t.status)}

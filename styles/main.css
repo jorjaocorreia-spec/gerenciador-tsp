@@ -44,6 +44,21 @@
   --kb-label-radius:  4px;
   --kb-label-min-w:   40px;
   --warning-color:    #eab308;
+
+  /* Escala semântica de z-index — só para overlays de topo (que competem entre si
+     na mesma stacking context global). Popups/labels aninhados dentro de um
+     componente já empilhado (ex.: color-picker do Kanban, .rsvp-dot, float-label)
+     usam valores locais pequenos de propósito e não entram nesta escala. */
+  --z-dropdown: 200;
+  --z-modal: 1000;
+  --z-popover: 9999;
+  --z-toast: 10000;
+  --z-tooltip: 60;
+
+  /* Cor do tipo "Lembrete" na Agenda — âmbar mais escuro que --warning-color
+     porque o texto branco do chip precisa de contraste AA (âmbar/amarelo puro
+     com texto branco fica ~2:1, bem abaixo de 4.5:1). */
+  --event-reminder-color: #b45309;
 }
 
 /* =========================================
@@ -747,7 +762,7 @@ h4 {
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 1000;
+  z-index: var(--z-modal);
   opacity: 0;
   pointer-events: none;
   transition: opacity 0.3s ease;
@@ -999,6 +1014,11 @@ h4 {
   background: var(--kb-card-bg-hover);
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
 }
+.kb-card:focus-visible {
+  outline: none;
+  background: var(--kb-card-bg-hover);
+  box-shadow: 0 0 0 2px rgba(139, 92, 246, 0.7);
+}
 .kb-card.dragging {
   opacity: 0.4;
   transform: rotate(1deg);
@@ -1101,8 +1121,10 @@ h4 {
   opacity: 0;
   transition: opacity 0.15s;
 }
-.kb-card:hover .kb-card-actions { opacity: 1; }
+.kb-card:hover .kb-card-actions,
+.kb-card:focus-within .kb-card-actions { opacity: 1; }
 .kb-action-btn {
+  position: relative;
   background: none;
   border: none;
   color: var(--text-secondary);
@@ -1112,6 +1134,13 @@ h4 {
   display: flex;
   align-items: center;
   transition: background 0.15s, color 0.15s;
+}
+/* Alvo de toque só pode crescer ~1px por lado sem sobrepor os ícones vizinhos
+   (.kb-card-actions gap:2px) — geometria não comporta 44px nessa densidade. */
+.kb-action-btn::before {
+  content: '';
+  position: absolute;
+  inset: -1px;
 }
 .kb-action-btn:hover { background: rgba(255,255,255,0.1); color: var(--text-primary); }
 .kb-action-danger:hover { background: rgba(255,107,107,0.2); color: #ff6b6b; }
@@ -1407,6 +1436,20 @@ h4 {
   min-height: 0;
   padding-right: 10px;
 }
+/* Modal de Tarefa/Chamado (dois painéis) em viewport estreito: sem isto, o
+   painel principal ficava com ~136px úteis em 375px de tela (185px fixos do
+   sidebar consumiam quase tudo). Empilha verticalmente e o sidebar de metadados
+   passa a rolar dentro da própria altura reservada, não mais lado a lado. */
+@media (max-width: 700px) {
+  .modal-task-body {
+    flex-direction: column;
+    overflow-y: auto;
+  }
+  .modal-task-sidebar {
+    width: 100%;
+    max-height: 40vh;
+  }
+}
 /* Scrollbars do modal de dois painéis (Tarefa/Chamado) seguem o padrão
    thin/roxo já usado no Kanban (.kb-dropzone/.kanban-board) — nunca a
    scrollbar branca padrão do navegador (::-webkit-scrollbar global). */
@@ -1511,6 +1554,12 @@ details.modal-sidebar-group summary.modal-sidebar-group-title::marker {
 .kb-col-btn:hover, .kb-col-btn.active {
   background: rgba(255, 255, 255, 0.10);
   color: var(--text-primary);
+}
+.kb-col-btn:focus-visible {
+  outline: none;
+  background: rgba(255, 255, 255, 0.10);
+  color: var(--text-primary);
+  box-shadow: 0 0 0 2px rgba(139, 92, 246, 0.7);
 }
 .modal-sidebar-actions {
   display: flex;
@@ -1796,8 +1845,16 @@ details.modal-sidebar-group summary.modal-sidebar-group-title::marker {
   z-index: 2;
   flex-shrink: 0;
 }
-.event-block:hover .event-delete-btn {
+.event-block:hover .event-delete-btn,
+.event-block:focus-within .event-delete-btn {
   opacity: 1;
+}
+/* Área de toque ampliada (~34px) sem inflar o botão visual — eventos curtos na
+   grade não comportam o alvo "ideal" de 44px sem colidir com o .rsvp-dot. */
+.event-delete-btn::before {
+  content: '';
+  position: absolute;
+  inset: -8px;
 }
 
 /* Evento maior que tem sobreposição: pseudo-element escurece sem criar stacking context */
@@ -1831,7 +1888,7 @@ details.modal-sidebar-group summary.modal-sidebar-group-title::marker {
 }
 
 .type-reminder {
-  background: #d97706;
+  background: var(--event-reminder-color);
 }
 
 .events-container {
@@ -2061,6 +2118,7 @@ details.modal-sidebar-group summary.modal-sidebar-group-title::marker {
 }
 
 .btn-icon-sm {
+  position: relative;
   padding: 0;
   width: 34px;
   height: 34px;
@@ -2068,6 +2126,16 @@ details.modal-sidebar-group summary.modal-sidebar-group-title::marker {
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
+}
+/* Área de toque ampliada sem aumentar o tamanho visual — necessário em colunas
+   de ação densas (Apontamentos, 4 ícones lado a lado em ~148px). Limitada a
+   -2px (não os 44px "ideais") porque o gap entre os botões é de só 4px
+   (.apt-actions); um inset maior faria a área invisível de um botão vizinho
+   se sobrepor e roubar o clique. */
+.btn-icon-sm::before {
+  content: '';
+  position: absolute;
+  inset: -2px;
 }
 
 .btn-icon-sm svg {
@@ -2370,7 +2438,7 @@ details.modal-sidebar-group summary.modal-sidebar-group-title::marker {
 .schedule-event-dot.type-meeting    { background: #3b82f6; }
 .schedule-event-dot.type-consulting { background: #8b5cf6; }
 .schedule-event-dot.type-task       { background: #10b981; }
-.schedule-event-dot.type-reminder   { background: #f59e0b; }
+.schedule-event-dot.type-reminder   { background: var(--event-reminder-color); }
 
 .schedule-event-time {
   font-size: 0.8rem;
@@ -2702,7 +2770,7 @@ body.money-hidden .money-value {
   position: fixed;
   bottom: 24px;
   right: 24px;
-  z-index: 10000;
+  z-index: var(--z-toast);
   display: flex;
   flex-direction: column;
   gap: 10px;
@@ -3261,20 +3329,20 @@ kbd {
 /* ─────────────────────────────────────────────────────────────── */
 
 .btn-sm { padding: 5px 12px; font-size: .82rem; }
+/* Variante usada em Apontamentos: reaproveita o .btn-icon-sm acima (tamanho/
+   área de toque já definidos), só adiciona fundo transparente + opacidade
+   apagada em repouso. Nunca redeclarar width/height/padding aqui — foi
+   exatamente essa duplicação que colapsava o alvo de toque para ~25px. */
 .btn-icon-sm {
     background: none;
     border: none;
     cursor: pointer;
-    padding: 5px;
     border-radius: 6px;
     opacity: .55;
     transition: opacity .15s, color .15s;
     color: inherit;
-    display: inline-flex;
-    align-items: center;
 }
 .btn-icon-sm:hover { opacity: 1; }
-.btn-icon-sm svg { width: 15px; height: 15px; }
 .btn-danger-sm:hover { color: #f87171; }
 
 /* ── Agendamento Automático (Fase 25) ──────────────────────── */
@@ -3304,7 +3372,9 @@ kbd {
 }
 .modal-tab:hover { color: var(--text-primary); }
 .modal-tab.active {
-    color: var(--primary);
+    /* Mesmo fix de contraste do .status-filter-tab.active: var(--primary) sobre
+       o fundo escuro do modal fica ~4.2:1, abaixo do AA (4.5:1). */
+    color: #a883f8;
     border-bottom-color: var(--primary);
 }
 
@@ -3463,7 +3533,7 @@ kbd {
 }
 .preview-badge-ok    { background: rgba(34,197,94,0.15);  color: #4ade80; }
 .preview-badge-under { background: rgba(239,68,68,0.13);  color: #f87171; }
-.preview-badge-over  { background: rgba(234,179,8,0.13);  color: #facc15; }
+.preview-badge-over  { background: rgba(234,179,8,0.13);  color: var(--warning-color); }
 
 /* Área de ações do preview */
 .preview-actions {
@@ -4066,6 +4136,7 @@ kbd {
     line-height: 1;
 }
 .caf-chip-remove {
+    position: relative;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -4079,6 +4150,15 @@ kbd {
     padding: 0;
     flex-shrink: 0;
     transition: var(--transition);
+}
+/* Área de toque ampliada sem inflar o chip visualmente — limitada a -6px
+   (não os 44px "ideais") porque os chips ficam a só 6px de distância entre si
+   (.chamados-active-filters gap:6px); um inset maior faria a área invisível
+   de um chip vizinho se sobrepor e roubar o clique. */
+.caf-chip-remove::before {
+    content: '';
+    position: absolute;
+    inset: -6px;
 }
 .caf-chip-remove:hover,
 .caf-chip-remove:focus-visible {
@@ -4110,7 +4190,7 @@ kbd {
     justify-content: space-between;
     gap: 6px;
     width: 100%;
-    height: 36px;
+    height: 44px;
     padding: 0 10px;
     background: rgba(15, 23, 42, 0.5);
     border: 1px solid var(--surface-border);
@@ -4165,7 +4245,7 @@ kbd {
     border: 1px solid var(--surface-border);
     border-radius: 8px;
     box-shadow: 0 8px 24px rgba(0,0,0,0.4);
-    z-index: 200;
+    z-index: var(--z-dropdown);
     padding: 4px 0;
 }
 .mf-dropdown.mf-drop-open {
@@ -4323,6 +4403,10 @@ kbd {
         border-color: rgba(239, 68, 68, 0.5);
         box-shadow: 0 0 18px rgba(239, 68, 68, 0.12);
     }
+    .badge-danger-pulse,
+    .badge-danger-pulse::before {
+        animation: none;
+    }
     #dashboard-container.dash-slide-right .stat-card-animate,
     #dashboard-container.dash-slide-left .stat-card-animate {
         animation: none;
@@ -4441,7 +4525,9 @@ kbd {
 }
 .badge-danger-pulse {
     position: relative;
-    background: var(--danger-color);
+    /* Fundo mais escuro que --danger-color de propósito: texto branco sobre
+       #ef4444 puro fica ~3.76:1 num badge de 0.7rem, abaixo do AA (4.5:1). */
+    background: #b91c1c;
     color: white;
     padding: 2px 8px 2px 6px;
     border-radius: 4px;
@@ -4762,6 +4848,13 @@ kbd {
     transition: transform 0.15s ease, box-shadow 0.15s ease;
     z-index: 2;
 }
+/* Área de toque ampliada (~31px) sem inflar o dot visual — mesma ressalva do
+   .event-delete-btn: eventos curtos não comportam os 44px "ideais". */
+.rsvp-dot::before {
+    content: '';
+    position: absolute;
+    inset: -8px;
+}
 .rsvp-dot svg {
     width: 9px;
     height: 9px;
@@ -4774,25 +4867,25 @@ kbd {
     box-shadow: 0 0 0 3px rgba(255,255,255,0.3);
 }
 .rsvp-dot--needsAction {
-    background: #f59e0b;
-    border: 2px solid #d97706;
+    background: var(--warning-color);
+    border: 2px solid color-mix(in srgb, var(--warning-color) 80%, black);
     animation: rsvp-pending-pulse 1.6s ease-in-out infinite;
 }
 @keyframes rsvp-pending-pulse {
-    0%, 100% { box-shadow: 0 0 0 0 rgba(245, 158, 11, 0.55); }
-    50% { box-shadow: 0 0 0 5px rgba(245, 158, 11, 0); }
+    0%, 100% { box-shadow: 0 0 0 0 rgba(234, 179, 8, 0.55); }
+    50% { box-shadow: 0 0 0 5px rgba(234, 179, 8, 0); }
 }
 .rsvp-dot--accepted {
-    background: #22c55e;
-    border: 2px solid #16a34a;
+    background: var(--success-color);
+    border: 2px solid color-mix(in srgb, var(--success-color) 80%, black);
 }
 .rsvp-dot--tentative {
-    background: #f59e0b;
-    border: 2px solid #d97706;
+    background: var(--warning-color);
+    border: 2px solid color-mix(in srgb, var(--warning-color) 80%, black);
 }
 .rsvp-dot--declined {
-    background: #ef4444;
-    border: 2px solid #dc2626;
+    background: var(--danger-color);
+    border: 2px solid color-mix(in srgb, var(--danger-color) 80%, black);
 }
 .rsvp-dot--loading {
     background: rgba(255,255,255,0.4);
@@ -4871,7 +4964,7 @@ kbd {
 /* Mini-popup "Você vai?" */
 .rsvp-popup {
     position: fixed;
-    z-index: 9999;
+    z-index: var(--z-popover);
     background: var(--bg-glass, rgba(30, 30, 50, 0.95));
     border: 1px solid rgba(255,255,255,0.12);
     border-radius: 10px;
@@ -5056,7 +5149,7 @@ kbd {
     transform: translateX(-50%) translateY(4px);
     width: 300px;
     padding: 12px 14px;
-    background: #1c1830;
+    background: rgba(30, 41, 59, 0.97);
     border: 1px solid rgba(168, 85, 247, 0.35);
     border-radius: 10px;
     color: var(--text-secondary);
@@ -5064,7 +5157,7 @@ kbd {
     font-weight: 400;
     line-height: 1.55;
     text-align: left;
-    z-index: 60;
+    z-index: var(--z-tooltip);
     box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
     transition: opacity 0.18s ease, transform 0.18s ease, visibility 0.18s;
     pointer-events: none;
@@ -5105,7 +5198,7 @@ kbd {
 
 .notif-panel {
     position: fixed;
-    z-index: 9999;
+    z-index: var(--z-popover);
     background: var(--bg-glass, rgba(30, 30, 50, 0.95));
     border: 1px solid rgba(255,255,255,0.12);
     border-radius: 10px;
