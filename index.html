@@ -217,9 +217,9 @@
                 <div style="display: flex; gap: 8px; align-items: center;">
                     <input type="checkbox" id="dash-filter-total" onchange="app.renderDashboard()" style="width: 18px; height: 18px; cursor: pointer; accent-color: var(--primary-color);">
                     <label for="dash-filter-total" style="margin: 0; cursor: pointer; color: var(--primary-color); font-weight: 500;">Totalizar Horas</label>
-                    <span class="info-tooltip" tabindex="0" aria-label="Como o cálculo é feito">
+                    <span class="info-tooltip" tabindex="0" aria-label="Como o cálculo é feito" aria-describedby="tooltip-totalizar-horas">
                         <i data-lucide="info" style="width: 15px; height: 15px; color: var(--primary-color);"></i>
-                        <span class="info-tooltip-text">A totalização considera apenas <strong>meses já encerrados</strong>: as horas aplicadas e a cota contratada do mês vigente não entram no cálculo.<br><br>Saldo = saldo inicial + horas aplicadas − (meses concluídos × horas mensais contratadas).</span>
+                        <span class="info-tooltip-text" id="tooltip-totalizar-horas" role="tooltip">A totalização considera apenas <strong>meses já encerrados</strong>: as horas aplicadas e a cota contratada do mês vigente não entram no cálculo.<br><br>Saldo = saldo inicial + horas aplicadas − (meses concluídos × horas mensais contratadas).</span>
                     </span>
                 </div>
                 <!-- Navegação de mês -->
@@ -274,9 +274,9 @@
                     <button class="btn btn-secondary" id="btn-open-saldo" onclick="app.openSaldoPanel()" title="Posição de horas por projeto" style="padding: 8px 14px; gap: 6px;">
                         <i data-lucide="scale" style="width: 16px; height: 16px;"></i> Saldo
                     </button>
-                    <span class="info-tooltip" tabindex="0" aria-label="Como o saldo é calculado">
+                    <span class="info-tooltip" tabindex="0" aria-label="Como o saldo é calculado" aria-describedby="tooltip-saldo-clientes">
                         <i data-lucide="info" style="width: 15px; height: 15px; color: var(--primary-color);"></i>
-                        <span class="info-tooltip-text">Saldo = horas aplicadas − horas contratadas acumuladas desde o início do controle de cada cliente.</span>
+                        <span class="info-tooltip-text" id="tooltip-saldo-clientes" role="tooltip">Saldo = horas aplicadas − horas contratadas acumuladas desde o início do controle de cada cliente.</span>
                     </span>
                     <button class="btn btn-primary" onclick="app.openModal('modal-client')">
                         <i data-lucide="plus"></i> Novo Cliente
@@ -285,11 +285,12 @@
             </div>
 
             <div class="glass" style="padding: 24px;">
-                <div class="status-filter-tabs" id="client-status-filter-tabs">
-                    <button type="button" class="status-filter-tab active" data-status="active" onclick="app.setClientStatusFilter('active')">Ativos</button>
-                    <button type="button" class="status-filter-tab" data-status="finished" onclick="app.setClientStatusFilter('finished')">Finalizados</button>
-                    <button type="button" class="status-filter-tab" data-status="all" onclick="app.setClientStatusFilter('all')">Todos</button>
+                <div class="status-filter-tabs" id="client-status-filter-tabs" role="tablist" aria-label="Filtrar por status">
+                    <button type="button" class="status-filter-tab active" role="tab" aria-selected="true" data-status="active" onclick="app.setClientStatusFilter('active')">Ativos</button>
+                    <button type="button" class="status-filter-tab" role="tab" aria-selected="false" data-status="finished" onclick="app.setClientStatusFilter('finished')">Finalizados</button>
+                    <button type="button" class="status-filter-tab" role="tab" aria-selected="false" data-status="all" onclick="app.setClientStatusFilter('all')">Todos</button>
                 </div>
+                <div style="overflow-x: auto;">
                 <table class="data-table" id="clients-table">
                     <thead>
                         <tr>
@@ -302,6 +303,7 @@
                         <!-- Tabela renderizada via JS -->
                     </tbody>
                 </table>
+                </div>
             </div>
         </section>
 
@@ -352,6 +354,7 @@
                     </div>
                 </div>
 
+                <div style="overflow-x: auto;">
                 <table class="data-table" id="records-table">
                     <thead>
                         <tr>
@@ -367,6 +370,7 @@
                     </tbody>
                     <tfoot id="records-tfoot"></tfoot>
                 </table>
+                </div>
             </div>
         </section>
 
@@ -865,6 +869,7 @@
                 </div>
             </div>
 
+            <div style="overflow-x: auto;">
             <table class="data-table" id="financeiro-table">
                 <thead>
                     <tr>
@@ -880,6 +885,7 @@
                 </tbody>
                 <tfoot id="financeiro-tfoot"></tfoot>
             </table>
+            </div>
 
             <div class="view-header" style="margin-top:24px;">
                 <div class="view-header-left">
@@ -946,12 +952,12 @@
                 </div>
             </div>
             <!-- Tabs do modal de cliente -->
-            <div class="modal-tabs" id="modal-client-tabs">
-                <button type="button" class="modal-tab active" id="tab-btn-dados" onclick="app.switchClientModalTab('dados')">Dados</button>
-                <button type="button" class="modal-tab" id="tab-btn-scheduling" onclick="app.switchClientModalTab('scheduling')">
+            <div class="modal-tabs" id="modal-client-tabs" role="tablist" aria-label="Seções do cliente">
+                <button type="button" class="modal-tab active" role="tab" aria-selected="true" id="tab-btn-dados" onclick="app.switchClientModalTab('dados')">Dados</button>
+                <button type="button" class="modal-tab" role="tab" aria-selected="false" id="tab-btn-scheduling" onclick="app.switchClientModalTab('scheduling')">
                     <i data-lucide="calendar-clock" style="width:14px;height:14px;"></i> Agendamento
                 </button>
-                <button type="button" class="modal-tab" id="tab-btn-report" onclick="app.switchClientModalTab('report')">
+                <button type="button" class="modal-tab" role="tab" aria-selected="false" id="tab-btn-report" onclick="app.switchClientModalTab('report')">
                     <i data-lucide="file-text" style="width:14px;height:14px;"></i> Relatório
                 </button>
             </div>
@@ -2134,7 +2140,7 @@
 
                     <div class="form-group" style="grid-column: 1 / -1;">
                         <label class="form-label">Código / Script</label>
-                        <textarea id="impl-code" class="form-control" rows="6" style="font-family: 'Courier New', monospace; font-size: 0.8rem;" placeholder="Cole aqui o SQL, script ou pseudocódigo..." spellcheck="false"></textarea>
+                        <textarea id="impl-code" class="form-control" rows="6" style="font-family: var(--font-mono); font-size: 0.8rem;" placeholder="Cole aqui o SQL, script ou pseudocódigo..." spellcheck="false"></textarea>
                     </div>
 
                     <div class="form-group" style="grid-column: 1 / -1;">
@@ -2470,9 +2476,9 @@
                 <h3>Configurar OTOBO</h3>
                 <button class="close-modal" onclick="app.closeModal('modal-otobo-config')"><i data-lucide="x"></i></button>
             </div>
-            <div class="modal-tabs">
-                <button class="modal-tab active" data-tab="otobo-tab-conexao" onclick="app.switchOtoboTab('conexao')">Conexão</button>
-                <button class="modal-tab" data-tab="otobo-tab-sync" onclick="app.switchOtoboTab('sync')">Filtros de Sync</button>
+            <div class="modal-tabs" role="tablist" aria-label="Configuração do OTOBO">
+                <button class="modal-tab active" role="tab" aria-selected="true" data-tab="otobo-tab-conexao" onclick="app.switchOtoboTab('conexao')">Conexão</button>
+                <button class="modal-tab" role="tab" aria-selected="false" data-tab="otobo-tab-sync" onclick="app.switchOtoboTab('sync')">Filtros de Sync</button>
             </div>
             <div id="otobo-tab-conexao" style="padding:24px; display:flex; flex-direction:column; gap:16px;">
                 <div class="form-group" style="margin-bottom:0;">
@@ -2647,7 +2653,7 @@
                     <label class="form-label">API Key</label>
                     <div style="position:relative;">
                         <input type="password" id="ai-api-key" class="form-control" placeholder="sk-..." autocomplete="off" style="padding-right: 42px;">
-                        <button type="button" onclick="app.toggleAIKeyVisibility()" style="position:absolute;right:10px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;color:var(--text-muted);padding:4px;" title="Mostrar/ocultar chave">
+                        <button type="button" id="btn-ai-key-toggle" onclick="app.toggleAIKeyVisibility()" style="position:absolute;right:10px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;color:var(--text-muted);padding:4px;" title="Mostrar chave" aria-pressed="false" aria-label="Mostrar chave">
                             <i data-lucide="eye" id="icon-ai-key-toggle" style="width:16px;height:16px;"></i>
                         </button>
                     </div>
@@ -2664,7 +2670,7 @@
                 </div>
 
                 <div style="margin-top:12px; padding-top:12px; border-top:1px solid rgba(255,255,255,0.06); display:flex; justify-content:flex-end;">
-                    <button type="button" class="btn btn-ghost" id="btn-ai-remove" onclick="app.removeAIConfig()" style="font-size:0.82rem; color:var(--danger-color); display:none;">
+                    <button type="button" class="btn btn-ghost" id="btn-ai-remove" onclick="app.removeAIConfig(this)" style="font-size:0.82rem; color:var(--danger-color); display:none;">
                         <i data-lucide="trash-2" style="width:14px;height:14px;"></i> Remover configuração
                     </button>
                 </div>

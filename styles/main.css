@@ -21,6 +21,9 @@
   --text-secondary: #94a3b8;
   --text-muted: #94a3b8;
   --font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  /* Única exceção deliberada à fonte Inter (código-fonte em Implementações) —
+     stack moderna com fallback, não uma única fonte datada sem alternativa. */
+  --font-mono: ui-monospace, 'SFMono-Regular', Menlo, Consolas, 'Liberation Mono', monospace;
   --border-radius: 12px;
   --transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 
@@ -78,6 +81,21 @@ body {
   display: flex;
   overflow: hidden;
   /* App-like feel */
+}
+
+/* Rede de segurança global de prefers-reduced-motion — os componentes com
+   animação de entrada/pulso mais visível já têm override dedicado (Dashboard,
+   Agenda, Toast, badge Estourado etc.), mas nada cobria o restante do app por
+   padrão. Isso encurta qualquer animação/transição não coberta explicitamente
+   para virtualmente instantânea, sem removê-la (evita quebrar lógica que
+   dependa do fim do evento `transitionend`/`animationend`). */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }
 
 /* =========================================
@@ -650,6 +668,16 @@ h4 {
   outline: none;
   box-shadow: 0 0 0 2px rgba(139,92,246,0.5);
 }
+/* Sem isto, `btn.disabled = true` (setado em vários pontos via JS, ex.: botão
+   "Entrar" do login, modal de IA) não mudava a aparência nenhuma — cursor
+   pointer e cor cheia continuavam, único sinal era o texto trocar para
+   "Aguarde..." */
+.btn:disabled,
+.btn[disabled] {
+  opacity: 0.55;
+  cursor: not-allowed;
+  pointer-events: none;
+}
 
 /* Foco de teclado consistente para os elementos interativos da Agenda
    (chips de evento, seletor de view, RSVP) — nenhum tinha indicador antes */
@@ -748,6 +776,15 @@ h4 {
   box-shadow: 0 0 0 2px rgba(139, 92, 246, 0.2);
   background-size: 100% 2px;
 }
+/* Sem isto, a cor do placeholder do .form-control genérico (usado no login e
+   em quase todo formulário do app) dependia do estilo padrão do navegador
+   sobre fundo escuro — não garantidamente ≥4.5:1 e variável entre browsers/SO.
+   var(--text-muted) sozinho (sem opacity extra) já mede ~6.4:1 contra o fundo
+   do input, então nenhuma redução adicional é aplicada aqui. */
+.form-control::placeholder {
+  color: var(--text-muted);
+  opacity: 1;
+}
 
 /* =========================================
    Components: Modals
@@ -762,6 +799,11 @@ h4 {
   display: flex;
   align-items: center;
   justify-content: center;
+  /* Piso de respiro lateral — sem isso, .modal (width:100%; max-width:500px)
+     encostava exatamente nas bordas em viewports muito estreitos (~360px,
+     o caso mais comum de smartphone). Modais que já definem padding inline
+     (modal-saldo, modal-horas-mes etc.) simplesmente sobrescrevem este valor. */
+  padding: 16px;
   z-index: var(--z-modal);
   opacity: 0;
   pointer-events: none;
@@ -2804,15 +2846,39 @@ body.money-hidden .money-value {
   border: 1px solid rgba(139, 92, 246, 0.35);
   color: #a78bfa;
 }
+.toast-close {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: inherit;
+  opacity: 0.7;
+  padding: 2px;
+  margin-left: 4px;
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+}
+.toast-close:hover { opacity: 1; }
+.toast-close:focus-visible {
+  outline: none;
+  opacity: 1;
+  box-shadow: 0 0 0 2px rgba(139,92,246,0.6);
+  border-radius: 4px;
+}
+/* Entrada monotônica (ease-out-quart), sem o overshoot "passa-e-volta" que a
+   versão anterior tinha nos keyframes intermediários — o guia de motion do
+   projeto bane easing bounce/elástico, e o efeito visual era o mesmo mesmo
+   sem usar uma curva bounce nomeada. */
 @keyframes toast-in {
-  0%   { opacity: 0; transform: translateX(40px) scale(0.95); }
-  60%  { opacity: 1; transform: translateX(-6px) scale(1.02); }
-  80%  { transform: translateX(3px) scale(0.99); }
-  100% { opacity: 1; transform: translateX(0) scale(1); }
+  0%   { opacity: 0; transform: translateX(40px); }
+  100% { opacity: 1; transform: translateX(0); }
 }
 @keyframes toast-out {
   from { opacity: 1; transform: translateX(0); }
   to   { opacity: 0; transform: translateX(40px); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .toast { animation: none; }
 }
 
 /* ── Anexos de Tarefa ─────────────────────────────────────── */
@@ -3151,10 +3217,17 @@ kbd {
 }
 @media (max-width: 720px) {
     .apt-quickadd { grid-template-columns: 1fr; }
-}
-#apt-start::-webkit-calendar-picker-indicator,
-#apt-end::-webkit-calendar-picker-indicator {
-    display: none;
+    /* .apt-row tinha grid-template-columns fixo (150px 80px 1fr 60px 148px) sem
+       nenhum fallback — só o quick-add tinha esse breakpoint, forçando scroll
+       horizontal em qualquer linha de dado real abaixo de ~500-600px. Empilha
+       os campos verticalmente, igual ao quick-add; o cabeçalho tabular (rótulos
+       de coluna) some porque deixa de haver colunas para rotular. */
+    .apt-row {
+        grid-template-columns: 1fr;
+        gap: 4px;
+    }
+    .apt-table-header { display: none; }
+    .apt-actions { justify-content: flex-end; }
 }
 .apt-duration-display {
     display: inline-block;

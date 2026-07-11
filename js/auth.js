@@ -75,12 +75,16 @@ const Auth = {
         const password = document.getElementById('auth-password').value;
         const btn = document.getElementById('auth-submit');
 
-        btn.disabled = true;
-        btn.textContent = 'Aguarde...';
+        // window.app já existe neste ponto (AppController é instanciado em
+        // DOMContentLoaded, antes de qualquer submit de login) — reaproveita o
+        // mesmo padrão de loading/sucesso usado no resto do app em vez de
+        // reimplementar manualmente (spinner/texto próprios, sem "Salvo!").
+        if (window.app) window.app._btnPending(btn); else { btn.disabled = true; btn.textContent = 'Aguarde...'; }
         this.clearMessage();
 
         try {
             await this.signIn(email, password);
+            if (window.app) await window.app._btnSuccess(btn);
             this.hideAuthScreen();
             if (window.app) window.app.initAfterAuth();
         } catch (err) {
@@ -89,9 +93,7 @@ const Auth = {
                 'Email not confirmed': 'Confirme seu e-mail antes de entrar.',
             };
             this.showMessage(msgs[err.message] || err.message);
-        } finally {
-            btn.disabled = false;
-            btn.textContent = 'Entrar';
+            if (window.app) window.app._btnError(btn); else { btn.disabled = false; btn.textContent = 'Entrar'; }
         }
     },
 

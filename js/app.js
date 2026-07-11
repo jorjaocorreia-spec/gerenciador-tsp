@@ -8,14 +8,25 @@ const Toast = {
         if (!container) {
             container = document.createElement('div');
             container.id = 'toast-container';
+            // aria-live + role=status: único canal de feedback de erro/sucesso do
+            // app inteiro — sem isso, leitores de tela nunca eram avisados.
+            container.setAttribute('role', 'status');
+            container.setAttribute('aria-live', 'polite');
             document.body.appendChild(container);
         }
         const icons = { success: 'check-circle', error: 'x-circle', info: 'info' };
         const el = document.createElement('div');
         el.className = `toast toast-${type}`;
-        el.innerHTML = `<i data-lucide="${icons[type] || 'info'}" style="width:16px;height:16px;flex-shrink:0;"></i><span>${message}</span>`;
+        const closeBtnHtml = type === 'error'
+            ? `<button type="button" class="toast-close" aria-label="Fechar aviso" onclick="this.closest('.toast').style.animation='toast-out 0.3s ease forwards';setTimeout(()=>this.closest('.toast')?.remove(),300)"><i data-lucide="x" style="width:14px;height:14px;"></i></button>`
+            : '';
+        el.innerHTML = `<i data-lucide="${icons[type] || 'info'}" style="width:16px;height:16px;flex-shrink:0;"></i><span>${message}</span>${closeBtnHtml}`;
         container.appendChild(el);
         lucide.createIcons();
+        // Erros não somem sozinhos — só o "×" fecha. Mensagens de erro tendem a
+        // ser mais longas (ex.: comentário não salvo) e o usuário precisa de
+        // tempo para ler/copiar antes de perder o aviso.
+        if (type === 'error') return;
         setTimeout(() => {
             el.style.animation = 'toast-out 0.3s ease forwards';
             setTimeout(() => el.remove(), 300);
@@ -1173,13 +1184,13 @@ class AppController {
             if (isImage) {
                 return `<div class="attach-thumb">
                     <img src="${att.data}" alt="${escapeHtml(att.name)}" onclick="app._openAttachmentLightbox(${i})" title="${escapeHtml(att.name)}">
-                    <button type="button" class="attach-remove" onclick="app.removeTaskAttachment(${i})" title="Remover">×</button>
+                    <button type="button" class="attach-remove" onclick="app.removeTaskAttachment(${i})" title="Remover" aria-label="Remover ${escapeHtml(att.name)}">×</button>
                 </div>`;
             }
             return `<div class="attach-thumb attach-thumb-file" onclick="app._openAttachmentLightbox(${i})" title="${escapeHtml(att.name)}">
                 <i data-lucide="file-text" style="width:26px;height:26px;opacity:.75;pointer-events:none;"></i>
                 <span class="attach-thumb-fname">${escapeHtml(att.name)}</span>
-                <button type="button" class="attach-remove" onclick="event.stopPropagation();app.removeTaskAttachment(${i})" title="Remover">×</button>
+                <button type="button" class="attach-remove" onclick="event.stopPropagation();app.removeTaskAttachment(${i})" title="Remover" aria-label="Remover ${escapeHtml(att.name)}">×</button>
             </div>`;
         }).join('');
         lucide.createIcons();
@@ -1381,13 +1392,13 @@ class AppController {
                 <div class="attach-thumb attach-thumb-file" onclick="app._openImplAttachmentLightbox(${i})" title="${escapeHtml(att.name)}" style="cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;min-width:80px;padding:8px;background:var(--bg-glass);border:1px solid var(--border-color);border-radius:8px;">
                     <i data-lucide="file-code-2" style="width:32px;height:32px;color:var(--primary);"></i>
                     <span style="font-size:10px;color:var(--text-muted);text-align:center;max-width:80px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHtml(att.name)}</span>
-                    <button type="button" class="attach-remove" onclick="event.stopPropagation();app.removeImplAttachment(${i})" title="Remover" style="position:static;margin-top:2px;">×</button>
+                    <button type="button" class="attach-remove" onclick="event.stopPropagation();app.removeImplAttachment(${i})" title="Remover" aria-label="Remover ${escapeHtml(att.name)}" style="position:static;margin-top:2px;">×</button>
                 </div>`;
             }
             return `
             <div class="attach-thumb">
                 <img src="${att.data}" alt="${escapeHtml(att.name)}" onclick="app._openImplAttachmentLightbox(${i})" title="${escapeHtml(att.name)}">
-                <button type="button" class="attach-remove" onclick="app.removeImplAttachment(${i})" title="Remover">×</button>
+                <button type="button" class="attach-remove" onclick="app.removeImplAttachment(${i})" title="Remover" aria-label="Remover ${escapeHtml(att.name)}">×</button>
             </div>`;
         }).join('');
         lucide.createIcons();
@@ -2950,7 +2961,9 @@ class AppController {
     setClientStatusFilter(status) {
         this.clientStatusFilter = status;
         document.querySelectorAll('#client-status-filter-tabs .status-filter-tab').forEach(btn => {
-            btn.classList.toggle('active', btn.dataset.status === status);
+            const isActive = btn.dataset.status === status;
+            btn.classList.toggle('active', isActive);
+            btn.setAttribute('aria-selected', String(isActive));
         });
         this.renderClients(this._clientsCache, this._clientsStatsCache);
     }
@@ -7005,9 +7018,9 @@ class AppController {
         if (!container || !data) return;
 
         const tabsHtml = `
-            <div class="indicadores-tabs">
-                <button type="button" class="indicadores-tab ${this.indicadoresTab === 'mensal' ? 'active' : ''}" onclick="app.switchIndicadoresTab('mensal')">Mensal</button>
-                <button type="button" class="indicadores-tab ${this.indicadoresTab === 'geral' ? 'active' : ''}" onclick="app.switchIndicadoresTab('geral')">Geral</button>
+            <div class="indicadores-tabs" role="tablist" aria-label="Período dos indicadores">
+                <button type="button" class="indicadores-tab ${this.indicadoresTab === 'mensal' ? 'active' : ''}" role="tab" aria-selected="${this.indicadoresTab === 'mensal'}" onclick="app.switchIndicadoresTab('mensal')">Mensal</button>
+                <button type="button" class="indicadores-tab ${this.indicadoresTab === 'geral' ? 'active' : ''}" role="tab" aria-selected="${this.indicadoresTab === 'geral'}" onclick="app.switchIndicadoresTab('geral')">Geral</button>
             </div>`;
 
         let bodyHtml;
@@ -7062,6 +7075,7 @@ class AppController {
                 <div class="glass indicadores-kpi-card">
                     <span class="indicadores-kpi-label">Tempo médio de conclusão</span>
                     <span class="indicadores-kpi-value">${kpis.avgCompletionDays !== null ? kpis.avgCompletionDays + ' dias' : '—'}</span>
+                    <span class="indicadores-kpi-sub">Da criação até a conclusão</span>
                 </div>
             </div>`;
 
@@ -7409,12 +7423,19 @@ class AppController {
         }
         const bal = summary.accumulated.balanceMinutes;
         const color = bal >= 0 ? '#4ade80' : '#f87171';
+        const trendIcon = bal >= 0 ? 'trending-up' : 'trending-down';
         const [sy, sm, sd] = summary.config.startDate.split('-');
         const [ly, lm, ld] = summary.accumulated.lastDate.split('-');
+        // Número grande + label pequeno é o padrão "hero-metric" que o design
+        // system bane — o ícone de tendência dá uma segunda dimensão de
+        // informação (direção, não só magnitude) e o tamanho do número foi
+        // reduzido para não competir com o card de período logo abaixo.
         card.innerHTML = `
             <div class="stat-header">
                 <span class="client-name">Saldo Acumulado</span>
-                <span style="font-weight:700;font-size:1.4rem;color:${color};">${TSPProductivity.fmtMinutes(bal)}</span>
+                <span style="display:inline-flex;align-items:center;gap:6px;font-weight:700;font-size:1.15rem;color:${color};">
+                    <i data-lucide="${trendIcon}" style="width:15px;height:15px;flex-shrink:0;"></i>${TSPProductivity.fmtMinutes(bal)}
+                </span>
             </div>
             <p class="text-muted" style="margin:4px 0 0;font-size:0.8rem;">Desde ${sd}/${sm}/${sy} até ${ld}/${lm}/${ly}</p>
         `;
@@ -8327,6 +8348,9 @@ class AppController {
                 store.getImplementationsWithClients(),
                 store.getClients()
             ]);
+            // Reaproveitado por openEditImplementation() para não refazer a
+            // mesma query (lista inteira) a cada clique num card.
+            this._implementationsCache = impls;
 
             const filterType   = document.getElementById('impl-filter-type')?.value || '';
             const filterStatus = document.getElementById('impl-filter-status')?.value || '';
@@ -8457,7 +8481,11 @@ class AppController {
     }
 
     async openEditImplementation(id) {
-        const impls = await store.getImplementationsWithClients();
+        // Reaproveita a lista já buscada por renderImplementations() em vez de
+        // refazer a mesma query completa a cada abertura de card (mesmo
+        // anti-padrão já corrigido em editAgendaEvent()). Fallback só na
+        // corrida improvável de abrir antes do primeiro render terminar.
+        const impls = this._implementationsCache || await store.getImplementationsWithClients();
         const impl = impls.find(i => i.id === id);
         if (!impl) return;
 
@@ -8557,6 +8585,9 @@ class AppController {
                 store.getTrainingsWithClients(),
                 store.getClients()
             ]);
+            // Reaproveitado por openEditTraining() — mesmo padrão de
+            // renderImplementations().
+            this._trainingsCache = trainings;
 
             const filterCategory = document.getElementById('training-filter-category')?.value || '';
             const filterStatus   = document.getElementById('training-filter-status')?.value || '';
@@ -8720,7 +8751,7 @@ class AppController {
         container.innerHTML = this.trainingAttachments.map((att, i) => `
             <div class="attach-thumb">
                 <img src="${att.data}" alt="${escapeHtml(att.name)}" onclick="app._openTrainingAttachmentLightbox(${i})" title="${escapeHtml(att.name)}">
-                <button type="button" class="attach-remove" onclick="app.removeTrainingAttachment(${i})" title="Remover">×</button>
+                <button type="button" class="attach-remove" onclick="app.removeTrainingAttachment(${i})" title="Remover" aria-label="Remover ${escapeHtml(att.name)}">×</button>
             </div>
         `).join('');
     }
@@ -8764,7 +8795,9 @@ class AppController {
     }
 
     async openEditTraining(id) {
-        const trainings = await store.getTrainingsWithClients();
+        // Reaproveita a lista já buscada por renderTrainings() — mesmo padrão
+        // de openEditImplementation().
+        const trainings = this._trainingsCache || await store.getTrainingsWithClients();
         const t = trainings.find(x => x.id === id);
         if (!t) return;
 
@@ -8871,11 +8904,16 @@ class AppController {
         dados.style.display = 'none';
         sched.style.display = 'none';
         if (rep) rep.style.display = 'none';
-        [btnDados, btnSched, btnRep].forEach(b => b && b.classList.remove('active'));
+        [btnDados, btnSched, btnRep].forEach(b => {
+            if (!b) return;
+            b.classList.remove('active');
+            b.setAttribute('aria-selected', 'false');
+        });
 
         if (tab === 'scheduling') {
             sched.style.display = 'block';
             btnSched.classList.add('active');
+            btnSched.setAttribute('aria-selected', 'true');
             const clientId = document.getElementById('client-id').value;
             if (clientId) this._renderClientSchedulingTab(clientId);
             else {
@@ -8884,7 +8922,7 @@ class AppController {
             }
         } else if (tab === 'report') {
             if (rep) rep.style.display = 'block';
-            if (btnRep) btnRep.classList.add('active');
+            if (btnRep) { btnRep.classList.add('active'); btnRep.setAttribute('aria-selected', 'true'); }
             const clientId = document.getElementById('client-id').value;
             if (clientId) {
                 // Pré-preenche período com o mês corrente
@@ -8900,6 +8938,7 @@ class AppController {
         } else {
             dados.style.display = '';
             btnDados.classList.add('active');
+            btnDados.setAttribute('aria-selected', 'true');
         }
         lucide.createIcons();
     }
@@ -10052,6 +10091,7 @@ class AppController {
     toggleAIKeyVisibility() {
         const input = document.getElementById('ai-api-key');
         const icon = document.getElementById('icon-ai-key-toggle');
+        const btn = document.getElementById('btn-ai-key-toggle');
         if (input.value.startsWith('•')) {
             Toast.show('A chave está salva de forma segura. Redigite para alterá-la.', 'info');
             return;
@@ -10059,9 +10099,15 @@ class AppController {
         if (input.type === 'password') {
             input.type = 'text';
             icon.setAttribute('data-lucide', 'eye-off');
+            btn.setAttribute('aria-pressed', 'true');
+            btn.setAttribute('aria-label', 'Ocultar chave');
+            btn.title = 'Ocultar chave';
         } else {
             input.type = 'password';
             icon.setAttribute('data-lucide', 'eye');
+            btn.setAttribute('aria-pressed', 'false');
+            btn.setAttribute('aria-label', 'Mostrar chave');
+            btn.title = 'Mostrar chave';
         }
         lucide.createIcons();
     }
@@ -10080,21 +10126,17 @@ class AppController {
         }
 
         const btn = e.target.querySelector('button[type="submit"]');
-        const orig = btn.innerHTML;
-        btn.disabled = true;
-        btn.innerHTML = '<div class="spinner" style="width:16px;height:16px;"></div> Salvando...';
+        this._btnPending(btn);
 
         try {
             await store.saveAIConfig(provider, apiKey, model);
             await aiClient.loadConfig();
             this._updateAIStatusBadge();
-            Toast.show('Configuração de IA salva com sucesso!', 'success');
+            await this._btnSuccess(btn);
             this.closeModal('modal-ai-config');
         } catch (err) {
             Toast.show('Erro ao salvar: ' + err.message, 'error');
-        } finally {
-            btn.disabled = false;
-            btn.innerHTML = orig;
+            this._btnError(btn);
         }
     }
 
@@ -10111,36 +10153,42 @@ class AppController {
         }
 
         const btn = document.getElementById('btn-ai-test');
-        const orig = btn.innerHTML;
-        btn.disabled = true;
-        btn.innerHTML = '<div class="spinner" style="width:14px;height:14px;"></div> Testando...';
+        // Reaproveita o spinner (.btn-spinner) e o padrão de erro (.btn-error)
+        // do resto do app; o texto de sucesso é próprio ("Conexão OK") em vez
+        // do "Salvo!" de _btnSuccess() porque este botão testa, não salva.
+        this._btnPending(btn);
 
         try {
             await store.saveAIConfig(provider, apiKey, model);
             await aiClient.loadConfig();
             const resp = await aiClient.testConnection();
+            btn.classList.remove('btn-loading');
+            btn.innerHTML = btn._origHtml;
+            btn.disabled = btn._origDisabled || false;
             if (resp) {
                 Toast.show('Conexão OK! IA respondeu com sucesso.', 'success');
             }
         } catch (err) {
             Toast.show('Falha no teste: ' + err.message, 'error');
-        } finally {
-            btn.disabled = false;
-            btn.innerHTML = orig;
+            this._btnError(btn);
         }
     }
 
-    async removeAIConfig() {
-        if (!confirm('Remover configuração de IA? Os recursos de IA ficarão indisponíveis.')) return;
-        try {
-            await store.deleteAIConfig();
-            aiClient.reset();
-            this._updateAIStatusBadge();
-            Toast.show('Configuração de IA removida.', 'info');
-            this.closeModal('modal-ai-config');
-        } catch (err) {
-            Toast.show('Erro ao remover: ' + err.message, 'error');
-        }
+    removeAIConfig(btn) {
+        // Era o único delete destrutivo do app usando window.confirm() nativo
+        // em vez do padrão de confirmação em 2 passos já usado em todo o
+        // resto da plataforma (excluir cliente, tarefa, coluna, etc.).
+        this._twostepDelete(btn, async () => {
+            try {
+                await store.deleteAIConfig();
+                aiClient.reset();
+                this._updateAIStatusBadge();
+                Toast.show('Configuração de IA removida.', 'info');
+                this.closeModal('modal-ai-config');
+            } catch (err) {
+                Toast.show('Erro ao remover: ' + err.message, 'error');
+            }
+        });
     }
 
     _updateAIStatusBadge() {
@@ -10993,7 +11041,9 @@ class AppController {
             if (el) el.style.display = key === tab ? 'flex' : 'none';
         }
         document.querySelectorAll('#modal-otobo-config .modal-tab').forEach(btn => {
-            btn.classList.toggle('active', btn.dataset.tab === tabMap[tab]);
+            const isActive = btn.dataset.tab === tabMap[tab];
+            btn.classList.toggle('active', isActive);
+            btn.setAttribute('aria-selected', String(isActive));
         });
     }
 
@@ -11053,7 +11103,7 @@ class AppController {
             <div class="ticket-card-header">
                 <span class="ticket-number">#${escapeHtml(t.ticketNumber || t.ticketId)}</span>
             </div>
-            <div class="ticket-card-title">${escapeHtml(t.title)}</div>
+            <div class="ticket-card-title" title="${escapeHtml(t.title)}">${escapeHtml(t.title)}</div>
             <div class="ticket-card-badges">
                 <span class="ticket-badge ${statusClass}">${escapeHtml(t.status)}</span>
                 <span class="ticket-badge ${priorityClass}">${escapeHtml(t.priority)}</span>
