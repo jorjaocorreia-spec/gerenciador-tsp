@@ -779,6 +779,7 @@ class AppController {
         const hoursInput = document.getElementById('record-unavailability-hours');
         const descLabel = document.getElementById('record-desc-label');
         const calcInput = document.getElementById('record-calculated');
+        const descInput = document.getElementById('record-desc');
 
         document.getElementById('record-unavailability').checked = checked;
         timeFields.style.display = checked ? 'none' : 'flex';
@@ -787,6 +788,7 @@ class AppController {
         endInput.required = !checked;
         hoursInput.required = checked;
         descLabel.innerText = checked ? 'Justificativa' : 'Descrição do que foi feito';
+        descInput.placeholder = checked ? 'Motivo da indisponibilidade do cliente...' : 'Detalhes da atividade...';
 
         if (checked) {
             startInput.value = '';
@@ -865,17 +867,19 @@ class AppController {
         });
     }
 
-    async handleDeleteRecord(id, btn) {
-        const row = btn?.closest('tr');
-        if (row) { row.classList.add('row-deleting'); await new Promise(r => setTimeout(r, 400)); }
-        try {
-            await store.deleteRecord(id);
-            await this.renderAll();
-            Toast.show('Atendimento excluído.', 'success');
-        } catch (err) {
-            if (row) row.classList.remove('row-deleting');
-            Toast.show('Erro ao excluir atendimento: ' + err.message, 'error');
-        }
+    handleDeleteRecord(id, btn) {
+        this._twostepDelete(btn, async () => {
+            const row = btn?.closest('tr');
+            if (row) { row.classList.add('row-deleting'); await new Promise(r => setTimeout(r, 400)); }
+            try {
+                await store.deleteRecord(id);
+                await this.renderAll();
+                Toast.show('Atendimento excluído.', 'success');
+            } catch (err) {
+                if (row) row.classList.remove('row-deleting');
+                Toast.show(this._friendlyErrorMessage(err), 'error');
+            }
+        }, true);
     }
 
     async handleEditRecord(id) {
@@ -2672,12 +2676,19 @@ class AppController {
         el.style.height = Math.min(el.scrollHeight, 240) + 'px';
     }
 
-    _twostepDelete(btn, onConfirm) {
+    _twostepDelete(btn, onConfirm, compact = false) {
         if (!btn) return;
         if (!btn._confirmDelete) {
             btn._confirmDelete = true;
             btn._origDeleteHtml = btn.innerHTML;
-            btn.innerHTML = '<i data-lucide="alert-triangle" style="width:14px;height:14px;margin-right:4px;vertical-align:middle;"></i>Confirmar?';
+            if (compact) {
+                // Botão de ícone fixo (ex.: ações de linha densa) não cabe o rótulo "Confirmar?" — só troca o ícone/cor.
+                btn._origTitle = btn.title;
+                btn.title = 'Confirmar exclusão?';
+                btn.innerHTML = '<i data-lucide="alert-triangle"></i>';
+            } else {
+                btn.innerHTML = '<i data-lucide="alert-triangle" style="width:14px;height:14px;margin-right:4px;vertical-align:middle;"></i>Confirmar?';
+            }
             btn.style.setProperty('background', 'linear-gradient(135deg,#ef4444,#dc2626)', 'important');
             btn.style.setProperty('border-color', 'transparent', 'important');
             lucide.createIcons();
@@ -2685,6 +2696,7 @@ class AppController {
                 if (btn._confirmDelete) {
                     btn._confirmDelete = false;
                     btn.innerHTML = btn._origDeleteHtml;
+                    if (compact && btn._origTitle !== undefined) btn.title = btn._origTitle;
                     btn.style.removeProperty('background');
                     btn.style.removeProperty('border-color');
                     lucide.createIcons();
@@ -3450,11 +3462,13 @@ class AppController {
         const tbody = document.querySelector('#records-table tbody');
         this._skTable(tbody, 5, 6);
         let records = (await store.getRecords()).sort((a, b) => new Date(b.date) - new Date(a.date));
+        const totalRecordsCount = records.length;
 
         // APERFEIÇOAMENTO: Filtros da Interface
         const filterClient = document.getElementById('filter-client')?.value;
         const filterStart = document.getElementById('filter-date-start')?.value;
         const filterEnd = document.getElementById('filter-date-end')?.value;
+        const hasActiveFilters = !!(filterClient || filterStart || filterEnd);
 
         if (filterClient) {
             records = records.filter(r => r.clientId === filterClient);
@@ -3472,8 +3486,11 @@ class AppController {
 
         const btnNewRecord = document.getElementById('btn-new-record');
         if (records.length === 0) {
-            tbody.innerHTML = `<tr><td colspan="5" class="text-muted" style="text-align: center;">Nenhum atendimento lançado.</td></tr>`;
-            if (btnNewRecord) btnNewRecord.classList.add('btn-pulse-empty');
+            const emptyMsg = (hasActiveFilters && totalRecordsCount > 0)
+                ? 'Nenhum resultado para os filtros aplicados. <a href="#" onclick="app.clearFilters(); return false;" style="color:var(--primary-color);">Limpar filtros</a>'
+                : 'Nenhum atendimento lançado.';
+            tbody.innerHTML = `<tr><td colspan="5" class="text-muted" style="text-align: center;">${emptyMsg}</td></tr>`;
+            if (btnNewRecord && !hasActiveFilters) btnNewRecord.classList.add('btn-pulse-empty');
             return;
         }
         if (btnNewRecord) btnNewRecord.classList.remove('btn-pulse-empty');
@@ -3506,13 +3523,13 @@ class AppController {
                     <td class="hours-flip">${r.minutes} min <span class="text-muted">(${hoursStr})</span></td>
                     <td>
                         <div style="display: flex; gap: 8px;">
-                            <button class="btn btn-secondary" onclick="app.handleViewRecord('${r.id}')" style="padding: 6px 10px; font-size: 0.8rem;" title="Visualizar">
+                            <button class="btn btn-secondary" onclick="app.handleViewRecord('${r.id}')" style="padding: 6px 10px; font-size: 0.8rem;" title="Visualizar" aria-label="Visualizar atendimento">
                                 <i data-lucide="eye" style="width: 16px; height: 16px;"></i>
                             </button>
-                            <button class="btn btn-primary" onclick="app.handleEditRecord('${r.id}')" style="padding: 6px 10px; font-size: 0.8rem;" title="Editar">
+                            <button class="btn btn-primary" onclick="app.handleEditRecord('${r.id}')" style="padding: 6px 10px; font-size: 0.8rem;" title="Editar" aria-label="Editar atendimento">
                                 <i data-lucide="pencil" style="width: 16px; height: 16px;"></i>
                             </button>
-                            <button class="btn btn-danger" onclick="app.handleDeleteRecord('${r.id}', this)" style="padding: 6px 10px; font-size: 0.8rem;" title="Apagar">
+                            <button class="btn btn-danger" onclick="app.handleDeleteRecord('${r.id}', this)" style="padding: 6px 10px; font-size: 0.8rem;" title="Apagar" aria-label="Excluir atendimento">
                                 <i data-lucide="trash-2" style="width: 16px; height: 16px;"></i>
                             </button>
                         </div>
@@ -3778,13 +3795,13 @@ class AppController {
                     <td class="hours-flip">${r.minutes} min <span class="text-muted">(${hoursStr})</span></td>
                     <td>
                         <div style="display: flex; gap: 8px;">
-                            <button class="btn btn-secondary" onclick="app.handleViewRecord('${r.id}')" style="padding: 6px 10px; font-size: 0.8rem;" title="Visualizar">
+                            <button class="btn btn-secondary" onclick="app.handleViewRecord('${r.id}')" style="padding: 6px 10px; font-size: 0.8rem;" title="Visualizar" aria-label="Visualizar atendimento">
                                 <i data-lucide="eye" style="width: 16px; height: 16px;"></i>
                             </button>
-                            <button class="btn btn-primary" onclick="app.handleEditRecord('${r.id}')" style="padding: 6px 10px; font-size: 0.8rem;" title="Editar">
+                            <button class="btn btn-primary" onclick="app.handleEditRecord('${r.id}')" style="padding: 6px 10px; font-size: 0.8rem;" title="Editar" aria-label="Editar atendimento">
                                 <i data-lucide="pencil" style="width: 16px; height: 16px;"></i>
                             </button>
-                            <button class="btn btn-danger" onclick="app.handleDeleteRecord('${r.id}', this)" style="padding: 6px 10px; font-size: 0.8rem;" title="Apagar">
+                            <button class="btn btn-danger" onclick="app.handleDeleteRecord('${r.id}', this)" style="padding: 6px 10px; font-size: 0.8rem;" title="Apagar" aria-label="Excluir atendimento">
                                 <i data-lucide="trash-2" style="width: 16px; height: 16px;"></i>
                             </button>
                         </div>
@@ -4334,10 +4351,17 @@ class AppController {
     async switchAgendaMode(mode) {
         this.agendaViewMode = mode;
         localStorage.setItem('agendaViewMode', mode);
-        document.getElementById('btn-agenda-schedule').classList.toggle('active-mode', mode === 'schedule');
-        document.getElementById('btn-agenda-monthly').classList.toggle('active-mode', mode === 'monthly');
-        document.getElementById('btn-agenda-weekly').classList.toggle('active-mode', mode === 'weekly');
-        document.getElementById('btn-agenda-daily').classList.toggle('active-mode', mode === 'daily');
+        const modeButtons = {
+            schedule: document.getElementById('btn-agenda-schedule'),
+            monthly: document.getElementById('btn-agenda-monthly'),
+            weekly: document.getElementById('btn-agenda-weekly'),
+            daily: document.getElementById('btn-agenda-daily')
+        };
+        Object.entries(modeButtons).forEach(([key, btn]) => {
+            const isActive = key === mode;
+            btn.classList.toggle('active-mode', isActive);
+            btn.setAttribute('aria-selected', String(isActive));
+        });
         await this.renderAgenda();
     }
 
@@ -5049,7 +5073,9 @@ class AppController {
                 const isPending = ev.isInvited && (!ev.rsvpStatus || ev.rsvpStatus === 'needsAction');
                 const pendingTitle = isPending ? ' — Convite aguardando resposta' : '';
                 eventsHtml += `<div class="agenda-month-event type-${ev.type}${isPending ? ' rsvp-pending' : ''}"
+                     tabindex="0" role="button" aria-label="${escapeHtml(ev.title)} (${timeLabel})${pendingTitle}"
                      onclick="event.stopPropagation(); app.editAgendaEvent('${ev.id}')"
+                     onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();event.stopPropagation();app.editAgendaEvent('${ev.id}')}"
                      title="${escapeHtml(ev.title)} (${timeLabel})${pendingTitle}">
                     ${escapeHtml(ev.title)}
                 </div>`;
@@ -5166,8 +5192,12 @@ class AppController {
                     const pendingBadge = isPending
                         ? `<span class="rsvp-pending-badge" style="position:static; margin-left:6px;">Aguardando resposta</span>`
                         : '';
-                    html += `<div class="schedule-event${isPending ? ' rsvp-pending' : ''}" onclick="app.editAgendaEvent('${ev.id}')">
-                        <div class="schedule-event-dot type-${ev.type}"></div>
+                    const scheduleTypeLabels = { meeting: 'Reunião', consulting: 'Consultoria', task: 'Tarefa', reminder: 'Lembrete' };
+                    html += `<div class="schedule-event${isPending ? ' rsvp-pending' : ''}"
+                        tabindex="0" role="button" aria-label="${escapeHtml(ev.title)}, ${scheduleTypeLabels[ev.type] || ev.type}"
+                        onclick="app.editAgendaEvent('${ev.id}')"
+                        onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();app.editAgendaEvent('${ev.id}')}">
+                        <div class="schedule-event-dot type-${ev.type}" title="${scheduleTypeLabels[ev.type] || ev.type}"></div>
                         <div class="schedule-event-time">${ev.startTime ? `${ev.startTime} – ${ev.endTime}` : '<span style="font-style:italic; opacity:0.8;">Dia inteiro</span>'}</div>
                         <div class="schedule-event-info">
                             <span class="schedule-event-title">${escapeHtml(ev.title)}</span>
@@ -5188,10 +5218,13 @@ class AppController {
         if (!ev.isInvited) return '';
         const status = ev.rsvpStatus || 'needsAction';
         const labels = { needsAction: 'Sem resposta', accepted: 'Confirmado', tentative: 'Talvez', declined: 'Declinado' };
+        const icons = { needsAction: 'minus', accepted: 'check', tentative: 'help-circle', declined: 'x' };
         return `<button class="rsvp-dot rsvp-dot--${status}"
                         title="Você vai? ${labels[status] || ''}"
+                        aria-label="RSVP: ${labels[status] || ''}"
                         data-event-id="${ev.id}"
                         onclick="event.stopPropagation(); app.openRsvpPopup('${ev.id}', this, event)">
+                    <i data-lucide="${icons[status] || 'minus'}"></i>
                 </button>`;
     }
 
@@ -5303,6 +5336,7 @@ class AppController {
             lucide.createIcons();
         }
         btn.title = this._hideDeclinedEvents ? 'Mostrar eventos declinados' : 'Ocultar eventos declinados';
+        btn.setAttribute('aria-label', btn.title);
         btn.classList.toggle('active', this._hideDeclinedEvents);
     }
 
@@ -5324,7 +5358,9 @@ class AppController {
         return `<div class="allday-event-banner ${typeClass}${rsvpDeclinedClass}${rsvpHiddenClass}${rsvpPendingClass}"
                      data-event-id="${ev.id}"
                      data-rsvp="${ev.rsvpStatus || 'needsAction'}"
+                     tabindex="0" role="button" aria-label="${escapeHtml(ev.title)}${clientName ? ' · ' + clientName : ''}"
                      onclick="event.stopPropagation(); app.editAgendaEvent('${ev.id}')"
+                     onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();event.stopPropagation();app.editAgendaEvent('${ev.id}')}"
                      title="${escapeHtml(ev.title)}${clientName ? ' · ' + clientName : ''}">
             <i data-lucide="sun" style="width:11px; height:11px; flex-shrink:0;"></i>
             <span>${escapeHtml(ev.title)}${clientName ? ' · ' + clientName : ''}</span>
@@ -5401,7 +5437,9 @@ class AppController {
                  data-event-id="${ev.id}"
                  data-rsvp="${ev.rsvpStatus || 'needsAction'}"
                  style="top:${top}px;height:${height}px;width:${width};left:${left};right:auto;"
-                 onclick="event.stopPropagation();app.editAgendaEvent('${ev.id}')">
+                 tabindex="0" role="button" aria-label="${escapeHtml(ev.title)}, ${ev.startTime}–${ev.endTime}"
+                 onclick="event.stopPropagation();app.editAgendaEvent('${ev.id}')"
+                 onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();event.stopPropagation();app.editAgendaEvent('${ev.id}')}">
                 <button class="event-delete-btn"
                         onclick="event.stopPropagation();app.deleteAgendaEvent('${ev.id}',this)"
                         title="Excluir">×</button>
@@ -7649,17 +7687,19 @@ class AppController {
         });
     }
 
-    async deleteApontamento(id, btn) {
-        const row = btn?.closest('.apt-row');
-        if (row) { row.classList.add('row-deleting'); await new Promise(r => setTimeout(r, 400)); }
-        try {
-            await store.deleteApontamento(id);
-            await this.renderApontamentos();
-            Toast.show('Apontamento excluído.', 'success');
-        } catch (err) {
-            if (row) row.classList.remove('row-deleting');
-            Toast.show('Erro ao excluir: ' + err.message, 'error');
-        }
+    deleteApontamento(id, btn) {
+        this._twostepDelete(btn, async () => {
+            const row = btn?.closest('.apt-row');
+            if (row) { row.classList.add('row-deleting'); await new Promise(r => setTimeout(r, 400)); }
+            try {
+                await store.deleteApontamento(id);
+                await this.renderApontamentos();
+                Toast.show('Apontamento excluído.', 'success');
+            } catch (err) {
+                if (row) row.classList.remove('row-deleting');
+                Toast.show('Erro ao excluir: ' + err.message, 'error');
+            }
+        }, true);
     }
 
     // ===================================
@@ -10346,6 +10386,7 @@ class AppController {
         }
 
         document.getElementById('btn-sync-chamados').style.display = '';
+        document.getElementById('btn-sync-chamados-full').style.display = '';
 
         // Mostrar data da última sync (incremental ou completa)
         const syncInfo = document.getElementById('chamados-sync-info');
@@ -10362,6 +10403,7 @@ class AppController {
 
             if (tickets.length === 0) {
                 document.getElementById('chamados-filters').style.display = 'none';
+                document.getElementById('chamados-active-filters').style.display = 'none';
                 content.innerHTML = `
                     <div class="empty-state">
                         <i data-lucide="inbox" style="width:48px;height:48px;color:var(--text-muted);"></i>
@@ -10378,13 +10420,23 @@ class AppController {
             this._attachChamadoFilterListeners();
 
             const filtered = this._applyTicketFilters(tickets, clients);
+            this._renderActiveFilterChips();
             if (filtered.length === 0) {
                 content.innerHTML = `<div class="empty-state"><p>Nenhum chamado corresponde aos filtros selecionados.</p></div>`;
             } else {
                 this._renderChamadosCards(filtered, clients, content);
             }
         } catch (err) {
-            content.innerHTML = `<div class="empty-state"><p>Erro ao carregar chamados: ${escapeHtml(err.message)}</p></div>`;
+            console.error('Erro ao carregar chamados:', err);
+            document.getElementById('chamados-filters').style.display = 'none';
+            document.getElementById('chamados-active-filters').style.display = 'none';
+            content.innerHTML = `
+                <div class="empty-state">
+                    <i data-lucide="alert-triangle" style="width:48px;height:48px;color:var(--text-muted);"></i>
+                    <h3>Não foi possível carregar os chamados</h3>
+                    <p>Verifique sua conexão ou tente novamente em instantes.</p>
+                    <button class="btn btn-primary" onclick="app.renderChamados()">Tentar novamente</button>
+                </div>`;
         }
         lucide.createIcons();
     }
@@ -10401,23 +10453,38 @@ class AppController {
             });
         }
         document.addEventListener('click', e => {
-            if (!e.target.closest('.mf-wrap')) {
-                document.querySelectorAll('.mf-dropdown.mf-drop-open').forEach(d => d.classList.remove('mf-drop-open'));
-                document.querySelectorAll('.mf-wrap.mf-open').forEach(w => w.classList.remove('mf-open'));
-            }
+            if (!e.target.closest('.mf-wrap')) this._closeAllMf();
+        });
+        // Escape fecha o dropdown aberto e devolve o foco ao botão que o abriu —
+        // sem isso, um usuário de teclado ficava preso dentro do dropdown.
+        document.addEventListener('keydown', e => {
+            if (e.key !== 'Escape') return;
+            const openWrap = document.querySelector('.mf-wrap.mf-open');
+            if (!openWrap) return;
+            this._closeAllMf();
+            openWrap.querySelector('.mf-btn')?.focus();
+        });
+    }
+
+    _closeAllMf() {
+        document.querySelectorAll('.mf-dropdown.mf-drop-open').forEach(d => d.classList.remove('mf-drop-open'));
+        document.querySelectorAll('.mf-wrap.mf-open').forEach(w => {
+            w.classList.remove('mf-open');
+            w.querySelector('.mf-btn')?.setAttribute('aria-expanded', 'false');
         });
     }
 
     _toggleMf(wrapId) {
         const wrap = document.getElementById(wrapId);
         const drop = wrap?.querySelector('.mf-dropdown');
+        const btn = wrap?.querySelector('.mf-btn');
         if (!drop) return;
         const isOpen = drop.classList.contains('mf-drop-open');
-        document.querySelectorAll('.mf-dropdown.mf-drop-open').forEach(d => d.classList.remove('mf-drop-open'));
-        document.querySelectorAll('.mf-wrap.mf-open').forEach(w => w.classList.remove('mf-open'));
+        this._closeAllMf();
         if (!isOpen) {
             drop.classList.add('mf-drop-open');
             wrap.classList.add('mf-open');
+            btn?.setAttribute('aria-expanded', 'true');
         }
     }
 
@@ -10491,6 +10558,7 @@ class AppController {
         const content = document.getElementById('chamados-content');
         if (!content) return;
         const filtered = this._applyTicketFilters(this._cachedChamadosTickets, this._cachedChamadosClients);
+        this._renderActiveFilterChips();
         if (filtered.length === 0) {
             content.innerHTML = `<div class="empty-state"><p>Nenhum chamado corresponde aos filtros selecionados.</p></div>`;
         } else {
@@ -10503,6 +10571,54 @@ class AppController {
             store.saveOtoboLocalFilters(state).catch(() => {});
             if (this._otoboConfig) this._otoboConfig.localFilters = state;
         }, 800);
+    }
+
+    // Tira de chips com os filtros ativos — recognition-over-recall: mostra de
+    // relance o estado dos 6 dropdowns + busca sem precisar reabrir cada um.
+    _renderActiveFilterChips() {
+        const container = document.getElementById('chamados-active-filters');
+        if (!container) return;
+        const chips = [];
+
+        const searchEl = document.getElementById('filter-chamado-search');
+        const search = (searchEl?.value || '').trim();
+        if (search) {
+            chips.push({ text: `Busca: "${search}"`, remove: () => { if (searchEl) searchEl.value = ''; } });
+        }
+
+        const mfIds = ['mf-status', 'mf-priority', 'mf-queue', 'mf-owner', 'mf-type', 'mf-client'];
+        for (const wrapId of mfIds) {
+            const wrap = document.getElementById(wrapId);
+            if (!wrap) continue;
+            wrap.querySelectorAll('.mf-dropdown input:checked').forEach(cb => {
+                const label = cb.nextElementSibling?.textContent || cb.value;
+                chips.push({ text: label, remove: () => { cb.checked = false; this._updateMfLabel(wrapId); } });
+            });
+        }
+
+        if (chips.length === 0) {
+            container.style.display = 'none';
+            container.innerHTML = '';
+            return;
+        }
+
+        container.style.display = '';
+        container.innerHTML = chips.map((c, i) => `
+            <span class="caf-chip">
+                ${escapeHtml(c.text)}
+                <button type="button" class="caf-chip-remove" data-chip-idx="${i}" aria-label="Remover filtro: ${escapeHtml(c.text)}"><i data-lucide="x"></i></button>
+            </span>`).join('')
+            + `<button type="button" class="caf-clear-all">Limpar todos</button>`;
+
+        container.querySelectorAll('.caf-chip-remove').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const idx = Number(btn.dataset.chipIdx);
+                chips[idx]?.remove();
+                this._rerenderChamadosWithFilters();
+            });
+        });
+        container.querySelector('.caf-clear-all')?.addEventListener('click', () => this.clearChamadoFilters());
+        lucide.createIcons();
     }
 
     _applyTicketFilters(tickets, clients) {
@@ -10638,9 +10754,15 @@ class AppController {
         container.innerHTML = html;
 
         container.querySelectorAll('.ticket-card').forEach(card => {
-            card.addEventListener('click', () => {
+            const open = () => {
                 const ticket = tickets.find(t => t.ticketId === card.dataset.ticketId);
                 if (ticket) this.openChamadoModal(ticket);
+            };
+            card.addEventListener('click', open);
+            // Sem tabindex/keydown, um card clicável só com listener de click é
+            // invisível para navegação por teclado — bloqueio real da ação primária.
+            card.addEventListener('keydown', e => {
+                if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); open(); }
             });
         });
     }
@@ -10652,7 +10774,7 @@ class AppController {
         const typeHtml = t.ticketType ? `<span class="ticket-badge ticket-type-badge">${escapeHtml(t.ticketType)}</span>` : '';
         const queueHtml = t.queue ? `<span class="ticket-meta-item"><i data-lucide="layers" style="width:11px;height:11px;"></i>${escapeHtml(t.queue)}</span>` : '';
         const ownerHtml = t.owner ? `<span class="ticket-meta-item"><i data-lucide="user" style="width:11px;height:11px;"></i>${escapeHtml(t.owner)}</span>` : '';
-        return `<div class="ticket-card clickable-card" data-ticket-id="${escapeHtml(t.ticketId)}">
+        return `<div class="ticket-card clickable-card" data-ticket-id="${escapeHtml(t.ticketId)}" tabindex="0" role="button" aria-label="Abrir chamado #${escapeHtml(t.ticketNumber || t.ticketId)}: ${escapeHtml(t.title)}">
             <div class="ticket-card-header">
                 <span class="ticket-number">#${escapeHtml(t.ticketNumber || t.ticketId)}</span>
             </div>
@@ -10790,6 +10912,25 @@ class AppController {
             document.removeEventListener('click', this._closeNotifOnOutsideClick);
             this._closeNotifOnOutsideClick = null;
         }
+    }
+
+    // Ação explícita para sync completa (antes só descobrível via Shift+clique
+    // no botão "Sincronizar", nunca lida pela maioria dos usuários). Pede
+    // confirmação porque pode apagar do cache local tickets que sumiram do OTOBO.
+    confirmFullSyncChamados(btn) {
+        this._twostepDelete(btn, () => {
+            // Restaura a aparência do botão ao confirmar — ele não é recriado
+            // pelo re-render do Chamados (fica no header, fora de #chamados-content),
+            // então ficaria preso em "Confirmar?" sem isso. O botão de sync
+            // incremental já mostra o estado de carregamento da operação.
+            if (btn._origDeleteHtml) {
+                btn.innerHTML = btn._origDeleteHtml;
+                btn.style.removeProperty('background');
+                btn.style.removeProperty('border-color');
+                lucide.createIcons();
+            }
+            this.syncChamados(true);
+        });
     }
 
     async syncChamados(force = false) {

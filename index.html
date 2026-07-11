@@ -312,9 +312,14 @@
                     <h1>Atendimentos</h1>
                     <p class="text-muted">Lançamento de horas utilizadas.</p>
                 </div>
-                <button id="btn-new-record" class="btn btn-primary" onclick="app.openModal('modal-record')">
-                    <i data-lucide="plus"></i> Lançar Horas
-                </button>
+                <div style="display:flex; gap:8px;">
+                    <button id="btn-new-record-import-pdf" class="btn btn-secondary" onclick="document.getElementById('file-import-pdf').click()" title="Importar Ata (PDF)" aria-label="Importar Ata em PDF">
+                        <i data-lucide="file-text"></i> Importar PDF
+                    </button>
+                    <button id="btn-new-record" class="btn btn-primary" onclick="app.openModal('modal-record')">
+                        <i data-lucide="plus"></i> Lançar Horas
+                    </button>
+                </div>
             </div>
 
             <div class="glass" style="padding: 24px;">
@@ -337,11 +342,11 @@
                     </div>
                     <div style="flex: 0; margin-bottom: 0; display: flex; gap: 8px;">
                         <button class="btn btn-secondary" onclick="app.clearFilters()"
-                            style="padding: 12px 16px; height: 42px;" title="Limpar Filtros">
+                            style="padding: 12px 16px; height: 42px;" title="Limpar Filtros" aria-label="Limpar filtros">
                             <i data-lucide="filter-x"></i>
                         </button>
                         <button class="btn btn-primary" onclick="app.exportFilteredToPDF()"
-                            style="padding: 12px 16px; height: 42px;" title="Exportar PDF">
+                            style="padding: 12px 16px; height: 42px;" title="Exportar PDF" aria-label="Exportar para PDF">
                             <i data-lucide="file-down"></i> Exportar
                         </button>
                     </div>
@@ -466,16 +471,16 @@
                 <div class="agenda-toolbar">
                     <!-- Grupo 1: integração Google -->
                     <div class="agenda-toolbar-group">
-                        <button class="btn btn-secondary btn-icon-sm" id="btn-calendar-settings" onclick="app.openCalendarSettings()" title="Configurar integração Google Calendar">
+                        <button class="btn btn-secondary btn-icon-sm" id="btn-calendar-settings" onclick="app.openCalendarSettings()" title="Configurar integração Google Calendar" aria-label="Configurar integração Google Calendar">
                             <i data-lucide="settings"></i>
                         </button>
-                        <button class="btn btn-secondary btn-icon-sm" onclick="app.openAgendaHelp()" title="Como funciona a integração com Google Calendar">
+                        <button class="btn btn-secondary btn-icon-sm" onclick="app.openAgendaHelp()" title="Como funciona a integração com Google Calendar" aria-label="Como funciona a integração com Google Calendar">
                             <i data-lucide="help-circle"></i>
                         </button>
                         <span id="google-sync-status" class="google-sync-status" style="display:none"></span>
                         <button class="btn btn-secondary btn-icon-sm" id="btn-toggle-hide-declined"
                                 onclick="app.toggleHideDeclined()"
-                                title="Ocultar eventos declinados">
+                                title="Ocultar eventos declinados" aria-label="Ocultar eventos declinados">
                             <i data-lucide="eye-off"></i>
                         </button>
                         <button class="btn btn-secondary" id="btn-agenda-sync" onclick="app.promptGoogleSync()">
@@ -498,11 +503,11 @@
                     <div class="agenda-toolbar-sep"></div>
 
                     <!-- Grupo 3: seletor de view (segmented control) -->
-                    <div class="agenda-view-switcher">
-                        <button class="agenda-view-btn active-mode" id="btn-agenda-schedule" onclick="app.switchAgendaMode('schedule')">Programação</button>
-                        <button class="agenda-view-btn" id="btn-agenda-monthly" onclick="app.switchAgendaMode('monthly')">Mensal</button>
-                        <button class="agenda-view-btn" id="btn-agenda-weekly" onclick="app.switchAgendaMode('weekly')">Semanal</button>
-                        <button class="agenda-view-btn" id="btn-agenda-daily" onclick="app.switchAgendaMode('daily')">Diário</button>
+                    <div class="agenda-view-switcher" role="tablist" aria-label="Modo de visualização da Agenda">
+                        <button class="agenda-view-btn active-mode" id="btn-agenda-schedule" role="tab" aria-selected="true" onclick="app.switchAgendaMode('schedule')">Programação</button>
+                        <button class="agenda-view-btn" id="btn-agenda-monthly" role="tab" aria-selected="false" onclick="app.switchAgendaMode('monthly')">Mensal</button>
+                        <button class="agenda-view-btn" id="btn-agenda-weekly" role="tab" aria-selected="false" onclick="app.switchAgendaMode('weekly')">Semanal</button>
+                        <button class="agenda-view-btn" id="btn-agenda-daily" role="tab" aria-selected="false" onclick="app.switchAgendaMode('daily')">Diário</button>
                     </div>
 
                     <!-- CTA -->
@@ -536,14 +541,14 @@
                 style="padding: 16px; margin-bottom: 24px; display: flex; justify-content: space-between; align-items: center;">
                 <button class="btn btn-secondary" onclick="app.prevAgendaDate()"><i data-lucide="chevron-left"></i>
                     Anterior</button>
-                <h3 id="agenda-current-date-label" style="margin: 0;">Hoje</h3>
+                <p id="agenda-current-date-label" style="margin: 0; font-weight: 600; font-size: 1.1rem; color: #ffffff;">Hoje</p>
                 <button class="btn btn-secondary" onclick="app.nextAgendaDate()">Próximo <i
                         data-lucide="chevron-right"></i></button>
             </div>
 
             <!-- Agenda Container -->
             <div class="glass" style="padding: 24px; overflow-x: auto;">
-                <div id="agenda-container" class="agenda-wrapper" style="min-width: 800px;">
+                <div id="agenda-container" class="agenda-wrapper">
                     <!-- Rendered via JS -->
                 </div>
             </div>
@@ -738,60 +743,68 @@
                         <i data-lucide="settings-2" style="width:16px;height:16px;"></i>
                         <span class="nav-label">Configurar OTOBO</span>
                     </button>
-                    <button class="btn btn-primary" id="btn-sync-chamados" onclick="app.syncChamados(event.shiftKey)" title="Sincronizar (Shift+clique para sync completa)" style="display:none;">
+                    <button class="btn btn-secondary" id="btn-sync-chamados-full" onclick="app.confirmFullSyncChamados(this)" title="Sincronização completa: rebusca todos os chamados no OTOBO e remove do cache local os que não existem mais lá" style="display:none;">
+                        <span class="nav-label">Sincronização completa</span>
+                    </button>
+                    <button class="btn btn-primary" id="btn-sync-chamados" onclick="app.syncChamados(event.shiftKey)" title="Sincronizar (atualização incremental)" style="display:none;">
                         <i data-lucide="refresh-cw" style="width:16px;height:16px;"></i>
                         <span class="nav-label">Sincronizar</span>
                     </button>
                 </div>
             </div>
             <div class="chamados-filters" id="chamados-filters" style="display:none;">
-                <input type="text" id="filter-chamado-search" class="form-control" placeholder="Nº ou título...">
-                <div class="mf-wrap" id="mf-status" data-placeholder="Todos os status">
-                    <button type="button" class="mf-btn" onclick="app._toggleMf('mf-status')">
-                        <span class="mf-label">Todos os status</span>
-                        <i data-lucide="chevron-down" style="width:13px;height:13px;flex-shrink:0;"></i>
-                    </button>
-                    <div class="mf-dropdown"></div>
+                <div class="chamados-filter-group" role="group" aria-label="Filtros do chamado">
+                    <input type="text" id="filter-chamado-search" class="form-control" placeholder="Nº ou título...">
+                    <div class="mf-wrap" id="mf-status" data-placeholder="Todos os status">
+                        <button type="button" class="mf-btn" aria-haspopup="true" aria-expanded="false" onclick="app._toggleMf('mf-status')">
+                            <span class="mf-label">Todos os status</span>
+                            <i data-lucide="chevron-down" style="width:13px;height:13px;flex-shrink:0;"></i>
+                        </button>
+                        <div class="mf-dropdown" role="group"></div>
+                    </div>
+                    <div class="mf-wrap" id="mf-priority" data-placeholder="Todas prioridades">
+                        <button type="button" class="mf-btn" aria-haspopup="true" aria-expanded="false" onclick="app._toggleMf('mf-priority')">
+                            <span class="mf-label">Todas prioridades</span>
+                            <i data-lucide="chevron-down" style="width:13px;height:13px;flex-shrink:0;"></i>
+                        </button>
+                        <div class="mf-dropdown" role="group"></div>
+                    </div>
                 </div>
-                <div class="mf-wrap" id="mf-priority" data-placeholder="Todas prioridades">
-                    <button type="button" class="mf-btn" onclick="app._toggleMf('mf-priority')">
-                        <span class="mf-label">Todas prioridades</span>
-                        <i data-lucide="chevron-down" style="width:13px;height:13px;flex-shrink:0;"></i>
-                    </button>
-                    <div class="mf-dropdown"></div>
-                </div>
-                <div class="mf-wrap" id="mf-queue" data-placeholder="Todas as filas">
-                    <button type="button" class="mf-btn" onclick="app._toggleMf('mf-queue')">
-                        <span class="mf-label">Todas as filas</span>
-                        <i data-lucide="chevron-down" style="width:13px;height:13px;flex-shrink:0;"></i>
-                    </button>
-                    <div class="mf-dropdown"></div>
-                </div>
-                <div class="mf-wrap" id="mf-owner" data-placeholder="Todos os proprietários">
-                    <button type="button" class="mf-btn" onclick="app._toggleMf('mf-owner')">
-                        <span class="mf-label">Todos os proprietários</span>
-                        <i data-lucide="chevron-down" style="width:13px;height:13px;flex-shrink:0;"></i>
-                    </button>
-                    <div class="mf-dropdown"></div>
-                </div>
-                <div class="mf-wrap" id="mf-type" data-placeholder="Todos os tipos">
-                    <button type="button" class="mf-btn" onclick="app._toggleMf('mf-type')">
-                        <span class="mf-label">Todos os tipos</span>
-                        <i data-lucide="chevron-down" style="width:13px;height:13px;flex-shrink:0;"></i>
-                    </button>
-                    <div class="mf-dropdown"></div>
-                </div>
-                <div class="mf-wrap" id="mf-client" data-placeholder="Todos os clientes">
-                    <button type="button" class="mf-btn" onclick="app._toggleMf('mf-client')">
-                        <span class="mf-label">Todos os clientes</span>
-                        <i data-lucide="chevron-down" style="width:13px;height:13px;flex-shrink:0;"></i>
-                    </button>
-                    <div class="mf-dropdown"></div>
+                <div class="chamados-filter-group" role="group" aria-label="Filtros de roteamento e propriedade">
+                    <div class="mf-wrap" id="mf-queue" data-placeholder="Todas as filas">
+                        <button type="button" class="mf-btn" aria-haspopup="true" aria-expanded="false" onclick="app._toggleMf('mf-queue')">
+                            <span class="mf-label">Todas as filas</span>
+                            <i data-lucide="chevron-down" style="width:13px;height:13px;flex-shrink:0;"></i>
+                        </button>
+                        <div class="mf-dropdown" role="group"></div>
+                    </div>
+                    <div class="mf-wrap" id="mf-owner" data-placeholder="Todos os proprietários">
+                        <button type="button" class="mf-btn" aria-haspopup="true" aria-expanded="false" onclick="app._toggleMf('mf-owner')">
+                            <span class="mf-label">Todos os proprietários</span>
+                            <i data-lucide="chevron-down" style="width:13px;height:13px;flex-shrink:0;"></i>
+                        </button>
+                        <div class="mf-dropdown" role="group"></div>
+                    </div>
+                    <div class="mf-wrap" id="mf-type" data-placeholder="Todos os tipos">
+                        <button type="button" class="mf-btn" aria-haspopup="true" aria-expanded="false" onclick="app._toggleMf('mf-type')">
+                            <span class="mf-label">Todos os tipos</span>
+                            <i data-lucide="chevron-down" style="width:13px;height:13px;flex-shrink:0;"></i>
+                        </button>
+                        <div class="mf-dropdown" role="group"></div>
+                    </div>
+                    <div class="mf-wrap" id="mf-client" data-placeholder="Todos os clientes">
+                        <button type="button" class="mf-btn" aria-haspopup="true" aria-expanded="false" onclick="app._toggleMf('mf-client')">
+                            <span class="mf-label">Todos os clientes</span>
+                            <i data-lucide="chevron-down" style="width:13px;height:13px;flex-shrink:0;"></i>
+                        </button>
+                        <div class="mf-dropdown" role="group"></div>
+                    </div>
                 </div>
                 <button class="btn btn-secondary" onclick="app.clearChamadoFilters()" title="Limpar filtros">
                     <i data-lucide="x" style="width:14px;height:14px;"></i> Limpar
                 </button>
             </div>
+            <div class="chamados-active-filters" id="chamados-active-filters" style="display:none;"></div>
             <div id="chamados-content"></div>
         </section>
 
@@ -1279,13 +1292,13 @@
                 <div class="form-group">
                     <label>Tempo Gasto Calculado</label>
                     <input type="text" id="record-calculated" class="form-control"
-                        style="background: rgba(0,0,0,0.2); cursor: not-allowed; color: var(--primary-color); font-weight: bold;"
+                        style="background: rgba(15,23,42,0.5); cursor: not-allowed; color: var(--primary-color); font-weight: bold;"
                         readonly placeholder="Preencha os horários acima...">
                 </div>
                 <div class="form-group">
                     <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:6px;">
                         <label id="record-desc-label" style="margin:0;">Descrição do que foi feito</label>
-                        <button type="button" id="btn-ai-improve-record" onclick="app.improveRecordDescription()" class="btn btn-ghost" style="font-size:0.78rem; padding:3px 10px; color:var(--primary-color); border:1px solid rgba(139,92,246,0.35); display:none;">
+                        <button type="button" id="btn-ai-improve-record" onclick="app.improveRecordDescription()" class="btn btn-ghost btn-sm" style="gap:4px; color:#a78bfa; border:1px solid rgba(167,139,250,0.3); display:none;">
                             <i data-lucide="sparkles" style="width:13px;height:13px;"></i> Melhorar com IA
                         </button>
                     </div>
@@ -1640,13 +1653,13 @@
                 <input type="hidden" id="agenda-calendar-event-id" value="">
 
                 <div class="form-group">
-                    <label>Título do Evento</label>
+                    <label for="agenda-title">Título do Evento</label>
                     <input type="text" id="agenda-title" class="form-control" placeholder="Ex: Reunião de Alinhamento"
                         required>
                 </div>
 
                 <div class="form-group">
-                    <label>Descrição (Opcional)</label>
+                    <label for="agenda-desc">Descrição (Opcional)</label>
                     <textarea id="agenda-desc" class="form-control" rows="5"
                         placeholder="Detalhes ou pauta..." spellcheck="true" style="resize:vertical;min-height:120px;max-height:340px;overflow-y:auto;white-space:pre-wrap;"></textarea>
                     <div id="agenda-desc-links" class="agenda-desc-links" style="display:none;">
@@ -1657,7 +1670,7 @@
 
                 <div style="display: flex; gap: 16px;">
                     <div class="form-group" style="flex: 1;">
-                        <label>Tipo de Evento</label>
+                        <label for="agenda-type">Tipo de Evento</label>
                         <select id="agenda-type" class="form-control" required>
                             <option value="meeting">Reunião</option>
                             <option value="consulting">Consultoria</option>
@@ -1668,7 +1681,7 @@
                 </div>
 
                 <div class="form-group">
-                    <label>Cliente (Opcional)</label>
+                    <label for="agenda-client">Cliente (Opcional)</label>
                     <select id="agenda-client" class="form-control">
                         <!-- Options carregados via JS -->
                     </select>
@@ -1692,11 +1705,11 @@
 
                 <div style="display: flex; gap: 16px;">
                     <div class="form-group" style="flex: 1;">
-                        <label>Data Inicial</label>
+                        <label for="agenda-date">Data Inicial</label>
                         <input type="date" id="agenda-date" class="form-control" required>
                     </div>
                     <div class="form-group" style="flex: 1;">
-                        <label>Data Final</label>
+                        <label for="agenda-date-end">Data Final</label>
                         <input type="date" id="agenda-date-end" class="form-control" required>
                     </div>
                 </div>
@@ -1709,23 +1722,23 @@
 
                 <div id="agenda-time-fields" style="display: flex; gap: 16px;">
                     <div class="form-group" style="flex: 1;">
-                        <label>Horário Inicial</label>
+                        <label for="agenda-start">Horário Inicial</label>
                         <input type="time" id="agenda-start" class="form-control" required>
                     </div>
                     <div class="form-group" style="flex: 1;">
-                        <label>Horário Final</label>
+                        <label for="agenda-end">Horário Final</label>
                         <input type="time" id="agenda-end" class="form-control" required>
                     </div>
                 </div>
 
                 <div class="form-group">
-                    <label>Localização (Opcional)</label>
+                    <label for="agenda-location">Localização (Opcional)</label>
                     <input type="text" id="agenda-location" class="form-control"
                         placeholder="Ex: Sala de reuniões, endereço...">
                 </div>
 
                 <div class="form-group">
-                    <label>Participantes (Opcional)</label>
+                    <label for="agenda-attendees">Participantes (Opcional)</label>
                     <input type="text" id="agenda-attendees" class="form-control"
                         placeholder="email1@ex.com, email2@ex.com">
                     <small style="color: var(--text-muted); margin-top: 4px; display: block;">Convites enviados automaticamente pelo Google Calendar</small>

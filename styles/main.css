@@ -7,10 +7,15 @@
   --surface-color: rgba(30, 41, 59, 0.6);
   --surface-border: rgba(255, 255, 255, 0.08);
   --primary-color: #8b5cf6;
+  --primary: #8b5cf6;
   --primary-hover: #7c3aed;
+  --primary-light: #a78bfa;
   --secondary-color: #3b82f6;
   --success-color: #10b981;
   --danger-color: #ef4444;
+  --warning-color-2: #eab308;
+  --delta-positive: #4ade80;
+  --delta-negative: #f87171;
   --text-main: #f8fafc;
   --text-primary: #f8fafc;
   --text-secondary: #94a3b8;
@@ -520,6 +525,11 @@ h4 {
     box-shadow: 0 6px 20px rgba(139,92,246,0.18);
     border-color: rgba(139,92,246,0.45) !important;
 }
+.clickable-card:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 2px rgba(139,92,246,0.4);
+    border-color: rgba(139,92,246,0.45) !important;
+}
 
 /* =========================================
    Components: Buttons & Forms
@@ -541,6 +551,20 @@ h4 {
 .btn:focus-visible {
   outline: none;
   box-shadow: 0 0 0 2px rgba(139,92,246,0.5);
+}
+
+/* Foco de teclado consistente para os elementos interativos da Agenda
+   (chips de evento, seletor de view, RSVP) — nenhum tinha indicador antes */
+.event-block:focus-visible,
+.allday-event-banner:focus-visible,
+.agenda-month-event:focus-visible,
+.schedule-event:focus-visible,
+.agenda-view-btn:focus-visible,
+.rsvp-dot:focus-visible,
+.rsvp-option:focus-visible,
+.event-delete-btn:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px rgba(139,92,246,0.7);
 }
 
 .btn-primary {
@@ -589,6 +613,8 @@ h4 {
   justify-content: space-between;
   align-items: center;
   margin-bottom: 32px;
+  flex-wrap: wrap;
+  row-gap: 16px;
 }
 
 .form-group {
@@ -1672,30 +1698,25 @@ h4 {
 /* Evento menor sobreposto: z-index acima de 5 (z-index base do .event-block) */
 .event-block.event-overlay {
   z-index: 8;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.55);
-  border-left-width: 4px;
-  border-left-style: solid;
-  border-left-color: rgba(255, 255, 255, 0.55);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.55), inset 0 0 0 1.5px rgba(255, 255, 255, 0.55);
 }
 
+/* Cor de tipo é flat (sem gradiente decorativo) — o texto do evento sempre acompanha,
+   então a cor nunca é o único sinal (WCAG 1.4.1) */
 .type-meeting {
-  background: linear-gradient(135deg, #3b82f6, #2563eb);
-  border-left: 4px solid #60a5fa;
+  background: var(--secondary-color);
 }
 
 .type-consulting {
-  background: linear-gradient(135deg, #8b5cf6, #7c3aed);
-  border-left: 4px solid #a78bfa;
+  background: var(--primary-color);
 }
 
 .type-task {
-  background: linear-gradient(135deg, #10b981, #059669);
-  border-left: 4px solid #34d399;
+  background: var(--success-color);
 }
 
 .type-reminder {
-  background: linear-gradient(135deg, #f59e0b, #d97706);
-  border-left: 4px solid #fbbf24;
+  background: #d97706;
 }
 
 .events-container {
@@ -1840,8 +1861,9 @@ h4 {
 .agenda-toolbar {
   display: flex;
   align-items: center;
-  gap: 6px;
-  flex-wrap: nowrap;
+  gap: 6px 10px;
+  flex-wrap: wrap;
+  row-gap: 10px;
 }
 
 .agenda-toolbar-group {
@@ -1856,6 +1878,24 @@ h4 {
   background: rgba(255, 255, 255, 0.1);
   flex-shrink: 0;
   margin: 0 4px;
+}
+
+/* Container da Agenda: só a grade de horário (diária/semanal) precisa de largura mínima
+   fixa para caber a coluna de horas + colunas de dia; Mensal e Programação já reflow
+   em grid/flex proporcional e não devem forçar scroll horizontal. */
+#agenda-container {
+  min-width: 0;
+}
+#agenda-container:has(.agenda-body-scroll) {
+  min-width: 800px;
+}
+@media (max-width: 640px) {
+  #agenda-container:has(.agenda-body-scroll) {
+    min-width: 560px;
+  }
+  .agenda-toolbar-sep {
+    display: none;
+  }
 }
 
 /* Google Calendar sync status chip */
@@ -1954,7 +1994,8 @@ h4 {
   background: transparent;
   border: 1px solid transparent;
   color: var(--text-muted);
-  padding: 4px 11px;
+  padding: 6px 11px;
+  min-height: 24px;
   border-radius: 5px;
   font-size: 12.5px;
   font-weight: 500;
@@ -2383,8 +2424,7 @@ h4 {
 /* Atendimentos: célula de descrição com rowspan (registros agrupados por mesma descrição/dia) */
 .grouped-desc-cell {
   vertical-align: top !important;
-  background: rgba(99, 102, 241, 0.04);
-  border-left: 2px solid rgba(99, 102, 241, 0.35);
+  background: rgba(139, 92, 246, 0.05);
 }
 
 /* Separador visual entre grupos de registros consecutivos */
@@ -3555,11 +3595,13 @@ kbd {
 .ticket-status-open     { background: rgba(72,187,120,0.15); color: #68d391; }
 .ticket-status-pending  { background: rgba(246,173,85,0.15); color: #f6ad55; }
 .ticket-status-other    { background: rgba(160,174,192,0.12); color: #a0aec0; }
-.ticket-priority-5-urgent { background: rgba(252,129,129,0.15); color: #fc8181; }
-.ticket-priority-4-high   { background: rgba(246,173,85,0.15); color: #f6ad55; }
-.ticket-priority-3-normal { background: rgba(160,174,192,0.12); color: #a0aec0; }
-.ticket-priority-2-low    { background: rgba(72,187,120,0.15); color: #68d391; }
-.ticket-priority-1-very-low { background: rgba(160,174,192,0.08); color: #718096; }
+/* Rampa de prioridade deliberadamente separada da de status (mesmo par verde/âmbar
+   era reutilizado nas duas taxonomias — badges lado a lado ficavam indistinguíveis). */
+.ticket-priority-5-urgent   { background: rgba(244,63,94,0.18);   color: #fb7185; }
+.ticket-priority-4-high     { background: rgba(234,88,12,0.18);   color: #fb923c; }
+.ticket-priority-3-normal   { background: rgba(160,174,192,0.12); color: #a0aec0; }
+.ticket-priority-2-low      { background: rgba(56,189,248,0.15);  color: #7dd3fc; }
+.ticket-priority-1-very-low { background: rgba(56,189,248,0.09);  color: #5eafd6; }
 .ticket-card-meta {
     display: flex;
     flex-wrap: wrap;
@@ -3774,15 +3816,33 @@ kbd {
     padding-top: 2px;
 }
 
-/* Barra de filtros locais da view Chamados */
+/* Barra de filtros locais da view Chamados — dois grupos visuais (chamado-intrínseco
+   vs roteamento/propriedade) em vez de 6 dropdowns soltos numa única fileira,
+   para reduzir a carga de memória de trabalho ao escanear o que está filtrando. */
 .chamados-filters {
     display: flex;
     flex-wrap: wrap;
     align-items: center;
-    gap: 8px;
+    gap: 8px 20px;
     padding: 12px 0 16px;
     border-bottom: 1px solid rgba(255,255,255,0.07);
-    margin-bottom: 20px;
+    margin-bottom: 12px;
+}
+.chamados-filter-group {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+}
+.chamados-filter-group + .chamados-filter-group {
+    padding-left: 20px;
+    border-left: 1px solid rgba(255,255,255,0.08);
+}
+@media (max-width: 860px) {
+    .chamados-filter-group + .chamados-filter-group {
+        padding-left: 0;
+        border-left: none;
+    }
 }
 .chamados-filters .form-control {
     height: 36px;
@@ -3797,6 +3857,61 @@ kbd {
 .chamados-filters select.form-control {
     min-width: 140px;
 }
+
+/* Tira de chips com filtros ativos — recognition-over-recall: mostra de relance
+   o que está filtrando sem precisar reabrir cada um dos 6 dropdowns. */
+.chamados-active-filters {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px;
+    margin: -2px 0 16px;
+}
+.caf-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 6px 4px 10px;
+    border-radius: 20px;
+    background: rgba(139,92,246,0.12);
+    border: 1px solid rgba(139,92,246,0.3);
+    color: var(--text-main);
+    font-size: 0.76rem;
+    line-height: 1;
+}
+.caf-chip-remove {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    border: none;
+    background: rgba(255,255,255,0.08);
+    color: var(--text-main);
+    cursor: pointer;
+    padding: 0;
+    flex-shrink: 0;
+    transition: var(--transition);
+}
+.caf-chip-remove:hover,
+.caf-chip-remove:focus-visible {
+    background: rgba(239,68,68,0.25);
+    color: #fca5a5;
+    outline: none;
+}
+.caf-chip-remove svg { width: 10px; height: 10px; pointer-events: none; }
+.caf-clear-all {
+    font-size: 0.76rem;
+    color: var(--text-muted);
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 4px 2px;
+    text-decoration: underline;
+    text-underline-offset: 2px;
+}
+.caf-clear-all:hover { color: var(--text-main); }
 
 /* Multi-filter dropdown (filtros de seleção múltipla dos Chamados) */
 .mf-wrap {
@@ -3828,7 +3943,13 @@ kbd {
 }
 .mf-wrap.mf-open .mf-btn {
     border-color: var(--primary-color);
+}
+/* Anel de foco visível para navegação por teclado — o outline nativo era
+   removido incondicionalmente sempre que o dropdown abria, mesmo via clique
+   do mouse, deixando quem navega por Tab sem indicação de foco nenhuma. */
+.mf-btn:focus-visible {
     outline: none;
+    box-shadow: 0 0 0 2px rgba(139,92,246,0.35);
 }
 .mf-wrap.mf-active .mf-btn {
     border-color: var(--primary-color);
@@ -3891,9 +4012,11 @@ kbd {
     overflow: hidden;
     text-overflow: ellipsis;
 }
+/* Metadado neutro (não é ação de IA nem identidade) — não deve competir
+   pelo violeta reservado do sistema; reaproveita o mesmo cinza de ticket-status-other. */
 .ticket-type-badge {
-    background: rgba(159,122,234,0.15);
-    color: #9f7aea;
+    background: rgba(160,174,192,0.12);
+    color: #a0aec0;
 }
 
 /* ── Animações de interface ────────────────────────────────── */
@@ -3918,6 +4041,9 @@ kbd {
 .btn-pulse-empty {
     animation: btn-pulse-empty 1.6s ease-out infinite;
     will-change: transform;
+}
+@media (prefers-reduced-motion: reduce) {
+    .btn-pulse-empty { animation: none; }
 }
 
 /* Bounce do card Kanban ao ser solto */
@@ -4332,6 +4458,24 @@ kbd {
     animation: agenda-slide-from-left 0.28s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
+/* Agenda: respeita prefers-reduced-motion — sem cascade de entrada dos eventos,
+   sem slide de navegação e sem os pulsos infinitos (sync e RSVP pendente) */
+@media (prefers-reduced-motion: reduce) {
+    .event-block {
+        animation: none;
+        opacity: 1;
+    }
+    #agenda-container.agenda-nav-right > *,
+    #agenda-container.agenda-nav-left > * {
+        animation: none;
+        opacity: 1;
+    }
+    .status-connected .sync-status-dot,
+    .rsvp-dot--needsAction {
+        animation: none;
+    }
+}
+
 /* F2 — Float label nos formulários (JS-driven, funciona com label antes do input) */
 .float-group {
     position: relative;
@@ -4418,20 +4562,30 @@ kbd {
    RSVP — Você vai?
    ========================================= */
 
-/* Indicador circular no event-block */
+/* Indicador circular no event-block — ícone + cor (nunca só cor, WCAG 1.4.1) */
 .rsvp-dot {
     position: absolute;
-    bottom: 5px;
-    right: 5px;
-    width: 10px;
-    height: 10px;
+    bottom: 4px;
+    right: 4px;
+    width: 15px;
+    height: 15px;
     border-radius: 50%;
     border: none;
     cursor: pointer;
     padding: 0;
     flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
     transition: transform 0.15s ease, box-shadow 0.15s ease;
     z-index: 2;
+}
+.rsvp-dot svg {
+    width: 9px;
+    height: 9px;
+    stroke: white;
+    stroke-width: 3;
+    pointer-events: none;
 }
 .rsvp-dot:hover {
     transform: scale(1.4);
@@ -4509,11 +4663,10 @@ kbd {
     border: 2px dashed rgba(245, 158, 11, 0.9);
 }
 .agenda-month-event.rsvp-pending {
-    border-left: 3px dashed #f59e0b;
-    padding-left: 4px;
+    border: 1px dashed #f59e0b;
 }
 .schedule-event.rsvp-pending {
-    border-left: 3px dashed #f59e0b;
+    border: 1px dashed #f59e0b;
 }
 .rsvp-pending-badge {
     position: absolute;
