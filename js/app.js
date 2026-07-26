@@ -2302,7 +2302,7 @@ class AppController {
         if (searchTerm)     tasks = tasks.filter(t => this._taskMatchesSearch(t, searchTerm));
         if (hasDateFilter)  tasks = this._applyTaskDateFilters(tasks, dateFilters);
 
-        this._renderKanbanBoard(this._currentColumns, tasks, {}, true);
+        this._renderKanbanBoard(this._currentColumns, tasks, {}, true, true);
         lucide.createIcons();
     }
 
@@ -4109,7 +4109,7 @@ class AppController {
         `;
     }
 
-    _renderKanbanBoard(columns, tasks, clientsMap, readOnly = false) {
+    _renderKanbanBoard(columns, tasks, clientsMap, readOnly = false, allowReorder = !readOnly) {
         const board = document.getElementById('kanban-board');
         if (!board) return;
         board.innerHTML = '';
@@ -4134,7 +4134,7 @@ class AppController {
                     <button class="kb-header-add" onclick="app.openQuickAdd('${colId}')" title="Adicionar card">
                         <i data-lucide="plus"></i>
                     </button>`;
-            const dropzoneAttrs = readOnly ? '' : `ondragover="app.allowDrop(event)" ondrop="app.dropTask(event)"`;
+            const dropzoneAttrs = allowReorder ? `ondragover="app.allowDrop(event)" ondrop="app.dropTask(event)"` : '';
             const quickAddHtml = readOnly ? '' : `
                 <div class="kb-quick-add" id="kb-quick-add-${colId}" style="display:none">
                     <textarea class="kb-quick-add-input" id="kb-quick-input-${colId}" rows="3"
@@ -4166,7 +4166,7 @@ class AppController {
             `;
 
             const dropzone = colEl.querySelector('.kb-dropzone');
-            colTasks.forEach(task => dropzone.appendChild(this.createKanbanCard(task, clientsMap, readOnly)));
+            colTasks.forEach(task => dropzone.appendChild(this.createKanbanCard(task, clientsMap, readOnly, allowReorder)));
 
             board.appendChild(colEl);
         });
@@ -4216,16 +4216,16 @@ class AppController {
             </table>`;
     }
 
-    createKanbanCard(task, clientsMap, readOnly = false) {
+    createKanbanCard(task, clientsMap, readOnly = false, allowReorder = !readOnly) {
         const card = document.createElement('div');
         card.className = 'kb-card' + (task.id === this._lastAddedTaskId ? ' kb-card-new' : '');
-        card.draggable = !readOnly;
+        card.draggable = allowReorder;
         card.dataset.id = task.id;
         card.tabIndex = 0;
         card.setAttribute('role', 'button');
         card.setAttribute('aria-label', task.title ? `Tarefa: ${task.title}` : 'Tarefa sem título');
 
-        if (!readOnly) {
+        if (allowReorder) {
             card.addEventListener('dragstart', this.dragStart.bind(this));
             card.addEventListener('dragend', this.dragEnd.bind(this));
             card.addEventListener('dragover', (e) => {
