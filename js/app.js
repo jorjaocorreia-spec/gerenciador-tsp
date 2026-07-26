@@ -1576,6 +1576,16 @@ class AppController {
         const newStatus = colEl?.dataset.status;
         if (!draggedId || !newStatus) return;
 
+        const oldStatus = this._draggingFromStatus;
+
+        // Portal do Cliente: só pode reordenar dentro da mesma coluna. Mudar
+        // de coluna (status) continua exclusivo do consultor.
+        if (this.userRole === 'client' && newStatus !== oldStatus) {
+            Toast.show('Só é possível reordenar tarefas dentro da mesma fila.', 'warning');
+            this.renderClientPortalTasks();
+            return;
+        }
+
         // Lê a ordem do DOM: substitui o placeholder pelo id do card arrastado
         const elements = [...colEl.querySelectorAll('.kb-card:not(.dragging), .kb-drag-placeholder')];
         const ids = elements.map(el =>
@@ -1585,7 +1595,6 @@ class AppController {
         // Garante que o card arrastado está na lista (coluna vazia)
         if (!ids.includes(draggedId)) ids.push(draggedId);
 
-        const oldStatus = this._draggingFromStatus;
         const reorderData = ids.map((id, pos) => ({ id, status: newStatus, position: pos }));
 
         // Optimistic: atualiza cache imediatamente e re-renderiza o board (instantâneo)
@@ -1594,7 +1603,11 @@ class AppController {
                 const t = this._tasksCache.find(t => t.id === id);
                 if (t) { t.status = status; t.position = position; }
             });
-            this._renderTasksFromCache();
+            if (this.userRole === 'client') {
+                this.renderClientPortalTasks();
+            } else {
+                this._renderTasksFromCache();
+            }
         }
 
         // Bounce animation no card após o re-render
@@ -1605,6 +1618,22 @@ class AppController {
                 droppedCard.addEventListener('animationend', () => droppedCard.classList.remove('kb-card-dropped'), { once: true });
             }
         });
+
+        // Portal do Cliente: persiste só a posição, nunca status/updated_at
+        // (ver migration 20260726_client_task_reorder.sql — a trigger bloqueia
+        // qualquer outro campo mesmo que este código um dia envie mais coisa).
+        if (this.userRole === 'client') {
+            store.reorderClientTaskPositions(
+                reorderData.map(({ id, position }) => ({ id, position })),
+                this.userClientId
+            ).catch(err => {
+                console.error('reorderClientTaskPositions error:', err);
+                this._tasksCache = null;
+                this.renderClientPortalTasks();
+                Toast.show('Erro ao salvar a nova ordem.', 'error');
+            });
+            return;
+        }
 
         // Persiste em background (reorderTasks já salva status + position de todos os afetados)
         store.reorderTasks(reorderData).catch(err => {
