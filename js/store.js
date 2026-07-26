@@ -952,6 +952,26 @@ class TSPStore {
         return (data || []).map(r => this._column(r));
     }
 
+    // Reordenação de tarefas pelo Portal do Cliente: só grava `position`,
+    // nunca `status` nem `updated_at` — a trigger enforce_client_task_position_only
+    // (migration 20260726_client_task_reorder.sql) garante isso também no banco,
+    // mesmo que este método um dia envie algo além de position por engano.
+    // Sem filtro por user_id pelo mesmo motivo de getClientPortalTasks: a tarefa
+    // pertence ao consultor, não ao usuário-cliente logado — a RLS
+    // (clients_reorder_own_tasks) autoriza via client_id.
+    async reorderClientTaskPositions(updates, clientId) {
+        // updates: [{id, position}]
+        const results = await Promise.all(
+            updates.map(u =>
+                this.db.from('tasks')
+                    .update({ position: u.position })
+                    .eq('id', u.id).eq('client_id', clientId)
+            )
+        );
+        const failed = results.find(r => r.error);
+        if (failed) throw failed.error;
+    }
+
     // Nome do cliente para exibir travado no filtro do Portal do Cliente.
     // Select explícito (só id, name) — nunca usar '*' aqui: a RLS libera a
     // linha inteira (client_pays, hourly_rate, notes, etc.) e o papel
