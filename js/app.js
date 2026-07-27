@@ -1142,8 +1142,8 @@ class AppController {
         this._renderTaskAttachmentPreviews();
         this._renderTaskComments();
 
-        this._applyTaskModalReadOnlyState(readOnly);
         this.openModal('modal-task');
+        this._applyTaskModalReadOnlyState(readOnly);
     }
 
     _applyTaskModalReadOnlyState(readOnly) {
