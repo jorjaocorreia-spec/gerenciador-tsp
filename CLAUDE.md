@@ -603,8 +603,10 @@ python -m http.server 8080
 # Verificar se porta 8080 está em uso
 netstat -ano | findstr :8080
 
-# Git push (usa git do GitHub Desktop)
-$git = "C:\Users\jorge\AppData\Local\GitHubDesktop\app-3.5.8\resources\app\git\cmd\git.exe"
+# Git push (usa git do GitHub Desktop — versão do app-* muda a cada update do GitHub Desktop;
+# descobrir dinamicamente em vez de hardcodar o número de versão)
+$git = (Get-ChildItem "C:\Users\jorge\AppData\Local\GitHubDesktop" -Directory -Filter "app-*" |
+    Sort-Object Name -Descending | Select-Object -First 1).FullName + "\resources\app\git\cmd\git.exe"
 Set-Location d:\GerenciadorTSP
 & $git add . && & $git commit -m "mensagem" && & $git push
 ```
