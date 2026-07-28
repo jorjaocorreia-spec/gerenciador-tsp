@@ -292,16 +292,21 @@ class TSPStore {
         return { task: this._task(data), completedAt };
     }
 
-    async reorderTasks(updates) {
-        // updates: [{id, status, position}]
+    async reorderTasks(updates, draggedId = null) {
+        // updates: [{id, status, position}] — apenas o card arrastado (draggedId)
+        // recebe updated_at novo; os demais cards da coluna só têm a posição
+        // recalculada, sem "carimbar" updated_at (ver CLAUDE.md: Gerador de
+        // Apontamentos usa updated_at como sinal de trabalho feito no dia).
         const now = new Date().toISOString();
         const results = await Promise.all(
-            updates.map(u =>
-                this.db.from('tasks')
-                    .update({ status: u.status, position: u.position, updated_at: now })
+            updates.map(u => {
+                const payload = { status: u.status, position: u.position };
+                if (draggedId && u.id === draggedId) payload.updated_at = now;
+                return this.db.from('tasks')
+                    .update(payload)
                     .eq('id', u.id)
-                    .eq('user_id', this.userId)
-            )
+                    .eq('user_id', this.userId);
+            })
         );
         const failed = results.find(r => r.error);
         if (failed) throw failed.error;

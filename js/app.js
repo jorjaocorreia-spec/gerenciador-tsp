@@ -1635,8 +1635,9 @@ class AppController {
             return;
         }
 
-        // Persiste em background (reorderTasks já salva status + position de todos os afetados)
-        store.reorderTasks(reorderData).catch(err => {
+        // Persiste em background (reorderTasks já salva status + position de todos os afetados;
+        // só o card arrastado ganha updated_at novo, ver store.reorderTasks)
+        store.reorderTasks(reorderData, draggedId).catch(err => {
             console.error('reorderTasks error:', err);
             // Rollback: invalida cache e busca dados frescos do banco
             this._tasksCache = null;
