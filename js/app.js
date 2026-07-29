@@ -10661,20 +10661,24 @@ class AppController {
             `<option value="${c.id}" ${c.id === targetClientId ? 'selected' : ''}>${escapeHtml(c.name)}</option>`
         ).join('');
         const myUserId = Auth.getUserId();
+        const canManage = this.userRole === 'consultant';
         const rowsHtml = result.users.map(u => {
             const isSelf = u.userId === myUserId;
             const isClientRole = u.role === 'client';
+            const isLocked = isSelf || !canManage;
+            const lockedAttr = isLocked ? `disabled ${isSelf ? 'title="Você não pode alterar seu próprio papel"' : 'title="Apenas consultores podem trocar papéis"'}` : '';
             return `
             <tr>
                 <td>${escapeHtml(u.email)}</td>
                 <td>
-                    <select class="form-control" style="min-width:140px" ${isSelf ? 'disabled title="Você não pode alterar seu próprio papel"' : ''}
+                    <select class="form-control" style="min-width:140px" ${lockedAttr}
                         onchange="app.handleRoleSelectChange(this, '${u.userId}', '${u.role}', '${u.clientId || ''}')">
                         <option value="consultant" ${u.role === 'consultant' ? 'selected' : ''}>Consultor</option>
                         <option value="client" ${u.role === 'client' ? 'selected' : ''}>Cliente</option>
                         <option value="manager" ${u.role === 'manager' ? 'selected' : ''}>Gerente</option>
                     </select>
-                    <select class="form-control user-role-client-select" style="min-width:140px;margin-top:4px;${isClientRole ? '' : 'display:none;'}" ${isClientRole ? '' : 'disabled'}>
+                    <select class="form-control user-role-client-select" style="min-width:140px;margin-top:4px;${isClientRole ? '' : 'display:none;'}" ${(isClientRole && !isLocked) ? '' : 'disabled'} ${isLocked ? lockedAttr : ''}
+                        onchange="app.handleClientSelectChangeForRole(this, '${u.userId}', '${u.role}', '${u.clientId || ''}')">
                         <option value="">Selecione o cliente...</option>
                         ${clientOptionsHtml(u.clientId)}
                     </select>
@@ -10775,16 +10779,17 @@ class AppController {
             clientSelect.style.display = '';
             clientSelect.disabled = false;
             clientSelect.value = '';
-            clientSelect.onchange = () => {
-                if (!clientSelect.value) return;
-                this._submitRoleChange(userId, newRole, clientSelect.value, selectEl, oldRole, oldClientId);
-            };
             return;
         }
         clientSelect.style.display = 'none';
         clientSelect.disabled = true;
-        clientSelect.onchange = null;
         this._submitRoleChange(userId, newRole, null, selectEl, oldRole, oldClientId);
+    }
+
+    handleClientSelectChangeForRole(clientSelectEl, userId, oldRole, oldClientId) {
+        if (!clientSelectEl.value) return;
+        const roleSelect = clientSelectEl.parentElement.querySelector('select.form-control:not(.user-role-client-select)');
+        this._submitRoleChange(userId, 'client', clientSelectEl.value, roleSelect, oldRole, oldClientId);
     }
 
     async _submitRoleChange(userId, role, clientId, selectEl, oldRole, oldClientId) {

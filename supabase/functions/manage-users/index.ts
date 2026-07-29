@@ -60,7 +60,7 @@ serve(async (req) => {
     const { action, email, role, clientId, userId } = await req.json();
 
     if (action !== "list" && callerRole.role !== "consultant") {
-      return jsonResponse({ error: "Apenas consultores podem convidar, revogar ou reenviar acesso." }, 403);
+      return jsonResponse({ error: "Apenas consultores podem convidar, revogar, reenviar acesso ou trocar papéis." }, 403);
     }
 
     if (action === "list") {
@@ -93,6 +93,9 @@ serve(async (req) => {
       if (!email || typeof email !== "string") return jsonResponse({ error: "E-mail é obrigatório." }, 400);
       if (role !== "consultant" && role !== "client" && role !== "manager") return jsonResponse({ error: "Papel inválido." }, 400);
       if (role === "client" && !clientId) return jsonResponse({ error: "Cliente é obrigatório para o papel 'client'." }, 400);
+      if (role === "manager" && caller.email !== SUPER_ADMIN_EMAIL) {
+        return jsonResponse({ error: "Apenas o administrador do sistema pode conceder o papel de Gerente." }, 403);
+      }
 
       const { data: invited, error: inviteError } = await admin.auth.admin.inviteUserByEmail(email);
       if (inviteError) return jsonResponse({ error: inviteError.message }, 400);
@@ -129,6 +132,10 @@ serve(async (req) => {
         .eq("user_id", userId)
         .single();
       if (fetchRoleError) return jsonResponse({ error: fetchRoleError.message }, 400);
+
+      if (existingRole.role === "manager" && caller.email !== SUPER_ADMIN_EMAIL) {
+        return jsonResponse({ error: "Apenas o administrador do sistema pode remover o acesso de um Gerente." }, 403);
+      }
 
       const { error: roleDeleteError } = await admin.from("user_roles").delete().eq("user_id", userId);
       if (roleDeleteError) return jsonResponse({ error: roleDeleteError.message }, 400);
