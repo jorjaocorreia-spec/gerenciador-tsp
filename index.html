@@ -152,6 +152,9 @@
         </ul>
         <div class="sidebar-bottom">
             <p class="text-muted sidebar-section-label">SISTEMA</p>
+            <button class="btn btn-secondary" id="btn-manager-supervisor" style="width:100%; margin-bottom:8px; display:none;" onclick="app.openManagerSupervisorPicker()" title="Ver outro consultor">
+                <i data-lucide="eye"></i><span class="nav-label"> Ver outro consultor</span>
+            </button>
             <button class="btn btn-secondary" id="btn-import-pdf" style="width: 100%; margin-bottom: 8px;" title="Importar Ata (PDF)">
                 <i data-lucide="file-text"></i><span class="nav-label"> Importar Ata (PDF)</span>
             </button>
@@ -1435,6 +1438,20 @@
                     <i data-lucide="send" style="width:14px;height:14px"></i> Enviar convite
                 </button>
             </form>
+        </div>
+    </div>
+
+    <!-- MODAL: SUPERVISÃO GERENCIAL — ESCOLHER CONSULTOR -->
+    <div class="modal-overlay" id="modal-manager-supervisor">
+        <div class="modal glass" style="max-width:480px;">
+            <div class="modal-header">
+                <h2>Ver outro consultor</h2>
+                <button class="close-modal" onclick="app.closeModal('modal-manager-supervisor')"><i data-lucide="x"></i></button>
+            </div>
+            <p class="text-muted" style="padding: 0 24px 12px; font-size: 0.85rem;">
+                Modo somente leitura — você verá as telas exatamente como aquele consultor, sem poder editar nada.
+            </p>
+            <div id="manager-supervisor-list" style="padding: 0 24px 20px; max-height: 50vh; overflow-y: auto;"></div>
         </div>
     </div>
 

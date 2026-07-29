@@ -2233,6 +2233,9 @@ class AppController {
             return this.enterClientPortalMode();
         }
 
+        const btnSupervisor = document.getElementById('btn-manager-supervisor');
+        if (btnSupervisor) btnSupervisor.style.display = this.userRole === 'manager' ? '' : 'none';
+
         this.checkLocalStorageMigration();
         this.applySidebarState();
         this.applyMoneyVisibility();
@@ -10722,6 +10725,39 @@ class AppController {
             btn.disabled = false;
             btn.innerHTML = origHtml;
         }
+    }
+
+    async openManagerSupervisorPicker() {
+        const container = document.getElementById('manager-supervisor-list');
+        container.innerHTML = '<p class="text-muted">Carregando...</p>';
+        this.openModal('modal-manager-supervisor');
+        try {
+            const result = await this._manageUsersFetch('list');
+            const myId = Auth.getUserId();
+            const candidates = result.users.filter(u =>
+                (u.role === 'consultant' || u.role === 'manager') && u.userId !== myId
+            );
+            if (candidates.length === 0) {
+                container.innerHTML = '<p class="text-muted">Nenhum outro consultor cadastrado.</p>';
+                return;
+            }
+            container.innerHTML = candidates.map(u => `
+                <div style="display:flex; align-items:center; justify-content:space-between; padding:10px 0; border-bottom:1px solid var(--surface-border);">
+                    <span>${escapeHtml(u.email)}</span>
+                    <button class="btn btn-primary btn-sm" onclick="app.enterManagerView('${u.userId}', '${escapeHtml(u.email)}')">
+                        <i data-lucide="eye" style="width:13px;height:13px"></i> Visualizar
+                    </button>
+                </div>`).join('');
+            lucide.createIcons();
+        } catch (err) {
+            container.innerHTML = `<p class="text-muted">Erro ao carregar consultores: ${escapeHtml(err.message)}</p>`;
+        }
+    }
+
+    enterManagerView(consultantUserId, consultantEmail) {
+        sessionStorage.setItem('tsp_manager_viewing_as', consultantUserId);
+        sessionStorage.setItem('tsp_manager_viewing_as_email', consultantEmail);
+        location.reload();
     }
 
     // ===================================
