@@ -4256,7 +4256,7 @@ class AppController {
                 ? `<span class="kb-badge kb-badge-completed"><i data-lucide="check-circle" style="width:10px;height:10px"></i> Concluída</span>`
                 : '—';
             return `
-                <tr onclick="app.handleEditTask('${t.id}')" style="cursor:pointer">
+                <tr onclick="app.handleEditTask('${t.id}', ${this.isManagerView})" style="cursor:pointer">
                     <td>${escapeHtml(t.title)}</td>
                     <td>${escapeHtml(clientName)}</td>
                     <td><span class="kb-badge kb-badge-${priClass}">${priLabel}</span></td>
