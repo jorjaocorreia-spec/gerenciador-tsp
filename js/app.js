@@ -10651,11 +10651,34 @@ class AppController {
             container.innerHTML = `<p class="text-muted">Erro ao carregar usuários: ${escapeHtml(err.message)}</p>`;
             return;
         }
-        const roleLabel = { consultant: 'Consultor', client: 'Cliente', manager: 'Gerente' };
-        const rowsHtml = result.users.map(u => `
+        let clients = [];
+        try {
+            clients = await store.getClients();
+        } catch (err) {
+            Toast.show('Erro ao carregar clientes para o seletor de papel: ' + err.message, 'error');
+        }
+        const clientOptionsHtml = (targetClientId) => clients.map(c =>
+            `<option value="${c.id}" ${c.id === targetClientId ? 'selected' : ''}>${escapeHtml(c.name)}</option>`
+        ).join('');
+        const myUserId = Auth.getUserId();
+        const rowsHtml = result.users.map(u => {
+            const isSelf = u.userId === myUserId;
+            const isClientRole = u.role === 'client';
+            return `
             <tr>
                 <td>${escapeHtml(u.email)}</td>
-                <td>${roleLabel[u.role] || u.role}</td>
+                <td>
+                    <select class="form-control" style="min-width:140px" ${isSelf ? 'disabled title="Você não pode alterar seu próprio papel"' : ''}
+                        onchange="app.handleRoleSelectChange(this, '${u.userId}', '${u.role}', '${u.clientId || ''}')">
+                        <option value="consultant" ${u.role === 'consultant' ? 'selected' : ''}>Consultor</option>
+                        <option value="client" ${u.role === 'client' ? 'selected' : ''}>Cliente</option>
+                        <option value="manager" ${u.role === 'manager' ? 'selected' : ''}>Gerente</option>
+                    </select>
+                    <select class="form-control user-role-client-select" style="min-width:140px;margin-top:4px;${isClientRole ? '' : 'display:none;'}" ${isClientRole ? '' : 'disabled'}>
+                        <option value="">Selecione o cliente...</option>
+                        ${clientOptionsHtml(u.clientId)}
+                    </select>
+                </td>
                 <td>${u.clientName ? escapeHtml(u.clientName) : '—'}</td>
                 <td>${new Date(u.createdAt).toLocaleDateString('pt-BR')}</td>
                 <td style="display:flex;gap:8px;flex-wrap:wrap;">
@@ -10667,7 +10690,8 @@ class AppController {
                         <i data-lucide="user-x" style="width:13px;height:13px"></i> Remover acesso
                     </button>
                 </td>
-            </tr>`).join('');
+            </tr>`;
+        }).join('');
         container.innerHTML = `
             <table class="data-table">
                 <thead><tr><th>E-mail</th><th>Papel</th><th>Cliente</th><th>Convidado em</th><th></th></tr></thead>
@@ -10741,6 +10765,43 @@ class AppController {
             Toast.show(`Erro ao reenviar convite: ${err.message}`, 'error', 6000);
             btn.disabled = false;
             btn.innerHTML = origHtml;
+        }
+    }
+
+    handleRoleSelectChange(selectEl, userId, oldRole, oldClientId) {
+        const newRole = selectEl.value;
+        const clientSelect = selectEl.parentElement.querySelector('.user-role-client-select');
+        if (newRole === 'client') {
+            clientSelect.style.display = '';
+            clientSelect.disabled = false;
+            clientSelect.value = '';
+            clientSelect.onchange = () => {
+                if (!clientSelect.value) return;
+                this._submitRoleChange(userId, newRole, clientSelect.value, selectEl, oldRole, oldClientId);
+            };
+            return;
+        }
+        clientSelect.style.display = 'none';
+        clientSelect.disabled = true;
+        clientSelect.onchange = null;
+        this._submitRoleChange(userId, newRole, null, selectEl, oldRole, oldClientId);
+    }
+
+    async _submitRoleChange(userId, role, clientId, selectEl, oldRole, oldClientId) {
+        try {
+            await this._manageUsersFetch('changeRole', { userId, role, clientId });
+            Toast.show('Papel atualizado.', 'success');
+            await this.renderUsers();
+        } catch (err) {
+            Toast.show(`Erro ao trocar papel: ${err.message}`, 'error', 6000);
+            selectEl.value = oldRole;
+            const clientSelect = selectEl.parentElement.querySelector('.user-role-client-select');
+            if (clientSelect) {
+                clientSelect.style.display = oldRole === 'client' ? '' : 'none';
+                clientSelect.disabled = oldRole !== 'client';
+                clientSelect.value = oldClientId || '';
+                clientSelect.onchange = null;
+            }
         }
     }
 
