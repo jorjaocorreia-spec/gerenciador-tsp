@@ -1,6 +1,6 @@
 class TSPStore {
     get db() { return window.supabaseClient; }
-    get userId() { return Auth.getUserId(); }
+    get userId() { return this.viewingAsUserId || Auth.getUserId(); }
 
     // ── Mappers camelCase ↔ snake_case ────────────────────────────
 
@@ -1641,4 +1641,29 @@ class TSPStore {
     }
 }
 
-window.store = new TSPStore();
+// Modo Supervisão (papel Gerente, Fase 49): quando `isManagerView` está ativo,
+// bloqueia qualquer método que não seja leitura (nome não iniciado por get/_)
+// antes de chegar ao banco. Defesa em profundidade — a RLS (Task 1) já nega
+// escrita cross-user; este guard só dá feedback imediato e amigável na UI.
+function _wrapStoreWithManagerGuard(storeInstance) {
+    const BLOCKED_MESSAGE = 'Modo de visualização: ação bloqueada. Saia do modo supervisão para editar.';
+    return new Proxy(storeInstance, {
+        get(target, prop) {
+            const value = Reflect.get(target, prop, target);
+            if (typeof value !== 'function') return value;
+            if (typeof prop === 'string' && (prop.startsWith('get') || prop.startsWith('_'))) {
+                return value.bind(target);
+            }
+            return function guardedStoreMethod(...args) {
+                if (target.isManagerView) {
+                    return Promise.reject(new Error(BLOCKED_MESSAGE));
+                }
+                return value.apply(target, args);
+            };
+        }
+    });
+}
+
+window.store = _wrapStoreWithManagerGuard(new TSPStore());
+window.store.isManagerView = false;
+window.store.viewingAsUserId = null;
