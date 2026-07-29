@@ -4003,10 +4003,17 @@ class AppController {
         }
 
         if (btnManage) btnManage.style.display = 'flex';
+        if (btnManage && this.isManagerView) btnManage.style.display = 'none';
+        const btnNewTaskEl = document.getElementById('btn-new-task');
+        if (btnNewTaskEl) btnNewTaskEl.style.display = this.isManagerView ? 'none' : '';
 
-        // Carrega (ou cria) colunas do cliente selecionado — sempre, pois cliente pode ter mudado
+        // Em Modo Supervisão nunca criar colunas padrão (ensureDefaultColumns insere
+        // linhas) — o consultor supervisionado já deve ter colunas; usar getColumns
+        // (somente leitura) evita disparar o guard de escrita por engano.
         try {
-            this._currentColumns = await store.ensureDefaultColumns(filterClient);
+            this._currentColumns = this.isManagerView
+                ? await store.getColumns(filterClient)
+                : await store.ensureDefaultColumns(filterClient);
         } catch (err) {
             console.error('Erro ao carregar colunas:', err);
             this._currentColumns = [];
@@ -4032,7 +4039,7 @@ class AppController {
         if (searchTerm)     tasks = tasks.filter(t => this._taskMatchesSearch(t, searchTerm));
         if (hasDateFilter)  tasks = this._applyTaskDateFilters(tasks, dateFilters);
 
-        this._renderKanbanBoard(this._currentColumns, tasks, this._clientsMapCache);
+        this._renderKanbanBoard(this._currentColumns, tasks, this._clientsMapCache, this.isManagerView, false);
         await this.renderTasksDashboard(tasks, filterClient);
         lucide.createIcons();
 
@@ -4108,7 +4115,7 @@ class AppController {
         if (searchTerm)     tasks = tasks.filter(t => this._taskMatchesSearch(t, searchTerm));
         if (hasDateFilter)  tasks = this._applyTaskDateFilters(tasks, dateFilters);
 
-        this._renderKanbanBoard(this._currentColumns, tasks, this._clientsMapCache);
+        this._renderKanbanBoard(this._currentColumns, tasks, this._clientsMapCache, this.isManagerView, false);
         this._renderTasksDashboardSync(tasks, filterClient);
         lucide.createIcons();
 
