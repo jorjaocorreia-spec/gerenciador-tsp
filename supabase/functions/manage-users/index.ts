@@ -7,6 +7,11 @@ const corsHeaders = {
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
+// Único usuário autorizado a conceder OU remover o papel 'manager' de qualquer
+// outro usuário (nas duas direções) — ver design em
+// docs/superpowers/specs/2026-07-29-troca-papel-usuario-design.md.
+const SUPER_ADMIN_EMAIL = "jorjaocorreia@gmail.com";
+
 function jsonResponse(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), { status, headers: { ...corsHeaders, "Content-Type": "application/json" } });
 }
@@ -192,6 +197,34 @@ serve(async (req) => {
       }
 
       return jsonResponse({ userId: newUserId, email });
+    }
+
+    if (action === "changeRole") {
+      if (!userId || typeof userId !== "string") return jsonResponse({ error: "userId é obrigatório." }, 400);
+      if (role !== "consultant" && role !== "client" && role !== "manager") return jsonResponse({ error: "Papel inválido." }, 400);
+      if (role === "client" && !clientId) return jsonResponse({ error: "Cliente é obrigatório para o papel 'client'." }, 400);
+      if (userId === caller.id) return jsonResponse({ error: "Você não pode alterar o próprio papel." }, 400);
+
+      const { data: targetRole, error: targetRoleError } = await admin
+        .from("user_roles")
+        .select("role")
+        .eq("user_id", userId)
+        .single();
+      if (targetRoleError) return jsonResponse({ error: targetRoleError.message }, 400);
+
+      // Trava do Gerente: vale para conceder OU remover, nas duas direções.
+      const touchesManager = role === "manager" || targetRole.role === "manager";
+      if (touchesManager && caller.email !== SUPER_ADMIN_EMAIL) {
+        return jsonResponse({ error: "Apenas o administrador do sistema pode conceder ou remover o papel de Gerente." }, 403);
+      }
+
+      const { error: updateError } = await admin
+        .from("user_roles")
+        .update({ role, client_id: role === "client" ? clientId : null })
+        .eq("user_id", userId);
+      if (updateError) return jsonResponse({ error: updateError.message }, 400);
+
+      return jsonResponse({ ok: true });
     }
 
     return jsonResponse({ error: "Invalid action" }, 400);
