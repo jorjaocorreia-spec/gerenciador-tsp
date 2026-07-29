@@ -628,17 +628,54 @@ Continuando do teste da Task 6: após o reload, confirmar que a barra amarela ap
 - Consumes: erro lançado pelo guard da Task 4 (`Error('Modo de visualização: ação bloqueada...')`).
 - Produces: nenhuma interface nova — só melhora a mensagem exibida por todo handler que já usa `_friendlyErrorMessage` (não precisa tocar em nenhum dos ~12 `handleXxxSubmit`).
 
-- [ ] **Step 1: Adicionar o caso no início da função**
+- [ ] **Step 1: Adicionar o caso logo após `const msg = ...`**
 
-Em `js/app.js:503-519`, logo após `console.error(err);` (linha 504), adicionar:
+Em `js/app.js:503-519`, a função é:
 
 ```js
+    _friendlyErrorMessage(err) {
+        console.error(err);
+        const msg = (err?.message || '').toLowerCase();
+        if (!navigator.onLine || msg.includes('failed to fetch') || msg.includes('networkerror')) {
+            return 'Sem conexão com a internet. Verifique sua rede e tente novamente.';
+        }
+        if (msg.includes('jwt') || msg.includes('401') || msg.includes('unauthorized')) {
+            return 'Sua sessão expirou. Atualize a página e faça login novamente.';
+        }
+        if (msg.includes('duplicate key') || msg.includes('unique constraint')) {
+            return 'Já existe um registro com esses dados.';
+        }
+        if (msg.includes('violates') || msg.includes('constraint') || msg.includes('null value')) {
+            return 'Alguns dados não puderam ser salvos — confira os campos obrigatórios.';
+        }
+        return 'Não foi possível salvar. Tente novamente em instantes.';
+    }
+```
+
+Trocar por (o único bloco novo é o `if (msg.includes('modo de visualização'))`, inserido logo depois de `const msg = ...` e antes do primeiro `if` já existente):
+
+```js
+    _friendlyErrorMessage(err) {
+        console.error(err);
+        const msg = (err?.message || '').toLowerCase();
         if (msg.includes('modo de visualização')) {
             return 'Ação bloqueada: você está em Modo Supervisão (somente leitura). Saia do modo para editar.';
         }
+        if (!navigator.onLine || msg.includes('failed to fetch') || msg.includes('networkerror')) {
+            return 'Sem conexão com a internet. Verifique sua rede e tente novamente.';
+        }
+        if (msg.includes('jwt') || msg.includes('401') || msg.includes('unauthorized')) {
+            return 'Sua sessão expirou. Atualize a página e faça login novamente.';
+        }
+        if (msg.includes('duplicate key') || msg.includes('unique constraint')) {
+            return 'Já existe um registro com esses dados.';
+        }
+        if (msg.includes('violates') || msg.includes('constraint') || msg.includes('null value')) {
+            return 'Alguns dados não puderam ser salvos — confira os campos obrigatórios.';
+        }
+        return 'Não foi possível salvar. Tente novamente em instantes.';
+    }
 ```
-
-(Precisa vir antes de `const msg = ...`? Não — `msg` já é calculado na linha seguinte à atual `console.error`. Inserir o novo bloco **depois** da linha `const msg = (err?.message || '').toLowerCase();`, não antes, já que `msg` ainda não existiria. Ordem final da função: `console.error(err);` → `const msg = ...` → o novo `if (msg.includes('modo de visualização'))` → os `if`s já existentes.)
 
 - [ ] **Step 2: Verificação manual**
 
