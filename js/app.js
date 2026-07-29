@@ -78,6 +78,7 @@ class AppController {
         this.selectedClient = null;
         this.selectedMonth = null;
         this.userRole = null;       // 'consultant' | 'client' — setado em initAfterAuth()
+        this.isManagerView = false;  // true quando um 'manager' está supervisionando outro consultor
         this._notifications = [];          // lista cacheada de app_notifications
         this._notificationsLastSeenAt = null; // ISO string ou null
         this._closeNotifOnOutsideClick = null;
@@ -2219,6 +2220,15 @@ class AppController {
         this.userRole = roleRow.role;
         this.userClientId = roleRow.clientId;
 
+        if (this.userRole === 'manager') {
+            const viewingAs = sessionStorage.getItem('tsp_manager_viewing_as');
+            if (viewingAs) {
+                store.viewingAsUserId = viewingAs;
+                store.isManagerView = true;
+                this.isManagerView = true;
+            }
+        }
+
         if (this.userRole === 'client') {
             return this.enterClientPortalMode();
         }
@@ -2233,17 +2243,19 @@ class AppController {
             sidebar.classList.add('sidebar--nav-cascade');
             setTimeout(() => sidebar.classList.remove('sidebar--nav-cascade'), 1100);
         }
-        const settings = await store.getUserSettings();
-        if (settings && settings.googleClientId && settings.googleApiKey) {
-            await calendarAPI.configure(settings.googleClientId, settings.googleApiKey);
+        if (!this.isManagerView) {
+            const settings = await store.getUserSettings();
+            if (settings && settings.googleClientId && settings.googleApiKey) {
+                await calendarAPI.configure(settings.googleClientId, settings.googleApiKey);
+            }
+            // Carrega config de IA em background (não bloqueia o render)
+            aiClient.loadConfig().then(() => this._updateAIStatusBadge());
+            store.getHideDeclinedSetting().then(val => {
+                this._hideDeclinedEvents = val;
+                this._updateHideDeclinedBtn();
+            }).catch(() => {});
+            this._initNotifications().catch(() => {});
         }
-        // Carrega config de IA em background (não bloqueia o render)
-        aiClient.loadConfig().then(() => this._updateAIStatusBadge());
-        store.getHideDeclinedSetting().then(val => {
-            this._hideDeclinedEvents = val;
-            this._updateHideDeclinedBtn();
-        }).catch(() => {});
-        this._initNotifications().catch(() => {});
         await this.renderAll();
     }
 
