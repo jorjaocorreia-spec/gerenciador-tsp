@@ -504,6 +504,9 @@ class AppController {
     _friendlyErrorMessage(err) {
         console.error(err);
         const msg = (err?.message || '').toLowerCase();
+        if (msg.includes('modo de visualização')) {
+            return 'Ação bloqueada: você está em Modo Supervisão (somente leitura). Saia do modo para editar.';
+        }
         if (!navigator.onLine || msg.includes('failed to fetch') || msg.includes('networkerror')) {
             return 'Sem conexão com a internet. Verifique sua rede e tente novamente.';
         }
