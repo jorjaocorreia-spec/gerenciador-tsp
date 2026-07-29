@@ -48,11 +48,15 @@ serve(async (req) => {
     if (callerRoleError) {
       console.error("Erro ao consultar user_roles do caller:", callerRoleError.message);
     }
-    if (!callerRole || callerRole.role !== "consultant") {
-      return jsonResponse({ error: "Apenas consultores podem gerenciar usuários." }, 403);
+    if (!callerRole || (callerRole.role !== "consultant" && callerRole.role !== "manager")) {
+      return jsonResponse({ error: "Apenas consultores ou gerentes podem acessar esta função." }, 403);
     }
 
     const { action, email, role, clientId, userId } = await req.json();
+
+    if (action !== "list" && callerRole.role !== "consultant") {
+      return jsonResponse({ error: "Apenas consultores podem convidar, revogar ou reenviar acesso." }, 403);
+    }
 
     if (action === "list") {
       const { data: rows, error } = await admin
@@ -82,7 +86,7 @@ serve(async (req) => {
 
     if (action === "invite") {
       if (!email || typeof email !== "string") return jsonResponse({ error: "E-mail é obrigatório." }, 400);
-      if (role !== "consultant" && role !== "client") return jsonResponse({ error: "Papel inválido." }, 400);
+      if (role !== "consultant" && role !== "client" && role !== "manager") return jsonResponse({ error: "Papel inválido." }, 400);
       if (role === "client" && !clientId) return jsonResponse({ error: "Cliente é obrigatório para o papel 'client'." }, 400);
 
       const { data: invited, error: inviteError } = await admin.auth.admin.inviteUserByEmail(email);
