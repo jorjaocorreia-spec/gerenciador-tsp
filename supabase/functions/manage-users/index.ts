@@ -10,7 +10,7 @@ const corsHeaders = {
 // Único usuário autorizado a conceder OU remover o papel 'manager' de qualquer
 // outro usuário (nas duas direções) — ver design em
 // docs/superpowers/specs/2026-07-29-troca-papel-usuario-design.md.
-const SUPER_ADMIN_EMAIL = "jorjaocorreia@gmail.com";
+const SUPER_ADMIN_EMAIL = "jorge.henrique@tecinco.com.br";
 
 function jsonResponse(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), { status, headers: { ...corsHeaders, "Content-Type": "application/json" } });
