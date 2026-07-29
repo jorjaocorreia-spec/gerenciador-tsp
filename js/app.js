@@ -2226,6 +2226,13 @@ class AppController {
                 store.viewingAsUserId = viewingAs;
                 store.isManagerView = true;
                 this.isManagerView = true;
+                const banner = document.getElementById('manager-view-banner');
+                const bannerEmail = document.getElementById('manager-view-banner-email');
+                if (banner && bannerEmail) {
+                    bannerEmail.textContent = sessionStorage.getItem('tsp_manager_viewing_as_email') || viewingAs;
+                    banner.style.display = 'flex';
+                    lucide.createIcons();
+                }
             }
         }
 
@@ -10757,6 +10764,12 @@ class AppController {
     enterManagerView(consultantUserId, consultantEmail) {
         sessionStorage.setItem('tsp_manager_viewing_as', consultantUserId);
         sessionStorage.setItem('tsp_manager_viewing_as_email', consultantEmail);
+        location.reload();
+    }
+
+    exitManagerView() {
+        sessionStorage.removeItem('tsp_manager_viewing_as');
+        sessionStorage.removeItem('tsp_manager_viewing_as_email');
         location.reload();
     }
 

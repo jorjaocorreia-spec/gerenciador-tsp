@@ -5349,3 +5349,26 @@ kbd {
     text-align: center;
     padding: 16px 0;
 }
+
+/* =========================================
+   Modo Supervisão (Gerente visualizando outro consultor)
+   ========================================= */
+#manager-view-banner {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 500;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 20px;
+    background: var(--warning-color);
+    color: #1a1a1a;
+    font-size: 0.85rem;
+    font-weight: 600;
+}
+
+#manager-view-banner strong {
+    font-weight: 700;
+}

@@ -182,6 +182,14 @@
         </div>
     </nav>
 
+    <!-- BANNER: MODO SUPERVISÃO (Gerente visualizando outro consultor) -->
+    <div id="manager-view-banner" style="display:none;">
+        <i data-lucide="eye" style="width:15px;height:15px;"></i>
+        <span>Visualizando: <strong id="manager-view-banner-email"></strong> — somente leitura</span>
+        <button class="btn btn-secondary btn-sm" onclick="app.openManagerSupervisorPicker()">Trocar</button>
+        <button class="btn btn-danger btn-sm" onclick="app.exitManagerView()">Sair</button>
+    </div>
+
     <!-- CONTENT AREA -->
     <main class="main-content" id="main-content">
 
