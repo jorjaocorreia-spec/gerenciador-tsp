@@ -4039,7 +4039,7 @@ class AppController {
         if (searchTerm)     tasks = tasks.filter(t => this._taskMatchesSearch(t, searchTerm));
         if (hasDateFilter)  tasks = this._applyTaskDateFilters(tasks, dateFilters);
 
-        this._renderKanbanBoard(this._currentColumns, tasks, this._clientsMapCache, this.isManagerView, false);
+        this._renderKanbanBoard(this._currentColumns, tasks, this._clientsMapCache, this.isManagerView, !this.isManagerView);
         await this.renderTasksDashboard(tasks, filterClient);
         lucide.createIcons();
 
@@ -4115,7 +4115,7 @@ class AppController {
         if (searchTerm)     tasks = tasks.filter(t => this._taskMatchesSearch(t, searchTerm));
         if (hasDateFilter)  tasks = this._applyTaskDateFilters(tasks, dateFilters);
 
-        this._renderKanbanBoard(this._currentColumns, tasks, this._clientsMapCache, this.isManagerView, false);
+        this._renderKanbanBoard(this._currentColumns, tasks, this._clientsMapCache, this.isManagerView, !this.isManagerView);
         this._renderTasksDashboardSync(tasks, filterClient);
         lucide.createIcons();
 
@@ -11881,6 +11881,13 @@ document.addEventListener('DOMContentLoaded', async () => {
             window.app._indicadoresMonthlyData = null;
             window.app._indicadoresChatHistoryMensal = [];
             window.app._indicadoresChatHistoryGeral = [];
+            sessionStorage.removeItem('tsp_manager_viewing_as');
+            sessionStorage.removeItem('tsp_manager_viewing_as_email');
+            store.viewingAsUserId = null;
+            store.isManagerView = false;
+            window.app.isManagerView = false;
+            const managerBanner = document.getElementById('manager-view-banner');
+            if (managerBanner) managerBanner.style.display = 'none';
         }
         if (window.aiClient) aiClient.reset();
         await Auth.signOut();
