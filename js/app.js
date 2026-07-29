@@ -10619,7 +10619,7 @@ class AppController {
             container.innerHTML = `<p class="text-muted">Erro ao carregar usuários: ${escapeHtml(err.message)}</p>`;
             return;
         }
-        const roleLabel = { consultant: 'Consultor', client: 'Cliente' };
+        const roleLabel = { consultant: 'Consultor', client: 'Cliente', manager: 'Gerente' };
         const rowsHtml = result.users.map(u => `
             <tr>
                 <td>${escapeHtml(u.email)}</td>
