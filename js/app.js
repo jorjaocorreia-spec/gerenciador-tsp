@@ -3952,10 +3952,14 @@ class AppController {
         const board = document.getElementById('kanban-board');
         if (!board) return;
 
-        // Skeleton imediato — com cliente selecionado, tudo que segue (migração de
-        // status legado, colunas, tasks) é assíncrono; sem esse feedback visual a
-        // troca de cliente dava a impressão de tela travada durante os awaits.
-        if (filterClient) this._skKanban(board, this._currentColumns.length || 3);
+        // Skeleton imediato — toda chamada a renderTasks() passa por pelo menos um
+        // await bloqueante logo abaixo (_migrateOldStatuses() sempre faz uma query;
+        // com cliente, ainda busca as colunas). Sem esse feedback visual, tanto a
+        // troca/seleção de cliente quanto uma busca (Enter no campo "Buscar") ou um
+        // filtro de data davam a impressão de tela travada durante os awaits.
+        if (filterClient || searchTerm || hasDateFilter) {
+            this._skKanban(board, this._currentColumns.length || 3);
+        }
 
         // Migração: status antigos ('new','doing','done') → UUIDs das colunas do cliente
         await this._migrateOldStatuses();
