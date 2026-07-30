@@ -3942,9 +3942,6 @@ class AppController {
     async renderTasks() {
         if (this.currentView !== 'tasks') return;
 
-        // Migração: status antigos ('new','doing','done') → UUIDs das colunas do cliente
-        await this._migrateOldStatuses();
-
         const filterClient   = document.getElementById('filter-task-client')?.value;
         const filterPriority = document.getElementById('filter-task-priority')?.value;
         const filterLabel    = document.getElementById('filter-task-label')?.value;
@@ -3954,6 +3951,14 @@ class AppController {
 
         const board = document.getElementById('kanban-board');
         if (!board) return;
+
+        // Skeleton imediato — com cliente selecionado, tudo que segue (migração de
+        // status legado, colunas, tasks) é assíncrono; sem esse feedback visual a
+        // troca de cliente dava a impressão de tela travada durante os awaits.
+        if (filterClient) this._skKanban(board, this._currentColumns.length || 3);
+
+        // Migração: status antigos ('new','doing','done') → UUIDs das colunas do cliente
+        await this._migrateOldStatuses();
 
         // Botão Gerenciar Colunas — só visível com cliente selecionado
         const btnManage = document.getElementById('btn-manage-columns');
@@ -4010,9 +4015,8 @@ class AppController {
             Toast.show('Erro ao carregar colunas. Execute o SQL de migração no Supabase.', 'error', 5000);
         }
 
-        // Usa cache se disponível, senão busca do banco (mostra skeleton durante a espera)
+        // Usa cache se disponível, senão busca do banco (skeleton já visível desde acima)
         if (this._tasksCache === null) {
-            this._skKanban(board, this._currentColumns.length || 3);
             const allTasks = await store.getTasks();
             this._tasksCache = allTasks;
             // Popula cache de clientes para todos os clientes nas tasks
