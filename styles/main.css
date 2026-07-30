@@ -921,7 +921,6 @@ h4 {
   height: 100%;
 }
 #view-tasks.active > .header-actions,
-#view-tasks.active > #tasks-dashboard-container,
 #view-tasks.active > .kanban-filters {
   flex-shrink: 0;
 }

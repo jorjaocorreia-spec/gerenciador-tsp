@@ -169,7 +169,6 @@ class AppController {
         // Cache para optimistic updates do Kanban
         this._tasksCache = null;        // null = inválido; [] = vazio válido
         this._clientsMapCache = {};     // { clientId: clientObj }
-        this._overLimitClientsCache = 0; // contagem de clientes sobrecarregados
         // Cache para optimistic updates da Agenda
         this._agendaEventsCache = null;     // null = inválido; [] = vazio válido
         this._agendaClientsMapCache = {};   // { clientId: clientObj }
@@ -2284,13 +2283,10 @@ class AppController {
             const el = document.getElementById(id);
             if (el) el.style.display = 'none';
         });
-        // View Tarefas: dashboard de métricas não faz sentido no portal.
-        // A barra de filtros permanece visível (busca é útil para achar
-        // tarefas), mas o campo Cliente vem travado no próprio client_id —
-        // nunca pode ser trocado, para o cliente não acessar dados de outros.
-        const dashboardBox = document.getElementById('tasks-dashboard-container');
-        if (dashboardBox) dashboardBox.style.display = 'none';
-
+        // View Tarefas: a barra de filtros permanece visível (busca é útil
+        // para achar tarefas), mas o campo Cliente vem travado no próprio
+        // client_id — nunca pode ser trocado, para o cliente não acessar
+        // dados de outros.
         const clientSelect = document.getElementById('filter-task-client');
         if (clientSelect) {
             const clientName = await store.getClientPortalName(this.userClientId);
@@ -2882,8 +2878,6 @@ class AppController {
         if (!filters) return;
         const collapsed = filters.classList.toggle('kf-collapsed');
         sessionStorage.setItem('kanbanFiltersCollapsed', collapsed ? '1' : '0');
-        const dashboard = document.getElementById('tasks-dashboard-container');
-        if (dashboard) dashboard.classList.toggle('kf-collapsed', collapsed);
         this._applyKanbanFiltersButtonState(collapsed);
     }
 
@@ -2892,8 +2886,6 @@ class AppController {
         if (!filters) return;
         const collapsed = sessionStorage.getItem('kanbanFiltersCollapsed') === '1';
         filters.classList.toggle('kf-collapsed', collapsed);
-        const dashboard = document.getElementById('tasks-dashboard-container');
-        if (dashboard) dashboard.classList.toggle('kf-collapsed', collapsed);
         this._applyKanbanFiltersButtonState(collapsed);
     }
 
@@ -3987,7 +3979,6 @@ class AppController {
                 if (filterLabel)    results = results.filter(t => (t.labels || []).some(l => l.color === filterLabel));
                 if (hasDateFilter)  results = this._applyTaskDateFilters(results, dateFilters);
                 this._renderTaskSearchResultsList(results, this._clientsMapCache);
-                await this.renderTasksDashboard(this._tasksCache, '');
                 lucide.createIcons();
                 return;
             }
@@ -3997,7 +3988,6 @@ class AppController {
                     <i data-lucide="columns" style="width:48px;height:48px;opacity:0.25"></i>
                     <p>Selecione um cliente nos filtros para visualizar o Kanban</p>
                 </div>`;
-            await this.renderTasksDashboard(this._tasksCache, '');
             lucide.createIcons();
             return;
         }
@@ -4040,7 +4030,6 @@ class AppController {
         if (hasDateFilter)  tasks = this._applyTaskDateFilters(tasks, dateFilters);
 
         this._renderKanbanBoard(this._currentColumns, tasks, this._clientsMapCache, this.isManagerView, !this.isManagerView);
-        await this.renderTasksDashboard(tasks, filterClient);
         lucide.createIcons();
 
         const btnNewTask = document.getElementById('btn-new-task');
@@ -4105,7 +4094,6 @@ class AppController {
                 this._renderTaskSearchResultsList(results, this._clientsMapCache);
                 lucide.createIcons();
             }
-            this._renderTasksDashboardSync(this._tasksCache, '');
             return;
         }
 
@@ -4116,7 +4104,6 @@ class AppController {
         if (hasDateFilter)  tasks = this._applyTaskDateFilters(tasks, dateFilters);
 
         this._renderKanbanBoard(this._currentColumns, tasks, this._clientsMapCache, this.isManagerView, !this.isManagerView);
-        this._renderTasksDashboardSync(tasks, filterClient);
         lucide.createIcons();
 
         const btnNewTask = document.getElementById('btn-new-task');
@@ -4124,51 +4111,6 @@ class AppController {
             if (tasks.length === 0) btnNewTask.classList.add('btn-pulse-empty');
             else btnNewTask.classList.remove('btn-pulse-empty');
         }
-    }
-
-    // Versão síncrona do dashboard de stats de tarefas (sem query ao banco)
-    _renderTasksDashboardSync(tasks, filteredClientId) {
-        const container = document.getElementById('tasks-dashboard-container');
-        if (!container) return;
-
-        const doneIds = new Set(this._currentColumns.filter(c => c.isDone).map(c => c.id));
-        doneIds.add('done');
-        const openTasks = tasks.filter(t => !doneIds.has(t.status));
-        const today = new Date().toISOString().split('T')[0];
-        let delayed = 0, totalEst = 0, totalSpent = 0;
-        openTasks.forEach(t => {
-            if (t.dueDate && t.dueDate < today) delayed++;
-            totalEst  += parseInt(t.estimatedMinutes) || 0;
-            totalSpent += parseInt(t.spentMinutes) || 0;
-        });
-
-        container.innerHTML = `
-            <div class="stat-card glass" style="padding: 16px;">
-                <div class="stat-header">
-                    <span class="client-name">Abertas</span>
-                    <span style="font-size: 1.5rem; color: var(--primary-color)">${openTasks.length}</span>
-                </div>
-            </div>
-            <div class="stat-card glass" style="padding: 16px;">
-                <div class="stat-header">
-                    <span class="client-name">Atrasadas</span>
-                    <span style="font-size: 1.5rem; color: ${delayed > 0 ? 'var(--danger-color)' : 'var(--success-color)'}">${delayed}</span>
-                </div>
-            </div>
-            <div class="stat-card glass" style="padding: 16px;">
-                <div class="stat-header">
-                    <span class="client-name">Tempo (Gasto / Estimado)</span>
-                    <span style="font-size: 1.2rem; color: var(--text-main)">${(totalSpent / 60).toFixed(1)}h / ${(totalEst / 60).toFixed(1)}h</span>
-                </div>
-            </div>
-            ${!filteredClientId ? `
-            <div class="stat-card glass" style="padding: 16px;">
-                <div class="stat-header">
-                    <span class="client-name" style="color: var(--danger-color)">Contratos Sobrecarregados</span>
-                    <span style="font-size: 1.2rem;">${this._overLimitClientsCache}</span>
-                </div>
-            </div>` : ''}
-        `;
     }
 
     _renderKanbanBoard(columns, tasks, clientsMap, readOnly = false, allowReorder = !readOnly) {
@@ -4394,58 +4336,6 @@ class AppController {
             </div>
         `;
         return card;
-    }
-
-    async renderTasksDashboard(tasks, filteredClientId) {
-        const container = document.getElementById('tasks-dashboard-container');
-        if (!container) return;
-
-        const doneIds = new Set(this._currentColumns.filter(c => c.isDone).map(c => c.id));
-        doneIds.add('done'); // suporte legado
-        const openTasks = tasks.filter(t => !doneIds.has(t.status));
-        let delayed = 0;
-        let totalEst = 0;
-        let totalSpent = 0;
-
-        const today = new Date().toISOString().split('T')[0];
-
-        openTasks.forEach(t => {
-            if (t.dueDate && t.dueDate < today) delayed++;
-            totalEst += parseInt(t.estimatedMinutes) || 0;
-            totalSpent += parseInt(t.spentMinutes) || 0;
-        });
-
-        const stats = await store.getAllStats();
-        const overLimitClients = stats.filter(s => s.isOverLimit);
-        this._overLimitClientsCache = overLimitClients.length;
-
-        container.innerHTML = `
-            <div class="stat-card glass" style="padding: 16px;">
-                <div class="stat-header">
-                    <span class="client-name">Abertas</span>
-                    <span style="font-size: 1.5rem; color: var(--primary-color)">${openTasks.length}</span>
-                </div>
-            </div>
-            <div class="stat-card glass" style="padding: 16px;">
-                <div class="stat-header">
-                    <span class="client-name">Atrasadas</span>
-                    <span style="font-size: 1.5rem; color: ${delayed > 0 ? 'var(--danger-color)' : 'var(--success-color)'}">${delayed}</span>
-                </div>
-            </div>
-            <div class="stat-card glass" style="padding: 16px;">
-                <div class="stat-header">
-                    <span class="client-name">Tempo (Gasto / Estimado)</span>
-                    <span style="font-size: 1.2rem; color: var(--text-main)">${(totalSpent / 60).toFixed(1)}h / ${(totalEst / 60).toFixed(1)}h</span>
-                </div>
-            </div>
-            ${!filteredClientId ? `
-            <div class="stat-card glass" style="padding: 16px;">
-                <div class="stat-header">
-                    <span class="client-name" style="color: var(--danger-color)">Contratos Sobrecarregados</span>
-                    <span style="font-size: 1.2rem;">${overLimitClients.length}</span>
-                </div>
-            </div>` : ''}
-        `;
     }
 
     // ===================================
@@ -11936,7 +11826,6 @@ document.addEventListener('DOMContentLoaded', async () => {
             window.app.closeRsvpPopup();
             window.app._tasksCache = null;
             window.app._clientsMapCache = {};
-            window.app._overLimitClientsCache = 0;
             window.app._agendaEventsCache = null;
             window.app._agendaClientsMapCache = {};
             window.app._agendaTasksCache = null;
