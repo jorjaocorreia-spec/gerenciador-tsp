@@ -8927,6 +8927,170 @@ class AppController {
         lucide.createIcons();
     }
 
+    csCommissionNavMonth(delta) {
+        const [y, m] = this.csCommissionMonth.split('-').map(Number);
+        const d = new Date(y, m - 1 + delta, 1);
+        this.csCommissionMonth = d.toISOString().slice(0, 7);
+        this._renderCsCommissionPanel();
+    }
+
+    async createCsCommissionPeriodForMonth() {
+        try {
+            await store.createCsCommissionPeriod(`${this.csCommissionMonth}-01`);
+            await this._renderCsCommissionPanel();
+        } catch (err) {
+            Toast.show('Erro ao criar período: ' + err.message, 'error');
+        }
+    }
+
+    async saveCsCommissionValues(periodId) {
+        const cancellations = document.getElementById('cs-cancellations').value;
+        const sales = document.getElementById('cs-sales-total').value;
+        const increase = document.getElementById('cs-monthly-increase').value;
+        try {
+            await store.updateCsCommissionPeriodValues(periodId, cancellations, sales, increase);
+            await this._renderCsCommissionPanel();
+            Toast.show('Valores da comissão CS salvos.', 'success');
+        } catch (err) {
+            Toast.show('Erro ao salvar: ' + err.message, 'error');
+        }
+    }
+
+    async confirmAddCsParticipant(periodId, csProjectNum) {
+        const select = document.getElementById('cs-add-participant-select');
+        const userId = select.value;
+        if (!userId) { Toast.show('Selecione um consultor.', 'error'); return; }
+        try {
+            const hours = await store.getCsHoursForUser(userId, this.csCommissionMonth, csProjectNum);
+            await store.addCsCommissionParticipant(periodId, userId, hours);
+            await this._renderCsCommissionPanel();
+            Toast.show('Consultor adicionado à comissão CS.', 'success');
+        } catch (err) {
+            Toast.show('Erro ao adicionar participante: ' + err.message, 'error');
+        }
+    }
+
+    async updateCsParticipantHoursInline(participantId, value) {
+        try {
+            await store.updateCsCommissionParticipantHours(participantId, value);
+            await this._renderCsCommissionPanel();
+        } catch (err) {
+            Toast.show('Erro ao atualizar horas: ' + err.message, 'error');
+        }
+    }
+
+    removeCsParticipantRow(btn, participantId) {
+        this._twostepDelete(btn, async () => {
+            try {
+                await store.removeCsCommissionParticipant(participantId);
+                await this._renderCsCommissionPanel();
+            } catch (err) {
+                Toast.show('Erro ao remover participante: ' + err.message, 'error');
+            }
+        });
+    }
+
+    async _renderCsCommissionPanel() {
+        const container = document.getElementById('client-cs-commission-container');
+        if (!container) return;
+        container.innerHTML = spinnerHtml;
+        try {
+            const referenceMonth = `${this.csCommissionMonth}-01`;
+            const csClient = await store.getCsProjectClient();
+            if (!csClient) {
+                container.innerHTML = '<p class="text-muted" style="padding:16px 0;">Marque este cliente como "Projeto de Comissão CS" e salve antes de gerenciar a comissão.</p>';
+                return;
+            }
+
+            const [y, m] = this.csCommissionMonth.split('-').map(Number);
+            const monthNames = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+            const monthLabel = `${monthNames[m - 1]} ${y}`;
+            const navHtml = `
+                <div style="display:flex;align-items:center;gap:6px;margin-bottom:16px;">
+                    <button type="button" class="btn btn-ghost" style="padding:6px 10px;" onclick="app.csCommissionNavMonth(-1)"><i data-lucide="chevron-left" style="width:16px;height:16px;"></i></button>
+                    <span style="font-weight:600;min-width:120px;text-align:center;">${monthLabel}</span>
+                    <button type="button" class="btn btn-ghost" style="padding:6px 10px;" onclick="app.csCommissionNavMonth(1)"><i data-lucide="chevron-right" style="width:16px;height:16px;"></i></button>
+                </div>`;
+
+            const period = await store.getCsCommissionPeriodByMonth(referenceMonth);
+            if (!period) {
+                container.innerHTML = navHtml + `
+                    <p class="text-muted" style="padding:16px 0;">Nenhum período cadastrado para ${monthLabel}.</p>
+                    <button type="button" class="btn btn-primary" onclick="app.createCsCommissionPeriodForMonth()">Criar período de ${monthLabel}</button>`;
+                lucide.createIcons();
+                return;
+            }
+
+            const participants = await store.getCsCommissionParticipants(period.id);
+            if (!this._csUsersListCache) {
+                const result = await this._manageUsersFetch('list');
+                this._csUsersListCache = result.users.filter(u => u.role === 'consultant' || u.role === 'manager');
+            }
+            const usersList = this._csUsersListCache;
+            const emailByUserId = {};
+            usersList.forEach(u => { emailByUserId[u.userId] = u.email; });
+            const availableUsers = usersList.filter(u => !participants.some(p => p.userId === u.userId));
+
+            const fmt = v => `R$ ${v.toFixed(2).replace('.', ',')}`;
+            const rowsHtml = participants.map(p => {
+                const result = TSPCsCommission.computeConsultantResult(
+                    p.hoursApontadas, period.participantCount, period.cancellationsCount,
+                    period.salesTotal, period.monthlyIncreaseTotal);
+                return `
+                    <tr>
+                        <td>${escapeHtml(emailByUserId[p.userId] || p.userId)}</td>
+                        <td><input type="number" step="0.01" min="0" value="${p.hoursApontadas}" class="form-control" style="width:90px;" onchange="app.updateCsParticipantHoursInline('${p.id}', this.value)"></td>
+                        <td>${(result.percentual * 100).toFixed(1)}%</td>
+                        <td>${fmt(result.bonus)}</td>
+                        <td>${fmt(result.comissaoVendas)}</td>
+                        <td>${fmt(result.comissaoMensalidade)}</td>
+                        <td><strong>${fmt(result.total)}</strong></td>
+                        <td><button type="button" class="btn btn-danger btn-sm" onclick="app.removeCsParticipantRow(this, '${p.id}')"><i data-lucide="trash-2" style="width:13px;height:13px;"></i></button></td>
+                    </tr>`;
+            }).join('');
+
+            container.innerHTML = navHtml + `
+                <div style="display:flex; gap:16px; margin-bottom:16px;">
+                    <div class="form-group" style="flex:1;">
+                        <label for="cs-cancellations">Cancelamentos no mês</label>
+                        <input type="number" min="0" step="1" id="cs-cancellations" class="form-control" value="${period.cancellationsCount}">
+                    </div>
+                    <div class="form-group" style="flex:1;">
+                        <label for="cs-sales-total">Valor total vendido (R$)</label>
+                        <input type="number" step="0.01" id="cs-sales-total" class="form-control money-value" value="${period.salesTotal}">
+                    </div>
+                    <div class="form-group" style="flex:1;">
+                        <label for="cs-monthly-increase">Acréscimo de mensalidade (R$)</label>
+                        <input type="number" step="0.01" id="cs-monthly-increase" class="form-control money-value" value="${period.monthlyIncreaseTotal}">
+                    </div>
+                </div>
+                <button type="button" class="btn btn-secondary" style="margin-bottom:16px;" onclick="app.saveCsCommissionValues('${period.id}')">Salvar valores do mês</button>
+
+                <div style="display:flex; gap:8px; align-items:flex-end; margin-bottom:12px;">
+                    <div class="form-group" style="flex:1; margin-bottom:0;">
+                        <label for="cs-add-participant-select">Adicionar consultor</label>
+                        <select id="cs-add-participant-select" class="form-control">
+                            <option value="">Selecione...</option>
+                            ${availableUsers.map(u => `<option value="${u.userId}">${escapeHtml(u.email)}</option>`).join('')}
+                        </select>
+                    </div>
+                    <button type="button" class="btn btn-primary" onclick="app.confirmAddCsParticipant('${period.id}', '${csClient.projectNum}')">
+                        <i data-lucide="plus"></i> Adicionar
+                    </button>
+                </div>
+
+                <div style="overflow-x:auto;">
+                <table class="data-table">
+                    <thead><tr><th>Consultor</th><th>Horas</th><th>%</th><th>Bônus</th><th>Com. Vendas</th><th>Com. Mensalidade</th><th>Total</th><th></th></tr></thead>
+                    <tbody>${rowsHtml || '<tr><td colspan="8" class="text-muted">Nenhum participante neste mês.</td></tr>'}</tbody>
+                </table>
+                </div>`;
+            lucide.createIcons();
+        } catch (err) {
+            container.innerHTML = `<p class="text-muted">Erro ao carregar comissão CS: ${escapeHtml(err.message)}</p>`;
+        }
+    }
+
     async _renderClientSchedulingTab(clientId) {
         const container = document.getElementById('client-scheduling-rules-list');
         container.innerHTML = `<div style="padding:16px 0;">${spinnerHtml}</div>`;
