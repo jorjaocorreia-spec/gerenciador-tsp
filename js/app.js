@@ -6871,38 +6871,63 @@ class AppController {
         chartContainer.innerHTML = spinnerHtml;
 
         try {
-            const [summary, history] = await Promise.all([
+            const referenceMonth = `${this.financeiroYear}-${String(this.financeiroMonth).padStart(2, '0')}-01`;
+            const [summary, history, myCs] = await Promise.all([
                 store.getFinancialSummary(this.financeiroYear, this.financeiroMonth),
-                store.getFinancialHistory(12, this.financeiroHistEndYear, this.financeiroHistEndMonth)
+                store.getFinancialHistory(12, this.financeiroHistEndYear, this.financeiroHistEndMonth),
+                store.getMyCsCommissionForMonth(referenceMonth).catch(() => null)
             ]);
             this._financeiroSummary = summary;
             this._financeiroHistory = history;
 
             const formatMoney = (val) => (val && !isNaN(val)) ? `R$ ${parseFloat(val).toFixed(2).replace('.', ',')}` : 'R$ 0,00';
 
-            if (summary.items.length === 0) {
-                tbody.innerHTML = `<tr><td colspan="5" class="text-muted">Nenhum cliente elegível neste mês.</td></tr>`;
-            } else {
-                tbody.innerHTML = summary.items.map(({ client, valor, comissao, detalhe }) => {
-                    const modelo = client.billingModel === 'hourly' ? 'Por Hora' : 'Fixo';
-                    const detalheStr = detalhe ? `${detalhe.horas.toFixed(1)}h × ${formatMoney(detalhe.rate)}` : '—';
-                    const comissaoStr = client.billingModel === 'hourly' ? `<span class="money-value">${formatMoney(valor)}</span>` : `<span class="money-value">${formatMoney(comissao)}</span>`;
-                    return `
-                        <tr>
-                            <td>${escapeHtml(client.name)}</td>
-                            <td>${modelo}</td>
-                            <td>${detalheStr}</td>
-                            <td><span class="money-value">${formatMoney(valor)}</span></td>
-                            <td>${comissaoStr}</td>
-                        </tr>`;
-                }).join('');
+            let csRowHtml = '';
+            let csTotal = 0;
+            if (myCs) {
+                const result = TSPCsCommission.computeConsultantResult(
+                    myCs.participant.hoursApontadas, myCs.period.participantCount,
+                    myCs.period.cancellationsCount, myCs.period.salesTotal, myCs.period.monthlyIncreaseTotal);
+                csTotal = result.total;
+                const detailText = `${myCs.participant.hoursApontadas.toFixed(1)}h (${(result.percentual * 100).toFixed(1)}%) · Bônus ${formatMoney(result.bonus)} · Vendas ${formatMoney(result.comissaoVendas)} · Mensalidade ${formatMoney(result.comissaoMensalidade)}`;
+                csRowHtml = `
+                    <tr>
+                        <td>Comissão CS
+                            <span class="info-tooltip" tabindex="0" aria-label="Detalhamento da comissão CS" aria-describedby="tooltip-cs-financeiro">
+                                <i data-lucide="info" style="width: 14px; height: 14px; color: var(--primary-color); margin-left:4px; vertical-align:middle;"></i>
+                                <span class="info-tooltip-text" id="tooltip-cs-financeiro" role="tooltip">${escapeHtml(detailText)}</span>
+                            </span>
+                        </td>
+                        <td>—</td>
+                        <td>—</td>
+                        <td>—</td>
+                        <td><span class="money-value">${formatMoney(csTotal)}</span></td>
+                    </tr>`;
             }
 
+            const itemsHtml = summary.items.map(({ client, valor, comissao, detalhe }) => {
+                const modelo = client.billingModel === 'hourly' ? 'Por Hora' : 'Fixo';
+                const detalheStr = detalhe ? `${detalhe.horas.toFixed(1)}h × ${formatMoney(detalhe.rate)}` : '—';
+                const comissaoStr = client.billingModel === 'hourly' ? `<span class="money-value">${formatMoney(valor)}</span>` : `<span class="money-value">${formatMoney(comissao)}</span>`;
+                return `
+                    <tr>
+                        <td>${escapeHtml(client.name)}</td>
+                        <td>${modelo}</td>
+                        <td>${detalheStr}</td>
+                        <td><span class="money-value">${formatMoney(valor)}</span></td>
+                        <td>${comissaoStr}</td>
+                    </tr>`;
+            }).join('');
+
+            const combinedHtml = itemsHtml + csRowHtml;
+            tbody.innerHTML = combinedHtml || `<tr><td colspan="5" class="text-muted">Nenhum cliente elegível neste mês.</td></tr>`;
+
+            const grandTotalComissao = summary.totalComissao + csTotal;
             tfoot.innerHTML = `
                 <tr style="font-weight:600;">
                     <td colspan="3">Total</td>
                     <td><span class="money-value">${formatMoney(summary.totalValor)}</span></td>
-                    <td><span class="money-value">${formatMoney(summary.totalComissao)}</span></td>
+                    <td><span class="money-value">${formatMoney(grandTotalComissao)}</span></td>
                 </tr>`;
 
             chartContainer.innerHTML = '';
