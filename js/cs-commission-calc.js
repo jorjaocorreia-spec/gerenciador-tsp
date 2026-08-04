@@ -7,6 +7,10 @@
     function computeConsultantResult(hours, sumPercentuals, cancellationsCount, salesTotal, monthlyIncreaseTotal) {
         const percentual = computePercentual(hours);
         const bonus = (parseInt(cancellationsCount) || 0) === 0 ? 400 : 0;
+        // Bônus de apontamento: R$450 em 15h+ (percentual=100%), proporcional
+        // abaixo disso (ex: 50% das horas = R$225). Independe do bônus de
+        // cancelamento — os dois são condições separadas.
+        const apontamentoBonus = 450 * percentual;
         const poolVendas = (parseFloat(salesTotal) || 0) * 0.10;
         const poolMensalidade = (parseFloat(monthlyIncreaseTotal) || 0) * 0.50;
         // share = fatia do consultor sobre a soma dos percentuais de TODOS os
@@ -17,8 +21,8 @@
         const share = denom > 0 ? percentual / denom : 0;
         const comissaoVendas = poolVendas * share;
         const comissaoMensalidade = poolMensalidade * share;
-        const total = bonus + comissaoVendas + comissaoMensalidade;
-        return { percentual, bonus, comissaoVendas, comissaoMensalidade, total };
+        const total = bonus + apontamentoBonus + comissaoVendas + comissaoMensalidade;
+        return { percentual, bonus, apontamentoBonus, comissaoVendas, comissaoMensalidade, total };
     }
 
     global.TSPCsCommission = { computePercentual, computeConsultantResult };

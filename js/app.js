@@ -6900,7 +6900,7 @@ class AppController {
                     myCs.participant.hoursApontadas, myCs.period.sumPercentual,
                     myCs.period.cancellationsCount, myCs.period.salesTotal, myCs.period.monthlyIncreaseTotal);
                 csTotal = result.total;
-                const detailText = `${myCs.participant.hoursApontadas.toFixed(1)}h (${(result.percentual * 100).toFixed(1)}%) · Bônus ${formatMoney(result.bonus)} · Vendas ${formatMoney(result.comissaoVendas)} · Mensalidade ${formatMoney(result.comissaoMensalidade)}`;
+                const detailText = `${myCs.participant.hoursApontadas.toFixed(1)}h (${(result.percentual * 100).toFixed(1)}%) · Bônus ${formatMoney(result.bonus)} · Bônus Apontamento ${formatMoney(result.apontamentoBonus)} · Vendas ${formatMoney(result.comissaoVendas)} · Mensalidade ${formatMoney(result.comissaoMensalidade)}`;
                 csRowHtml = `
                     <tr>
                         <td>Comissão CS
@@ -9120,6 +9120,7 @@ class AppController {
                         <td><input type="number" step="0.01" min="0" value="${p.hoursApontadas}" class="form-control" style="width:90px;" onchange="app.updateCsParticipantHoursInline('${p.id}', this.value)"></td>
                         <td>${(result.percentual * 100).toFixed(1)}%</td>
                         <td>${fmt(result.bonus)}</td>
+                        <td>${fmt(result.apontamentoBonus)}</td>
                         <td>${fmt(result.comissaoVendas)}</td>
                         <td>${fmt(result.comissaoMensalidade)}</td>
                         <td><strong>${fmt(result.total)}</strong></td>
@@ -9168,8 +9169,8 @@ class AppController {
 
                 <div style="overflow-x:auto;">
                 <table class="data-table">
-                    <thead><tr><th>Consultor</th><th>Horas</th><th>%</th><th>Bônus</th><th>Com. Vendas</th><th>Com. Mensalidade</th><th>Total</th><th></th></tr></thead>
-                    <tbody>${rowsHtml || '<tr><td colspan="8" class="text-muted">Nenhum participante neste mês.</td></tr>'}</tbody>
+                    <thead><tr><th>Consultor</th><th>Horas</th><th>%</th><th>Bônus</th><th>Bônus Apontamento</th><th>Com. Vendas</th><th>Com. Mensalidade</th><th>Total</th><th></th></tr></thead>
+                    <tbody>${rowsHtml || '<tr><td colspan="9" class="text-muted">Nenhum participante neste mês.</td></tr>'}</tbody>
                 </table>
                 </div>`;
             lucide.createIcons();
