@@ -1656,7 +1656,8 @@ class TSPStore {
 
     _csParticipant(r) {
         return { id: r.id, periodId: r.period_id, userId: r.user_id,
-            hoursApontadas: parseFloat(r.hours_apontadas) || 0, createdAt: r.created_at };
+            hoursApontadas: parseFloat(r.hours_apontadas) || 0,
+            hoursClientId: r.hours_client_id || null, createdAt: r.created_at };
     }
 
     async getCsCommissionPeriodByMonth(referenceMonth) {
@@ -1692,30 +1693,38 @@ class TSPStore {
         return (data || []).map(r => this._csParticipant(r));
     }
 
-    async getCsHoursForUser(targetUserId, referenceMonthYYYYMM, csProjectNum) {
-        // O campo "Projeto (Número)" do cliente CS pode conter vários números
-        // separados por vírgula/espaço (ex: "35291, 36642") — mesmo padrão de
-        // split já usado em js/app.js para casar projetos de PDF com clientes.
-        // Cada apontamento tem um único número, então comparamos por IN, nunca
-        // por igualdade exata da string inteira do cliente.
-        const projectNums = (csProjectNum || '').split(/\D+/).filter(Boolean);
-        if (projectNums.length === 0) return 0;
+    async getClientsForUser(targetUserId) {
+        const { data, error } = await this.db.from('clients').select('*')
+            .eq('user_id', targetUserId).order('name');
+        if (error) throw error;
+        return (data || []).map(r => this._client(r));
+    }
+
+    async getRecordsHoursForClient(targetUserId, referenceMonthYYYYMM, clientId) {
+        // Horas de CS vêm de Atendimentos (records) lançados pelo próprio
+        // consultor no cliente que o Gerente escolheu para ele — cada
+        // consultor já mantém seu próprio cliente "CS" (nomes e números de
+        // projeto inconsistentes entre si), então casar por número de
+        // projeto era frágil; o Gerente escolhe o cliente certo na hora de
+        // adicionar o participante (ver confirmAddCsParticipant em app.js).
+        if (!clientId) return 0;
         const [y, m] = referenceMonthYYYYMM.split('-').map(Number);
         const lastDay = new Date(y, m, 0).getDate();
         const monthStr = `${y}-${String(m).padStart(2, '0')}`;
-        const { data, error } = await this.db.from('apontamentos').select('start_time, end_time')
+        const { data, error } = await this.db.from('records').select('minutes')
             .eq('user_id', targetUserId)
-            .in('project_num', projectNums)
+            .eq('client_id', clientId)
+            .eq('is_unavailability', false)
             .gte('date', `${monthStr}-01`).lte('date', `${monthStr}-${String(lastDay).padStart(2, '0')}`);
         if (error) throw error;
-        const toMins = t => { const [h, mm] = (t || '00:00').split(':').map(Number); return (h || 0) * 60 + (mm || 0); };
-        const totalMinutes = (data || []).reduce((sum, r) => sum + Math.max(0, toMins(r.end_time) - toMins(r.start_time)), 0);
+        const totalMinutes = (data || []).reduce((sum, r) => sum + (parseInt(r.minutes) || 0), 0);
         return totalMinutes / 60;
     }
 
-    async addCsCommissionParticipant(periodId, targetUserId, hoursApontadas) {
+    async addCsCommissionParticipant(periodId, targetUserId, hoursApontadas, hoursClientId) {
         const { data, error } = await this.db.from('cs_commission_participants').insert({
-            period_id: periodId, user_id: targetUserId, hours_apontadas: parseFloat(hoursApontadas) || 0
+            period_id: periodId, user_id: targetUserId, hours_apontadas: parseFloat(hoursApontadas) || 0,
+            hours_client_id: hoursClientId || null
         }).select().single();
         if (error) throw error;
         return this._csParticipant(data);

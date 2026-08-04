@@ -8992,14 +8992,39 @@ class AppController {
         }
     }
 
-    async confirmAddCsParticipant(periodId) {
-        const select = document.getElementById('cs-add-participant-select');
-        const userId = select.value;
-        if (!userId) { Toast.show('Selecione um consultor.', 'error'); return; }
-        const csProjectNum = document.getElementById('client-project').value.trim();
+    async onCsParticipantUserChange(userId) {
+        const clientSelect = document.getElementById('cs-add-participant-client');
+        if (!clientSelect) return;
+        if (!userId) {
+            clientSelect.innerHTML = '<option value="">Selecione o consultor primeiro...</option>';
+            clientSelect.disabled = true;
+            return;
+        }
+        clientSelect.disabled = true;
+        clientSelect.innerHTML = '<option value="">Carregando clientes...</option>';
         try {
-            const hours = await store.getCsHoursForUser(userId, this.csCommissionMonth, csProjectNum);
-            await store.addCsCommissionParticipant(periodId, userId, hours);
+            const clients = await store.getClientsForUser(userId);
+            if (clients.length === 0) {
+                clientSelect.innerHTML = '<option value="">Nenhum cliente encontrado para este consultor</option>';
+                return;
+            }
+            clientSelect.innerHTML = '<option value="">Selecione o cliente...</option>' +
+                clients.map(c => `<option value="${c.id}">${escapeHtml(c.name)}${c.projectNum ? ' (' + escapeHtml(c.projectNum) + ')' : ''}</option>`).join('');
+            clientSelect.disabled = false;
+        } catch (err) {
+            clientSelect.innerHTML = '<option value="">Erro ao carregar clientes</option>';
+            Toast.show('Erro ao carregar clientes do consultor: ' + err.message, 'error');
+        }
+    }
+
+    async confirmAddCsParticipant(periodId) {
+        const userId = document.getElementById('cs-add-participant-select').value;
+        const clientId = document.getElementById('cs-add-participant-client').value;
+        if (!userId) { Toast.show('Selecione um consultor.', 'error'); return; }
+        if (!clientId) { Toast.show('Selecione o cliente de horas desse consultor.', 'error'); return; }
+        try {
+            const hours = await store.getRecordsHoursForClient(userId, this.csCommissionMonth, clientId);
+            await store.addCsCommissionParticipant(periodId, userId, hours, clientId);
             await this._renderCsCommissionPanel();
             Toast.show('Consultor adicionado à comissão CS.', 'success');
         } catch (err) {
@@ -9099,18 +9124,25 @@ class AppController {
                 </div>
                 <button type="button" class="btn btn-secondary" style="margin-bottom:16px;" onclick="app.saveCsCommissionValues('${period.id}')">Salvar valores do mês</button>
 
-                <div style="display:flex; gap:8px; align-items:flex-end; margin-bottom:12px;">
-                    <div class="form-group" style="flex:1; margin-bottom:0;">
+                <div style="display:flex; gap:8px; align-items:flex-end; margin-bottom:12px; flex-wrap:wrap;">
+                    <div class="form-group" style="flex:1; min-width:200px; margin-bottom:0;">
                         <label for="cs-add-participant-select">Adicionar consultor</label>
-                        <select id="cs-add-participant-select" class="form-control">
+                        <select id="cs-add-participant-select" class="form-control" onchange="app.onCsParticipantUserChange(this.value)">
                             <option value="">Selecione...</option>
                             ${availableUsers.map(u => `<option value="${u.userId}">${escapeHtml(u.email)}</option>`).join('')}
+                        </select>
+                    </div>
+                    <div class="form-group" style="flex:1; min-width:200px; margin-bottom:0;">
+                        <label for="cs-add-participant-client">Cliente de horas dele(a)</label>
+                        <select id="cs-add-participant-client" class="form-control" disabled>
+                            <option value="">Selecione o consultor primeiro...</option>
                         </select>
                     </div>
                     <button type="button" class="btn btn-primary" onclick="app.confirmAddCsParticipant('${period.id}')">
                         <i data-lucide="plus"></i> Adicionar
                     </button>
                 </div>
+                <p class="text-muted" style="font-size:0.78rem;margin:-8px 0 12px;">As horas do consultor são somadas a partir dos Atendimentos lançados por ele no cliente escolhido acima.</p>
 
                 <div style="overflow-x:auto;">
                 <table class="data-table">
