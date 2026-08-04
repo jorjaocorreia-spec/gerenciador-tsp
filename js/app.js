@@ -6897,7 +6897,7 @@ class AppController {
             let csTotal = 0;
             if (myCs) {
                 const result = TSPCsCommission.computeConsultantResult(
-                    myCs.participant.hoursApontadas, myCs.period.participantCount,
+                    myCs.participant.hoursApontadas, myCs.period.sumPercentual,
                     myCs.period.cancellationsCount, myCs.period.salesTotal, myCs.period.monthlyIncreaseTotal);
                 csTotal = result.total;
                 const detailText = `${myCs.participant.hoursApontadas.toFixed(1)}h (${(result.percentual * 100).toFixed(1)}%) · Bônus ${formatMoney(result.bonus)} · Vendas ${formatMoney(result.comissaoVendas)} · Mensalidade ${formatMoney(result.comissaoMensalidade)}`;
@@ -9112,7 +9112,7 @@ class AppController {
             const fmt = v => `R$ ${v.toFixed(2).replace('.', ',')}`;
             const rowsHtml = participants.map(p => {
                 const result = TSPCsCommission.computeConsultantResult(
-                    p.hoursApontadas, period.participantCount, period.cancellationsCount,
+                    p.hoursApontadas, period.sumPercentual, period.cancellationsCount,
                     period.salesTotal, period.monthlyIncreaseTotal);
                 return `
                     <tr>

@@ -1651,6 +1651,7 @@ class TSPStore {
             salesTotal: parseFloat(r.sales_total) || 0,
             monthlyIncreaseTotal: parseFloat(r.monthly_increase_total) || 0,
             participantCount: parseInt(r.participant_count) || 0,
+            sumPercentual: parseFloat(r.sum_percentual) || 0,
             createdBy: r.created_by, createdAt: r.created_at, updatedAt: r.updated_at };
     }
 
