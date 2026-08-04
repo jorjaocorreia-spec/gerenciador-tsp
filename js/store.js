@@ -1693,12 +1693,19 @@ class TSPStore {
     }
 
     async getCsHoursForUser(targetUserId, referenceMonthYYYYMM, csProjectNum) {
+        // O campo "Projeto (Número)" do cliente CS pode conter vários números
+        // separados por vírgula/espaço (ex: "35291, 36642") — mesmo padrão de
+        // split já usado em js/app.js para casar projetos de PDF com clientes.
+        // Cada apontamento tem um único número, então comparamos por IN, nunca
+        // por igualdade exata da string inteira do cliente.
+        const projectNums = (csProjectNum || '').split(/\D+/).filter(Boolean);
+        if (projectNums.length === 0) return 0;
         const [y, m] = referenceMonthYYYYMM.split('-').map(Number);
         const lastDay = new Date(y, m, 0).getDate();
         const monthStr = `${y}-${String(m).padStart(2, '0')}`;
         const { data, error } = await this.db.from('apontamentos').select('start_time, end_time')
             .eq('user_id', targetUserId)
-            .eq('project_num', csProjectNum)
+            .in('project_num', projectNums)
             .gte('date', `${monthStr}-01`).lte('date', `${monthStr}-${String(lastDay).padStart(2, '0')}`);
         if (error) throw error;
         const toMins = t => { const [h, mm] = (t || '00:00').split(':').map(Number); return (h || 0) * 60 + (mm || 0); };
