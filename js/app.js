@@ -6904,7 +6904,7 @@ class AppController {
                 csRowHtml = `
                     <tr>
                         <td>Comissão CS
-                            <span class="info-tooltip" tabindex="0" aria-label="Detalhamento da comissão CS" aria-describedby="tooltip-cs-financeiro">
+                            <span class="info-tooltip info-tooltip--start" tabindex="0" aria-label="Detalhamento da comissão CS" aria-describedby="tooltip-cs-financeiro">
                                 <i data-lucide="info" style="width: 14px; height: 14px; color: var(--primary-color); margin-left:4px; vertical-align:middle;"></i>
                                 <span class="info-tooltip-text" id="tooltip-cs-financeiro" role="tooltip">${escapeHtml(detailText)}</span>
                             </span>

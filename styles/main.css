@@ -5251,6 +5251,23 @@ kbd {
     transform: translateX(-50%) translateY(0);
 }
 
+/* Variante para ícones perto da borda esquerda de um container com
+   overflow-x:auto (ex: 1ª coluna de tabelas) — centralizar cortaria a
+   caixa pela metade; abre alinhada ao ícone em vez de centralizada. */
+.info-tooltip--start .info-tooltip-text {
+    left: 0;
+    transform: translateX(0) translateY(4px);
+}
+.info-tooltip--start .info-tooltip-text::after {
+    left: 10px;
+    transform: translateX(0);
+}
+.info-tooltip--start:hover .info-tooltip-text,
+.info-tooltip--start:focus .info-tooltip-text,
+.info-tooltip--start:focus-within .info-tooltip-text {
+    transform: translateX(0) translateY(0);
+}
+
 /* ===== Central de Notificações ===== */
 .notif-badge {
     position: absolute;
