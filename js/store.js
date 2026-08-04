@@ -1642,6 +1642,106 @@ class TSPStore {
         }, { onConflict: 'user_id' });
         if (error) throw error;
     }
+
+    // ── COMISSÃO CS ──────────────────────────────────────────────
+
+    _csPeriod(r) {
+        return { id: r.id, referenceMonth: r.reference_month,
+            cancellationsCount: parseInt(r.cancellations_count) || 0,
+            salesTotal: parseFloat(r.sales_total) || 0,
+            monthlyIncreaseTotal: parseFloat(r.monthly_increase_total) || 0,
+            participantCount: parseInt(r.participant_count) || 0,
+            createdBy: r.created_by, createdAt: r.created_at, updatedAt: r.updated_at };
+    }
+
+    _csParticipant(r) {
+        return { id: r.id, periodId: r.period_id, userId: r.user_id,
+            hoursApontadas: parseFloat(r.hours_apontadas) || 0, createdAt: r.created_at };
+    }
+
+    async getCsProjectClient() {
+        const { data, error } = await this.db.from('clients').select('*')
+            .eq('user_id', this.userId).eq('is_cs_project', true).limit(1).maybeSingle();
+        if (error) throw error;
+        return data ? this._client(data) : null;
+    }
+
+    async getCsCommissionPeriodByMonth(referenceMonth) {
+        const { data, error } = await this.db.from('cs_commission_periods').select('*')
+            .eq('reference_month', referenceMonth).maybeSingle();
+        if (error) throw error;
+        return data ? this._csPeriod(data) : null;
+    }
+
+    async createCsCommissionPeriod(referenceMonth) {
+        const { data, error } = await this.db.from('cs_commission_periods').insert({
+            reference_month: referenceMonth, created_by: this.userId
+        }).select().single();
+        if (error) throw error;
+        return this._csPeriod(data);
+    }
+
+    async updateCsCommissionPeriodValues(periodId, cancellationsCount, salesTotal, monthlyIncreaseTotal) {
+        const { data, error } = await this.db.from('cs_commission_periods').update({
+            cancellations_count: parseInt(cancellationsCount) || 0,
+            sales_total: parseFloat(salesTotal) || 0,
+            monthly_increase_total: parseFloat(monthlyIncreaseTotal) || 0,
+            updated_at: new Date().toISOString()
+        }).eq('id', periodId).select().single();
+        if (error) throw error;
+        return this._csPeriod(data);
+    }
+
+    async getCsCommissionParticipants(periodId) {
+        const { data, error } = await this.db.from('cs_commission_participants').select('*')
+            .eq('period_id', periodId).order('created_at');
+        if (error) throw error;
+        return (data || []).map(r => this._csParticipant(r));
+    }
+
+    async getCsHoursForUser(targetUserId, referenceMonthYYYYMM, csProjectNum) {
+        const [y, m] = referenceMonthYYYYMM.split('-').map(Number);
+        const lastDay = new Date(y, m, 0).getDate();
+        const monthStr = `${y}-${String(m).padStart(2, '0')}`;
+        const { data, error } = await this.db.from('apontamentos').select('minutes')
+            .eq('user_id', targetUserId)
+            .eq('project_num', csProjectNum)
+            .gte('date', `${monthStr}-01`).lte('date', `${monthStr}-${String(lastDay).padStart(2, '0')}`);
+        if (error) throw error;
+        const totalMinutes = (data || []).reduce((sum, r) => sum + (parseInt(r.minutes) || 0), 0);
+        return totalMinutes / 60;
+    }
+
+    async addCsCommissionParticipant(periodId, targetUserId, hoursApontadas) {
+        const { data, error } = await this.db.from('cs_commission_participants').insert({
+            period_id: periodId, user_id: targetUserId, hours_apontadas: parseFloat(hoursApontadas) || 0
+        }).select().single();
+        if (error) throw error;
+        return this._csParticipant(data);
+    }
+
+    async updateCsCommissionParticipantHours(participantId, hoursApontadas) {
+        const { data, error } = await this.db.from('cs_commission_participants').update({
+            hours_apontadas: parseFloat(hoursApontadas) || 0
+        }).eq('id', participantId).select().single();
+        if (error) throw error;
+        return this._csParticipant(data);
+    }
+
+    async removeCsCommissionParticipant(participantId) {
+        const { error } = await this.db.from('cs_commission_participants').delete().eq('id', participantId);
+        if (error) throw error;
+    }
+
+    async getMyCsCommissionForMonth(referenceMonth) {
+        const period = await this.getCsCommissionPeriodByMonth(referenceMonth);
+        if (!period) return null;
+        const { data, error } = await this.db.from('cs_commission_participants').select('*')
+            .eq('period_id', period.id).eq('user_id', this.userId).maybeSingle();
+        if (error) throw error;
+        if (!data) return null;
+        return { period, participant: this._csParticipant(data) };
+    }
 }
 
 // Modo Supervisão (papel Gerente, Fase 49): quando `isManagerView` está ativo,
