@@ -2259,6 +2259,9 @@ class AppController {
         const btnSupervisor = document.getElementById('btn-manager-supervisor');
         if (btnSupervisor) btnSupervisor.style.display = this.userRole === 'manager' ? '' : 'none';
 
+        const rowCsProjectFlag = document.getElementById('row-cs-project-flag');
+        if (rowCsProjectFlag) rowCsProjectFlag.style.display = this.userRole === 'manager' ? 'flex' : 'none';
+
         this.checkLocalStorageMigration();
         this.applySidebarState();
         this.applyMoneyVisibility();
