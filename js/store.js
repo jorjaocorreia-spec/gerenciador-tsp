@@ -1703,12 +1703,13 @@ class TSPStore {
         const [y, m] = referenceMonthYYYYMM.split('-').map(Number);
         const lastDay = new Date(y, m, 0).getDate();
         const monthStr = `${y}-${String(m).padStart(2, '0')}`;
-        const { data, error } = await this.db.from('apontamentos').select('minutes')
+        const { data, error } = await this.db.from('apontamentos').select('start_time, end_time')
             .eq('user_id', targetUserId)
             .eq('project_num', csProjectNum)
             .gte('date', `${monthStr}-01`).lte('date', `${monthStr}-${String(lastDay).padStart(2, '0')}`);
         if (error) throw error;
-        const totalMinutes = (data || []).reduce((sum, r) => sum + (parseInt(r.minutes) || 0), 0);
+        const toMins = t => { const [h, mm] = (t || '00:00').split(':').map(Number); return (h || 0) * 60 + (mm || 0); };
+        const totalMinutes = (data || []).reduce((sum, r) => sum + Math.max(0, toMins(r.end_time) - toMins(r.start_time)), 0);
         return totalMinutes / 60;
     }
 
