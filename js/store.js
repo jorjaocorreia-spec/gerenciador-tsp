@@ -11,6 +11,7 @@ class TSPStore {
             consultantBonus: parseFloat(r.consultant_bonus) || 0,
             billingModel: r.billing_model || 'fixed',
             hourlyRate: parseFloat(r.hourly_rate) || 0,
+            isCsProject: !!r.is_cs_project,
             notes: r.notes || '', status: r.status || 'active',
             initialBalanceMinutes: parseInt(r.initial_balance_minutes) || 0,
             balanceStartDate: r.balance_start_date || null,
@@ -98,7 +99,7 @@ class TSPStore {
         return this._client(data);
     }
 
-    async addClient(name, hoursTotal, csName, projectNum, clientPays, consultantBonus, notes, status, initialBalanceMinutes, balanceStartDate, otoboCustomerId, billingModel, hourlyRate) {
+    async addClient(name, hoursTotal, csName, projectNum, clientPays, consultantBonus, notes, status, initialBalanceMinutes, balanceStartDate, otoboCustomerId, billingModel, hourlyRate, isCsProject) {
         const { data, error } = await this.db.from('clients').insert({
             user_id: this.userId, name,
             hours_total: parseFloat(hoursTotal) || 0, cs_name: csName || '',
@@ -109,13 +110,14 @@ class TSPStore {
             balance_start_date: balanceStartDate || null,
             otobo_customer_id: otoboCustomerId || null,
             billing_model: billingModel || 'fixed',
-            hourly_rate: parseFloat(hourlyRate) || 0
+            hourly_rate: parseFloat(hourlyRate) || 0,
+            is_cs_project: !!isCsProject
         }).select().single();
         if (error) throw error;
         return this._client(data);
     }
 
-    async updateClient(id, name, hoursTotal, csName, projectNum, clientPays, consultantBonus, notes, status, initialBalanceMinutes, balanceStartDate, otoboCustomerId, billingModel, hourlyRate) {
+    async updateClient(id, name, hoursTotal, csName, projectNum, clientPays, consultantBonus, notes, status, initialBalanceMinutes, balanceStartDate, otoboCustomerId, billingModel, hourlyRate, isCsProject) {
         const { data, error } = await this.db.from('clients').update({
             name, hours_total: parseFloat(hoursTotal) || 0, cs_name: csName || '',
             project_num: projectNum || '', client_pays: parseFloat(clientPays) || 0,
@@ -125,7 +127,8 @@ class TSPStore {
             balance_start_date: balanceStartDate || null,
             otobo_customer_id: otoboCustomerId || null,
             billing_model: billingModel || 'fixed',
-            hourly_rate: parseFloat(hourlyRate) || 0
+            hourly_rate: parseFloat(hourlyRate) || 0,
+            is_cs_project: !!isCsProject
         }).eq('id', id).select().single();
         if (error) throw error;
         return this._client(data);

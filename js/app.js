@@ -606,6 +606,7 @@ class AppController {
         if (modalId === 'modal-client') {
             document.getElementById('form-client').reset();
             document.getElementById('client-id').value = '';
+            document.getElementById('client-is-cs-project').checked = false;
             document.getElementById('modal-client-title').innerText = 'Novo Cliente';
             this.switchClientModalTab('dados');
             this.toggleBillingModel();
@@ -721,6 +722,7 @@ class AppController {
         const consultantBonus = document.getElementById('consultant-bonus').value;
         const billingModel = document.getElementById('billing-model-hourly').checked ? 'hourly' : 'fixed';
         const hourlyRate = document.getElementById('client-hourly-rate').value;
+        const isCsProject = document.getElementById('client-is-cs-project').checked;
         const notes = document.getElementById('client-notes').value;
         const status = document.getElementById('client-status').value;
         const otoboCustomerId = document.getElementById('client-otobo-id').value.trim();
@@ -741,9 +743,9 @@ class AppController {
         this._btnPending(btn);
         try {
             if (id) {
-                await store.updateClient(id, name, hours, csName, projectNum, clientPays, consultantBonus, notes, status, initialBalanceMinutes, balanceStartDate || null, otoboCustomerId || null, billingModel, hourlyRate);
+                await store.updateClient(id, name, hours, csName, projectNum, clientPays, consultantBonus, notes, status, initialBalanceMinutes, balanceStartDate || null, otoboCustomerId || null, billingModel, hourlyRate, isCsProject);
             } else {
-                await store.addClient(name, hours, csName, projectNum, clientPays, consultantBonus, notes, status, initialBalanceMinutes, balanceStartDate || null, otoboCustomerId || null, billingModel, hourlyRate);
+                await store.addClient(name, hours, csName, projectNum, clientPays, consultantBonus, notes, status, initialBalanceMinutes, balanceStartDate || null, otoboCustomerId || null, billingModel, hourlyRate, isCsProject);
             }
             await this._btnSuccess(btn);
             e.target.reset();
@@ -3037,6 +3039,7 @@ class AppController {
         document.getElementById('client-initial-balance').value =
             client.initialBalanceMinutes ? (client.initialBalanceMinutes / 60) : '';
         document.getElementById('client-balance-start').value = client.balanceStartDate || '';
+        document.getElementById('client-is-cs-project').checked = !!client.isCsProject;
 
         this.calculateConsultantValue();
         this.openModal('modal-client');
