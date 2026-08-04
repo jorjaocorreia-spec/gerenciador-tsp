@@ -966,6 +966,9 @@
                 <button type="button" class="modal-tab" role="tab" aria-selected="false" id="tab-btn-report" onclick="app.switchClientModalTab('report')">
                     <i data-lucide="file-text" style="width:14px;height:14px;"></i> Relatório
                 </button>
+                <button type="button" class="modal-tab" role="tab" aria-selected="false" id="tab-btn-cs" style="display:none;" onclick="app.switchClientModalTab('cs')">
+                    <i data-lucide="percent" style="width:14px;height:14px;"></i> Comissão CS
+                </button>
             </div>
             <!-- Painel: Dados -->
             <div id="tab-client-dados">
@@ -1134,6 +1137,12 @@
                 <button type="button" class="btn btn-primary" id="btn-new-scheduling-rule" onclick="app.openNewSchedulingRule()" style="margin-top: 12px; width: 100%; justify-content: center;">
                     <i data-lucide="plus"></i> Nova Regra de Agendamento
                 </button>
+            </div>
+            <!-- Painel: Comissão CS -->
+            <div id="tab-client-cs" style="display:none; padding: 0 24px 24px;">
+                <div id="client-cs-commission-container">
+                    <!-- preenchido via JS -->
+                </div>
             </div>
         </div>
     </div>

@@ -607,6 +607,9 @@ class AppController {
             document.getElementById('form-client').reset();
             document.getElementById('client-id').value = '';
             document.getElementById('client-is-cs-project').checked = false;
+            document.getElementById('tab-btn-cs').style.display = 'none';
+            this.csCommissionMonth = null;
+            this._csUsersListCache = null;
             document.getElementById('modal-client-title').innerText = 'Novo Cliente';
             this.switchClientModalTab('dados');
             this.toggleBillingModel();
@@ -781,6 +784,15 @@ class AppController {
         document.getElementById('field-client-pays').style.display = isHourly ? 'none' : '';
         document.getElementById('row-consultant-fields').style.display = isHourly ? 'none' : '';
         document.getElementById('field-hourly-rate').style.display = isHourly ? '' : 'none';
+    }
+
+    toggleCsProjectTab() {
+        const btn = document.getElementById('tab-btn-cs');
+        if (!btn) return;
+        const checked = document.getElementById('client-is-cs-project').checked;
+        const clientId = document.getElementById('client-id').value;
+        const canShow = checked && !!clientId && this.userRole === 'manager';
+        btn.style.display = canShow ? '' : 'none';
     }
 
     onCentesimalToggle() {
@@ -3040,6 +3052,7 @@ class AppController {
             client.initialBalanceMinutes ? (client.initialBalanceMinutes / 60) : '';
         document.getElementById('client-balance-start').value = client.balanceStartDate || '';
         document.getElementById('client-is-cs-project').checked = !!client.isCsProject;
+        this.toggleCsProjectTab();
 
         this.calculateConsultantValue();
         this.openModal('modal-client');
@@ -8859,15 +8872,18 @@ class AppController {
         const dados = document.getElementById('tab-client-dados');
         const sched = document.getElementById('tab-client-scheduling');
         const rep   = document.getElementById('tab-client-report');
+        const cs    = document.getElementById('tab-client-cs');
         const btnDados = document.getElementById('tab-btn-dados');
         const btnSched = document.getElementById('tab-btn-scheduling');
         const btnRep   = document.getElementById('tab-btn-report');
+        const btnCs    = document.getElementById('tab-btn-cs');
         if (!dados || !sched) return;
 
         dados.style.display = 'none';
         sched.style.display = 'none';
         if (rep) rep.style.display = 'none';
-        [btnDados, btnSched, btnRep].forEach(b => {
+        if (cs) cs.style.display = 'none';
+        [btnDados, btnSched, btnRep, btnCs].forEach(b => {
             if (!b) return;
             b.classList.remove('active');
             b.setAttribute('aria-selected', 'false');
@@ -8898,6 +8914,11 @@ class AppController {
                 if (endEl   && !endEl.value)   endEl.value   = last;
                 this._reportInlineClientId = clientId;
             }
+        } else if (tab === 'cs') {
+            if (cs) cs.style.display = 'block';
+            if (btnCs) { btnCs.classList.add('active'); btnCs.setAttribute('aria-selected', 'true'); }
+            if (!this.csCommissionMonth) this.csCommissionMonth = new Date().toISOString().slice(0, 7);
+            this._renderCsCommissionPanel();
         } else {
             dados.style.display = '';
             btnDados.classList.add('active');
