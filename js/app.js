@@ -8992,43 +8992,63 @@ class AppController {
         }
     }
 
-    async onCsParticipantUserChange(userId) {
-        const clientSelect = document.getElementById('cs-add-participant-client');
-        if (!clientSelect) return;
-        if (!userId) {
-            clientSelect.innerHTML = '<option value="">Selecione o consultor primeiro...</option>';
-            clientSelect.disabled = true;
-            return;
-        }
-        clientSelect.disabled = true;
-        clientSelect.innerHTML = '<option value="">Carregando clientes...</option>';
-        try {
-            const clients = await store.getClientsForUser(userId);
+    toggleCsParticipantCheckbox(userId, checked) {
+        const row = document.querySelector(`.cs-add-participant-row[data-user-id="${userId}"]`);
+        if (!row) return;
+        const select = row.querySelector('.cs-add-participant-client-select');
+        if (!checked) { select.style.display = 'none'; return; }
+        select.style.display = '';
+        if (select.dataset.loaded === '1') return;
+        select.disabled = true;
+        select.innerHTML = '<option value="">Carregando clientes...</option>';
+        store.getClientsForUser(userId).then(clients => {
             if (clients.length === 0) {
-                clientSelect.innerHTML = '<option value="">Nenhum cliente encontrado para este consultor</option>';
+                select.innerHTML = '<option value="">Nenhum cliente encontrado</option>';
                 return;
             }
-            clientSelect.innerHTML = '<option value="">Selecione o cliente...</option>' +
+            select.innerHTML = '<option value="">Selecione o cliente...</option>' +
                 clients.map(c => `<option value="${c.id}">${escapeHtml(c.name)}${c.projectNum ? ' (' + escapeHtml(c.projectNum) + ')' : ''}</option>`).join('');
-            clientSelect.disabled = false;
-        } catch (err) {
-            clientSelect.innerHTML = '<option value="">Erro ao carregar clientes</option>';
-            Toast.show('Erro ao carregar clientes do consultor: ' + err.message, 'error');
-        }
+            select.disabled = false;
+            select.dataset.loaded = '1';
+        }).catch(err => {
+            select.innerHTML = '<option value="">Erro ao carregar clientes</option>';
+            Toast.show('Erro ao carregar clientes: ' + err.message, 'error');
+        });
     }
 
-    async confirmAddCsParticipant(periodId) {
-        const userId = document.getElementById('cs-add-participant-select').value;
-        const clientId = document.getElementById('cs-add-participant-client').value;
-        if (!userId) { Toast.show('Selecione um consultor.', 'error'); return; }
-        if (!clientId) { Toast.show('Selecione o cliente de horas desse consultor.', 'error'); return; }
-        try {
-            const hours = await store.getRecordsHoursForClient(userId, this.csCommissionMonth, clientId);
-            await store.addCsCommissionParticipant(periodId, userId, hours, clientId);
-            await this._renderCsCommissionPanel();
-            Toast.show('Consultor adicionado à comissão CS.', 'success');
-        } catch (err) {
-            Toast.show('Erro ao adicionar participante: ' + err.message, 'error');
+    async confirmAddCsParticipants(periodId) {
+        const rows = document.querySelectorAll('.cs-add-participant-row');
+        const toAdd = [];
+        rows.forEach(row => {
+            const checkbox = row.querySelector('input[type="checkbox"]');
+            if (!checkbox.checked) return;
+            const select = row.querySelector('.cs-add-participant-client-select');
+            toAdd.push({
+                userId: row.dataset.userId,
+                email: row.dataset.userEmail,
+                clientId: select.value
+            });
+        });
+        if (toAdd.length === 0) { Toast.show('Marque ao menos um consultor.', 'error'); return; }
+        const missingClient = toAdd.find(x => !x.clientId);
+        if (missingClient) { Toast.show(`Selecione o cliente de horas de ${missingClient.email}.`, 'error'); return; }
+
+        let successCount = 0;
+        const errors = [];
+        for (const item of toAdd) {
+            try {
+                const hours = await store.getRecordsHoursForClient(item.userId, this.csCommissionMonth, item.clientId);
+                await store.addCsCommissionParticipant(periodId, item.userId, hours, item.clientId);
+                successCount++;
+            } catch (err) {
+                errors.push(`${item.email}: ${err.message}`);
+            }
+        }
+        await this._renderCsCommissionPanel();
+        if (errors.length === 0) {
+            Toast.show(`${successCount} consultor(es) adicionado(s) à comissão CS.`, 'success');
+        } else {
+            Toast.show(`${successCount} adicionado(s), ${errors.length} com erro: ${errors.join('; ')}`, 'error', 8000);
         }
     }
 
@@ -9124,25 +9144,27 @@ class AppController {
                 </div>
                 <button type="button" class="btn btn-secondary" style="margin-bottom:16px;" onclick="app.saveCsCommissionValues('${period.id}')">Salvar valores do mês</button>
 
-                <div style="display:flex; gap:8px; align-items:flex-end; margin-bottom:12px; flex-wrap:wrap;">
-                    <div class="form-group" style="flex:1; min-width:200px; margin-bottom:0;">
-                        <label for="cs-add-participant-select">Adicionar consultor</label>
-                        <select id="cs-add-participant-select" class="form-control" onchange="app.onCsParticipantUserChange(this.value)">
-                            <option value="">Selecione...</option>
-                            ${availableUsers.map(u => `<option value="${u.userId}">${escapeHtml(u.email)}</option>`).join('')}
-                        </select>
+                <div class="form-group" style="margin-bottom:12px;">
+                    <label>Adicionar consultores</label>
+                    ${availableUsers.length === 0
+                        ? '<p class="text-muted" style="margin:6px 0;">Todos os consultores disponíveis já foram adicionados neste mês.</p>'
+                        : `<div id="cs-add-participants-list" style="display:flex; flex-direction:column; gap:10px; max-height:260px; overflow-y:auto; border:1px solid rgba(255,255,255,0.08); border-radius:8px; padding:10px;">
+                        ${availableUsers.map(u => `
+                            <div class="cs-add-participant-row" data-user-id="${u.userId}" data-user-email="${escapeHtml(u.email)}">
+                                <label style="display:flex; align-items:center; gap:8px; font-weight:normal; cursor:pointer; margin:0;">
+                                    <input type="checkbox" onchange="app.toggleCsParticipantCheckbox('${u.userId}', this.checked)">
+                                    ${escapeHtml(u.email)}
+                                </label>
+                                <select class="form-control cs-add-participant-client-select" style="display:none; margin-top:6px;" disabled>
+                                    <option value="">Selecione o cliente...</option>
+                                </select>
+                            </div>`).join('')}
                     </div>
-                    <div class="form-group" style="flex:1; min-width:200px; margin-bottom:0;">
-                        <label for="cs-add-participant-client">Cliente de horas dele(a)</label>
-                        <select id="cs-add-participant-client" class="form-control" disabled>
-                            <option value="">Selecione o consultor primeiro...</option>
-                        </select>
-                    </div>
-                    <button type="button" class="btn btn-primary" onclick="app.confirmAddCsParticipant('${period.id}')">
-                        <i data-lucide="plus"></i> Adicionar
-                    </button>
+                    <p class="text-muted" style="font-size:0.78rem;margin:6px 0 0;">Marque os consultores, escolha o cliente de horas de cada um (as horas somam os Atendimentos lançados nele) e clique em Adicionar.</p>
+                    <button type="button" class="btn btn-primary" style="margin-top:10px;" onclick="app.confirmAddCsParticipants('${period.id}')">
+                        <i data-lucide="plus"></i> Adicionar selecionados
+                    </button>`}
                 </div>
-                <p class="text-muted" style="font-size:0.78rem;margin:-8px 0 12px;">As horas do consultor são somadas a partir dos Atendimentos lançados por ele no cliente escolhido acima.</p>
 
                 <div style="overflow-x:auto;">
                 <table class="data-table">
