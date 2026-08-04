@@ -980,6 +980,18 @@ class TSPStore {
         if (failed) throw failed.error;
     }
 
+    // Atendimentos do portal do cliente: SEM filtro por user_id — a RLS
+    // (policy clients_read_own_records, adicionada na migration dos
+    // Indicadores) já restringe ao client_id vinculado ao usuário logado,
+    // mesmo que o dono real da linha seja outro user_id (o consultor).
+    // Nunca adicionar .eq('user_id', this.userId) aqui.
+    async getClientPortalRecords(clientId) {
+        const { data, error } = await this.db.from('records').select('*')
+            .eq('client_id', clientId).order('date', { ascending: false });
+        if (error) throw error;
+        return data.map(r => this._record(r));
+    }
+
     // Nome do cliente para exibir travado no filtro do Portal do Cliente.
     // Select explícito (só id, name) — nunca usar '*' aqui: a RLS libera a
     // linha inteira (client_pays, hourly_rate, notes, etc.) e o papel

@@ -340,20 +340,20 @@
                 <div style="display: flex; gap: 16px; margin-bottom: 24px; flex-wrap: wrap; align-items: flex-end;">
                     <div class="form-group" style="flex: 2; min-width: 200px; margin-bottom: 0;">
                         <label>Filtrar por Cliente</label>
-                        <select id="filter-client" class="form-control" onchange="app.renderAll()">
+                        <select id="filter-client" class="form-control" onchange="app.refreshRecordFilters()">
                             <option value="">Todos os Clientes</option>
                             <!-- Carregado via JS -->
                         </select>
                     </div>
                     <div class="form-group" style="flex: 1; min-width: 150px; margin-bottom: 0;">
                         <label>Data Início</label>
-                        <input type="date" id="filter-date-start" class="form-control" onchange="app.renderAll()">
+                        <input type="date" id="filter-date-start" class="form-control" onchange="app.refreshRecordFilters()">
                     </div>
                     <div class="form-group" style="flex: 1; min-width: 150px; margin-bottom: 0;">
                         <label>Data Fim</label>
-                        <input type="date" id="filter-date-end" class="form-control" onchange="app.renderAll()">
+                        <input type="date" id="filter-date-end" class="form-control" onchange="app.refreshRecordFilters()">
                     </div>
-                    <div style="flex: 0; margin-bottom: 0; display: flex; gap: 8px;">
+                    <div id="records-filter-actions" style="flex: 0; margin-bottom: 0; display: flex; gap: 8px;">
                         <button class="btn btn-secondary" onclick="app.clearFilters()"
                             style="padding: 12px 16px; height: 42px;" title="Limpar Filtros" aria-label="Limpar filtros">
                             <i data-lucide="filter-x"></i>
@@ -370,10 +370,10 @@
                     <thead>
                         <tr>
                             <th>Data e Hora</th>
-                            <th>Cliente</th>
+                            <th id="records-th-client">Cliente</th>
                             <th>Descrição da Atividade</th>
                             <th>Tempo Gasto</th>
-                            <th>Ações</th>
+                            <th id="records-th-actions">Ações</th>
                         </tr>
                     </thead>
                     <tbody>

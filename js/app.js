@@ -2294,9 +2294,25 @@ class AppController {
     async enterClientPortalMode() {
         document.querySelectorAll('.nav-item').forEach(item => {
             const view = item.getAttribute('data-view');
-            item.style.display = ['tasks', 'indicadores'].includes(view) ? '' : 'none';
+            item.style.display = ['tasks', 'indicadores', 'records'].includes(view) ? '' : 'none';
         });
-        ['btn-import-pdf', 'btn-migrate-local', 'btn-ai-config', 'btn-whatsapp-config'].forEach(id => {
+        ['btn-import-pdf', 'btn-migrate-local', 'btn-ai-config', 'btn-whatsapp-config',
+         'btn-new-record-import-pdf', 'btn-new-record'].forEach(id => {
+            const el = document.getElementById(id);
+            if (el) el.style.display = 'none';
+        });
+        // View Atendimentos: filtro de cliente travado no próprio client_id,
+        // mesmo padrão do filtro de Tarefas — nunca pode ser trocado.
+        // Colunas "Cliente" e "Ações" e os botões limpar/exportar somem —
+        // só há um cliente possível e não há edição/exclusão/PDF no portal.
+        const recordClientSelect = document.getElementById('filter-client');
+        if (recordClientSelect) {
+            const clientName = await store.getClientPortalName(this.userClientId);
+            recordClientSelect.innerHTML = `<option value="${this.userClientId}">${escapeHtml(clientName || 'Meu cliente')}</option>`;
+            recordClientSelect.value = this.userClientId;
+            recordClientSelect.disabled = true;
+        }
+        ['records-th-client', 'records-th-actions', 'records-filter-actions'].forEach(id => {
             const el = document.getElementById(id);
             if (el) el.style.display = 'none';
         });
@@ -2323,10 +2339,10 @@ class AppController {
         lucide.createIcons();
     }
 
-    // Navegação dentro do Portal do Cliente — só 'tasks' e 'indicadores'
-    // são liberados (ver filtro de visibilidade em enterClientPortalMode).
+    // Navegação dentro do Portal do Cliente — só 'tasks', 'indicadores' e
+    // 'records' são liberados (ver filtro de visibilidade em enterClientPortalMode).
     switchClientPortalView(view) {
-        if (!['tasks', 'indicadores'].includes(view)) return;
+        if (!['tasks', 'indicadores', 'records'].includes(view)) return;
         this.currentView = view;
         this._setActiveNavItem(view);
         document.querySelectorAll('.view-section').forEach(section => {
@@ -2334,6 +2350,8 @@ class AppController {
         });
         if (view === 'tasks') {
             this.renderClientPortalTasks();
+        } else if (view === 'records') {
+            this.renderClientPortalRecords();
         } else {
             this.renderIndicadores();
         }
@@ -2381,6 +2399,11 @@ class AppController {
     refreshTaskFilters() {
         if (this.userRole === 'client') return this.renderClientPortalTasks();
         return this.renderTasks();
+    }
+
+    refreshRecordFilters() {
+        if (this.userRole === 'client') return this.renderClientPortalRecords();
+        return this.renderAll();
     }
 
     async renderAll() {
@@ -3599,6 +3622,72 @@ class AppController {
             }
         });
         return groups;
+    }
+
+    // Atendimentos do Portal do Cliente: somente leitura, sem filtros
+    // (o filtro de cliente já vem travado no próprio client_id — ver
+    // enterClientPortalMode) e sem ações de editar/excluir/exportar.
+    async renderClientPortalRecords() {
+        const tbody = document.querySelector('#records-table tbody');
+        if (!tbody) return;
+        this._skTable(tbody, 3, 5);
+        let records = (await store.getClientPortalRecords(this.userClientId))
+            .sort((a, b) => new Date(b.date) - new Date(a.date));
+
+        const filterStart = document.getElementById('filter-date-start')?.value;
+        const filterEnd = document.getElementById('filter-date-end')?.value;
+        if (filterStart) records = records.filter(r => new Date(r.date) >= new Date(filterStart));
+        if (filterEnd) records = records.filter(r => new Date(r.date) <= new Date(filterEnd));
+
+        tbody.innerHTML = '';
+        const tfoot = document.getElementById('records-tfoot');
+        if (tfoot) tfoot.innerHTML = '';
+
+        if (records.length === 0) {
+            tbody.innerHTML = `<tr><td colspan="3" class="text-muted" style="text-align: center;">Nenhum atendimento lançado${(filterStart || filterEnd) ? ' para o período filtrado' : ''}.</td></tr>`;
+            return;
+        }
+
+        const groups = this._groupRecordsByDescription(records);
+        groups.forEach(group => {
+            const groupSize = group.records.length;
+            group.records.forEach((r, idx) => {
+                const hoursStr = (r.minutes / 60).toFixed(2) + 'h';
+                const timeRange = r.isUnavailability
+                    ? '<br><small style="color:#f59e0b;">⚠ Indisponibilidade do Cliente</small>'
+                    : ((r.startTime && r.endTime) ? `<br><small class="text-muted">${r.startTime} às ${r.endTime}</small>` : '');
+                const partLabel = groupSize > 1 ? `<br><small class="text-muted" style="opacity:.7">Parte ${idx + 1}/${groupSize}</small>` : '';
+
+                const tr = document.createElement('tr');
+                if (idx === 0 && groupSize > 1) tr.classList.add('record-group-start');
+                const descCell = idx === 0
+                    ? `<td rowspan="${groupSize}" class="grouped-desc-cell">${escapeHtml(r.description)}</td>`
+                    : '';
+                tr.innerHTML = `
+                    <td>${r.date.split('-').reverse().join('/')}${timeRange}${partLabel}</td>
+                    ${descCell}
+                    <td class="hours-flip">${r.minutes} min <span class="text-muted">(${hoursStr})</span></td>
+                `;
+                tbody.appendChild(tr);
+            });
+        });
+
+        if (tfoot) {
+            const totalMinutes = records.reduce((sum, r) => sum + r.minutes, 0);
+            const totalH = Math.floor(totalMinutes / 60);
+            const totalM = totalMinutes % 60;
+            const totalLabel = totalM > 0 ? `${totalH}h ${totalM}min` : `${totalH}h`;
+            tfoot.innerHTML = `
+                <tr>
+                    <td colspan="2" style="text-align:right; font-weight:600; color:var(--text-muted); padding: 12px 16px; border-top: 1px solid rgba(255,255,255,0.08);">
+                        Total (${records.length} registro${records.length !== 1 ? 's' : ''}):
+                    </td>
+                    <td style="font-weight:700; color:var(--primary); padding: 12px 16px; border-top: 1px solid rgba(255,255,255,0.08); white-space:nowrap;">
+                        ${totalMinutes} min <span style="color:var(--text-muted); font-weight:400;">(${totalLabel})</span>
+                    </td>
+                </tr>
+            `;
+        }
     }
 
     async renderRecords(preloadedClients) {
