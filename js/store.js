@@ -1659,13 +1659,6 @@ class TSPStore {
             hoursApontadas: parseFloat(r.hours_apontadas) || 0, createdAt: r.created_at };
     }
 
-    async getCsProjectClient() {
-        const { data, error } = await this.db.from('clients').select('*')
-            .eq('user_id', this.userId).eq('is_cs_project', true).limit(1).maybeSingle();
-        if (error) throw error;
-        return data ? this._client(data) : null;
-    }
-
     async getCsCommissionPeriodByMonth(referenceMonth) {
         const { data, error } = await this.db.from('cs_commission_periods').select('*')
             .eq('reference_month', referenceMonth).maybeSingle();

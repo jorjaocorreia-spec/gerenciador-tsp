@@ -6872,13 +6872,21 @@ class AppController {
 
         try {
             const referenceMonth = `${this.financeiroYear}-${String(this.financeiroMonth).padStart(2, '0')}-01`;
+            let csFetchFailed = false;
             const [summary, history, myCs] = await Promise.all([
                 store.getFinancialSummary(this.financeiroYear, this.financeiroMonth),
                 store.getFinancialHistory(12, this.financeiroHistEndYear, this.financeiroHistEndMonth),
-                store.getMyCsCommissionForMonth(referenceMonth).catch(() => null)
+                store.getMyCsCommissionForMonth(referenceMonth).catch(err => {
+                    console.error('Erro ao carregar comissão CS:', err);
+                    csFetchFailed = true;
+                    return null;
+                })
             ]);
             this._financeiroSummary = summary;
             this._financeiroHistory = history;
+            if (csFetchFailed) {
+                Toast.show('Não foi possível carregar a comissão CS deste mês — o total pode estar incompleto.', 'error');
+            }
 
             const formatMoney = (val) => (val && !isNaN(val)) ? `R$ ${parseFloat(val).toFixed(2).replace('.', ',')}` : 'R$ 0,00';
 
@@ -8981,10 +8989,11 @@ class AppController {
         }
     }
 
-    async confirmAddCsParticipant(periodId, csProjectNum) {
+    async confirmAddCsParticipant(periodId) {
         const select = document.getElementById('cs-add-participant-select');
         const userId = select.value;
         if (!userId) { Toast.show('Selecione um consultor.', 'error'); return; }
+        const csProjectNum = document.getElementById('client-project').value.trim();
         try {
             const hours = await store.getCsHoursForUser(userId, this.csCommissionMonth, csProjectNum);
             await store.addCsCommissionParticipant(periodId, userId, hours);
@@ -9021,11 +9030,7 @@ class AppController {
         container.innerHTML = spinnerHtml;
         try {
             const referenceMonth = `${this.csCommissionMonth}-01`;
-            const csClient = await store.getCsProjectClient();
-            if (!csClient) {
-                container.innerHTML = '<p class="text-muted" style="padding:16px 0;">Marque este cliente como "Projeto de Comissão CS" e salve antes de gerenciar a comissão.</p>';
-                return;
-            }
+            const csProjectNum = document.getElementById('client-project').value.trim();
 
             const [y, m] = this.csCommissionMonth.split('-').map(Number);
             const monthNames = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
@@ -9099,7 +9104,7 @@ class AppController {
                             ${availableUsers.map(u => `<option value="${u.userId}">${escapeHtml(u.email)}</option>`).join('')}
                         </select>
                     </div>
-                    <button type="button" class="btn btn-primary" onclick="app.confirmAddCsParticipant('${period.id}', '${csClient.projectNum}')">
+                    <button type="button" class="btn btn-primary" onclick="app.confirmAddCsParticipant('${period.id}')">
                         <i data-lucide="plus"></i> Adicionar
                     </button>
                 </div>

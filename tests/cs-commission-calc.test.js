@@ -58,6 +58,11 @@ run('computeConsultantResult: participantCount 0 não gera divisão por zero', (
     assert.ok(Number.isFinite(r.total));
 });
 
+run('computeConsultantResult: Jorge (5h de 3 participantes) -> comissão proporcional a 33,33%', () => {
+    const r = TSPCsCommission.computeConsultantResult(5, 3, 0, 24444, 2362);
+    assert.ok(Math.abs(r.total - 802.8222) < 0.01, `total foi ${r.total}`);
+});
+
 if (process.exitCode) {
     console.error('\nALGUM TESTE FALHOU');
 } else {
