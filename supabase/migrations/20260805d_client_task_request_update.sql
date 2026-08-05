@@ -4,6 +4,20 @@
 -- enforce_client_task_request_insert (20260805c). Ver
 -- docs/superpowers/specs/2026-08-05-edicao-solicitacao-tarefa-cliente-design.md.
 
+-- ATENÇÃO (adicionado em 2026-08-05, revisão final da feature de edição):
+-- a trigger/função criadas abaixo (enforce_client_task_request_update /
+-- trg_enforce_client_task_request_update) foram REMOVIDAS pela migration
+-- 20260805e_fix_client_task_trigger_conflict.sql — colidiam com a trigger
+-- BEFORE UPDATE mais antiga trg_enforce_client_task_position_only (Fase
+-- 45/49), que o Postgres executa antes por ordem alfabética de nome,
+-- apagando as edições antes desta trigger capturá-las. A lógica de edição
+-- de solicitação pendente hoje vive consolidada dentro de
+-- enforce_client_task_position_only (ver 20260805e). Este arquivo é mantido
+-- por completude histórica (e porque a policy abaixo continua válida, só
+-- apertada depois por 20260805f) — não copiar o padrão de trigger separada
+-- abaixo para uma feature nova; ver a nota "única trigger BEFORE UPDATE em
+-- tasks" no CLAUDE.md.
+
 -- 1) RLS de UPDATE para o papel 'client' — aditiva, convive com as policies
 --    de UPDATE existentes do consultor dono e da reordenação de cards.
 CREATE POLICY "clients_update_own_pending_task_requests" ON tasks

@@ -611,6 +611,7 @@ class AppController {
             Toast.show('Você digitou um comentário mas não clicou em "Comentar". Envie o comentário ou apague o texto para fechar.', 'error');
             return;
         }
+        if (modalId === 'modal-new-task-request') this._editingRequestId = null;
         const overlay = document.getElementById(modalId);
         // Only animate out if the modal is currently open; otherwise clean up immediately
         // (prevents the 200ms timeout from closing a modal that was just re-opened)
@@ -1519,7 +1520,10 @@ class AppController {
             if (this.clientPortalTasksTab === 'requests') await this.renderClientTaskRequests();
         } catch (err) {
             console.error(isEditing ? 'Erro ao editar solicitação de tarefa:' : 'Erro ao enviar solicitação de tarefa:', err);
-            Toast.show(isEditing ? 'Erro ao salvar alterações. Tente novamente.' : 'Erro ao enviar solicitação. Tente novamente.', 'error');
+            const alreadyDecided = isEditing && err.code === 'PGRST116';
+            Toast.show(alreadyDecided
+                ? 'Esta solicitação já foi analisada pelo consultor e não pode mais ser editada.'
+                : (isEditing ? 'Erro ao salvar alterações. Tente novamente.' : 'Erro ao enviar solicitação. Tente novamente.'), 'error');
             this._btnError(btn);
         }
     }

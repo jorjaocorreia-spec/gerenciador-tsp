@@ -967,7 +967,7 @@ class TSPStore {
         const { data, error } = await this.db.from('tasks').update({
             title, description: description || '',
             attachments: attachments || []
-        }).eq('id', id).select().single();
+        }).eq('id', id).eq('approval_status', 'pending').select().single();
         if (error) throw error;
         return this._task(data);
     }
