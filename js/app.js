@@ -170,6 +170,7 @@ class AppController {
         this._tasksCache = null;        // null = inválido; [] = vazio válido
         this._requestAttachments = [];      // [{name, data}] — anexos do modal de nova solicitação (Portal do Cliente)
         this._clientRequestsCache = null;   // null = inválido; [] = vazio válido — cache de getClientTaskRequests()
+        this._editingRequestId = null;      // id da solicitação em edição no modal-new-task-request, ou null = modo criação
         this.clientPortalTasksTab = 'kanban'; // 'kanban' | 'requests' — sub-aba ativa dentro de Tarefas no Portal
         this._pendingApprovalsCache = { clientId: null, items: [] }; // cache de getPendingTaskApprovals() do cliente filtrado
         this._pendingRejectIds = null; // ids aguardando confirmação de rejeição no modal de pendências
@@ -1473,9 +1474,28 @@ class AppController {
     }
 
     _openNewTaskRequestModal() {
+        this._editingRequestId = null;
         this._requestAttachments = [];
         document.getElementById('request-title').value = '';
         document.getElementById('request-description').value = '';
+        document.getElementById('modal-task-request-title').textContent = 'Nova Solicitação';
+        document.getElementById('btn-save-task-request-label').textContent = 'Enviar Solicitação';
+        this._renderRequestAttachmentPreviews();
+        this.openModal('modal-new-task-request');
+    }
+
+    // Só chamado para itens com approvalStatus==='pending' (ver renderClientTaskRequests) —
+    // busca o item direto do cache já carregado pela aba "Minhas Solicitações", sem
+    // round-trip ao banco, mesmo padrão de editAgendaEvent()/openEditImplementation().
+    _openEditTaskRequestModal(id) {
+        const item = (this._clientRequestsCache || []).find(t => t.id === id);
+        if (!item) return;
+        this._editingRequestId = id;
+        this._requestAttachments = item.attachments ? [...item.attachments] : [];
+        document.getElementById('request-title').value = item.title;
+        document.getElementById('request-description').value = item.description || '';
+        document.getElementById('modal-task-request-title').textContent = 'Editar Solicitação';
+        document.getElementById('btn-save-task-request-label').textContent = 'Salvar Alterações';
         this._renderRequestAttachmentPreviews();
         this.openModal('modal-new-task-request');
     }
@@ -1485,16 +1505,21 @@ class AppController {
         const title = document.getElementById('request-title').value.trim();
         if (!title) { Toast.show('Informe um título para a solicitação.', 'error'); return; }
         const description = document.getElementById('request-description').value.trim();
+        const isEditing = !!this._editingRequestId;
         this._btnPending(btn);
         try {
-            await store.submitTaskRequest(this.userClientId, { title, description, attachments: this._requestAttachments });
+            if (isEditing) {
+                await store.updateTaskRequest(this._editingRequestId, { title, description, attachments: this._requestAttachments });
+            } else {
+                await store.submitTaskRequest(this.userClientId, { title, description, attachments: this._requestAttachments });
+            }
             this._clientRequestsCache = null; // força re-fetch na próxima abertura da aba
             await this._btnSuccess(btn);
             this.closeModal('modal-new-task-request');
             if (this.clientPortalTasksTab === 'requests') await this.renderClientTaskRequests();
         } catch (err) {
-            console.error('Erro ao enviar solicitação de tarefa:', err);
-            Toast.show('Erro ao enviar solicitação. Tente novamente.', 'error');
+            console.error(isEditing ? 'Erro ao editar solicitação de tarefa:' : 'Erro ao enviar solicitação de tarefa:', err);
+            Toast.show(isEditing ? 'Erro ao salvar alterações. Tente novamente.' : 'Erro ao enviar solicitação. Tente novamente.', 'error');
             this._btnError(btn);
         }
     }
@@ -2510,7 +2535,14 @@ class AppController {
             const dateStr = t.createdAt ? new Date(t.createdAt).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', year: 'numeric' }) : '';
             const reasonHtml = t.approvalStatus === 'rejected' && t.rejectionReason
                 ? `<div class="client-request-reason">${escapeHtml(t.rejectionReason)}</div>` : '';
-            return `<div class="client-request-card">
+            // Só solicitações pendentes podem ser editadas pelo cliente (ver
+            // trigger enforce_client_task_request_update, migration 20260805d) —
+            // aprovadas/rejeitadas ficam com o card estático, sem indicação de clique.
+            const isEditable = t.approvalStatus === 'pending';
+            const cardAttrs = isEditable
+                ? `onclick="app._openEditTaskRequestModal('${t.id}')" tabindex="0" role="button" aria-label="Editar solicitação: ${escapeHtml(t.title)}" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();app._openEditTaskRequestModal('${t.id}')}" style="cursor:pointer"`
+                : '';
+            return `<div class="client-request-card" ${cardAttrs}>
                 <div class="client-request-header">
                     <strong>${escapeHtml(t.title)}</strong>
                     <span class="task-request-status task-request-status--${t.approvalStatus}">${STATUS_LABEL[t.approvalStatus] || t.approvalStatus}</span>
@@ -12545,6 +12577,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             window.app._clientsMapCache = {};
             window.app._clientRequestsCache = null;
             window.app.clientPortalTasksTab = 'kanban';
+            window.app._editingRequestId = null;
             window.app._pendingApprovalsCache = { clientId: null, items: [] };
             window.app._pendingRejectIds = null;
             window.app._agendaEventsCache = null;
