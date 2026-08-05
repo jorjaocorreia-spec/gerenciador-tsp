@@ -934,6 +934,84 @@ class TSPStore {
         return (data || []).map(r => this._column(r)).sort((a, b) => a.position - b.position);
     }
 
+    // ── SOLICITAÇÕES DE TAREFA PELO CLIENTE (Portal do Cliente) ────
+
+    // Insert como usuário-cliente: a trigger enforce_client_task_request_insert
+    // (migration 20260805c) reescreve user_id/approval_status/status/priority/
+    // etc. server-side — este payload só entrega title/description/attachments
+    // de fato. client_id precisa bater com user_roles.client_id do chamador
+    // (checado pela policy clients_insert_own_task_requests), senão a RLS
+    // rejeita o INSERT antes mesmo da trigger rodar.
+    async submitTaskRequest(clientId, { title, description, attachments }) {
+        const { data, error } = await this.db.from('tasks').insert({
+            user_id: this.userId, client_id: clientId,
+            title, description: description || '',
+            attachments: attachments || [],
+            requested_by_client: true, approval_status: 'pending'
+        }).select().single();
+        if (error) throw error;
+        return this._task(data);
+    }
+
+    // Histórico completo do cliente (pending/approved/rejected) — sem filtro
+    // por user_id, mesma regra de getClientPortalTasks: depende da RLS
+    // (clients_read_own_tasks já libera SELECT por client_id, sem exigir
+    // approval_status='approved' — essa policy não foi tocada por esta feature).
+    async getClientTaskRequests(clientId) {
+        const { data, error } = await this.db.from('tasks').select('*')
+            .eq('client_id', clientId).eq('requested_by_client', true)
+            .order('created_at', { ascending: false });
+        if (error) throw error;
+        return data.map(r => this._task(r));
+    }
+
+    // Lado do consultor — filtra por user_id normalmente (ele é o dono real
+    // da linha, a trigger de INSERT já garantiu isso).
+    async getPendingTaskApprovals(clientId) {
+        const { data, error } = await this.db.from('tasks').select('*')
+            .eq('user_id', this.userId).eq('client_id', clientId)
+            .eq('approval_status', 'pending')
+            .order('created_at', { ascending: true });
+        if (error) throw error;
+        return data.map(r => this._task(r));
+    }
+
+    // Sequencial (não Promise.all) de propósito: cada aprovação precisa da
+    // posição calculada a partir da anterior, já que todas entram na mesma
+    // coluna de destino. Nunca trocar por Promise.all — colidiriam na mesma
+    // position.
+    async approveTaskRequests(ids, targetColumnId) {
+        if (!ids || ids.length === 0) return [];
+        const { data: existing } = await this.db.from('tasks')
+            .select('position').eq('user_id', this.userId).eq('status', targetColumnId)
+            .order('position', { ascending: false }).limit(1);
+        let nextPosition = (existing && existing.length > 0) ? (existing[0].position + 1) : 0;
+        const results = [];
+        for (const id of ids) {
+            const { data, error } = await this.db.from('tasks').update({
+                approval_status: 'approved',
+                status: targetColumnId,
+                position: nextPosition,
+                updated_at: new Date().toISOString()
+            }).eq('id', id).eq('user_id', this.userId).select().single();
+            if (error) throw error;
+            results.push(this._task(data));
+            nextPosition += 1;
+        }
+        return results;
+    }
+
+    async rejectTaskRequests(ids, reason) {
+        if (!ids || ids.length === 0) return [];
+        const { data, error } = await this.db.from('tasks').update({
+            approval_status: 'rejected',
+            rejection_reason: reason || null,
+            updated_at: new Date().toISOString()
+        }).in('id', ids).eq('user_id', this.userId).select();
+        if (error) throw error;
+        return (data || []).map(r => this._task(r));
+    }
+
     // ── PAPÉIS DE USUÁRIO (Portal do Cliente) ──────────────────────
 
     async getUserRole() {
