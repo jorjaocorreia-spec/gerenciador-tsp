@@ -401,11 +401,13 @@
                             style="display:none" title="Personalizar colunas deste cliente">
                         <i data-lucide="columns"></i> Gerenciar Colunas
                     </button>
-                    <button class="btn btn-secondary" id="btn-task-approvals" onclick="app.openTaskApprovalsModal()"
-                            style="display:none;position:relative" title="Tarefas propostas pelo cliente aguardando análise">
-                        <i data-lucide="inbox"></i> Pendentes de Aprovação
-                        <span id="task-approvals-badge" class="notif-badge">0</span>
-                    </button>
+                    <span style="position:relative;display:inline-block">
+                        <button class="btn btn-secondary" id="btn-task-approvals" onclick="app.openTaskApprovalsModal()"
+                                style="display:none" title="Tarefas propostas pelo cliente aguardando análise">
+                            <i data-lucide="inbox"></i> Pendentes de Aprovação
+                        </button>
+                        <span id="task-approvals-badge" class="notif-badge" style="display:none">0</span>
+                    </span>
                     <button id="btn-new-task-request" class="btn btn-primary" onclick="app._openNewTaskRequestModal()"
                             style="display:none">
                         <i data-lucide="plus"></i> Nova Solicitação

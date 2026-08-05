@@ -4394,9 +4394,11 @@ class AppController {
     // board — só busca de novo quando o cliente filtrado muda.
     async _refreshApprovalsBadge(clientId) {
         const btn = document.getElementById('btn-task-approvals');
+        const badge = document.getElementById('task-approvals-badge');
         if (!btn) return;
         if (this.isManagerView || !clientId) {
             btn.style.display = 'none';
+            if (badge) badge.style.display = 'none';
             return;
         }
         if (this._pendingApprovalsCache.clientId !== clientId) {
@@ -4406,16 +4408,17 @@ class AppController {
             } catch (err) {
                 console.error('Erro ao buscar pendências de aprovação:', err);
                 btn.style.display = 'none';
+                if (badge) badge.style.display = 'none';
                 return;
             }
         }
         const count = this._pendingApprovalsCache.items.length;
-        const badge = document.getElementById('task-approvals-badge');
         if (count > 0) {
             btn.style.display = '';
-            if (badge) badge.textContent = String(count);
+            if (badge) { badge.style.display = ''; badge.textContent = String(count); }
         } else {
             btn.style.display = 'none';
+            if (badge) badge.style.display = 'none';
         }
     }
 
