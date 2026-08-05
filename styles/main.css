@@ -5388,3 +5388,46 @@ kbd {
 #manager-view-banner strong {
     font-weight: 700;
 }
+
+/* ===== Solicitações de Tarefa pelo Cliente (Portal) ===== */
+.task-request-status {
+    display: inline-flex; align-items: center; gap: 4px;
+    padding: 2px 10px; border-radius: 12px;
+    font-size: 0.75rem; font-weight: 600;
+}
+.task-request-status--pending  { background: rgba(245,158,11,0.15); color: var(--warning-color); }
+.task-request-status--approved { background: rgba(74,222,128,0.15); color: var(--success-color); }
+.task-request-status--rejected { background: rgba(248,113,113,0.15); color: var(--danger-color); }
+
+.client-request-card {
+    background: var(--bg-glass, rgba(30,30,50,0.6));
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 10px;
+    padding: 14px 16px;
+    margin-bottom: 12px;
+}
+.client-request-card .client-request-header {
+    display: flex; align-items: center; justify-content: space-between; gap: 8px;
+    margin-bottom: 6px;
+}
+.client-request-reason {
+    margin-top: 8px; padding: 8px 10px;
+    background: rgba(248,113,113,0.08);
+    border-left: 3px solid var(--danger-color);
+    border-radius: 4px;
+    font-size: 0.85rem; color: var(--text-muted);
+}
+
+.task-approval-row {
+    display: flex; align-items: flex-start; gap: 12px;
+    padding: 12px 0;
+    border-bottom: 1px solid rgba(255,255,255,0.08);
+}
+.task-approval-row:last-child { border-bottom: none; }
+.task-approval-check-label { padding-top: 3px; }
+.task-approval-body { flex: 1; min-width: 0; }
+.task-approval-title { font-weight: 600; margin-bottom: 4px; }
+.task-approval-desc { font-size: 0.85rem; color: var(--text-muted); margin-bottom: 6px; white-space: pre-wrap; }
+.task-approval-date { font-size: 0.75rem; color: var(--text-muted); margin-top: 6px; }
+.task-approval-attachments { display: flex; flex-wrap: wrap; gap: 8px; margin: 6px 0; }
+.task-approval-actions { display: flex; flex-direction: column; gap: 6px; flex-shrink: 0; }
