@@ -401,10 +401,27 @@
                             style="display:none" title="Personalizar colunas deste cliente">
                         <i data-lucide="columns"></i> Gerenciar Colunas
                     </button>
+                    <button class="btn btn-secondary" id="btn-task-approvals" onclick="app.openTaskApprovalsModal()"
+                            style="display:none;position:relative" title="Tarefas propostas pelo cliente aguardando análise">
+                        <i data-lucide="inbox"></i> Pendentes de Aprovação
+                        <span id="task-approvals-badge" class="notif-badge">0</span>
+                    </button>
+                    <button id="btn-new-task-request" class="btn btn-primary" onclick="app._openNewTaskRequestModal()"
+                            style="display:none">
+                        <i data-lucide="plus"></i> Nova Solicitação
+                    </button>
                     <button id="btn-new-task" class="btn btn-primary" onclick="app._openNewTaskModal()">
                         <i data-lucide="plus"></i> Nova Tarefa
                     </button>
                 </div>
+            </div>
+
+            <!-- Sub-abas do Portal do Cliente: Kanban / Minhas Solicitações.
+                 Ocultas por padrão; exibidas só para userRole==='client' em
+                 enterClientPortalMode() (Task 6). -->
+            <div class="status-filter-tabs" id="client-task-tabs" role="tablist" aria-label="Kanban ou Minhas Solicitações" style="display:none">
+                <button type="button" class="status-filter-tab active" role="tab" aria-selected="true" data-tab="kanban" onclick="app.switchClientPortalTasksTab('kanban')">Kanban</button>
+                <button type="button" class="status-filter-tab" role="tab" aria-selected="false" data-tab="requests" onclick="app.switchClientPortalTasksTab('requests')">Minhas Solicitações</button>
             </div>
 
             <!-- Filtros Kanban -->
@@ -468,6 +485,12 @@
             <!-- KANBAN BOARD — colunas geradas dinamicamente por JS -->
             <div class="kanban-board" id="kanban-board">
                 <!-- Preenchido por _renderKanbanBoard() -->
+            </div>
+
+            <!-- Portal do Cliente: histórico de solicitações (pending/approved/
+                 rejected). Oculto por padrão; alternado por switchClientPortalTasksTab(). -->
+            <div id="client-task-requests-panel" style="display:none">
+                <!-- Preenchido por renderClientTaskRequests() -->
             </div>
         </section>
 
@@ -1469,6 +1492,75 @@
                 Modo somente leitura — você verá as telas exatamente como aquele consultor, sem poder editar nada.
             </p>
             <div id="manager-supervisor-list" style="padding: 0 24px 20px; max-height: 50vh; overflow-y: auto;"></div>
+        </div>
+    </div>
+
+    <!-- MODAL: Nova Solicitação de Tarefa (Portal do Cliente) -->
+    <div class="modal-overlay" id="modal-new-task-request">
+        <div class="modal" style="max-width:520px">
+            <div class="modal-header">
+                <h2>Nova Solicitação</h2>
+                <button class="modal-close" onclick="app.closeModal('modal-new-task-request')" aria-label="Fechar">
+                    <i data-lucide="x"></i>
+                </button>
+            </div>
+            <form id="form-task-request" onsubmit="event.preventDefault(); app.handleTaskRequestSubmit();">
+                <div class="modal-body">
+                    <div class="form-group float-group">
+                        <label for="request-title">Título</label>
+                        <input type="text" id="request-title" class="form-control" required maxlength="200">
+                    </div>
+                    <div class="form-group float-group">
+                        <label for="request-description">Descrição</label>
+                        <textarea id="request-description" class="form-control" rows="4"></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label for="request-attachments">Anexos (fotos ou documentos)</label>
+                        <input type="file" id="request-attachments" multiple accept="image/*,.pdf,.doc,.docx,.xls,.xlsx">
+                        <p id="request-attach-hint" class="text-muted" style="font-size:0.8rem;margin-top:4px">Nenhum anexo adicionado.</p>
+                        <div id="request-attach-previews" style="display:flex;flex-wrap:wrap;gap:8px;margin-top:8px"></div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-ghost" onclick="app.closeModal('modal-new-task-request')">Cancelar</button>
+                    <button type="submit" id="btn-save-task-request" class="btn btn-primary">
+                        <i data-lucide="send"></i> Enviar Solicitação
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- MODAL: Pendências de Aprovação (Consultor) -->
+    <div class="modal-overlay" id="modal-task-approvals">
+        <div class="modal" style="max-width:640px">
+            <div class="modal-header">
+                <h2>Pendências de Aprovação</h2>
+                <button class="modal-close" onclick="app.closeModal('modal-task-approvals')" aria-label="Fechar">
+                    <i data-lucide="x"></i>
+                </button>
+            </div>
+            <div class="modal-body">
+                <div id="task-approvals-list"><!-- Preenchido por _renderTaskApprovalsList() --></div>
+                <div id="task-approval-reject-reason-section" style="display:none;margin-top:14px;padding-top:14px;border-top:1px solid rgba(255,255,255,0.08)">
+                    <div class="form-group">
+                        <label for="task-approval-reject-reason">Motivo da rejeição (opcional)</label>
+                        <textarea id="task-approval-reject-reason" class="form-control" rows="3"></textarea>
+                    </div>
+                    <div style="display:flex;gap:8px;justify-content:flex-end">
+                        <button type="button" class="btn btn-ghost" onclick="app.cancelRejectTaskRequests()">Cancelar</button>
+                        <button type="button" class="btn btn-danger" onclick="app.confirmRejectTaskRequests()">Confirmar Rejeição</button>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-danger" id="btn-reject-selected-requests" disabled onclick="app.rejectSelectedTaskRequests()">
+                    <i data-lucide="x"></i> Rejeitar Selecionadas
+                </button>
+                <button type="button" class="btn btn-success" id="btn-approve-selected-requests" disabled onclick="app.approveSelectedTaskRequests()">
+                    <i data-lucide="check"></i> Aprovar Selecionadas
+                </button>
+            </div>
         </div>
     </div>
 
@@ -2718,9 +2810,9 @@
     <script src="js/productivity-calc.js?v=1"></script>
     <script src="js/financial-calc.js?v=1"></script>
     <script src="js/cs-commission-calc.js?v=4"></script>
-    <script src="js/store.js?v=31"></script>
+    <script src="js/store.js?v=32"></script>
     <script src="js/ai.js?v=1"></script>
-    <script src="js/app.js?v=49"></script>
+    <script src="js/app.js?v=50"></script>
 </body>
 
 </html>
