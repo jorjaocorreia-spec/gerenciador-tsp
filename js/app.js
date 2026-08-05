@@ -171,6 +171,8 @@ class AppController {
         this._requestAttachments = [];      // [{name, data}] — anexos do modal de nova solicitação (Portal do Cliente)
         this._clientRequestsCache = null;   // null = inválido; [] = vazio válido — cache de getClientTaskRequests()
         this.clientPortalTasksTab = 'kanban'; // 'kanban' | 'requests' — sub-aba ativa dentro de Tarefas no Portal
+        this._pendingApprovalsCache = { clientId: null, items: [] }; // cache de getPendingTaskApprovals() do cliente filtrado
+        this._pendingRejectIds = null; // ids aguardando confirmação de rejeição no modal de pendências
         this._clientsMapCache = {};     // { clientId: clientObj }
         // Cache para optimistic updates da Agenda
         this._agendaEventsCache = null;     // null = inválido; [] = vazio válido
@@ -4224,6 +4226,8 @@ class AppController {
         const board = document.getElementById('kanban-board');
         if (!board) return;
 
+        this._refreshApprovalsBadge(filterClient);
+
         // Skeleton imediato — toda chamada a renderTasks() passa por pelo menos um
         // await bloqueante logo abaixo (_migrateOldStatuses() sempre faz uma query;
         // com cliente, ainda busca as colunas). Sem esse feedback visual, tanto a
@@ -4347,6 +4351,174 @@ class AppController {
         }
     }
 
+    // Botão "Pendentes de Aprovação" só aparece para o consultor dono do
+    // board (nunca em Modo Supervisão — aprovar/rejeitar são escritas
+    // bloqueadas pelo Proxy do store), e só quando há cliente filtrado.
+    // Cacheia por clientId para não refazer a query a cada re-render do
+    // board — só busca de novo quando o cliente filtrado muda.
+    async _refreshApprovalsBadge(clientId) {
+        const btn = document.getElementById('btn-task-approvals');
+        if (!btn) return;
+        if (this.userRole !== 'consultant' || this.isManagerView || !clientId) {
+            btn.style.display = 'none';
+            return;
+        }
+        if (this._pendingApprovalsCache.clientId !== clientId) {
+            try {
+                const items = await store.getPendingTaskApprovals(clientId);
+                this._pendingApprovalsCache = { clientId, items };
+            } catch (err) {
+                console.error('Erro ao buscar pendências de aprovação:', err);
+                btn.style.display = 'none';
+                return;
+            }
+        }
+        const count = this._pendingApprovalsCache.items.length;
+        const badge = document.getElementById('task-approvals-badge');
+        if (count > 0) {
+            btn.style.display = '';
+            if (badge) badge.textContent = String(count);
+        } else {
+            btn.style.display = 'none';
+        }
+    }
+
+    async openTaskApprovalsModal() {
+        const clientId = document.getElementById('filter-task-client')?.value;
+        if (!clientId) return;
+        let items = this._pendingApprovalsCache.clientId === clientId ? this._pendingApprovalsCache.items : null;
+        if (!items) {
+            try {
+                items = await store.getPendingTaskApprovals(clientId);
+                this._pendingApprovalsCache = { clientId, items };
+            } catch (err) {
+                console.error('Erro ao buscar pendências de aprovação:', err);
+                Toast.show('Erro ao carregar pendências de aprovação.', 'error');
+                return;
+            }
+        }
+        this._renderTaskApprovalsList(items);
+        document.getElementById('task-approval-reject-reason-section').style.display = 'none';
+        this.openModal('modal-task-approvals');
+    }
+
+    _renderTaskApprovalsList(items) {
+        const list = document.getElementById('task-approvals-list');
+        if (!list) return;
+        if (items.length === 0) {
+            list.innerHTML = `<p class="text-muted" style="padding:16px 0">Nenhuma pendência de aprovação.</p>`;
+            this._updateApprovalsBulkButtons();
+            lucide.createIcons();
+            return;
+        }
+        list.innerHTML = items.map(t => {
+            const dateStr = t.createdAt ? new Date(t.createdAt).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', year: 'numeric' }) : '';
+            const attachHtml = (t.attachments || []).map(att => {
+                const isImage = att.data && att.data.startsWith('data:image/');
+                return `<a class="attach-thumb" href="${att.data}" download="${escapeHtml(att.name)}" title="${escapeHtml(att.name)}" target="_blank" rel="noopener">
+                    ${isImage ? `<img src="${att.data}" alt="${escapeHtml(att.name)}">` : `<i data-lucide="file-text" style="width:26px;height:26px;opacity:.75"></i><span class="attach-thumb-fname">${escapeHtml(att.name)}</span>`}
+                </a>`;
+            }).join('');
+            return `<div class="task-approval-row" data-id="${t.id}">
+                <label class="task-approval-check-label">
+                    <input type="checkbox" class="task-approval-check" value="${t.id}" onchange="app._updateApprovalsBulkButtons()">
+                </label>
+                <div class="task-approval-body">
+                    <div class="task-approval-title">${escapeHtml(t.title)}</div>
+                    ${t.description ? `<div class="task-approval-desc">${escapeHtml(t.description)}</div>` : ''}
+                    ${attachHtml ? `<div class="task-approval-attachments">${attachHtml}</div>` : ''}
+                    <div class="task-approval-date">Pedida em ${dateStr}</div>
+                </div>
+                <div class="task-approval-actions">
+                    <button type="button" class="btn btn-success btn-sm" onclick="app.approveTaskRequest('${t.id}')"><i data-lucide="check"></i> Aprovar</button>
+                    <button type="button" class="btn btn-danger btn-sm" onclick="app.rejectTaskRequestPrompt('${t.id}')"><i data-lucide="x"></i> Rejeitar</button>
+                </div>
+            </div>`;
+        }).join('');
+        this._updateApprovalsBulkButtons();
+        lucide.createIcons();
+    }
+
+    _updateApprovalsBulkButtons() {
+        const checked = document.querySelectorAll('.task-approval-check:checked').length;
+        const btnApprove = document.getElementById('btn-approve-selected-requests');
+        const btnReject = document.getElementById('btn-reject-selected-requests');
+        if (btnApprove) btnApprove.disabled = checked === 0;
+        if (btnReject) btnReject.disabled = checked === 0;
+    }
+
+    // Aprovar individual e em massa convergem aqui — mesma regra de negócio,
+    // só muda quantos ids entram de uma vez (ver spec: "Aprovar entra direto
+    // na 1ª coluna do board").
+    async _approveTaskRequestIds(ids) {
+        const clientId = this._pendingApprovalsCache.clientId;
+        const targetColumnId = this._currentColumns[0]?.id;
+        if (!targetColumnId) {
+            Toast.show('Nenhuma coluna encontrada neste board para receber a tarefa aprovada.', 'error');
+            return;
+        }
+        try {
+            await store.approveTaskRequests(ids, targetColumnId);
+            this._pendingApprovalsCache.items = this._pendingApprovalsCache.items.filter(t => !ids.includes(t.id));
+            this._tasksCache = null; // tarefas aprovadas precisam entrar no board — força re-fetch
+            this._renderTaskApprovalsList(this._pendingApprovalsCache.items);
+            this._refreshApprovalsBadge(clientId);
+            await this.renderTasks();
+            Toast.show(ids.length === 1 ? 'Tarefa aprovada.' : `${ids.length} tarefas aprovadas.`, 'success');
+        } catch (err) {
+            console.error('Erro ao aprovar solicitação de tarefa:', err);
+            Toast.show('Erro ao aprovar. Tente novamente.', 'error');
+        }
+    }
+
+    approveTaskRequest(id) {
+        return this._approveTaskRequestIds([id]);
+    }
+
+    approveSelectedTaskRequests() {
+        const ids = [...document.querySelectorAll('.task-approval-check:checked')].map(el => el.value);
+        if (ids.length === 0) return;
+        return this._approveTaskRequestIds(ids);
+    }
+
+    rejectTaskRequestPrompt(id) {
+        this._pendingRejectIds = [id];
+        document.getElementById('task-approval-reject-reason').value = '';
+        document.getElementById('task-approval-reject-reason-section').style.display = 'block';
+    }
+
+    rejectSelectedTaskRequests() {
+        const ids = [...document.querySelectorAll('.task-approval-check:checked')].map(el => el.value);
+        if (ids.length === 0) return;
+        this._pendingRejectIds = ids;
+        document.getElementById('task-approval-reject-reason').value = '';
+        document.getElementById('task-approval-reject-reason-section').style.display = 'block';
+    }
+
+    cancelRejectTaskRequests() {
+        this._pendingRejectIds = null;
+        document.getElementById('task-approval-reject-reason-section').style.display = 'none';
+    }
+
+    async confirmRejectTaskRequests() {
+        const ids = this._pendingRejectIds;
+        if (!ids || ids.length === 0) return;
+        const reason = document.getElementById('task-approval-reject-reason').value.trim();
+        const clientId = this._pendingApprovalsCache.clientId;
+        try {
+            await store.rejectTaskRequests(ids, reason);
+            this._pendingApprovalsCache.items = this._pendingApprovalsCache.items.filter(t => !ids.includes(t.id));
+            this._pendingRejectIds = null;
+            document.getElementById('task-approval-reject-reason-section').style.display = 'none';
+            this._renderTaskApprovalsList(this._pendingApprovalsCache.items);
+            this._refreshApprovalsBadge(clientId);
+            Toast.show(ids.length === 1 ? 'Solicitação rejeitada.' : `${ids.length} solicitações rejeitadas.`, 'success');
+        } catch (err) {
+            console.error('Erro ao rejeitar solicitação de tarefa:', err);
+            Toast.show('Erro ao rejeitar. Tente novamente.', 'error');
+        }
+    }
+
     // Render instantâneo do board a partir do _tasksCache (zero queries ao banco)
     _renderTasksFromCache() {
         if (this.currentView !== 'tasks') return;
@@ -4363,6 +4535,8 @@ class AppController {
 
         const board = document.getElementById('kanban-board');
         if (!board) return;
+
+        this._refreshApprovalsBadge(filterClient);
 
         if (!filterClient) {
             if (searchTerm || hasDateFilter) {
@@ -12365,6 +12539,8 @@ document.addEventListener('DOMContentLoaded', async () => {
             window.app._clientsMapCache = {};
             window.app._clientRequestsCache = null;
             window.app.clientPortalTasksTab = 'kanban';
+            window.app._pendingApprovalsCache = { clientId: null, items: [] };
+            window.app._pendingRejectIds = null;
             window.app._agendaEventsCache = null;
             window.app._agendaClientsMapCache = {};
             window.app._agendaTasksCache = null;
