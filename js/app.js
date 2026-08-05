@@ -168,6 +168,9 @@ class AppController {
         this._renderAllPending = false;
         // Cache para optimistic updates do Kanban
         this._tasksCache = null;        // null = inválido; [] = vazio válido
+        this._requestAttachments = [];      // [{name, data}] — anexos do modal de nova solicitação (Portal do Cliente)
+        this._clientRequestsCache = null;   // null = inválido; [] = vazio válido — cache de getClientTaskRequests()
+        this.clientPortalTasksTab = 'kanban'; // 'kanban' | 'requests' — sub-aba ativa dentro de Tarefas no Portal
         this._clientsMapCache = {};     // { clientId: clientObj }
         // Cache para optimistic updates da Agenda
         this._agendaEventsCache = null;     // null = inválido; [] = vazio válido
@@ -414,6 +417,25 @@ class AppController {
             }
             e.target.value = '';
             this._renderTaskAttachmentPreviews();
+        });
+
+        // Seleção de arquivos via input — nova solicitação de tarefa (Portal do Cliente)
+        document.getElementById('request-attachments')?.addEventListener('change', async (e) => {
+            for (const file of e.target.files) {
+                let data;
+                if (file.type.startsWith('image/')) {
+                    data = await compressImageFile(file);
+                } else {
+                    data = await new Promise(res => {
+                        const r = new FileReader();
+                        r.onload = ev => res(ev.target.result);
+                        r.readAsDataURL(file);
+                    });
+                }
+                this._requestAttachments.push({ name: file.name, data });
+            }
+            e.target.value = '';
+            this._renderRequestAttachmentPreviews();
         });
 
         // Seleção de arquivos via input — implementação (imagens comprimidas; XML lido como base64)
@@ -1397,6 +1419,84 @@ class AppController {
         this._renderTaskAttachmentPreviews();
     }
 
+    _renderRequestAttachmentPreviews() {
+        const container = document.getElementById('request-attach-previews');
+        const hint = document.getElementById('request-attach-hint');
+        if (!container) return;
+        if (hint) hint.style.display = this._requestAttachments.length ? 'none' : '';
+        container.innerHTML = this._requestAttachments.map((att, i) => {
+            const isImage = att.data && att.data.startsWith('data:image/');
+            if (isImage) {
+                return `<div class="attach-thumb">
+                    <img src="${att.data}" alt="${escapeHtml(att.name)}" onclick="app._openRequestAttachmentLightbox(${i})" title="${escapeHtml(att.name)}">
+                    <button type="button" class="attach-remove" onclick="app.removeRequestAttachment(${i})" title="Remover" aria-label="Remover ${escapeHtml(att.name)}">×</button>
+                </div>`;
+            }
+            return `<div class="attach-thumb attach-thumb-file" onclick="app._openRequestAttachmentLightbox(${i})" title="${escapeHtml(att.name)}">
+                <i data-lucide="file-text" style="width:26px;height:26px;opacity:.75;pointer-events:none;"></i>
+                <span class="attach-thumb-fname">${escapeHtml(att.name)}</span>
+                <button type="button" class="attach-remove" onclick="event.stopPropagation();app.removeRequestAttachment(${i})" title="Remover" aria-label="Remover ${escapeHtml(att.name)}">×</button>
+            </div>`;
+        }).join('');
+        lucide.createIcons();
+    }
+
+    removeRequestAttachment(index) {
+        this._requestAttachments.splice(index, 1);
+        this._renderRequestAttachmentPreviews();
+    }
+
+    _openRequestAttachmentLightbox(index) {
+        const att = this._requestAttachments[index];
+        if (!att) return;
+        if (!att.data.startsWith('data:image/')) {
+            const a = document.createElement('a');
+            a.href = att.data;
+            a.download = att.name;
+            a.click();
+            return;
+        }
+        const overlay = document.createElement('div');
+        overlay.style.cssText = 'position:fixed;inset:0;z-index:99999;background:rgba(0,0,0,0.88);display:flex;align-items:center;justify-content:center;cursor:zoom-out;';
+        const img = document.createElement('img');
+        img.src = att.data;
+        img.style.cssText = 'max-width:90vw;max-height:90vh;border-radius:8px;object-fit:contain;box-shadow:0 8px 40px rgba(0,0,0,0.6);cursor:default;';
+        img.addEventListener('click', (e) => e.stopPropagation());
+        overlay.appendChild(img);
+        overlay.addEventListener('click', () => overlay.remove());
+        document.addEventListener('keydown', function esc(e) {
+            if (e.key === 'Escape') { overlay.remove(); document.removeEventListener('keydown', esc); }
+        });
+        document.body.appendChild(overlay);
+    }
+
+    _openNewTaskRequestModal() {
+        this._requestAttachments = [];
+        document.getElementById('request-title').value = '';
+        document.getElementById('request-description').value = '';
+        this._renderRequestAttachmentPreviews();
+        this.openModal('modal-new-task-request');
+    }
+
+    async handleTaskRequestSubmit() {
+        const btn = document.getElementById('btn-save-task-request');
+        const title = document.getElementById('request-title').value.trim();
+        if (!title) { Toast.show('Informe um título para a solicitação.', 'error'); return; }
+        const description = document.getElementById('request-description').value.trim();
+        this._btnPending(btn);
+        try {
+            await store.submitTaskRequest(this.userClientId, { title, description, attachments: this._requestAttachments });
+            this._clientRequestsCache = null; // força re-fetch na próxima abertura da aba
+            await this._btnSuccess(btn);
+            this.closeModal('modal-new-task-request');
+            if (this.clientPortalTasksTab === 'requests') await this.renderClientTaskRequests();
+        } catch (err) {
+            console.error('Erro ao enviar solicitação de tarefa:', err);
+            Toast.show('Erro ao enviar solicitação. Tente novamente.', 'error');
+            this._btnError(btn);
+        }
+    }
+
     _renderImplAttachmentPreviews() {
         const container = document.getElementById('impl-attach-previews');
         const hint = document.getElementById('impl-attach-hint');
@@ -2334,6 +2434,12 @@ class AppController {
             section.classList.toggle('active', section.id === 'view-tasks');
         });
 
+        const clientTaskTabs = document.getElementById('client-task-tabs');
+        if (clientTaskTabs) clientTaskTabs.style.display = 'flex';
+        const btnNewTaskRequest = document.getElementById('btn-new-task-request');
+        if (btnNewTaskRequest) btnNewTaskRequest.style.display = '';
+        this.switchClientPortalTasksTab('kanban');
+
         this.applyKanbanFiltersState();
         await this.renderClientPortalTasks();
         lucide.createIcons();
@@ -2355,6 +2461,64 @@ class AppController {
         } else {
             this.renderIndicadores();
         }
+    }
+
+    // Sub-abas dentro de Tarefas no Portal do Cliente: Kanban (somente
+    // leitura, já existente) ou Minhas Solicitações (histórico das
+    // propostas do cliente). Kanban e o painel de solicitações dividem o
+    // mesmo view-section (#view-tasks) — só um dos dois fica visível.
+    switchClientPortalTasksTab(tab) {
+        if (!['kanban', 'requests'].includes(tab)) return;
+        this.clientPortalTasksTab = tab;
+        document.querySelectorAll('#client-task-tabs .status-filter-tab').forEach(btn => {
+            const isActive = btn.dataset.tab === tab;
+            btn.classList.toggle('active', isActive);
+            btn.setAttribute('aria-selected', String(isActive));
+        });
+        const board = document.getElementById('kanban-board');
+        const panel = document.getElementById('client-task-requests-panel');
+        if (board) board.style.display = tab === 'kanban' ? '' : 'none';
+        if (panel) panel.style.display = tab === 'requests' ? '' : 'none';
+        if (tab === 'requests') this.renderClientTaskRequests();
+    }
+
+    async renderClientTaskRequests() {
+        const panel = document.getElementById('client-task-requests-panel');
+        if (!panel) return;
+        if (this._clientRequestsCache === null) {
+            try {
+                this._clientRequestsCache = await store.getClientTaskRequests(this.userClientId);
+            } catch (err) {
+                console.error('Erro ao buscar solicitações do cliente:', err);
+                panel.innerHTML = `<p class="text-muted" style="padding:16px 0">Erro ao carregar suas solicitações.</p>`;
+                return;
+            }
+        }
+        const items = this._clientRequestsCache;
+        if (items.length === 0) {
+            panel.innerHTML = `<div class="kb-empty-state">
+                <i data-lucide="inbox" style="width:48px;height:48px;opacity:0.25"></i>
+                <p>Você ainda não fez nenhuma solicitação de tarefa.</p>
+            </div>`;
+            lucide.createIcons();
+            return;
+        }
+        const STATUS_LABEL = { pending: 'Pendente', approved: 'Aprovada', rejected: 'Rejeitada' };
+        panel.innerHTML = items.map(t => {
+            const dateStr = t.createdAt ? new Date(t.createdAt).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', year: 'numeric' }) : '';
+            const reasonHtml = t.approvalStatus === 'rejected' && t.rejectionReason
+                ? `<div class="client-request-reason">${escapeHtml(t.rejectionReason)}</div>` : '';
+            return `<div class="client-request-card">
+                <div class="client-request-header">
+                    <strong>${escapeHtml(t.title)}</strong>
+                    <span class="task-request-status task-request-status--${t.approvalStatus}">${STATUS_LABEL[t.approvalStatus] || t.approvalStatus}</span>
+                </div>
+                ${t.description ? `<p class="text-muted" style="margin:4px 0">${escapeHtml(t.description)}</p>` : ''}
+                <div class="task-approval-date">Pedida em ${dateStr}</div>
+                ${reasonHtml}
+            </div>`;
+        }).join('');
+        lucide.createIcons();
     }
 
     async renderClientPortalTasks() {
@@ -12199,6 +12363,8 @@ document.addEventListener('DOMContentLoaded', async () => {
             window.app.closeRsvpPopup();
             window.app._tasksCache = null;
             window.app._clientsMapCache = {};
+            window.app._clientRequestsCache = null;
+            window.app.clientPortalTasksTab = 'kanban';
             window.app._agendaEventsCache = null;
             window.app._agendaClientsMapCache = {};
             window.app._agendaTasksCache = null;
