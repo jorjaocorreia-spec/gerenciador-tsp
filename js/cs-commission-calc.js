@@ -6,7 +6,10 @@
 
     function computeConsultantResult(hours, sumPercentuals, cancellationsCount, salesTotal, monthlyIncreaseTotal) {
         const percentual = computePercentual(hours);
-        const bonus = (parseInt(cancellationsCount) || 0) === 0 ? 400 : 0;
+        // Bônus de cancelamento: R$400 em 15h+ se cancellations_count===0 no
+        // mês, senão R$0 — proporcional às horas abaixo de 15h (ex: 50% das
+        // horas = R$200), igual ao bônus de apontamento.
+        const bonus = ((parseInt(cancellationsCount) || 0) === 0 ? 400 : 0) * percentual;
         // Bônus de apontamento: R$450 em 15h+ (percentual=100%), proporcional
         // abaixo disso (ex: 50% das horas = R$225). Independe do bônus de
         // cancelamento — os dois são condições separadas.

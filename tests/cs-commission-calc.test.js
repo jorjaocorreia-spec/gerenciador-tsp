@@ -40,42 +40,49 @@ run('computePercentual: 18h -> 100% (capado em 15)', () => {
 // anterior usava pool/participantCount por pessoa, deixando sobra não
 // redistribuída quando alguém tinha menos de 15h).
 
+// A partir de 2026-08-05 (mesmo dia) o bônus de cancelamento (R$400) também
+// passou a ser proporcional às horas, igual ao bônus de apontamento — só é
+// "cheio" em 15h+; abaixo disso é `400 * percentual`.
+
 run('computeConsultantResult: cenário 0h/5h/15h — soma das comissões de todos fecha exatamente o pool', () => {
     const sumPercentuals = 0 / 15 + 5 / 15 + 15 / 15; // 1.3333...
     const r15 = TSPCsCommission.computeConsultantResult(15, sumPercentuals, 0, 24444, 2362);
     const r5 = TSPCsCommission.computeConsultantResult(5, sumPercentuals, 0, 24444, 2362);
     const r0 = TSPCsCommission.computeConsultantResult(0, sumPercentuals, 0, 24444, 2362);
     assert.ok(Math.abs(r15.total - 3569.05) < 0.01, `15h total foi ${r15.total}`); // 400 bônus + 450 apontamento + 1833,3 vendas + 885,75 mensalidade
-    assert.ok(Math.abs(r5.total - 1456.35) < 0.01, `5h total foi ${r5.total}`); // 400 + 150 + 611,1 + 295,25
-    assert.strictEqual(r0.total, 400); // share 0, apontamentoBonus 0 -> só o bônus de cancelamento
+    assert.ok(Math.abs(r5.total - 1189.6833) < 0.01, `5h total foi ${r5.total}`); // 133,33 bônus + 150 apontamento + 611,1 + 295,25
+    assert.strictEqual(r0.total, 0); // percentual 0 -> nenhum componente proporcional gera valor
     const poolVendas = 24444 * 0.10;
     const poolMensalidade = 2362 * 0.50;
     assert.ok(Math.abs((r15.comissaoVendas + r5.comissaoVendas + r0.comissaoVendas) - poolVendas) < 0.01);
     assert.ok(Math.abs((r15.comissaoMensalidade + r5.comissaoMensalidade + r0.comissaoMensalidade) - poolMensalidade) < 0.01);
 });
 
-run('computeConsultantResult: com cancelamento -> sem bônus, comissões e apontamento continuam proporcionais', () => {
+run('computeConsultantResult: com cancelamento -> sem bônus (mesmo em 15h), comissões e apontamento continuam proporcionais', () => {
     const r = TSPCsCommission.computeConsultantResult(15, 1, 1, 24444, 2362);
     assert.strictEqual(r.bonus, 0);
     assert.ok(Math.abs(r.apontamentoBonus - 450) < 0.01); // independe do cancelamento
     assert.ok(Math.abs(r.comissaoVendas - 2444.4) < 0.01);
 });
 
-run('computeConsultantResult: único participante com 100% -> leva o pool inteiro + R$450 de apontamento', () => {
+run('computeConsultantResult: único participante com 100% -> leva o pool inteiro + R$400 bônus + R$450 apontamento', () => {
     const r = TSPCsCommission.computeConsultantResult(15, 1, 0, 1000, 500);
+    assert.ok(Math.abs(r.bonus - 400) < 0.01);
     assert.ok(Math.abs(r.apontamentoBonus - 450) < 0.01);
     assert.ok(Math.abs(r.comissaoVendas - 100) < 0.01);
     assert.ok(Math.abs(r.comissaoMensalidade - 250) < 0.01);
 });
 
-run('computeConsultantResult: bônus de apontamento é proporcional abaixo de 15h (ex: 50% das horas -> R$225)', () => {
+run('computeConsultantResult: bônus de cancelamento e de apontamento são proporcionais abaixo de 15h (50% das horas -> R$200 e R$225)', () => {
     const r = TSPCsCommission.computeConsultantResult(7.5, 1, 0, 0, 0);
+    assert.ok(Math.abs(r.bonus - 200) < 0.01, `bonus foi ${r.bonus}`);
     assert.ok(Math.abs(r.apontamentoBonus - 225) < 0.01, `apontamentoBonus foi ${r.apontamentoBonus}`);
 });
 
-run('computeConsultantResult: sumPercentuals 0 (ninguém com horas) não gera divisão por zero', () => {
+run('computeConsultantResult: sumPercentuals 0 e 0h -> tudo zero (percentual 0), sem divisão por zero', () => {
     const r = TSPCsCommission.computeConsultantResult(0, 0, 0, 1000, 500);
     assert.ok(Number.isFinite(r.total));
+    assert.strictEqual(r.bonus, 0);
     assert.strictEqual(r.apontamentoBonus, 0);
     assert.strictEqual(r.comissaoVendas, 0);
     assert.strictEqual(r.comissaoMensalidade, 0);
