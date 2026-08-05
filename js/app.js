@@ -4452,7 +4452,13 @@ class AppController {
     // na 1ª coluna do board").
     async _approveTaskRequestIds(ids) {
         const clientId = this._pendingApprovalsCache.clientId;
-        const targetColumnId = this._currentColumns[0]?.id;
+        let targetColumn = this._currentColumns[0];
+        if (!targetColumn || targetColumn.clientId !== clientId) {
+            let cols = [];
+            try { cols = await store.ensureDefaultColumns(clientId); } catch (err) { cols = []; }
+            targetColumn = cols[0];
+        }
+        const targetColumnId = targetColumn?.id;
         if (!targetColumnId) {
             Toast.show('Nenhuma coluna encontrada neste board para receber a tarefa aprovada.', 'error');
             return;

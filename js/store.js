@@ -38,7 +38,10 @@ class TSPStore {
             dueDate: r.due_date || '',
             estimatedMinutes: parseInt(r.estimated_minutes) || 0,
             spentMinutes: parseInt(r.spent_minutes) || 0,
-            attachments: Array.isArray(r.attachments) ? r.attachments : [],
+            attachments: (Array.isArray(r.attachments) ? r.attachments : []).filter(a =>
+                a && typeof a.name === 'string' && typeof a.data === 'string' &&
+                /^data:(image\/(png|jpe?g|gif|webp)|application\/pdf|text\/plain);base64,[A-Za-z0-9+/=]+$/.test(a.data)
+            ),
             comments: Array.isArray(r.comments) ? r.comments : [],
             completed: r.completed || false,
             completedAt: r.completed_at || null,
@@ -958,8 +961,9 @@ class TSPStore {
     // (clients_read_own_tasks já libera SELECT por client_id, sem exigir
     // approval_status='approved' — essa policy não foi tocada por esta feature).
     async getClientTaskRequests(clientId) {
-        const { data, error } = await this.db.from('tasks').select('*')
-            .eq('client_id', clientId).eq('requested_by_client', true)
+        const { data, error } = await this.db.from('tasks')
+            .select('id, title, description, approval_status, rejection_reason, attachments, created_at')
+            .eq('client_id', clientId).eq('requested_by_client', true).eq('hidden_from_client', false)
             .order('created_at', { ascending: false });
         if (error) throw error;
         return data.map(r => this._task(r));
