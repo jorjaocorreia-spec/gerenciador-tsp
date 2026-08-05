@@ -43,6 +43,9 @@ class TSPStore {
             completed: r.completed || false,
             completedAt: r.completed_at || null,
             hiddenFromClient: r.hidden_from_client || false,
+            requestedByClient: !!r.requested_by_client,
+            approvalStatus: r.approval_status || 'approved',
+            rejectionReason: r.rejection_reason || null,
             createdAt: r.created_at, updatedAt: r.updated_at };
     }
 
@@ -205,7 +208,8 @@ class TSPStore {
 
     async getTasks() {
         const { data, error } = await this.db.from('tasks').select('*')
-            .eq('user_id', this.userId).order('status').order('position');
+            .eq('user_id', this.userId).eq('approval_status', 'approved')
+            .order('status').order('position');
         if (error) throw error;
         return data.map(r => this._task(r));
     }
@@ -219,14 +223,15 @@ class TSPStore {
 
     async getTasksByClient(clientId) {
         const { data, error } = await this.db.from('tasks').select('*')
-            .eq('user_id', this.userId).eq('client_id', clientId);
+            .eq('user_id', this.userId).eq('client_id', clientId)
+            .eq('approval_status', 'approved');
         if (error) throw error;
         return data.map(r => this._task(r));
     }
 
     async getTasksForApontamento(date) {
         const { data, error } = await this.db.from('tasks').select('*')
-            .eq('user_id', this.userId);
+            .eq('user_id', this.userId).eq('approval_status', 'approved');
         if (error) throw error;
         return data.map(r => this._task(r)).filter(t => {
             if (!t.clientId) return false;
@@ -947,6 +952,7 @@ class TSPStore {
     async getClientPortalTasks(clientId) {
         const { data, error } = await this.db.from('tasks').select('*')
             .eq('client_id', clientId).eq('hidden_from_client', false)
+            .eq('approval_status', 'approved')
             .order('status').order('position');
         if (error) throw error;
         return data.map(r => this._task(r));
