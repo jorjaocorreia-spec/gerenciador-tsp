@@ -40,7 +40,7 @@ class TSPStore {
             spentMinutes: parseInt(r.spent_minutes) || 0,
             attachments: (Array.isArray(r.attachments) ? r.attachments : []).filter(a =>
                 a && typeof a.name === 'string' && typeof a.data === 'string' &&
-                /^data:(image\/(png|jpe?g|gif|webp)|application\/pdf|text\/plain);base64,[A-Za-z0-9+/=]+$/.test(a.data)
+                /^data:(image\/(png|jpe?g|gif|webp)|application\/pdf|text\/plain|application\/msword|application\/vnd\.openxmlformats-officedocument\.wordprocessingml\.document|application\/vnd\.ms-excel|application\/vnd\.openxmlformats-officedocument\.spreadsheetml\.sheet);base64,[A-Za-z0-9+/=]+$/.test(a.data)
             ),
             comments: Array.isArray(r.comments) ? r.comments : [],
             completed: r.completed || false,
