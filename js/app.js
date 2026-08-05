@@ -4359,7 +4359,7 @@ class AppController {
     async _refreshApprovalsBadge(clientId) {
         const btn = document.getElementById('btn-task-approvals');
         if (!btn) return;
-        if (this.userRole !== 'consultant' || this.isManagerView || !clientId) {
+        if (this.isManagerView || !clientId) {
             btn.style.display = 'none';
             return;
         }
