@@ -2536,7 +2536,7 @@ class AppController {
             const reasonHtml = t.approvalStatus === 'rejected' && t.rejectionReason
                 ? `<div class="client-request-reason">${escapeHtml(t.rejectionReason)}</div>` : '';
             // Só solicitações pendentes podem ser editadas pelo cliente (ver
-            // trigger enforce_client_task_request_update, migration 20260805d) —
+            // trigger enforce_client_task_position_only, migration 20260805e_fix_client_task_trigger_conflict.sql) —
             // aprovadas/rejeitadas ficam com o card estático, sem indicação de clique.
             const isEditable = t.approvalStatus === 'pending';
             const cardAttrs = isEditable

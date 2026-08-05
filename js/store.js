@@ -956,12 +956,13 @@ class TSPStore {
         return this._task(data);
     }
 
-    // Update como usuário-cliente: a trigger enforce_client_task_request_update
-    // (migration 20260805d) só aceita a alteração se a linha ainda estiver
-    // 'pending' — caso contrário vira no-op silencioso no banco, mesmo que
-    // este método seja chamado (a UI já impede a chamada nesse caso, mas a
-    // trigger é a barreira real). Só title/description/attachments passam
-    // do valor enviado; client_id/user_id não são tocados aqui.
+    // Update como usuário-cliente: a trigger enforce_client_task_position_only
+    // (consolidada na migration 20260805e_fix_client_task_trigger_conflict.sql)
+    // só aceita a alteração se a linha ainda estiver 'pending' — caso contrário
+    // vira no-op silencioso no banco, mesmo que este método seja chamado (a UI
+    // já impede a chamada nesse caso, mas a trigger é a barreira real). Só
+    // title/description/attachments passam do valor enviado; client_id/user_id
+    // não são tocados aqui.
     async updateTaskRequest(id, { title, description, attachments }) {
         const { data, error } = await this.db.from('tasks').update({
             title, description: description || '',
