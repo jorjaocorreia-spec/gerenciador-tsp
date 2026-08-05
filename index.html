@@ -1499,7 +1499,7 @@
     <div class="modal-overlay" id="modal-new-task-request">
         <div class="modal glass" style="max-width:520px">
             <div class="modal-header">
-                <h2>Nova Solicitação</h2>
+                <h2 id="modal-task-request-title">Nova Solicitação</h2>
                 <button class="modal-close" onclick="app.closeModal('modal-new-task-request')" aria-label="Fechar">
                     <i data-lucide="x"></i>
                 </button>
@@ -1525,7 +1525,7 @@
                 <div class="modal-footer">
                     <button type="button" class="btn btn-ghost" onclick="app.closeModal('modal-new-task-request')">Cancelar</button>
                     <button type="submit" id="btn-save-task-request" class="btn btn-primary">
-                        <i data-lucide="send"></i> Enviar Solicitação
+                        <i data-lucide="send"></i> <span id="btn-save-task-request-label">Enviar Solicitação</span>
                     </button>
                 </div>
             </form>
@@ -2811,9 +2811,9 @@
     <script src="js/productivity-calc.js?v=1"></script>
     <script src="js/financial-calc.js?v=1"></script>
     <script src="js/cs-commission-calc.js?v=4"></script>
-    <script src="js/store.js?v=32"></script>
+    <script src="js/store.js?v=33"></script>
     <script src="js/ai.js?v=1"></script>
-    <script src="js/app.js?v=50"></script>
+    <script src="js/app.js?v=51"></script>
 </body>
 
 </html>
