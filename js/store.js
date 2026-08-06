@@ -1835,7 +1835,7 @@ class TSPStore {
             .gte('date', `${monthStr}-01`).lte('date', `${monthStr}-${String(lastDay).padStart(2, '0')}`);
         if (error) throw error;
         const totalMinutes = (data || []).reduce((sum, r) => sum + (parseInt(r.minutes) || 0), 0);
-        return totalMinutes / 60;
+        return Math.round((totalMinutes / 60) * 100) / 100;
     }
 
     async addCsCommissionParticipant(periodId, targetUserId, hoursApontadas, hoursClientId) {
