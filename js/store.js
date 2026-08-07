@@ -70,6 +70,22 @@ class TSPStore {
             createdAt: r.created_at };
     }
 
+    _quickNote(r) {
+        return {
+            id: r.id,
+            text: r.text,
+            clientId: r.client_id,
+            suggestedDate: r.suggested_date || '',
+            isToday: !!r.is_today,
+            status: r.status || 'pending',
+            resolutionType: r.resolution_type || null,
+            resolvedTaskId: r.resolved_task_id || null,
+            resolvedEventId: r.resolved_event_id || null,
+            createdAt: r.created_at,
+            resolvedAt: r.resolved_at || null
+        };
+    }
+
     _apontamento(r) {
         return { id: r.id, date: r.date,
             startTime: r.start_time || '', endTime: r.end_time || '',
@@ -1868,6 +1884,48 @@ class TSPStore {
         if (error) throw error;
         if (!data) return null;
         return { period, participant: this._csParticipant(data) };
+    }
+
+    async getQuickNotes() {
+        const { data, error } = await this.db.from('quick_notes').select('*')
+            .eq('user_id', this.userId).order('created_at', { ascending: false });
+        if (error) throw error;
+        return data.map(r => this._quickNote(r));
+    }
+
+    async addQuickNote({ text, clientId, suggestedDate, isToday }) {
+        const { data, error } = await this.db.from('quick_notes').insert({
+            user_id: this.userId,
+            text: text,
+            client_id: clientId || null,
+            suggested_date: suggestedDate || null,
+            is_today: !!isToday
+        }).select().single();
+        if (error) throw error;
+        return this._quickNote(data);
+    }
+
+    async updateQuickNote(id, patch) {
+        const payload = {};
+        if (patch.text !== undefined) payload.text = patch.text;
+        if (patch.clientId !== undefined) payload.client_id = patch.clientId || null;
+        if (patch.suggestedDate !== undefined) payload.suggested_date = patch.suggestedDate || null;
+        if (patch.isToday !== undefined) payload.is_today = !!patch.isToday;
+        if (patch.status !== undefined) payload.status = patch.status;
+        if (patch.resolutionType !== undefined) payload.resolution_type = patch.resolutionType;
+        if (patch.resolvedTaskId !== undefined) payload.resolved_task_id = patch.resolvedTaskId;
+        if (patch.resolvedEventId !== undefined) payload.resolved_event_id = patch.resolvedEventId;
+        if (patch.resolvedAt !== undefined) payload.resolved_at = patch.resolvedAt;
+        const { data, error } = await this.db.from('quick_notes').update(payload)
+            .eq('id', id).eq('user_id', this.userId).select().single();
+        if (error) throw error;
+        return this._quickNote(data);
+    }
+
+    async deleteQuickNote(id) {
+        const { error } = await this.db.from('quick_notes').delete()
+            .eq('id', id).eq('user_id', this.userId);
+        if (error) throw error;
     }
 }
 
