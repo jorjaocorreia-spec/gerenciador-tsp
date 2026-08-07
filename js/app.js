@@ -11233,6 +11233,83 @@ class AppController {
         }
     }
 
+    async toggleQuickNoteToday(id) {
+        const note = (this._quickNotesCache || []).find(n => n.id === id);
+        if (!note) return;
+        const newVal = !note.isToday;
+        try {
+            await store.updateQuickNote(id, { isToday: newVal });
+            note.isToday = newVal;
+            this._renderQuickNotesLists();
+            this._updateQuickNotesBadge();
+            if (this._checkQuickNotesReminder) this._checkQuickNotesReminder();
+        } catch (err) {
+            Toast.show('Erro ao atualizar nota: ' + err.message, 'error');
+        }
+    }
+
+    _startEditQuickNoteText(id) {
+        const item = document.querySelector(`.quick-notes-item[data-id="${id}"] .quick-notes-item-text`);
+        if (!item || item.querySelector('textarea')) return;
+        const note = (this._quickNotesCache || []).find(n => n.id === id);
+        if (!note) return;
+        const textarea = document.createElement('textarea');
+        textarea.className = 'form-control';
+        textarea.rows = 2;
+        textarea.value = note.text;
+        item.textContent = '';
+        item.appendChild(textarea);
+        textarea.focus();
+        const save = () => this._saveQuickNoteText(id, textarea.value);
+        textarea.addEventListener('blur', save);
+        textarea.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' && e.ctrlKey) { e.preventDefault(); textarea.blur(); }
+        });
+    }
+
+    async _saveQuickNoteText(id, newText) {
+        const text = newText.trim();
+        const note = (this._quickNotesCache || []).find(n => n.id === id);
+        if (!note || !text || text === note.text) { this._renderQuickNotesLists(); return; }
+        try {
+            await store.updateQuickNote(id, { text });
+            note.text = text;
+        } catch (err) {
+            Toast.show('Erro ao editar nota: ' + err.message, 'error');
+        }
+        this._renderQuickNotesLists();
+    }
+
+    async resolveQuickNoteDismissed(id) {
+        const note = (this._quickNotesCache || []).find(n => n.id === id);
+        if (!note) return;
+        try {
+            const resolvedAt = new Date().toISOString();
+            await store.updateQuickNote(id, { status: 'resolved', resolutionType: 'dismissed', resolvedAt });
+            Object.assign(note, { status: 'resolved', resolutionType: 'dismissed', resolvedAt });
+            this._renderQuickNotesLists();
+            this._updateQuickNotesBadge();
+            if (this._checkQuickNotesReminder) this._checkQuickNotesReminder();
+            Toast.show('Nota marcada como resolvida.', 'success');
+        } catch (err) {
+            Toast.show('Erro ao resolver nota: ' + err.message, 'error');
+        }
+    }
+
+    deleteQuickNoteRow(id, btn) {
+        this._twostepDelete(btn, async () => {
+            try {
+                await store.deleteQuickNote(id);
+                this._quickNotesCache = (this._quickNotesCache || []).filter(n => n.id !== id);
+                this._renderQuickNotesLists();
+                this._updateQuickNotesBadge();
+                Toast.show('Nota excluída.', 'success');
+            } catch (err) {
+                Toast.show('Erro ao excluir nota: ' + err.message, 'error');
+            }
+        }, true);
+    }
+
     toggleAgendaAssistant() {
         const panel = document.getElementById('agenda-ai-assistant');
         if (!panel) return;
