@@ -11141,6 +11141,29 @@ class AppController {
         badge.classList.toggle('urgent', pending.some(n => n.isToday));
     }
 
+    _startQuickNotesReminder() {
+        if (this._quickNotesReminderInterval) clearInterval(this._quickNotesReminderInterval);
+        this._checkQuickNotesReminder();
+        this._quickNotesReminderInterval = setInterval(() => this._checkQuickNotesReminder(), 60 * 60 * 1000);
+    }
+
+    _checkQuickNotesReminder() {
+        const todayPending = (this._quickNotesCache || []).filter(n => n.status === 'pending' && n.isToday);
+        if (todayPending.length === 0) return;
+        if (document.getElementById('modal-quick-notes-reminder')?.classList.contains('active')) return;
+        this._renderQuickNotesReminderModal(todayPending);
+        this.openModal('modal-quick-notes-reminder');
+    }
+
+    _renderQuickNotesReminderModal(notes) {
+        const list = document.getElementById('quick-notes-reminder-list');
+        if (!list) return;
+        list.innerHTML = notes.map(n => `
+            <div class="quick-notes-item quick-notes-item--today">
+                <div class="quick-notes-item-text">${escapeHtml(n.text)}</div>
+            </div>`).join('');
+    }
+
     async openQuickNotesPanel() {
         if (!this._quickNotesClientsCache) {
             const clients = await store.getClients().catch(() => []);
