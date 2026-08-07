@@ -11299,9 +11299,9 @@ class AppController {
     triageQuickNoteAsTask(id) {
         const note = (this._quickNotesCache || []).find(n => n.id === id);
         if (!note) return;
-        this._triagingNoteId = id;
         this.closeModal('modal-quick-notes', true);
         this._openNewTaskModal();
+        this._triagingNoteId = id;
         document.getElementById('task-title').value = note.text.slice(0, 120);
         document.getElementById('task-description').value = note.text;
         if (note.clientId) {
@@ -11315,10 +11315,10 @@ class AppController {
     triageQuickNoteAsAgenda(id) {
         const note = (this._quickNotesCache || []).find(n => n.id === id);
         if (!note) return;
-        this._triagingNoteId = id;
         this.closeModal('modal-quick-notes', true);
         const dateStr = note.suggestedDate || new Date().toISOString().split('T')[0];
         this.openNewAgendaEvent(dateStr);
+        this._triagingNoteId = id;
         document.getElementById('agenda-title').value = note.text.slice(0, 120);
         document.getElementById('agenda-desc').value = note.text;
         if (note.clientId) document.getElementById('agenda-client').value = note.clientId;
