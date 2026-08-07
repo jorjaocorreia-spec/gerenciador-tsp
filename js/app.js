@@ -369,35 +369,6 @@ class AppController {
             }
         });
 
-        // Drag-and-drop de arquivos no modal de tarefa — anexa em qualquer ponto do modal,
-        // em vez de deixar o navegador abrir o arquivo numa aba nova (comportamento padrão
-        // do browser para 'drop' não tratado).
-        document.addEventListener('dragover', (e) => {
-            if (!document.getElementById('modal-task')?.classList.contains('active')) return;
-            if (!e.dataTransfer?.types?.includes('Files')) return;
-            e.preventDefault();
-        });
-        document.addEventListener('drop', async (e) => {
-            if (!document.getElementById('modal-task')?.classList.contains('active')) return;
-            const files = e.dataTransfer?.files;
-            if (!files || files.length === 0) return;
-            e.preventDefault();
-            for (const file of files) {
-                let data;
-                if (file.type.startsWith('image/')) {
-                    data = await compressImageFile(file);
-                } else {
-                    data = await new Promise(res => {
-                        const r = new FileReader();
-                        r.onload = ev => res(ev.target.result);
-                        r.readAsDataURL(file);
-                    });
-                }
-                this.taskAttachments.push({ name: file.name, data });
-            }
-            this._renderTaskAttachmentPreviews();
-        });
-
         // Modal padrão (.modal-overlay): Escape fecha, clique no backdrop fecha,
         // e Tab fica preso dentro do modal ativo (focus trap). Compartilhado por
         // todo modal do app — corrige de uma vez a experiência de teclado inteira.
