@@ -11130,6 +11130,109 @@ class AppController {
         setTimeout(() => document.getElementById('quick-note-text')?.focus(), 100);
     }
 
+    switchQuickNotesTab(tab) {
+        this.quickNotesTab = tab;
+        const btnPending = document.getElementById('tab-btn-quick-notes-pending');
+        const btnResolved = document.getElementById('tab-btn-quick-notes-resolved');
+        const listPending = document.getElementById('quick-notes-pending-list');
+        const listResolved = document.getElementById('quick-notes-resolved-list');
+        if (!btnPending || !btnResolved || !listPending || !listResolved) return;
+        btnPending.classList.toggle('active', tab === 'pending');
+        btnPending.setAttribute('aria-selected', tab === 'pending' ? 'true' : 'false');
+        btnResolved.classList.toggle('active', tab === 'resolved');
+        btnResolved.setAttribute('aria-selected', tab === 'resolved' ? 'true' : 'false');
+        listPending.style.display = tab === 'pending' ? '' : 'none';
+        listResolved.style.display = tab === 'resolved' ? '' : 'none';
+        this._renderQuickNotesLists();
+    }
+
+    _renderQuickNotesLists() {
+        const notes = this._quickNotesCache || [];
+        const pending = notes.filter(n => n.status === 'pending')
+            .sort((a, b) => (b.isToday - a.isToday) || b.createdAt.localeCompare(a.createdAt));
+        const resolved = notes.filter(n => n.status === 'resolved')
+            .sort((a, b) => (b.resolvedAt || '').localeCompare(a.resolvedAt || ''));
+
+        const pendingEl = document.getElementById('quick-notes-pending-list');
+        const resolvedEl = document.getElementById('quick-notes-resolved-list');
+        if (!pendingEl || !resolvedEl) return;
+
+        pendingEl.innerHTML = pending.length
+            ? pending.map(n => this._renderQuickNotePendingItem(n)).join('')
+            : '<div class="quick-notes-empty">Nenhuma nota pendente.</div>';
+        resolvedEl.innerHTML = resolved.length
+            ? resolved.map(n => this._renderQuickNoteResolvedItem(n)).join('')
+            : '<div class="quick-notes-empty">Nenhuma nota resolvida ainda.</div>';
+        lucide.createIcons();
+    }
+
+    _renderQuickNotePendingItem(n) {
+        const clientName = n.clientId ? (this._quickNotesClientsCache?.[n.clientId] || '') : '';
+        const metaParts = [];
+        if (clientName) metaParts.push(escapeHtml(clientName));
+        if (n.suggestedDate) metaParts.push(new Date(n.suggestedDate + 'T00:00:00').toLocaleDateString('pt-BR'));
+        return `
+        <div class="quick-notes-item ${n.isToday ? 'quick-notes-item--today' : ''}" data-id="${n.id}">
+            <div class="quick-notes-item-text" onclick="app._startEditQuickNoteText('${n.id}')" style="cursor:text;">${escapeHtml(n.text)}</div>
+            ${metaParts.length ? `<div class="quick-notes-item-meta">${metaParts.join(' · ')}</div>` : ''}
+            <div class="quick-notes-item-actions">
+                <button type="button" class="btn btn-secondary btn-sm" onclick="app.toggleQuickNoteToday('${n.id}')">
+                    <i data-lucide="${n.isToday ? 'star-off' : 'star'}" style="width:12px;height:12px;"></i> ${n.isToday ? 'Tirar de hoje' : 'Marcar hoje'}
+                </button>
+                <button type="button" class="btn btn-secondary btn-sm" onclick="app.triageQuickNoteAsTask('${n.id}')">
+                    <i data-lucide="kanban-square" style="width:12px;height:12px;"></i> Virar Tarefa
+                </button>
+                <button type="button" class="btn btn-secondary btn-sm" onclick="app.triageQuickNoteAsAgenda('${n.id}')">
+                    <i data-lucide="calendar-plus" style="width:12px;height:12px;"></i> Virar Compromisso
+                </button>
+                <button type="button" class="btn btn-secondary btn-sm" onclick="app.resolveQuickNoteDismissed('${n.id}')">
+                    <i data-lucide="check" style="width:12px;height:12px;"></i> Marcar resolvida
+                </button>
+                <button type="button" class="btn btn-icon-sm" title="Excluir" onclick="app.deleteQuickNoteRow('${n.id}', this)">
+                    <i data-lucide="trash-2" style="width:12px;height:12px;"></i>
+                </button>
+            </div>
+        </div>`;
+    }
+
+    _renderQuickNoteResolvedItem(n) {
+        const labels = { task: 'Virou Tarefa', agenda: 'Virou Compromisso', dismissed: 'Resolvida' };
+        let linkHtml = '';
+        if (n.resolutionType === 'task' && n.resolvedTaskId) {
+            linkHtml = `<button type="button" class="btn btn-secondary btn-sm" onclick="app.closeModal('modal-quick-notes', true); app.handleEditTask('${n.resolvedTaskId}')">Abrir tarefa</button>`;
+        } else if (n.resolutionType === 'agenda' && n.resolvedEventId) {
+            linkHtml = `<button type="button" class="btn btn-secondary btn-sm" onclick="app.closeModal('modal-quick-notes', true); app.editAgendaEvent('${n.resolvedEventId}')">Abrir compromisso</button>`;
+        }
+        return `
+        <div class="quick-notes-item" data-id="${n.id}">
+            <div class="quick-notes-item-text">${escapeHtml(n.text)}</div>
+            <div class="quick-notes-item-meta">${labels[n.resolutionType] || 'Resolvida'}</div>
+            ${linkHtml ? `<div class="quick-notes-item-actions">${linkHtml}</div>` : ''}
+        </div>`;
+    }
+
+    async submitQuickNote(e) {
+        e.preventDefault();
+        const textEl = document.getElementById('quick-note-text');
+        const text = textEl.value.trim();
+        if (!text) { Toast.show('Escreva algo antes de salvar.', 'error'); return; }
+        const clientId = document.getElementById('quick-note-client').value || null;
+        const suggestedDate = document.getElementById('quick-note-date').value || null;
+        const isToday = document.getElementById('quick-note-today').checked;
+        try {
+            const note = await store.addQuickNote({ text, clientId, suggestedDate, isToday });
+            if (!this._quickNotesCache) this._quickNotesCache = [];
+            this._quickNotesCache.unshift(note);
+            document.getElementById('form-quick-note').reset();
+            this.switchQuickNotesTab('pending');
+            this._updateQuickNotesBadge();
+            if (this._checkQuickNotesReminder) this._checkQuickNotesReminder();
+            Toast.show('Nota salva.', 'success');
+        } catch (err) {
+            Toast.show('Erro ao salvar nota: ' + err.message, 'error');
+        }
+    }
+
     toggleAgendaAssistant() {
         const panel = document.getElementById('agenda-ai-assistant');
         if (!panel) return;
