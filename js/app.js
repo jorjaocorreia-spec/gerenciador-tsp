@@ -180,6 +180,11 @@ class AppController {
         this._agendaClientsMapCache = {};   // { clientId: clientObj }
         this._agendaTasksCache = null;      // tarefas não-concluídas para o seletor "Vincular Tarefa"
         this._agendaEventsCacheLoading = null; // Promise em andamento — evita fetches concorrentes sobrescreverem o cache
+        this._quickNotesCache = null;              // null = inválido; [] = vazio válido
+        this._quickNotesClientsCache = null;        // { [clientId]: name }, populado ao abrir o painel
+        this._quickNotesReminderInterval = null;
+        this._triagingNoteId = null;                // id da nota sendo destinada (task ou agenda)
+        this.quickNotesTab = 'pending';              // 'pending' | 'resolved'
         // Horas do Mês
         this._horasMesStats = null;
         // Cobertura de Agenda
@@ -573,7 +578,7 @@ class AppController {
         const overlay = document.getElementById(modalId);
         overlay.classList.add('active');
         this._applyModalDialogA11y(overlay, modalId);
-        if (modalId === 'modal-record' || modalId === 'modal-task' || modalId === 'modal-agenda-event') {
+        if (modalId === 'modal-record' || modalId === 'modal-task' || modalId === 'modal-agenda-event' || modalId === 'modal-quick-notes') {
             this.updateClientSelects();
         }
         if (modalId === 'modal-task') {
@@ -2415,6 +2420,7 @@ class AppController {
                 this._updateHideDeclinedBtn();
             }).catch(() => {});
             this._initNotifications().catch(() => {});
+            this._initQuickNotes().catch(() => {});
         }
         await this.renderAll();
     }
@@ -3999,7 +4005,8 @@ class AppController {
             document.getElementById('filter-client'),
             document.getElementById('task-client'),
             document.getElementById('filter-task-client'),
-            document.getElementById('agenda-client')
+            document.getElementById('agenda-client'),
+            document.getElementById('quick-note-client')
         ];
 
         if (!clients) clients = await store.getClients();
@@ -4011,7 +4018,7 @@ class AppController {
             const currentValue = select.value;
 
             const isFilter = select.id === 'filter-client' || select.id === 'filter-task-client';
-            const isTaskModal = select.id === 'task-client';
+            const isTaskModal = select.id === 'task-client' || select.id === 'quick-note-client';
             select.innerHTML = isFilter
                 ? '<option value="">Todos</option>'
                 : (isTaskModal ? '<option value="">Sem cliente</option>' : '<option value="" disabled selected>-- Escolha um cliente --</option>');
@@ -11089,6 +11096,40 @@ class AppController {
         }
     }
 
+    async _initQuickNotes() {
+        const fab = document.getElementById('quick-notes-fab');
+        if (!fab) return;
+        this._quickNotesCache = await store.getQuickNotes().catch(() => []);
+        fab.style.display = 'flex';
+        this._updateQuickNotesBadge();
+        this._startQuickNotesReminder();
+    }
+
+    _updateQuickNotesBadge() {
+        const badge = document.getElementById('quick-notes-fab-badge');
+        if (!badge) return;
+        const pending = (this._quickNotesCache || []).filter(n => n.status === 'pending');
+        if (pending.length === 0) {
+            badge.style.display = 'none';
+            badge.classList.remove('urgent');
+            return;
+        }
+        badge.textContent = pending.length > 9 ? '9+' : String(pending.length);
+        badge.style.display = 'flex';
+        badge.classList.toggle('urgent', pending.some(n => n.isToday));
+    }
+
+    async openQuickNotesPanel() {
+        if (!this._quickNotesClientsCache) {
+            const clients = await store.getClients().catch(() => []);
+            this._quickNotesClientsCache = {};
+            clients.forEach(c => { this._quickNotesClientsCache[c.id] = c.name; });
+        }
+        this.openModal('modal-quick-notes');
+        this.switchQuickNotesTab('pending');
+        setTimeout(() => document.getElementById('quick-note-text')?.focus(), 100);
+    }
+
     toggleAgendaAssistant() {
         const panel = document.getElementById('agenda-ai-assistant');
         if (!panel) return;
@@ -12571,6 +12612,14 @@ document.addEventListener('DOMContentLoaded', async () => {
             window.app._hideDeclinedEvents = false;
             window.app._notifications = [];
             window.app._notificationsLastSeenAt = null;
+            window.app._quickNotesCache = null;
+            window.app._quickNotesClientsCache = null;
+            if (window.app._quickNotesReminderInterval) {
+                clearInterval(window.app._quickNotesReminderInterval);
+                window.app._quickNotesReminderInterval = null;
+            }
+            const quickNotesFab = document.getElementById('quick-notes-fab');
+            if (quickNotesFab) quickNotesFab.style.display = 'none';
             window.app.closeNotifPanel();
             const notifBell = document.getElementById('notif-bell');
             if (notifBell) notifBell.style.display = 'none';
