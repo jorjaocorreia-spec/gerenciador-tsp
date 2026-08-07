@@ -2808,14 +2808,92 @@
         </div>
     </div>
 
+    <!-- Notas Rápidas: FAB flutuante (oculto para Portal do Cliente e Modo Supervisão) -->
+    <button class="quick-notes-fab" id="quick-notes-fab" style="display:none;" onclick="app.openQuickNotesPanel()" title="Notas Rápidas">
+        <i data-lucide="notebook-pen" style="width:22px;height:22px;"></i>
+        <span class="quick-notes-fab-badge" id="quick-notes-fab-badge" style="display:none;">0</span>
+    </button>
+
+    <div class="modal-overlay" id="modal-quick-notes">
+        <div class="modal glass" style="max-width: 640px;">
+            <div class="modal-header">
+                <div>
+                    <h3 style="display:flex;align-items:center;gap:8px;">
+                        <i data-lucide="notebook-pen" style="width:20px;height:20px;color:var(--primary-color);"></i>
+                        Notas Rápidas
+                    </h3>
+                    <p class="text-muted" style="font-size:0.85rem;margin-top:2px;">Anote agora, destine depois: Tarefa, Compromisso ou só um lembrete.</p>
+                </div>
+                <button class="close-modal" onclick="app.closeModal('modal-quick-notes')"><i data-lucide="x"></i></button>
+            </div>
+
+            <form id="form-quick-note" onsubmit="app.submitQuickNote(event)" style="padding: 0 24px 20px;">
+                <div class="form-group float-group">
+                    <label for="quick-note-text">Anotação</label>
+                    <textarea id="quick-note-text" class="form-control" rows="2" required placeholder=" "></textarea>
+                </div>
+                <div style="display:flex; gap:12px;">
+                    <div class="form-group float-group" style="flex:2;">
+                        <label for="quick-note-client">Cliente (opcional)</label>
+                        <select id="quick-note-client" class="form-control">
+                            <option value="">Sem cliente</option>
+                        </select>
+                    </div>
+                    <div class="form-group float-group" style="flex:1;">
+                        <label for="quick-note-date">Data sugerida (opcional)</label>
+                        <input type="date" id="quick-note-date" class="form-control" placeholder=" ">
+                    </div>
+                </div>
+                <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:4px;">
+                    <label style="display:flex; align-items:center; gap:6px; font-size:0.85rem; cursor:pointer;">
+                        <input type="checkbox" id="quick-note-today">
+                        Não posso esquecer hoje
+                    </label>
+                    <button type="submit" class="btn btn-primary">
+                        <i data-lucide="plus" style="width:14px;height:14px;"></i> Salvar
+                    </button>
+                </div>
+            </form>
+
+            <div style="padding: 0 24px 24px;">
+                <div role="tablist" style="display:flex; gap:4px; border-bottom:1px solid rgba(255,255,255,0.08); margin-bottom:12px;">
+                    <button type="button" class="modal-tab active" role="tab" aria-selected="true" id="tab-btn-quick-notes-pending" onclick="app.switchQuickNotesTab('pending')">Pendentes</button>
+                    <button type="button" class="modal-tab" role="tab" aria-selected="false" id="tab-btn-quick-notes-resolved" onclick="app.switchQuickNotesTab('resolved')">Histórico</button>
+                </div>
+                <div id="quick-notes-pending-list" class="quick-notes-list"></div>
+                <div id="quick-notes-resolved-list" class="quick-notes-list" style="display:none;"></div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal-overlay" id="modal-quick-notes-reminder">
+        <div class="modal glass" style="max-width: 460px;">
+            <div class="modal-header">
+                <div>
+                    <h3 style="display:flex;align-items:center;gap:8px;">
+                        <i data-lucide="alarm-clock" style="width:20px;height:20px;color:var(--danger-color);"></i>
+                        Você marcou isso para hoje
+                    </h3>
+                </div>
+                <button class="close-modal" onclick="app.closeModal('modal-quick-notes-reminder')"><i data-lucide="x"></i></button>
+            </div>
+            <div style="padding: 0 24px 24px;">
+                <div id="quick-notes-reminder-list" style="display:flex; flex-direction:column; gap:8px; margin-bottom:16px;"></div>
+                <button type="button" class="btn btn-primary" style="width:100%; justify-content:center;" onclick="app.closeModal('modal-quick-notes-reminder', true); app.openQuickNotesPanel();">
+                    <i data-lucide="notebook-pen" style="width:14px;height:14px;"></i> Ver notas
+                </button>
+            </div>
+        </div>
+    </div>
+
     <script src="js/calendar.js?v=21"></script>
     <script src="js/holidays.js?v=1"></script>
     <script src="js/productivity-calc.js?v=1"></script>
     <script src="js/financial-calc.js?v=1"></script>
     <script src="js/cs-commission-calc.js?v=4"></script>
-    <script src="js/store.js?v=34"></script>
+    <script src="js/store.js?v=35"></script>
     <script src="js/ai.js?v=1"></script>
-    <script src="js/app.js?v=53"></script>
+    <script src="js/app.js?v=54"></script>
 </body>
 
 </html>
