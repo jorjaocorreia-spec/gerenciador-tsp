@@ -1088,6 +1088,17 @@ class AppController {
                     this._lastAddedTaskId = newTask.id;
                     this._tasksCache.push(newTask);
                 }
+                if (this._triagingNoteId) {
+                    const resolvedNoteId = this._triagingNoteId;
+                    this._triagingNoteId = null;
+                    const resolvedAt = new Date().toISOString();
+                    store.updateQuickNote(resolvedNoteId, { status: 'resolved', resolutionType: 'task', resolvedTaskId: newTask.id, resolvedAt })
+                        .then(() => {
+                            const note = (this._quickNotesCache || []).find(n => n.id === resolvedNoteId);
+                            if (note) Object.assign(note, { status: 'resolved', resolutionType: 'task', resolvedTaskId: newTask.id, resolvedAt });
+                            this._updateQuickNotesBadge();
+                        }).catch(() => {});
+                }
             }
             if (btn) await this._btnSuccess(btn);
             this.closeModal('modal-task');
@@ -5152,6 +5163,17 @@ class AppController {
                             this._agendaClientsMapCache[saved.clientId] = await store.getClient(saved.clientId);
                         }
                     }
+                }
+                if (this._triagingNoteId) {
+                    const resolvedNoteId = this._triagingNoteId;
+                    this._triagingNoteId = null;
+                    const resolvedAt = new Date().toISOString();
+                    store.updateQuickNote(resolvedNoteId, { status: 'resolved', resolutionType: 'agenda', resolvedEventId: saved.id, resolvedAt })
+                        .then(() => {
+                            const note = (this._quickNotesCache || []).find(n => n.id === resolvedNoteId);
+                            if (note) Object.assign(note, { status: 'resolved', resolutionType: 'agenda', resolvedEventId: saved.id, resolvedAt });
+                            this._updateQuickNotesBadge();
+                        }).catch(() => {});
                 }
             }
             const newMeetGenerated = generateMeet && eventData.meetLink;
@@ -11246,6 +11268,35 @@ class AppController {
         } catch (err) {
             Toast.show('Erro ao atualizar nota: ' + err.message, 'error');
         }
+    }
+
+    triageQuickNoteAsTask(id) {
+        const note = (this._quickNotesCache || []).find(n => n.id === id);
+        if (!note) return;
+        this._triagingNoteId = id;
+        this.closeModal('modal-quick-notes', true);
+        this._openNewTaskModal();
+        document.getElementById('task-title').value = note.text.slice(0, 120);
+        document.getElementById('task-description').value = note.text;
+        if (note.clientId) {
+            document.getElementById('task-client').value = note.clientId;
+            document.getElementById('task-client').dispatchEvent(new Event('change'));
+        }
+        if (note.suggestedDate) document.getElementById('task-due-date').value = note.suggestedDate;
+        this._refreshFloatLabels(document.getElementById('modal-task'));
+    }
+
+    triageQuickNoteAsAgenda(id) {
+        const note = (this._quickNotesCache || []).find(n => n.id === id);
+        if (!note) return;
+        this._triagingNoteId = id;
+        this.closeModal('modal-quick-notes', true);
+        const dateStr = note.suggestedDate || new Date().toISOString().split('T')[0];
+        this.openNewAgendaEvent(dateStr);
+        document.getElementById('agenda-title').value = note.text.slice(0, 120);
+        document.getElementById('agenda-desc').value = note.text;
+        if (note.clientId) document.getElementById('agenda-client').value = note.clientId;
+        this._refreshFloatLabels(document.getElementById('modal-agenda-event'));
     }
 
     _startEditQuickNoteText(id) {
