@@ -644,6 +644,7 @@ class AppController {
             document.getElementById('modal-client-title').innerText = 'Novo Cliente';
             this.switchClientModalTab('dados');
             this.toggleBillingModel();
+            this.toggleClientFinishedAt();
         }
         if (modalId === 'modal-scheduling-rule') {
             document.getElementById('form-scheduling-rule').reset();
@@ -762,6 +763,7 @@ class AppController {
         const isCsProject = document.getElementById('client-is-cs-project').checked;
         const notes = document.getElementById('client-notes').value;
         const status = document.getElementById('client-status').value;
+        const finishedAt = document.getElementById('client-finished-at').value;
         const otoboCustomerId = document.getElementById('client-otobo-id').value.trim();
         const initialBalanceH = document.getElementById('client-initial-balance').value;
         const balanceStartDate = document.getElementById('client-balance-start').value;
@@ -780,9 +782,9 @@ class AppController {
         this._btnPending(btn);
         try {
             if (id) {
-                await store.updateClient(id, name, hours, csName, projectNum, clientPays, consultantBonus, notes, status, initialBalanceMinutes, balanceStartDate || null, otoboCustomerId || null, billingModel, hourlyRate, isCsProject);
+                await store.updateClient(id, name, hours, csName, projectNum, clientPays, consultantBonus, notes, status, initialBalanceMinutes, balanceStartDate || null, otoboCustomerId || null, billingModel, hourlyRate, isCsProject, finishedAt || null);
             } else {
-                await store.addClient(name, hours, csName, projectNum, clientPays, consultantBonus, notes, status, initialBalanceMinutes, balanceStartDate || null, otoboCustomerId || null, billingModel, hourlyRate, isCsProject);
+                await store.addClient(name, hours, csName, projectNum, clientPays, consultantBonus, notes, status, initialBalanceMinutes, balanceStartDate || null, otoboCustomerId || null, billingModel, hourlyRate, isCsProject, finishedAt || null);
             }
             await this._btnSuccess(btn);
             e.target.reset();
@@ -818,6 +820,11 @@ class AppController {
         document.getElementById('field-client-pays').style.display = isHourly ? 'none' : '';
         document.getElementById('row-consultant-fields').style.display = isHourly ? 'none' : '';
         document.getElementById('field-hourly-rate').style.display = isHourly ? '' : 'none';
+    }
+
+    toggleClientFinishedAt() {
+        const isFinished = document.getElementById('client-status').value === 'finished';
+        document.getElementById('field-client-finished-at').style.display = isFinished ? '' : 'none';
     }
 
     toggleCsProjectTab() {
@@ -3295,6 +3302,8 @@ class AppController {
         this.toggleBillingModel();
         document.getElementById('client-notes').value = client.notes || '';
         document.getElementById('client-status').value = client.status || 'active';
+        document.getElementById('client-finished-at').value = client.finishedAt || '';
+        this.toggleClientFinishedAt();
         document.getElementById('client-otobo-id').value = client.otoboCustomerId || '';
         document.getElementById('client-initial-balance').value =
             client.initialBalanceMinutes ? (client.initialBalanceMinutes / 60) : '';

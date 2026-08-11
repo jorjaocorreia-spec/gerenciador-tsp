@@ -16,6 +16,7 @@ class TSPStore {
             initialBalanceMinutes: parseInt(r.initial_balance_minutes) || 0,
             balanceStartDate: r.balance_start_date || null,
             otoboCustomerId: r.otobo_customer_id || '',
+            finishedAt: r.finished_at || null,
             createdAt: r.created_at };
     }
 
@@ -121,7 +122,7 @@ class TSPStore {
         return this._client(data);
     }
 
-    async addClient(name, hoursTotal, csName, projectNum, clientPays, consultantBonus, notes, status, initialBalanceMinutes, balanceStartDate, otoboCustomerId, billingModel, hourlyRate, isCsProject) {
+    async addClient(name, hoursTotal, csName, projectNum, clientPays, consultantBonus, notes, status, initialBalanceMinutes, balanceStartDate, otoboCustomerId, billingModel, hourlyRate, isCsProject, finishedAt) {
         const { data, error } = await this.db.from('clients').insert({
             user_id: this.userId, name,
             hours_total: parseFloat(hoursTotal) || 0, cs_name: csName || '',
@@ -133,13 +134,14 @@ class TSPStore {
             otobo_customer_id: otoboCustomerId || null,
             billing_model: billingModel || 'fixed',
             hourly_rate: parseFloat(hourlyRate) || 0,
-            is_cs_project: !!isCsProject
+            is_cs_project: !!isCsProject,
+            finished_at: status === 'finished' ? (finishedAt || null) : null
         }).select().single();
         if (error) throw error;
         return this._client(data);
     }
 
-    async updateClient(id, name, hoursTotal, csName, projectNum, clientPays, consultantBonus, notes, status, initialBalanceMinutes, balanceStartDate, otoboCustomerId, billingModel, hourlyRate, isCsProject) {
+    async updateClient(id, name, hoursTotal, csName, projectNum, clientPays, consultantBonus, notes, status, initialBalanceMinutes, balanceStartDate, otoboCustomerId, billingModel, hourlyRate, isCsProject, finishedAt) {
         const { data, error } = await this.db.from('clients').update({
             name, hours_total: parseFloat(hoursTotal) || 0, cs_name: csName || '',
             project_num: projectNum || '', client_pays: parseFloat(clientPays) || 0,
@@ -150,7 +152,8 @@ class TSPStore {
             otobo_customer_id: otoboCustomerId || null,
             billing_model: billingModel || 'fixed',
             hourly_rate: parseFloat(hourlyRate) || 0,
-            is_cs_project: !!isCsProject
+            is_cs_project: !!isCsProject,
+            finished_at: status === 'finished' ? (finishedAt || null) : null
         }).eq('id', id).select().single();
         if (error) throw error;
         return this._client(data);

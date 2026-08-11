@@ -13,6 +13,19 @@
             }
         }
         if (selectedYM < createdYM) return false;
+
+        if (client.status === 'finished') {
+            // Sem finishedAt (dado legado, sem data informada) não há como saber em
+            // que período o cliente esteve realmente ativo — exclui de todos os meses.
+            if (!client.finishedAt) return false;
+            const isoStr = String(client.finishedAt);
+            const finishedYear = parseInt(isoStr.slice(0, 4), 10);
+            const finishedMonth = parseInt(isoStr.slice(5, 7), 10);
+            if (isNaN(finishedYear) || isNaN(finishedMonth)) return false;
+            const finishedYM = finishedYear * 12 + (finishedMonth - 1);
+            return selectedYM <= finishedYM;
+        }
+
         if (selectedYM >= currentYM) {
             return client.status === 'active';
         }

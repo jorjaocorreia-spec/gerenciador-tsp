@@ -1026,7 +1026,7 @@
                 <div style="display: flex; gap: 16px;">
                     <div class="form-group" style="flex: 1;">
                         <label for="client-status">Status</label>
-                        <select id="client-status" class="form-control" required>
+                        <select id="client-status" class="form-control" required onchange="app.toggleClientFinishedAt()">
                             <option value="active" selected>Ativo</option>
                             <option value="finished">Finalizado</option>
                         </select>
@@ -1035,6 +1035,12 @@
                         <label for="client-pays">Cliente Paga (R$)</label>
                         <input type="number" step="0.01" id="client-pays" class="form-control money-value" placeholder="Ex: 5000" oninput="app.calculateConsultantValue()">
                     </div>
+                </div>
+
+                <div class="form-group" id="field-client-finished-at" style="display:none;">
+                    <label for="client-finished-at">Data de Finalização</label>
+                    <input type="date" id="client-finished-at" class="form-control">
+                    <span style="font-size:0.75rem; color: var(--text-muted);">Define até qual mês o cliente conta no Financeiro. Sem data, ele deixa de aparecer em todos os meses.</span>
                 </div>
 
                 <div class="form-group">
