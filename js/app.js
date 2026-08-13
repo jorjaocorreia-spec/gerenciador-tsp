@@ -7382,7 +7382,7 @@ class AppController {
         const labelEl = document.getElementById('financeiro-month-label');
         if (labelEl) labelEl.textContent = `${monthNames[this.financeiroMonth - 1]} ${this.financeiroYear}`;
 
-        tbody.innerHTML = `<tr><td colspan="5" class="text-muted">Carregando...</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="6" class="text-muted">Carregando...</td></tr>`;
         tfoot.innerHTML = '';
         chartContainer.innerHTML = spinnerHtml;
 
@@ -7425,18 +7425,24 @@ class AppController {
                         <td>—</td>
                         <td>—</td>
                         <td>—</td>
+                        <td>—</td>
                         <td><span class="money-value">${formatMoney(csTotal)}</span></td>
                     </tr>`;
             }
+
+            const fmtHoras = (h) => (h || h === 0) ? `${parseFloat(h).toFixed(1).replace('.', ',')}h` : '—';
+            let totalHoras = 0;
 
             const itemsHtml = summary.items.map(({ client, valor, comissao, detalhe }) => {
                 const modelo = client.billingModel === 'hourly' ? 'Por Hora' : 'Fixo';
                 const detalheStr = detalhe ? `${detalhe.horas.toFixed(1)}h × ${formatMoney(detalhe.rate)}` : '—';
                 const comissaoStr = client.billingModel === 'hourly' ? `<span class="money-value">${formatMoney(valor)}</span>` : `<span class="money-value">${formatMoney(comissao)}</span>`;
+                totalHoras += parseFloat(client.hoursTotal) || 0;
                 return `
                     <tr>
                         <td>${escapeHtml(client.name)}</td>
                         <td>${modelo}</td>
+                        <td>${fmtHoras(client.hoursTotal)}</td>
                         <td>${detalheStr}</td>
                         <td><span class="money-value">${formatMoney(valor)}</span></td>
                         <td>${comissaoStr}</td>
@@ -7444,12 +7450,15 @@ class AppController {
             }).join('');
 
             const combinedHtml = itemsHtml + csRowHtml;
-            tbody.innerHTML = combinedHtml || `<tr><td colspan="5" class="text-muted">Nenhum cliente elegível neste mês.</td></tr>`;
+            tbody.innerHTML = combinedHtml || `<tr><td colspan="6" class="text-muted">Nenhum cliente elegível neste mês.</td></tr>`;
 
             const grandTotalComissao = summary.totalComissao + csTotal;
             tfoot.innerHTML = `
                 <tr style="font-weight:600;">
-                    <td colspan="3">Total</td>
+                    <td>Total</td>
+                    <td>—</td>
+                    <td>${fmtHoras(totalHoras)}</td>
+                    <td>—</td>
                     <td><span class="money-value">${formatMoney(summary.totalValor)}</span></td>
                     <td><span class="money-value">${formatMoney(grandTotalComissao)}</span></td>
                 </tr>`;
@@ -7458,7 +7467,7 @@ class AppController {
             chartContainer.appendChild(this._buildFinanceiroChart(history));
             lucide.createIcons();
         } catch (err) {
-            tbody.innerHTML = `<tr><td colspan="5" class="text-muted">Erro ao carregar: ${escapeHtml(err.message)}</td></tr>`;
+            tbody.innerHTML = `<tr><td colspan="6" class="text-muted">Erro ao carregar: ${escapeHtml(err.message)}</td></tr>`;
             chartContainer.innerHTML = '';
         }
     }
