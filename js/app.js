@@ -310,6 +310,8 @@ class AppController {
             ?.addEventListener('submit', (e) => this.handleProcessTypeSubmit(e));
         document.getElementById('form-client-process')
             ?.addEventListener('submit', (e) => this.handleClientProcessSubmit(e));
+        document.getElementById('form-process-link-existing')
+            ?.addEventListener('submit', (e) => this.handleProcessLinkExistingSubmit(e));
 
         document.getElementById('form-ai-config')
             ?.addEventListener('submit', (e) => this.handleAIConfigSubmit(e));
@@ -9244,6 +9246,63 @@ class AppController {
             Toast.show('Status atualizado.', 'success');
         } catch (err) {
             Toast.show('Erro ao atualizar status: ' + err.message, 'error');
+        }
+    }
+
+    async openProcessLinkExisting() {
+        if (!this.selectedProcessId || !this._processDetailCache) return;
+        const clientId = this._processDetailCache.process.clientId;
+        const container = document.getElementById('ple-container');
+        container.innerHTML = spinnerHtml;
+        this.openModal('modal-process-link-existing');
+        try {
+            const unlinked = await store.getUnlinkedItemsForClient(clientId);
+            this._unlinkedItemsCache = unlinked;
+            const groups = [
+                { key: 'tasks', label: 'Tarefas', items: unlinked.tasks, getLabel: t => t.title },
+                { key: 'events', label: 'Compromissos', items: unlinked.events, getLabel: e => `${e.title} — ${new Date(e.date + 'T12:00').toLocaleDateString('pt-BR')}` },
+                { key: 'records', label: 'Atendimentos', items: unlinked.records, getLabel: r => `${new Date(r.date + 'T12:00').toLocaleDateString('pt-BR')} — ${r.description || '(sem descrição)'}` },
+                { key: 'tickets', label: 'Chamados', items: unlinked.tickets, getLabel: k => `#${k.ticketNumber || k.ticketId} — ${k.title}` },
+            ];
+            container.innerHTML = groups.map(g => `
+                <div>
+                    <h5 style="font-size:.8rem;color:var(--text-muted);margin-bottom:6px;">${g.label} (${g.items.length})</h5>
+                    ${g.items.length === 0
+                        ? '<span style="font-size:.8rem;color:var(--text-muted);">Nada disponível.</span>'
+                        : g.items.map(item => `
+                            <label style="display:flex;align-items:center;gap:8px;font-size:.85rem;padding:4px 0;cursor:pointer;">
+                                <input type="checkbox" data-group="${g.key}" value="${item.id}">
+                                ${escapeHtml(g.getLabel(item))}
+                            </label>`).join('')}
+                </div>`).join('');
+        } catch (err) {
+            container.innerHTML = `<p class="text-muted">Erro ao carregar itens: ${escapeHtml(err.message)}</p>`;
+        }
+    }
+
+    async handleProcessLinkExistingSubmit(e) {
+        e.preventDefault();
+        if (!this.selectedProcessId) return;
+        const collect = (group) => Array.from(
+            document.querySelectorAll(`#ple-container input[data-group="${group}"]:checked`)
+        ).map(cb => cb.value);
+        const payload = {
+            taskIds: collect('tasks'), eventIds: collect('events'),
+            recordIds: collect('records'), ticketIds: collect('tickets'),
+        };
+        const total = payload.taskIds.length + payload.eventIds.length + payload.recordIds.length + payload.ticketIds.length;
+        if (total === 0) { Toast.show('Selecione ao menos um item.', 'error'); return; }
+        const btn = e.target.querySelector('[type="submit"]');
+        this._btnPending(btn);
+        try {
+            await store.linkExistingItemsToProcess(this.selectedProcessId, payload);
+            await this._btnSuccess(btn);
+            this.closeModal('modal-process-link-existing');
+            await this.renderProcessDetail();
+            Toast.show('Itens vinculados.', 'success');
+        } catch (err) {
+            this._btnError(btn);
+            Toast.show('Erro ao vincular: ' + err.message, 'error');
         }
     }
 

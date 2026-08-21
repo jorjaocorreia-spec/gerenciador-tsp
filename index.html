@@ -2346,6 +2346,22 @@
         </div>
     </div>
 
+    <div class="modal-overlay" id="modal-process-link-existing">
+        <div class="modal glass" style="max-width: 560px; max-height: 85vh; overflow-y: auto;">
+            <div class="modal-header">
+                <h3>Vincular itens existentes</h3>
+                <button class="close-modal" onclick="app.closeModal('modal-process-link-existing')"><i data-lucide="x"></i></button>
+            </div>
+            <form id="form-process-link-existing">
+                <div id="ple-container" style="display:flex;flex-direction:column;gap:16px;"></div>
+                <div style="display:flex;gap:12px;justify-content:flex-end;margin-top:16px;">
+                    <button type="button" class="btn btn-secondary" onclick="app.closeModal('modal-process-link-existing')">Cancelar</button>
+                    <button type="submit" class="btn btn-primary">Vincular selecionados</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
     <!-- MODAL: IMPLEMENTAÇÃO -->
     <div class="modal-overlay" id="modal-implementation">
         <div class="modal glass" style="max-width: 680px; max-height: 92vh; overflow-y: auto;">
