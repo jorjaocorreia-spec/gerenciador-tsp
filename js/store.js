@@ -2058,7 +2058,12 @@ class TSPStore {
         const process = await this.getClientProcess(processId);
         if (!process) return null;
         const [tasksRes, eventsRes, recordsRes, ticketsRes, columns] = await Promise.all([
-            this.db.from('tasks').select('*').eq('user_id', this.userId).eq('process_id', processId),
+            // Select explícito, sem 'attachments' (JSONB com imagens base64) —
+            // a timeline (TSPProcessTimeline.buildTimeline/computePendencies) só
+            // lê id/title/status/comments/createdAt de cada task. Mesmo padrão já
+            // documentado em getBatchStats ("sem blobs JSONB").
+            this.db.from('tasks').select('id, client_id, title, status, comments, created_at, process_id')
+                .eq('user_id', this.userId).eq('process_id', processId),
             this.db.from('agenda_events').select('*').eq('user_id', this.userId).eq('process_id', processId),
             this.db.from('records').select('*').eq('user_id', this.userId).eq('process_id', processId),
             this.db.from('tickets').select('*').eq('user_id', this.userId).eq('process_id', processId),
@@ -2084,7 +2089,9 @@ class TSPStore {
 
     async getUnlinkedItemsForClient(clientId) {
         const [tasksRes, eventsRes, recordsRes, ticketsRes] = await Promise.all([
-            this.db.from('tasks').select('*').eq('user_id', this.userId).eq('client_id', clientId)
+            // Select explícito — a UI "Vincular existente" (openProcessLinkExisting)
+            // só lê item.id/item.title de cada task; sem 'attachments' (blobs base64).
+            this.db.from('tasks').select('id, client_id, title').eq('user_id', this.userId).eq('client_id', clientId)
                 .eq('approval_status', 'approved').is('process_id', null),
             this.db.from('agenda_events').select('*').eq('user_id', this.userId).eq('client_id', clientId).is('process_id', null),
             this.db.from('records').select('*').eq('user_id', this.userId).eq('client_id', clientId).is('process_id', null),

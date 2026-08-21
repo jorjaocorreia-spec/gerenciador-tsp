@@ -2670,8 +2670,13 @@ class AppController {
             this._agendaEventsCache = null; // força re-fetch no próximo renderAgenda()
             this._agendaTasksCache = null; // força re-fetch do seletor "Vincular Tarefa"
             // Pre-busca tudo em 4 queries (antes: 4×N queries por ciclo)
-            const batchStats = await store.getBatchStats();
-            const activeProcesses = await store.getAllActiveClientProcessesWithType();
+            // activeProcesses roda em paralelo com getBatchStats e é non-fatal
+            // (.catch(() => [])) — uma falha na query de processos (rede/RLS/
+            // migration pendente) nunca pode derrubar o renderAll() inteiro.
+            const [batchStats, activeProcesses] = await Promise.all([
+                store.getBatchStats(),
+                store.getAllActiveClientProcessesWithType().catch(() => [])
+            ]);
             this._activeProcessesByClient = {};
             activeProcesses.forEach(p => {
                 if (!this._activeProcessesByClient[p.clientId]) this._activeProcessesByClient[p.clientId] = [];
@@ -9023,14 +9028,29 @@ class AppController {
         if (!select) return;
         const wrap = document.getElementById(selectId + '-section') || select.closest('.form-group') || select;
         const options = (clientId && this._activeProcessesByClient?.[clientId]) || [];
-        if (options.length === 0) {
+        // Se o item já está vinculado a um processo que não está mais "active"
+        // (concluído/pausado/cancelado), ele não aparece em _activeProcessesByClient.
+        // Sem essa checagem, o select renderizaria sem essa option, select.value
+        // resolveria para '' e o próximo save gravaria process_id: null — perdendo
+        // o vínculo em silêncio (achado crítico da revisão final). Em vez disso,
+        // injetamos manualmente a option do processo vinculado (ainda que não
+        // ativo), buscando o rótulo em this._processesCache (populado por
+        // renderProcessos()); se o cache ainda não carregou, usamos um rótulo
+        // genérico em vez de esconder/perder o vínculo.
+        let extraOption = null;
+        if (selectedId && !options.some(o => o.id === selectedId)) {
+            const cached = this._processesCache?.find(p => p.id === selectedId);
+            extraOption = { id: selectedId, label: cached ? cached.processTypeName : 'Processo vinculado' };
+        }
+        if (options.length === 0 && !extraOption) {
             select.innerHTML = '<option value="">Nenhum processo ativo</option>';
             wrap.style.display = 'none';
             return;
         }
         wrap.style.display = '';
+        const allOptions = extraOption ? [extraOption, ...options] : options;
         select.innerHTML = '<option value="">Nenhum</option>' +
-            options.map(o => `<option value="${o.id}">${escapeHtml(o.label)}</option>`).join('');
+            allOptions.map(o => `<option value="${o.id}">${escapeHtml(o.label)}</option>`).join('');
         select.value = selectedId || '';
     }
 
@@ -9191,7 +9211,7 @@ class AppController {
             container.innerHTML = `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:14px;">` +
                 filtered.map(p => {
                     const client = clientsMap[p.clientId];
-                    return `<div class="glass clickable-card" style="padding:16px;border-left:4px solid ${p.processTypeColor};"
+                    return `<div class="glass clickable-card" style="padding:16px;border-left:4px solid ${escapeHtml(p.processTypeColor)};"
                         onclick="app.openProcessDetail('${p.id}')" tabindex="0" role="button"
                         aria-label="Abrir processo: ${escapeHtml(p.processTypeName)} — ${escapeHtml(client?.name || '')}"
                         onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();app.openProcessDetail('${p.id}')}">
@@ -9261,7 +9281,8 @@ class AppController {
             pendContainer.innerHTML = pendencies.length === 0
                 ? '<span style="font-size:.85rem;color:var(--text-muted);">Nenhuma pendência.</span>'
                 : pendencies.map(t => `<div style="padding:8px;border-radius:6px;background:var(--bg-glass);margin-bottom:6px;font-size:.85rem;cursor:pointer;"
-                    onclick="app.handleEditTask('${t.id}')">${escapeHtml(t.title)}</div>`).join('');
+                    onclick="app.handleEditTask('${t.id}')" tabindex="0" role="button" aria-label="Editar tarefa: ${escapeHtml(t.title)}"
+                    onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();app.handleEditTask('${t.id}')}">${escapeHtml(t.title)}</div>`).join('');
 
             const timeline = TSPProcessTimeline.buildTimeline({ tasks, events, records, tickets });
             const iconByKind = { task: 'kanban', task_comment: 'message-square', agenda: 'calendar', record: 'clock', ticket: 'headphones' };
@@ -9298,6 +9319,8 @@ class AppController {
         if (!this.selectedProcessId || !this._processDetailCache) return;
         const clientId = this._processDetailCache.process.clientId;
         const container = document.getElementById('ple-container');
+        const filterInput = document.getElementById('ple-filter');
+        if (filterInput) filterInput.value = '';
         container.innerHTML = spinnerHtml;
         this.openModal('modal-process-link-existing');
         try {
@@ -9315,7 +9338,7 @@ class AppController {
                     ${g.items.length === 0
                         ? '<span style="font-size:.8rem;color:var(--text-muted);">Nada disponível.</span>'
                         : g.items.map(item => `
-                            <label style="display:flex;align-items:center;gap:8px;font-size:.85rem;padding:4px 0;cursor:pointer;">
+                            <label data-label="${escapeHtml(g.getLabel(item).toLowerCase())}" style="display:flex;align-items:center;gap:8px;font-size:.85rem;padding:4px 0;cursor:pointer;">
                                 <input type="checkbox" data-group="${g.key}" value="${item.id}">
                                 ${escapeHtml(g.getLabel(item))}
                             </label>`).join('')}
@@ -9323,6 +9346,17 @@ class AppController {
         } catch (err) {
             container.innerHTML = `<p class="text-muted">Erro ao carregar itens: ${escapeHtml(err.message)}</p>`;
         }
+    }
+
+    // Filtro local simples (substring, case-insensitive) sobre as linhas já
+    // renderizadas de "Vincular itens existentes" — sem nova query ao banco.
+    _filterProcessLinkExistingList(term) {
+        const container = document.getElementById('ple-container');
+        if (!container) return;
+        const q = (term || '').trim().toLowerCase();
+        container.querySelectorAll('label[data-label]').forEach(label => {
+            label.style.display = !q || label.dataset.label.includes(q) ? 'flex' : 'none';
+        });
     }
 
     async handleProcessLinkExistingSubmit(e) {
@@ -9364,20 +9398,25 @@ class AppController {
     async _renderProcessTypesList() {
         const list = document.getElementById('process-types-list');
         list.innerHTML = spinnerHtml;
-        const types = await store.getProcessTypes();
-        this._processTypesCache = types;
-        if (types.length === 0) {
-            list.innerHTML = '<span style="font-size:.85rem;color:var(--text-muted);">Nenhum tipo cadastrado ainda.</span>';
-            return;
+        try {
+            const types = await store.getProcessTypes();
+            this._processTypesCache = types;
+            if (types.length === 0) {
+                list.innerHTML = '<span style="font-size:.85rem;color:var(--text-muted);">Nenhum tipo cadastrado ainda.</span>';
+                return;
+            }
+            list.innerHTML = types.map(t => `
+                <div style="display:flex;align-items:center;gap:10px;padding:8px 10px;background:var(--bg-glass);border-radius:8px;">
+                    <span style="width:12px;height:12px;border-radius:50%;background:${escapeHtml(t.color)};flex-shrink:0;"></span>
+                    <span style="flex:1;font-size:.9rem;">${escapeHtml(t.name)}</span>
+                    <button type="button" class="btn-icon-sm" title="Editar" onclick="app._editProcessType('${t.id}')"><i data-lucide="pencil" style="width:14px;height:14px;"></i></button>
+                    <button type="button" class="btn-icon-sm" title="Excluir" onclick="app._deleteProcessType('${t.id}', this)"><i data-lucide="trash-2" style="width:14px;height:14px;"></i></button>
+                </div>`).join('');
+            lucide.createIcons();
+        } catch (err) {
+            list.innerHTML = `<span style="font-size:.85rem;color:var(--danger-color);">Erro ao carregar tipos de processo: ${escapeHtml(err.message)}</span>`;
+            Toast.show('Erro ao carregar tipos de processo: ' + err.message, 'error');
         }
-        list.innerHTML = types.map(t => `
-            <div style="display:flex;align-items:center;gap:10px;padding:8px 10px;background:var(--bg-glass);border-radius:8px;">
-                <span style="width:12px;height:12px;border-radius:50%;background:${t.color};flex-shrink:0;"></span>
-                <span style="flex:1;font-size:.9rem;">${escapeHtml(t.name)}</span>
-                <button type="button" class="btn-icon-sm" title="Editar" onclick="app._editProcessType('${t.id}')"><i data-lucide="pencil" style="width:14px;height:14px;"></i></button>
-                <button type="button" class="btn-icon-sm" title="Excluir" onclick="app._deleteProcessType('${t.id}', this)"><i data-lucide="trash-2" style="width:14px;height:14px;"></i></button>
-            </div>`).join('');
-        lucide.createIcons();
     }
 
     _editProcessType(id) {
@@ -9425,27 +9464,36 @@ class AppController {
 
     async _populateProcessTypeSelect(selectedId = '') {
         const select = document.getElementById('cp-type');
-        const types = this._processTypesCache || await store.getProcessTypes();
-        this._processTypesCache = types;
-        select.innerHTML = '<option value="">Selecione...</option>' +
-            types.map(t => `<option value="${t.id}">${escapeHtml(t.name)}</option>`).join('');
-        select.value = selectedId;
+        try {
+            const types = this._processTypesCache || await store.getProcessTypes();
+            this._processTypesCache = types;
+            select.innerHTML = '<option value="">Selecione...</option>' +
+                types.map(t => `<option value="${t.id}">${escapeHtml(t.name)}</option>`).join('');
+            select.value = selectedId;
+        } catch (err) {
+            select.innerHTML = '<option value="">Erro ao carregar tipos</option>';
+            Toast.show('Erro ao carregar tipos de processo: ' + err.message, 'error');
+        }
     }
 
     async openNewClientProcess(clientId = '') {
-        document.getElementById('modal-client-process-title').textContent = 'Novo Processo';
-        document.getElementById('cp-id').value = '';
-        document.getElementById('cp-notes').value = '';
-        document.getElementById('cp-status-group').style.display = 'none';
-        const clientSelect = document.getElementById('cp-client');
-        if (clientSelect.options.length <= 0) {
-            const clients = await store.getClients();
-            clientSelect.innerHTML = clients.map(c => `<option value="${c.id}">${escapeHtml(c.name)}</option>`).join('');
+        try {
+            document.getElementById('modal-client-process-title').textContent = 'Novo Processo';
+            document.getElementById('cp-id').value = '';
+            document.getElementById('cp-notes').value = '';
+            document.getElementById('cp-status-group').style.display = 'none';
+            const clientSelect = document.getElementById('cp-client');
+            if (clientSelect.options.length <= 0) {
+                const clients = await store.getClients();
+                clientSelect.innerHTML = clients.map(c => `<option value="${c.id}">${escapeHtml(c.name)}</option>`).join('');
+            }
+            clientSelect.value = clientId;
+            clientSelect.disabled = false;
+            await this._populateProcessTypeSelect('');
+            this.openModal('modal-client-process');
+        } catch (err) {
+            Toast.show('Erro ao abrir formulário de processo: ' + err.message, 'error');
         }
-        clientSelect.value = clientId;
-        clientSelect.disabled = false;
-        await this._populateProcessTypeSelect('');
-        this.openModal('modal-client-process');
     }
 
     async handleClientProcessSubmit(e) {

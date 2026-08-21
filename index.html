@@ -2367,6 +2367,7 @@
                 <button class="close-modal" onclick="app.closeModal('modal-process-link-existing')"><i data-lucide="x"></i></button>
             </div>
             <form id="form-process-link-existing">
+                <input type="text" id="ple-filter" placeholder="Filtrar..." class="form-control" style="margin-bottom:8px;" oninput="app._filterProcessLinkExistingList(this.value)">
                 <div id="ple-container" style="display:flex;flex-direction:column;gap:16px;"></div>
                 <div style="display:flex;gap:12px;justify-content:flex-end;margin-top:16px;">
                     <button type="button" class="btn btn-secondary" onclick="app.closeModal('modal-process-link-existing')">Cancelar</button>
