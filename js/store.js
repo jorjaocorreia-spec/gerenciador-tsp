@@ -106,6 +106,11 @@ class TSPStore {
             createdAt: r.created_at };
     }
 
+    _processType(r) {
+        return { id: r.id, name: r.name, description: r.description || '',
+            color: r.color || '#8b5cf6', createdAt: r.created_at };
+    }
+
     // ── CLIENTES ─────────────────────────────────────────────────
 
     async getClients() {
@@ -1927,6 +1932,37 @@ class TSPStore {
 
     async deleteQuickNote(id) {
         const { error } = await this.db.from('quick_notes').delete()
+            .eq('id', id).eq('user_id', this.userId);
+        if (error) throw error;
+    }
+
+    // ── TIPOS DE PROCESSO (catálogo) ────────────────────────────────
+
+    async getProcessTypes() {
+        const { data, error } = await this.db.from('process_types').select('*')
+            .eq('user_id', this.userId).order('name');
+        if (error) throw error;
+        return (data || []).map(r => this._processType(r));
+    }
+
+    async addProcessType({ name, description, color }) {
+        const { data, error } = await this.db.from('process_types').insert({
+            user_id: this.userId, name, description: description || '', color: color || '#8b5cf6'
+        }).select().single();
+        if (error) throw error;
+        return this._processType(data);
+    }
+
+    async updateProcessType(id, { name, description, color }) {
+        const { data, error } = await this.db.from('process_types').update({
+            name, description: description || '', color: color || '#8b5cf6'
+        }).eq('id', id).eq('user_id', this.userId).select().single();
+        if (error) throw error;
+        return this._processType(data);
+    }
+
+    async deleteProcessType(id) {
+        const { error } = await this.db.from('process_types').delete()
             .eq('id', id).eq('user_id', this.userId);
         if (error) throw error;
     }
