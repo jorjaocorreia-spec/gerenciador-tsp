@@ -9006,7 +9006,7 @@ class AppController {
     _populateProcessSelect(selectId, clientId, selectedId = '') {
         const select = document.getElementById(selectId);
         if (!select) return;
-        const wrap = select.closest('.form-group') || select;
+        const wrap = document.getElementById(selectId + '-section') || select.closest('.form-group') || select;
         const options = (clientId && this._activeProcessesByClient?.[clientId]) || [];
         if (options.length === 0) {
             select.innerHTML = '<option value="">Nenhum processo ativo</option>';
