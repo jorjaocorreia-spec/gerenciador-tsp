@@ -342,6 +342,13 @@ class AppController {
             this._populateProcessSelect('task-process', clientId, '');
         });
 
+        document.getElementById('record-client')?.addEventListener('change', (e) => {
+            this._populateProcessSelect('record-process', e.target.value, '');
+        });
+        document.getElementById('agenda-client')?.addEventListener('change', (e) => {
+            this._populateProcessSelect('agenda-process', e.target.value, '');
+        });
+
         // Paste de imagens nos modais de tarefa, implementação e treinamento
         document.addEventListener('paste', (e) => {
             const taskActive     = document.getElementById('modal-task')?.classList.contains('active');
@@ -601,9 +608,13 @@ class AppController {
             if (!document.getElementById('record-id').value) {
                 document.getElementById('record-date').valueAsDate = new Date();
             }
+            this._populateProcessSelect('record-process', document.getElementById('record-client').value, this._pendingRecordProcessId || '');
+            this._pendingRecordProcessId = null;
         }
         if (modalId === 'modal-agenda-event') {
             this.updateAgendaTaskSelect();
+            this._populateProcessSelect('agenda-process', document.getElementById('agenda-client').value, this._pendingAgendaProcessId || '');
+            this._pendingAgendaProcessId = null;
             if (!document.getElementById('agenda-id').value) {
                 const today = new Date().toISOString().split('T')[0];
                 document.getElementById('agenda-date').value = today;
@@ -960,11 +971,12 @@ class AppController {
         const btn = e.target.querySelector('[type="submit"]');
         this._btnPending(btn);
 
+        const processId = document.getElementById('record-process').value || null;
         try {
             if (recordId) {
-                await store.updateRecord(recordId, clientId, date, startTime, endTime, minutes, desc, isUnavailability);
+                await store.updateRecord(recordId, clientId, date, startTime, endTime, minutes, desc, isUnavailability, processId);
             } else {
-                await store.addRecord(clientId, date, startTime, endTime, minutes, desc, isUnavailability);
+                await store.addRecord(clientId, date, startTime, endTime, minutes, desc, isUnavailability, processId);
             }
             await this._btnSuccess(btn);
             e.target.reset();
@@ -1015,6 +1027,7 @@ class AppController {
         const r = await store.getRecord(id);
         if (!r) return;
         document.getElementById('record-id').value = r.id;
+        this._pendingRecordProcessId = r.processId || '';
         document.getElementById('record-client').value = r.clientId;
         document.getElementById('record-date').value = r.date;
         document.getElementById('record-desc').value = r.description;
@@ -5110,6 +5123,7 @@ class AppController {
             description: document.getElementById('agenda-desc').value,
             type: document.getElementById('agenda-type').value,
             clientId: document.getElementById('agenda-client').value || null,
+            processId: document.getElementById('agenda-process').value || null,
             relatedTaskId: this._agendaRelatedTaskIds[0] || null,
             relatedTaskIds: [...this._agendaRelatedTaskIds],
             date: startDate,
@@ -5256,6 +5270,7 @@ class AppController {
         setTimeout(() => this._autoResizeTextarea(agendaDescEl), 0);
         document.getElementById('agenda-type').value = ev.type;
         document.getElementById('agenda-client').value = ev.clientId || '';
+        this._pendingAgendaProcessId = ev.processId || '';
         this._agendaRelatedTaskIds = Array.isArray(ev.relatedTaskIds) ? [...ev.relatedTaskIds] : [];
         this._agendaTaskPanelTempIds = [];
         await this.updateAgendaTaskSelect();
