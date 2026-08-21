@@ -13109,10 +13109,27 @@ class AppController {
             </div>
         `;
         lucide.createIcons();
+        this._populateProcessSelect('chamado-process', ticket.linkedClientId, ticket.processId || '');
 
         // Artigos (carregados on-demand)
         this.openModal('modal-chamado');
         await this._loadChamadoArticles(ticket);
+    }
+
+    async handleChamadoProcessChange() {
+        if (!this._currentTicket) return;
+        const processId = document.getElementById('chamado-process').value || null;
+        try {
+            await store.updateTicketProcess(this._currentTicket.id, processId);
+            this._currentTicket.processId = processId;
+            if (this._cachedChamadosTickets) {
+                const t = this._cachedChamadosTickets.find(x => x.id === this._currentTicket.id);
+                if (t) t.processId = processId;
+            }
+            Toast.show('Processo do chamado atualizado.', 'success');
+        } catch (err) {
+            Toast.show('Erro ao vincular processo: ' + err.message, 'error');
+        }
     }
 
     async _loadChamadoArticles(ticket) {
