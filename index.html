@@ -134,6 +134,9 @@
             <li class="nav-item" data-view="trainings" title="Treinamentos" tabindex="0" role="button">
                 <i data-lucide="graduation-cap"></i><span class="nav-label">Treinamentos</span>
             </li>
+            <li class="nav-item" data-view="processos" title="Processos" tabindex="0" role="button">
+                <i data-lucide="git-branch"></i><span class="nav-label">Processos</span>
+            </li>
             <li class="nav-item" data-view="chamados" title="Chamados" tabindex="0" role="button">
                 <i data-lucide="headphones"></i><span class="nav-label">Chamados</span>
             </li>
@@ -763,6 +766,32 @@
             </div>
 
             <div id="trainings-container"></div>
+        </section>
+
+        <!-- VIEW: PROCESSOS -->
+        <section class="view-section" id="view-processos">
+            <div class="header-actions">
+                <div>
+                    <h1>Processos</h1>
+                    <p class="text-muted">Timeline agregada de implantações por cliente — tarefas, agenda, atendimentos e chamados de um mesmo processo, num só lugar.</p>
+                </div>
+                <div style="display:flex;gap:8px;">
+                    <button class="btn btn-secondary" onclick="app.openManageProcessTypes()">
+                        <i data-lucide="settings-2"></i> Tipos de Processo
+                    </button>
+                    <button class="btn btn-primary" onclick="app.openNewClientProcess()">
+                        <i data-lucide="plus"></i> Novo Processo
+                    </button>
+                </div>
+            </div>
+
+            <div class="status-filter-tabs" id="process-status-filter-tabs" role="tablist" aria-label="Filtrar por status">
+                <button type="button" class="status-filter-tab active" role="tab" aria-selected="true" data-status="active" onclick="app.setProcessStatusFilter('active')">Ativos</button>
+                <button type="button" class="status-filter-tab" role="tab" aria-selected="false" data-status="completed" onclick="app.setProcessStatusFilter('completed')">Concluídos</button>
+                <button type="button" class="status-filter-tab" role="tab" aria-selected="false" data-status="all" onclick="app.setProcessStatusFilter('all')">Todos</button>
+            </div>
+
+            <div id="processos-container"></div>
         </section>
 
         <!-- VIEW: CHAMADOS -->
@@ -2213,6 +2242,65 @@
                     <span id="btn-confirm-apt-gen-label">Criar Apontamentos</span>
                 </button>
             </div>
+        </div>
+    </div>
+
+    <div class="modal-overlay" id="modal-process-types">
+        <div class="modal glass" style="max-width: 560px;">
+            <div class="modal-header">
+                <h3>Tipos de Processo</h3>
+                <button class="close-modal" onclick="app.closeModal('modal-process-types')"><i data-lucide="x"></i></button>
+            </div>
+            <form id="form-process-type" style="display:flex; gap:10px; align-items:flex-end; margin-bottom:16px;">
+                <input type="hidden" id="process-type-id">
+                <div class="form-group" style="flex:2; margin-bottom:0;">
+                    <label class="form-label">Nome *</label>
+                    <input type="text" id="process-type-name" class="form-control" placeholder="Ex: Tabela de Preços" required>
+                </div>
+                <div class="form-group" style="flex:0; margin-bottom:0;">
+                    <label class="form-label">Cor</label>
+                    <input type="color" id="process-type-color" value="#8b5cf6" style="width:44px;height:42px;padding:2px;border-radius:8px;">
+                </div>
+                <button type="submit" class="btn btn-primary" style="height:42px;">Salvar</button>
+            </form>
+            <div id="process-types-list" style="display:flex; flex-direction:column; gap:8px; max-height:320px; overflow-y:auto;"></div>
+        </div>
+    </div>
+
+    <div class="modal-overlay" id="modal-client-process">
+        <div class="modal glass" style="max-width: 520px;">
+            <div class="modal-header">
+                <h3 id="modal-client-process-title">Novo Processo</h3>
+                <button class="close-modal" onclick="app.closeModal('modal-client-process')"><i data-lucide="x"></i></button>
+            </div>
+            <form id="form-client-process">
+                <input type="hidden" id="cp-id">
+                <div class="form-group">
+                    <label class="form-label">Cliente *</label>
+                    <select id="cp-client" class="form-control" required></select>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Tipo de Processo *</label>
+                    <select id="cp-type" class="form-control" required></select>
+                </div>
+                <div class="form-group" id="cp-status-group" style="display:none;">
+                    <label class="form-label">Status</label>
+                    <select id="cp-status" class="form-control">
+                        <option value="active">Em andamento</option>
+                        <option value="paused">Pausado</option>
+                        <option value="completed">Concluído</option>
+                        <option value="cancelled">Cancelado</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Observações</label>
+                    <textarea id="cp-notes" class="form-control" rows="3" placeholder="Contexto geral do processo..."></textarea>
+                </div>
+                <div style="display:flex; gap:12px; justify-content:flex-end;">
+                    <button type="button" class="btn btn-secondary" onclick="app.closeModal('modal-client-process')">Cancelar</button>
+                    <button type="submit" class="btn btn-primary">Salvar</button>
+                </div>
+            </form>
         </div>
     </div>
 
