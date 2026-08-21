@@ -339,6 +339,7 @@ class AppController {
             }
             this._modalStatus = this._currentColumns[0]?.id || 'new';
             this._syncModalColumnButtons();
+            this._populateProcessSelect('task-process', clientId, '');
         });
 
         // Paste de imagens nos modais de tarefa, implementação e treinamento
@@ -1078,7 +1079,8 @@ class AppController {
             attachments: this.taskAttachments,
             completed: this._modalCompleted || false,
             completedAt: this._modalCompletedAt || null,
-            hiddenFromClient: document.getElementById('task-hidden-from-client').checked
+            hiddenFromClient: document.getElementById('task-hidden-from-client').checked,
+            processId: document.getElementById('task-process').value || null,
         };
 
         const btn = document.querySelector('#form-task [type="submit"]');
@@ -1196,6 +1198,7 @@ class AppController {
         document.getElementById('task-title').value = t.title;
         document.getElementById('task-description').value = t.description;
         document.getElementById('task-client').value = t.clientId || '';
+        this._populateProcessSelect('task-process', t.clientId, t.processId || '');
         document.getElementById('task-priority').value = t.priority;
         document.getElementById('task-due-date').value = t.dueDate || '';
         document.getElementById('task-estimated-minutes').value = t.estimatedMinutes || '';
@@ -1950,6 +1953,7 @@ class AppController {
         // Pre-seleciona o cliente filtrado, se houver
         const filteredClient = document.getElementById('filter-task-client')?.value || '';
         document.getElementById('task-client').value = filteredClient;
+        this._populateProcessSelect('task-process', filteredClient, '');
         document.getElementById('task-priority').value = 'medium';
         document.getElementById('task-due-date').value = '';
         document.getElementById('task-estimated-minutes').value = '';
