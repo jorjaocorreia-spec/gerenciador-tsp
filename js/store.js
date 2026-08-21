@@ -25,6 +25,7 @@ class TSPStore {
             startTime: r.start_time || '', endTime: r.end_time || '',
             minutes: parseInt(r.minutes) || 0, description: r.description || '',
             isUnavailability: !!r.is_unavailability,
+            processId: r.process_id || null,
             createdAt: r.created_at };
     }
 
@@ -47,6 +48,7 @@ class TSPStore {
             completed: r.completed || false,
             completedAt: r.completed_at || null,
             hiddenFromClient: r.hidden_from_client || false,
+            processId: r.process_id || null,
             requestedByClient: !!r.requested_by_client,
             approvalStatus: r.approval_status || 'approved',
             rejectionReason: r.rejection_reason || null,
@@ -68,6 +70,7 @@ class TSPStore {
             rsvpStatus: r.rsvp_status || 'needsAction',
             isInvited: !!r.is_invited,
             calendarId: r.calendar_id || 'primary',
+            processId: r.process_id || null,
             createdAt: r.created_at };
     }
 
@@ -213,23 +216,23 @@ class TSPStore {
         return (data || []).map(r => this._record(r));
     }
 
-    async addRecord(clientId, date, startTime, endTime, minutes, description, isUnavailability = false) {
+    async addRecord(clientId, date, startTime, endTime, minutes, description, isUnavailability = false, processId = null) {
         const { data, error } = await this.db.from('records').insert({
             user_id: this.userId, client_id: clientId, date,
             start_time: startTime || '', end_time: endTime || '',
             minutes: parseInt(minutes) || 0, description: description || '',
-            is_unavailability: !!isUnavailability
+            is_unavailability: !!isUnavailability, process_id: processId || null
         }).select().single();
         if (error) throw error;
         return this._record(data);
     }
 
-    async updateRecord(id, clientId, date, startTime, endTime, minutes, description, isUnavailability = false) {
+    async updateRecord(id, clientId, date, startTime, endTime, minutes, description, isUnavailability = false, processId = null) {
         const { data, error } = await this.db.from('records').update({
             client_id: clientId, date, start_time: startTime || '',
             end_time: endTime || '', minutes: parseInt(minutes) || 0,
             description: description || '',
-            is_unavailability: !!isUnavailability
+            is_unavailability: !!isUnavailability, process_id: processId || null
         }).eq('id', id).select().single();
         if (error) throw error;
         return this._record(data);
@@ -298,7 +301,8 @@ class TSPStore {
             spent_minutes: 0,
             attachments: taskData.attachments || [],
             comments: [],
-            hidden_from_client: taskData.hiddenFromClient || false
+            hidden_from_client: taskData.hiddenFromClient || false,
+            process_id: taskData.processId || null
         }).select().single();
         if (error) throw error;
         return this._task(data);
@@ -319,6 +323,7 @@ class TSPStore {
             completed: taskData.completed || false,
             completed_at: taskData.completedAt || null,
             hidden_from_client: taskData.hiddenFromClient || false,
+            process_id: taskData.processId || null,
             ...(taskData.comments !== undefined && { comments: taskData.comments })
         }).eq('id', taskData.id).eq('user_id', this.userId).select().single();
         if (error) throw error;
@@ -440,7 +445,8 @@ class TSPStore {
             meet_link: eventData.meetLink || '', attendees: eventData.attendees || '',
             rsvp_status: eventData.rsvpStatus || 'needsAction',
             is_invited: eventData.isInvited || false,
-            calendar_id: eventData.calendarId || 'primary'
+            calendar_id: eventData.calendarId || 'primary',
+            process_id: eventData.processId || null
         }).select().single();
         if (error) throw error;
         return this._event(data);
@@ -460,7 +466,8 @@ class TSPStore {
             meet_link: eventData.meetLink || '', attendees: eventData.attendees || '',
             rsvp_status: eventData.rsvpStatus || 'needsAction',
             is_invited: eventData.isInvited || false,
-            calendar_id: eventData.calendarId || 'primary'
+            calendar_id: eventData.calendarId || 'primary',
+            process_id: eventData.processId || null
         }).eq('id', eventData.id).select().single();
         if (error) throw error;
         return this._event(data);
