@@ -1703,7 +1703,7 @@ class TSPStore {
             title: r.title, status: r.status, priority: r.priority,
             queue: r.queue, ticketType: r.ticket_type || '', customerName: r.customer_name, owner: r.owner,
             createdAtOtobo: r.created_at_otobo, updatedAtOtobo: r.updated_at_otobo,
-            rawData: r.raw_data || {}, linkedClientId: r.linked_client_id || null,
+            rawData: r.raw_data || {}, linkedClientId: r.linked_client_id || null, processId: r.process_id || null,
             syncedAt: r.synced_at
         };
     }
@@ -1728,6 +1728,13 @@ class TSPStore {
         }
         const { error } = await this.db.from('tickets').delete()
             .eq('user_id', this.userId).not('ticket_id', 'in', `(${ticketIds.join(',')})`);
+        if (error) throw error;
+    }
+
+    async updateTicketProcess(id, processId) {
+        const { error } = await this.db.from('tickets')
+            .update({ process_id: processId || null })
+            .eq('id', id).eq('user_id', this.userId);
         if (error) throw error;
     }
 
@@ -2045,6 +2052,65 @@ class TSPStore {
             .eq('id', id).eq('user_id', this.userId).select('*, process_types(name, color)').single();
         if (error) throw error;
         return this._clientProcess(data);
+    }
+
+    async getProcessDetailData(processId) {
+        const process = await this.getClientProcess(processId);
+        if (!process) return null;
+        const [tasksRes, eventsRes, recordsRes, ticketsRes, columns] = await Promise.all([
+            this.db.from('tasks').select('*').eq('user_id', this.userId).eq('process_id', processId),
+            this.db.from('agenda_events').select('*').eq('user_id', this.userId).eq('process_id', processId),
+            this.db.from('records').select('*').eq('user_id', this.userId).eq('process_id', processId),
+            this.db.from('tickets').select('*').eq('user_id', this.userId).eq('process_id', processId),
+            this.getAllColumns()
+        ]);
+        if (tasksRes.error) throw tasksRes.error;
+        if (eventsRes.error) throw eventsRes.error;
+        if (recordsRes.error) throw recordsRes.error;
+        if (ticketsRes.error) throw ticketsRes.error;
+
+        const columnsById = {};
+        columns.forEach(c => { columnsById[c.id] = c; });
+
+        return {
+            process,
+            tasks: (tasksRes.data || []).map(r => this._task(r)),
+            events: (eventsRes.data || []).map(r => this._event(r)),
+            records: (recordsRes.data || []).map(r => this._record(r)),
+            tickets: (ticketsRes.data || []).map(r => this._ticket(r)),
+            columnsById
+        };
+    }
+
+    async getUnlinkedItemsForClient(clientId) {
+        const [tasksRes, eventsRes, recordsRes, ticketsRes] = await Promise.all([
+            this.db.from('tasks').select('*').eq('user_id', this.userId).eq('client_id', clientId)
+                .eq('approval_status', 'approved').is('process_id', null),
+            this.db.from('agenda_events').select('*').eq('user_id', this.userId).eq('client_id', clientId).is('process_id', null),
+            this.db.from('records').select('*').eq('user_id', this.userId).eq('client_id', clientId).is('process_id', null),
+            this.db.from('tickets').select('*').eq('user_id', this.userId).eq('linked_client_id', clientId).is('process_id', null),
+        ]);
+        if (tasksRes.error) throw tasksRes.error;
+        if (eventsRes.error) throw eventsRes.error;
+        if (recordsRes.error) throw recordsRes.error;
+        if (ticketsRes.error) throw ticketsRes.error;
+        return {
+            tasks: (tasksRes.data || []).map(r => this._task(r)),
+            events: (eventsRes.data || []).map(r => this._event(r)),
+            records: (recordsRes.data || []).map(r => this._record(r)),
+            tickets: (ticketsRes.data || []).map(r => this._ticket(r)),
+        };
+    }
+
+    async linkExistingItemsToProcess(processId, { taskIds = [], eventIds = [], recordIds = [], ticketIds = [] }) {
+        const ops = [];
+        if (taskIds.length) ops.push(this.db.from('tasks').update({ process_id: processId }).in('id', taskIds).eq('user_id', this.userId));
+        if (eventIds.length) ops.push(this.db.from('agenda_events').update({ process_id: processId }).in('id', eventIds).eq('user_id', this.userId));
+        if (recordIds.length) ops.push(this.db.from('records').update({ process_id: processId }).in('id', recordIds).eq('user_id', this.userId));
+        if (ticketIds.length) ops.push(this.db.from('tickets').update({ process_id: processId }).in('id', ticketIds).eq('user_id', this.userId));
+        const results = await Promise.all(ops);
+        const failed = results.find(r => r.error);
+        if (failed) throw failed.error;
     }
 }
 
