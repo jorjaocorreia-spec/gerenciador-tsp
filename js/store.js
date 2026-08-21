@@ -111,6 +111,15 @@ class TSPStore {
             color: r.color || '#8b5cf6', createdAt: r.created_at };
     }
 
+    _clientProcess(r) {
+        return { id: r.id, clientId: r.client_id, processTypeId: r.process_type_id,
+            status: r.status || 'active', startedAt: r.started_at || null,
+            completedAt: r.completed_at || null, notes: r.notes || '',
+            createdAt: r.created_at,
+            processTypeName: r.process_types?.name || '(tipo removido)',
+            processTypeColor: r.process_types?.color || '#8b5cf6' };
+    }
+
     // ── CLIENTES ─────────────────────────────────────────────────
 
     async getClients() {
@@ -1965,6 +1974,70 @@ class TSPStore {
         const { error } = await this.db.from('process_types').delete()
             .eq('id', id).eq('user_id', this.userId);
         if (error) throw error;
+    }
+
+    // ── PROCESSOS DO CLIENTE (instâncias) ────────────────────────────
+
+    async getClientProcesses() {
+        const { data, error } = await this.db.from('client_processes')
+            .select('*, process_types(name, color)')
+            .eq('user_id', this.userId).order('created_at', { ascending: false });
+        if (error) throw error;
+        return (data || []).map(r => this._clientProcess(r));
+    }
+
+    async getClientProcess(id) {
+        const { data, error } = await this.db.from('client_processes')
+            .select('*, process_types(name, color)')
+            .eq('id', id).eq('user_id', this.userId).single();
+        if (error) return null;
+        return this._clientProcess(data);
+    }
+
+    async getClientProcessesByClient(clientId) {
+        const { data, error } = await this.db.from('client_processes')
+            .select('*, process_types(name, color)')
+            .eq('user_id', this.userId).eq('client_id', clientId)
+            .order('created_at', { ascending: false });
+        if (error) throw error;
+        return (data || []).map(r => this._clientProcess(r));
+    }
+
+    async getActiveClientProcessesByClient(clientId) {
+        const { data, error } = await this.db.from('client_processes')
+            .select('*, process_types(name, color)')
+            .eq('user_id', this.userId).eq('client_id', clientId).eq('status', 'active')
+            .order('created_at', { ascending: false });
+        if (error) throw error;
+        return (data || []).map(r => this._clientProcess(r));
+    }
+
+    async getAllActiveClientProcessesWithType() {
+        const { data, error } = await this.db.from('client_processes')
+            .select('*, process_types(name, color)')
+            .eq('user_id', this.userId).eq('status', 'active');
+        if (error) throw error;
+        return (data || []).map(r => this._clientProcess(r));
+    }
+
+    async addClientProcess({ clientId, processTypeId, notes }) {
+        const { data, error } = await this.db.from('client_processes').insert({
+            user_id: this.userId, client_id: clientId, process_type_id: processTypeId || null,
+            status: 'active', started_at: new Date().toISOString().slice(0, 10), notes: notes || ''
+        }).select('*, process_types(name, color)').single();
+        if (error) throw error;
+        return this._clientProcess(data);
+    }
+
+    async updateClientProcess(id, { status, notes, completedAt }) {
+        const payload = {};
+        if (status !== undefined) payload.status = status;
+        if (notes !== undefined) payload.notes = notes;
+        if (completedAt !== undefined) payload.completed_at = completedAt;
+        const { data, error } = await this.db.from('client_processes').update(payload)
+            .eq('id', id).eq('user_id', this.userId).select('*, process_types(name, color)').single();
+        if (error) throw error;
+        return this._clientProcess(data);
     }
 }
 
