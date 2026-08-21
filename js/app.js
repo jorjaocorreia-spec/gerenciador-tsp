@@ -2666,6 +2666,7 @@ class AppController {
                 this.renderImplementations(),
                 this.renderTrainings(),
                 this.renderProcessos(),
+                this.renderProcessDetail(),
                 this.renderChamados(),
                 this.renderProdutividade(),
                 this.renderFinanceiro(),
@@ -9169,6 +9170,81 @@ class AppController {
             tab.setAttribute('aria-selected', active ? 'true' : 'false');
         });
         this.renderProcessos();
+    }
+
+    openProcessDetail(id) {
+        this.selectedProcessId = id;
+        this.switchView('process-detail');
+        this._setActiveNavItem(null);
+    }
+
+    async renderProcessDetail() {
+        if (this.currentView !== 'process-detail' || !this.selectedProcessId) return;
+        const container = document.getElementById('pd-timeline');
+        if (!container) return;
+
+        try {
+            const detail = await store.getProcessDetailData(this.selectedProcessId);
+            if (!detail) { Toast.show('Processo não encontrado.', 'error'); this.switchView('processos'); return; }
+            this._processDetailCache = detail;
+            const { process, tasks, events, records, tickets, columnsById } = detail;
+            const client = await store.getClient(process.clientId);
+
+            document.getElementById('pd-title').textContent = process.processTypeName;
+            document.getElementById('pd-subtitle').textContent = client ? client.name : '(cliente removido)';
+            document.getElementById('pd-started-at').textContent = process.startedAt
+                ? new Date(process.startedAt + 'T12:00').toLocaleDateString('pt-BR') : '—';
+            const statusSelect = document.getElementById('pd-status');
+            statusSelect.innerHTML = `
+                <option value="active">Em andamento</option>
+                <option value="paused">Pausado</option>
+                <option value="completed">Concluído</option>
+                <option value="cancelled">Cancelado</option>`;
+            statusSelect.value = process.status;
+            const completedWrap = document.getElementById('pd-completed-at-wrap');
+            if (process.completedAt) {
+                completedWrap.style.display = '';
+                document.getElementById('pd-completed-at').textContent = new Date(process.completedAt + 'T12:00').toLocaleDateString('pt-BR');
+            } else {
+                completedWrap.style.display = 'none';
+            }
+
+            const pendencies = TSPProcessTimeline.computePendencies(tasks, columnsById);
+            const pendContainer = document.getElementById('pd-pendencies');
+            pendContainer.innerHTML = pendencies.length === 0
+                ? '<span style="font-size:.85rem;color:var(--text-muted);">Nenhuma pendência.</span>'
+                : pendencies.map(t => `<div style="padding:8px;border-radius:6px;background:var(--bg-glass);margin-bottom:6px;font-size:.85rem;cursor:pointer;"
+                    onclick="app.handleEditTask('${t.id}')">${escapeHtml(t.title)}</div>`).join('');
+
+            const timeline = TSPProcessTimeline.buildTimeline({ tasks, events, records, tickets });
+            const iconByKind = { task: 'kanban', task_comment: 'message-square', agenda: 'calendar', record: 'clock', ticket: 'headphones' };
+            container.innerHTML = timeline.length === 0
+                ? '<span style="font-size:.85rem;color:var(--text-muted);">Nenhum item vinculado ainda.</span>'
+                : timeline.map(item => `
+                    <div style="display:flex;gap:10px;padding:10px 0;border-bottom:1px solid var(--border-color);">
+                        <i data-lucide="${iconByKind[item.kind] || 'circle'}" style="width:16px;height:16px;flex-shrink:0;margin-top:2px;color:var(--primary);"></i>
+                        <div style="flex:1;">
+                            <div style="font-size:.85rem;font-weight:500;">${escapeHtml(item.title)}</div>
+                            <div style="font-size:.75rem;color:var(--text-muted);">${escapeHtml(item.subtitle)} · ${new Date(item.at).toLocaleString('pt-BR')}</div>
+                        </div>
+                    </div>`).join('');
+            lucide.createIcons();
+        } catch (err) {
+            container.innerHTML = `<p class="text-muted">Erro ao carregar processo: ${escapeHtml(err.message)}</p>`;
+        }
+    }
+
+    async handleProcessDetailStatusChange() {
+        if (!this.selectedProcessId) return;
+        const status = document.getElementById('pd-status').value;
+        const completedAt = status === 'completed' ? new Date().toISOString().slice(0, 10) : null;
+        try {
+            await store.updateClientProcess(this.selectedProcessId, { status, completedAt });
+            await this.renderProcessDetail();
+            Toast.show('Status atualizado.', 'success');
+        } catch (err) {
+            Toast.show('Erro ao atualizar status: ' + err.message, 'error');
+        }
     }
 
     // ── Catálogo de Tipos de Processo ───────────────────────────────
