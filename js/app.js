@@ -2654,6 +2654,12 @@ class AppController {
             this._agendaTasksCache = null; // força re-fetch do seletor "Vincular Tarefa"
             // Pre-busca tudo em 4 queries (antes: 4×N queries por ciclo)
             const batchStats = await store.getBatchStats();
+            const activeProcesses = await store.getAllActiveClientProcessesWithType();
+            this._activeProcessesByClient = {};
+            activeProcesses.forEach(p => {
+                if (!this._activeProcessesByClient[p.clientId]) this._activeProcessesByClient[p.clientId] = [];
+                this._activeProcessesByClient[p.clientId].push({ id: p.id, label: p.processTypeName });
+            });
             const clients = batchStats.map(s => s.client);
             await this.updateClientSelects(clients);
             await Promise.all([
@@ -8987,6 +8993,26 @@ class AppController {
         } catch (err) {
             container.innerHTML = `<p class="text-muted">Erro ao carregar implementações: ${escapeHtml(err.message)}</p>`;
         }
+    }
+
+    // Síncrono: lê de this._activeProcessesByClient (populado em renderAll()).
+    // Some silenciosamente se não houver cliente ou nenhum processo ativo
+    // desse cliente — mesmo padrão condicional de campos opcionais do app
+    // (ex.: agenda-generate-meet-row).
+    _populateProcessSelect(selectId, clientId, selectedId = '') {
+        const select = document.getElementById(selectId);
+        if (!select) return;
+        const wrap = select.closest('.form-group') || select;
+        const options = (clientId && this._activeProcessesByClient?.[clientId]) || [];
+        if (options.length === 0) {
+            select.innerHTML = '<option value="">Nenhum processo ativo</option>';
+            wrap.style.display = 'none';
+            return;
+        }
+        wrap.style.display = '';
+        select.innerHTML = '<option value="">Nenhum</option>' +
+            options.map(o => `<option value="${o.id}">${escapeHtml(o.label)}</option>`).join('');
+        select.value = selectedId || '';
     }
 
     async _populateImplClientCheckboxes(selectedIds = []) {
