@@ -306,6 +306,10 @@ class AppController {
             ?.addEventListener('submit', (e) => this.handleImplementationSubmit(e));
         document.getElementById('form-training')
             ?.addEventListener('submit', (e) => this.handleTrainingSubmit(e));
+        document.getElementById('form-process-type')
+            ?.addEventListener('submit', (e) => this.handleProcessTypeSubmit(e));
+        document.getElementById('form-client-process')
+            ?.addEventListener('submit', (e) => this.handleClientProcessSubmit(e));
 
         document.getElementById('form-ai-config')
             ?.addEventListener('submit', (e) => this.handleAIConfigSubmit(e));
@@ -485,7 +489,7 @@ class AppController {
         this.currentView = viewName;
 
         // V1: direção do slide baseada na ordem do menu
-        const VIEW_ORDER = ['dashboard','clients','records','tasks','agenda','apontamentos','implementations','trainings','chamados','produtividade','financeiro','indicadores','users'];
+        const VIEW_ORDER = ['dashboard','clients','records','tasks','agenda','apontamentos','implementations','trainings','processos','chamados','produtividade','financeiro','indicadores','users'];
         const prevIdx = VIEW_ORDER.indexOf(prevView);
         const newIdx  = VIEW_ORDER.indexOf(viewName);
         const slideDir = (prevIdx >= 0 && newIdx >= 0 && prevIdx !== newIdx)
@@ -2661,6 +2665,7 @@ class AppController {
                 this.renderApontamentos(),
                 this.renderImplementations(),
                 this.renderTrainings(),
+                this.renderProcessos(),
                 this.renderChamados(),
                 this.renderProdutividade(),
                 this.renderFinanceiro(),
@@ -9102,6 +9107,192 @@ class AppController {
         const els = ['impl-filter-type', 'impl-filter-status', 'impl-filter-client'];
         els.forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
         this.renderImplementations();
+    }
+
+    // ===================================
+    // PROCESSOS DO CLIENTE
+    // ===================================
+
+    async renderProcessos() {
+        if (this.currentView !== 'processos') return;
+        const container = document.getElementById('processos-container');
+        if (!container) return;
+        container.innerHTML = spinnerHtml;
+
+        try {
+            const [processes, clients] = await Promise.all([
+                store.getClientProcesses(),
+                store.getClients()
+            ]);
+            this._processesCache = processes;
+            const clientsMap = {};
+            clients.forEach(c => { clientsMap[c.id] = c; });
+
+            const filter = this.processStatusFilter || 'active';
+            const filtered = filter === 'all' ? processes : processes.filter(p => p.status === filter);
+
+            if (filtered.length === 0) {
+                container.innerHTML = `<div class="glass" style="padding:40px; text-align:center; color:var(--text-muted);">
+                    <i data-lucide="git-branch" style="width:48px;height:48px;opacity:.3;margin-bottom:12px;"></i>
+                    <p>Nenhum processo encontrado.</p></div>`;
+                lucide.createIcons();
+                return;
+            }
+
+            const statusLabels = { active: 'Em andamento', paused: 'Pausado', completed: 'Concluído', cancelled: 'Cancelado' };
+            container.innerHTML = `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:14px;">` +
+                filtered.map(p => {
+                    const client = clientsMap[p.clientId];
+                    return `<div class="glass clickable-card" style="padding:16px;border-left:4px solid ${p.processTypeColor};"
+                        onclick="app.openProcessDetail('${p.id}')" tabindex="0" role="button"
+                        aria-label="Abrir processo: ${escapeHtml(p.processTypeName)} — ${escapeHtml(client?.name || '')}"
+                        onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();app.openProcessDetail('${p.id}')}">
+                        <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;margin-bottom:6px;">
+                            <span style="font-weight:600;">${escapeHtml(p.processTypeName)}</span>
+                            <span style="font-size:.7rem;padding:2px 8px;border-radius:20px;background:var(--bg-glass);color:var(--text-muted);">${statusLabels[p.status] || p.status}</span>
+                        </div>
+                        <div style="font-size:.85rem;color:var(--text-secondary);margin-bottom:8px;">${escapeHtml(client?.name || '(cliente removido)')}</div>
+                        <div style="font-size:.75rem;color:var(--text-muted);">Iniciado em ${p.startedAt ? new Date(p.startedAt + 'T12:00').toLocaleDateString('pt-BR') : '—'}</div>
+                    </div>`;
+                }).join('') + `</div>`;
+            lucide.createIcons();
+        } catch (err) {
+            container.innerHTML = `<p class="text-muted">Erro ao carregar processos: ${escapeHtml(err.message)}</p>`;
+        }
+    }
+
+    setProcessStatusFilter(status) {
+        this.processStatusFilter = status;
+        document.querySelectorAll('#process-status-filter-tabs .status-filter-tab').forEach(tab => {
+            const active = tab.getAttribute('data-status') === status;
+            tab.classList.toggle('active', active);
+            tab.setAttribute('aria-selected', active ? 'true' : 'false');
+        });
+        this.renderProcessos();
+    }
+
+    // ── Catálogo de Tipos de Processo ───────────────────────────────
+
+    async openManageProcessTypes() {
+        document.getElementById('process-type-id').value = '';
+        document.getElementById('process-type-name').value = '';
+        document.getElementById('process-type-color').value = '#8b5cf6';
+        await this._renderProcessTypesList();
+        this.openModal('modal-process-types');
+    }
+
+    async _renderProcessTypesList() {
+        const list = document.getElementById('process-types-list');
+        list.innerHTML = spinnerHtml;
+        const types = await store.getProcessTypes();
+        this._processTypesCache = types;
+        if (types.length === 0) {
+            list.innerHTML = '<span style="font-size:.85rem;color:var(--text-muted);">Nenhum tipo cadastrado ainda.</span>';
+            return;
+        }
+        list.innerHTML = types.map(t => `
+            <div style="display:flex;align-items:center;gap:10px;padding:8px 10px;background:var(--bg-glass);border-radius:8px;">
+                <span style="width:12px;height:12px;border-radius:50%;background:${t.color};flex-shrink:0;"></span>
+                <span style="flex:1;font-size:.9rem;">${escapeHtml(t.name)}</span>
+                <button type="button" class="btn-icon-sm" title="Editar" onclick="app._editProcessType('${t.id}')"><i data-lucide="pencil" style="width:14px;height:14px;"></i></button>
+                <button type="button" class="btn-icon-sm" title="Excluir" onclick="app._deleteProcessType('${t.id}', this)"><i data-lucide="trash-2" style="width:14px;height:14px;"></i></button>
+            </div>`).join('');
+        lucide.createIcons();
+    }
+
+    _editProcessType(id) {
+        const t = (this._processTypesCache || []).find(x => x.id === id);
+        if (!t) return;
+        document.getElementById('process-type-id').value = t.id;
+        document.getElementById('process-type-name').value = t.name;
+        document.getElementById('process-type-color').value = t.color;
+    }
+
+    _deleteProcessType(id, btn) {
+        this._twostepDelete(btn, async () => {
+            try {
+                await store.deleteProcessType(id);
+                await this._renderProcessTypesList();
+                Toast.show('Tipo de processo excluído.', 'success');
+            } catch (err) {
+                Toast.show('Erro ao excluir: ' + err.message, 'error');
+            }
+        });
+    }
+
+    async handleProcessTypeSubmit(e) {
+        e.preventDefault();
+        const id = document.getElementById('process-type-id').value;
+        const payload = {
+            name: document.getElementById('process-type-name').value.trim(),
+            description: '',
+            color: document.getElementById('process-type-color').value,
+        };
+        try {
+            if (id) await store.updateProcessType(id, payload);
+            else await store.addProcessType(payload);
+            document.getElementById('process-type-id').value = '';
+            document.getElementById('form-process-type').reset();
+            document.getElementById('process-type-color').value = '#8b5cf6';
+            await this._renderProcessTypesList();
+            Toast.show(id ? 'Tipo atualizado.' : 'Tipo criado.', 'success');
+        } catch (err) {
+            Toast.show('Erro ao salvar: ' + err.message, 'error');
+        }
+    }
+
+    // ── Instância de Processo ───────────────────────────────────────
+
+    async _populateProcessTypeSelect(selectedId = '') {
+        const select = document.getElementById('cp-type');
+        const types = this._processTypesCache || await store.getProcessTypes();
+        this._processTypesCache = types;
+        select.innerHTML = '<option value="">Selecione...</option>' +
+            types.map(t => `<option value="${t.id}">${escapeHtml(t.name)}</option>`).join('');
+        select.value = selectedId;
+    }
+
+    async openNewClientProcess(clientId = '') {
+        document.getElementById('modal-client-process-title').textContent = 'Novo Processo';
+        document.getElementById('cp-id').value = '';
+        document.getElementById('cp-notes').value = '';
+        document.getElementById('cp-status-group').style.display = 'none';
+        const clientSelect = document.getElementById('cp-client');
+        if (clientSelect.options.length <= 0) {
+            const clients = await store.getClients();
+            clientSelect.innerHTML = clients.map(c => `<option value="${c.id}">${escapeHtml(c.name)}</option>`).join('');
+        }
+        clientSelect.value = clientId;
+        clientSelect.disabled = false;
+        await this._populateProcessTypeSelect('');
+        this.openModal('modal-client-process');
+    }
+
+    async handleClientProcessSubmit(e) {
+        e.preventDefault();
+        const id = document.getElementById('cp-id').value;
+        const notes = document.getElementById('cp-notes').value;
+        const btn = e.target.querySelector('[type="submit"]');
+        this._btnPending(btn);
+        try {
+            if (id) {
+                const status = document.getElementById('cp-status').value;
+                const completedAt = status === 'completed' ? new Date().toISOString().slice(0, 10) : null;
+                await store.updateClientProcess(id, { status, notes, completedAt });
+            } else {
+                const clientId = document.getElementById('cp-client').value;
+                const processTypeId = document.getElementById('cp-type').value;
+                if (!clientId || !processTypeId) { Toast.show('Selecione cliente e tipo de processo.', 'error'); this._btnError(btn); return; }
+                await store.addClientProcess({ clientId, processTypeId, notes });
+            }
+            await this._btnSuccess(btn);
+            this.closeModal('modal-client-process');
+            await this.renderProcessos();
+            Toast.show(id ? 'Processo atualizado.' : 'Processo criado.', 'success');
+        } catch (err) {
+            this._btnError(btn);
+            Toast.show('Erro ao salvar: ' + err.message, 'error');
+        }
     }
 
     // ===================================
