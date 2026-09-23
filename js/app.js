@@ -4017,7 +4017,7 @@ class AppController {
                     : '';
                 tr.innerHTML = `
                     <td>${r.date.split('-').reverse().join('/')}${timeRange}${partLabel}</td>
-                    <td><strong>${clientName}</strong></td>
+                    <td><strong>${clientName}</strong>${client && client.projectNum ? `<br><small class="text-muted">Proj. ${escapeHtml(client.projectNum)}</small>` : ''}</td>
                     ${descCell}
                     <td class="hours-flip">${r.minutes} min <span class="text-muted">(${hoursStr})</span></td>
                     <td>
@@ -6561,6 +6561,12 @@ class AppController {
                 .replace(/[\d:]+\s+Horas\s+contratadas[.:]*\s*[\d:]*\s*Horas\s+executadas[.:]*\s*[\d:]*/gi, '')
                 .replace(/Horas\s+(?:contratadas|executadas)[.:]*\s*[\d:]*/gi, '')
                 .replace(/\s{2,}/g, ' ')
+                .trim()
+                // Remove o cabeçalho "NOME DO CLIENTE - CÓDIGO (DESCRIÇÃO) Tipo.:" que o SAP repete
+                // no início da descrição (ex.: "MK AUTO CENTER - TSP (TECINCO SERVICE PRIME) Tipo.:").
+                // Ancorado no início e limitado aos primeiros 150 caracteres para nunca cortar
+                // conteúdo real caso "Tipo.:" apareça mais adiante no texto por coincidência.
+                .replace(/^.{0,150}?Tipo\s*[.:]+\s*/i, '')
                 .trim();
         }
 
