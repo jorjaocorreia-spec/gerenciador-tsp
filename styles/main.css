@@ -613,6 +613,42 @@ h4 {
   background-size: 100% 100%;
 }
 
+/* Tabela de Comissão CS (modal de Cliente, aba Comissão CS) — 9 colunas, a
+   maioria valores monetários. O padding:16px do .data-table padrão (pensado
+   para tabelas de 3-5 colunas como Clientes/Atendimentos) desperdiça espaço
+   horizontal aqui; mais crítico para fechar a tabela inteira numa tela sem
+   scroll. Colunas numéricas alinhadas à direita — números se comparam de
+   cima a baixo pela casa decimal, não pela borda esquerda do texto. */
+.cs-commission-table th,
+.cs-commission-table td {
+  padding: 10px 10px;
+  font-size: 0.85rem;
+  white-space: nowrap;
+}
+.cs-commission-table th {
+  font-size: 0.72rem;
+  letter-spacing: 0.03em;
+}
+.cs-commission-table th:first-child,
+.cs-commission-table td:first-child {
+  white-space: normal;
+}
+.cs-commission-table th:not(:first-child):not(:last-child),
+.cs-commission-table td:not(:first-child):not(:last-child) {
+  text-align: right;
+}
+.cs-commission-table .cs-hours-input {
+  width: 64px;
+  text-align: right;
+  padding: 6px 6px;
+}
+.cs-commission-table th:last-child,
+.cs-commission-table td:last-child {
+  text-align: center;
+  padding-left: 4px;
+  padding-right: 10px;
+}
+
 /* T1: row-in removido — re-disparava em todo renderAll() causando repaint contínuo */
 @keyframes row-in {
   from { opacity: 0; transform: translateY(6px); }
@@ -844,6 +880,24 @@ h4 {
 
 .modal-overlay.active .modal {
   transform: scale(1) translateY(0);
+}
+
+/* Modal de Cliente: largura própria (620px) para caber confortavelmente o
+   formulário de Dados. Tinha sido fixada via style="" inline, o que impedia
+   qualquer classe de sobrescrever — movida para CSS para permitir o modifier
+   .modal-wide abaixo (aba Comissão CS). */
+.modal.modal-client-size {
+  max-width: 620px;
+}
+
+/* Largura alternativa para abas de modal com tabela densa (ex.: Comissão CS do
+   modal de Cliente) — evita que uma tabela de 9 colunas fique espremida contra
+   o max-width:620px padrão do modal, forçando scroll vertical+horizontal
+   simultâneo. Aplicada/removida via JS só enquanto a aba larga está ativa;
+   a transição de largura usa a mesma curva do transform acima. */
+.modal.modal-wide {
+  max-width: 1180px;
+  transition: transform 0.35s cubic-bezier(0.16, 1, 0.3, 1), max-width 0.25s ease;
 }
 
 .modal-header {

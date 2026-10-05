@@ -9862,6 +9862,13 @@ class AppController {
         const btnCs    = document.getElementById('tab-btn-cs');
         if (!dados || !sched) return;
 
+        // A aba Comissão CS tem uma tabela de 9 colunas que não cabe no
+        // max-width:620px padrão do modal de Cliente sem forçar scroll
+        // horizontal+vertical simultâneo. Alarga só enquanto essa aba está
+        // ativa; as demais abas (formulários simples) voltam ao padrão.
+        const modalEl = document.querySelector('#modal-client .modal');
+        if (modalEl) modalEl.classList.toggle('modal-wide', tab === 'cs');
+
         dados.style.display = 'none';
         sched.style.display = 'none';
         if (rep) rep.style.display = 'none';
@@ -10064,7 +10071,7 @@ class AppController {
                 return `
                     <tr>
                         <td>${escapeHtml(emailByUserId[p.userId] || p.userId)}</td>
-                        <td><input type="number" step="0.01" min="0" value="${p.hoursApontadas}" class="form-control" style="width:90px;" onchange="app.updateCsParticipantHoursInline('${p.id}', this.value)"></td>
+                        <td><input type="number" step="0.01" min="0" value="${p.hoursApontadas}" class="form-control cs-hours-input" onchange="app.updateCsParticipantHoursInline('${p.id}', this.value)"></td>
                         <td>${(result.percentual * 100).toFixed(1)}%</td>
                         <td>${fmt(result.bonus)}</td>
                         <td>${fmt(result.apontamentoBonus)}</td>
@@ -10115,7 +10122,7 @@ class AppController {
                 </div>
 
                 <div style="overflow-x:auto;">
-                <table class="data-table">
+                <table class="data-table cs-commission-table">
                     <thead><tr><th>Consultor</th><th>Horas</th><th>%</th><th>Bônus</th><th>Bônus Apontamento</th><th>Com. Vendas</th><th>Com. Mensalidade</th><th>Total</th><th></th></tr></thead>
                     <tbody>${rowsHtml || '<tr><td colspan="9" class="text-muted">Nenhum participante neste mês.</td></tr>'}</tbody>
                 </table>
