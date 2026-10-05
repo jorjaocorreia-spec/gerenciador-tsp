@@ -5554,7 +5554,21 @@ kbd {
 }
 .quick-notes-item.quick-notes-item--today { border-left: 3px solid var(--danger-color); }
 .quick-notes-item-text { font-size: 0.9rem; white-space: pre-wrap; }
-.quick-notes-item-meta { display: flex; gap: 8px; font-size: 0.75rem; color: var(--text-muted); }
+.quick-notes-item-meta { display: flex; align-items: center; gap: 8px; font-size: 0.75rem; color: var(--text-muted); }
+/* Separador "·" entre os chips de meta-informação (cliente, data) — evita texto
+   solto misturado com spans num container flex (gap empurra cada nó igual,
+   um "·" como texto puro ficava com espaçamento inconsistente). */
+.quick-notes-item-meta > *:not(:first-child) { position: relative; padding-left: 8px; }
+.quick-notes-item-meta > *:not(:first-child)::before {
+    content: '·'; position: absolute; left: -1px; color: var(--text-muted);
+}
+.quick-notes-item-client { cursor: pointer; border-bottom: 1px dashed transparent; }
+.quick-notes-item-client:hover { color: var(--text-primary); border-bottom-color: var(--text-muted); }
+/* Estado vazio precisa de affordance mais forte que o resto da meta (texto
+   muted comum passaria despercebido) — é o convite pra ação obrigatória
+   (sem cliente, a nota não pode virar tarefa). */
+.quick-notes-item-client--empty { color: var(--primary); font-weight: 500; border-bottom-color: transparent; }
+.quick-notes-item-client--empty:hover { color: var(--primary-hover); border-bottom-color: var(--primary); }
 .quick-notes-item-actions { display: flex; gap: 6px; flex-wrap: wrap; }
 .quick-notes-empty { text-align: center; color: var(--text-muted); font-size: 0.85rem; padding: 20px 0; }
 

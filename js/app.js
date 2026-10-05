@@ -1099,10 +1099,14 @@ class AppController {
         const btn = document.querySelector('#form-task [type="submit"]');
         if (btn) this._btnPending(btn);
 
-        // Capturado antes do bloco de criação, que zera this._triagingNoteId assim que
+        // Captura antes do bloco de criação, que zera this._triagingNoteId assim que
         // resolve a nota — precisamos saber depois (fora do try) se este submit veio de
-        // "Virar Tarefa" sem cliente pré-selecionado, pra reabrir a tarefa recém-criada
-        // em modo edição (comentários/tempo liberados) em vez de só fechar o modal.
+        // uma triagem de nota, pra reabrir a tarefa recém-criada em modo edição
+        // (comentários/tempo liberados) em vez de só fechar o modal. Na prática
+        // triageQuickNoteAsTask() hoje exige cliente e nunca mais cai nesse branch
+        // (vai direto pro caminho rápido em handleEditTask), mas o guard continua
+        // válido como defesa caso outro ponto do app venha a setar _triagingNoteId
+        // antes de chamar handleTaskSubmit sem passar por _openNewTaskModal().
         const wasTriagingNote = !!this._triagingNoteId;
         let createdTaskId = null;
 
@@ -11681,13 +11685,19 @@ class AppController {
 
     _renderQuickNotePendingItem(n) {
         const clientName = n.clientId ? (this._quickNotesClientsCache?.[n.clientId] || '') : '';
-        const metaParts = [];
-        if (clientName) metaParts.push(escapeHtml(clientName));
-        if (n.suggestedDate) metaParts.push(new Date(n.suggestedDate + 'T00:00:00').toLocaleDateString('pt-BR'));
+        // Vínculo de cliente é editável inline — "Virar Tarefa" exige cliente (addTask()
+        // não aceita nota sem cliente), então notas criadas sem um precisam de um jeito
+        // de corrigir isso sem precisar apagar e recriar a nota.
+        const clientChip = clientName
+            ? `<span class="quick-notes-item-client" onclick="app._startEditQuickNoteClient('${n.id}')" title="Trocar cliente">${escapeHtml(clientName)}</span>`
+            : `<span class="quick-notes-item-client quick-notes-item-client--empty" onclick="app._startEditQuickNoteClient('${n.id}')">+ Adicionar cliente</span>`;
+        const dateChip = n.suggestedDate
+            ? `<span>${new Date(n.suggestedDate + 'T00:00:00').toLocaleDateString('pt-BR')}</span>`
+            : '';
         return `
         <div class="quick-notes-item ${n.isToday ? 'quick-notes-item--today' : ''}" data-id="${n.id}">
             <div class="quick-notes-item-text" onclick="app._startEditQuickNoteText('${n.id}')" style="cursor:text;">${escapeHtml(n.text)}</div>
-            ${metaParts.length ? `<div class="quick-notes-item-meta">${metaParts.join(' · ')}</div>` : ''}
+            <div class="quick-notes-item-meta" data-meta-id="${n.id}">${clientChip}${dateChip}</div>
             <div class="quick-notes-item-actions">
                 <button type="button" class="btn btn-secondary btn-sm" onclick="app.toggleQuickNoteToday('${n.id}')">
                     <i data-lucide="${n.isToday ? 'star-off' : 'star'}" style="width:12px;height:12px;"></i> ${n.isToday ? 'Tirar de hoje' : 'Marcar hoje'}
@@ -11764,21 +11774,19 @@ class AppController {
     async triageQuickNoteAsTask(id) {
         const note = (this._quickNotesCache || []).find(n => n.id === id);
         if (!note) return;
-        this.closeModal('modal-quick-notes', true);
 
-        // Nota sem cliente vinculado: addTask() exige clientId (obrigatório no banco),
-        // então não dá pra criar direto. Mantém o fluxo antigo — abre o modal de
-        // criação vazio pedindo o cliente; handleTaskSubmit() já reabre a tarefa em
-        // modo edição assim que ela for salva (ver wasTriagingNote ali).
+        // Cliente é obrigatório para virar tarefa — bloqueia aqui, antes de fechar o
+        // painel de notas, para o consultor continuar vendo a nota e poder editá-la
+        // (botão de lápis no próprio texto) e escolher um cliente antes de tentar de
+        // novo. addTask() também exigiria clientId mais adiante, mas validar cedo evita
+        // abrir qualquer modal e dá uma mensagem específica em vez de deixar a tarefa
+        // "pela metade" num fluxo de criação vazio.
         if (!note.clientId) {
-            this._openNewTaskModal();
-            this._triagingNoteId = id;
-            document.getElementById('task-title').value = note.text.slice(0, 120);
-            document.getElementById('task-description').value = note.text;
-            if (note.suggestedDate) document.getElementById('task-due-date').value = note.suggestedDate;
-            this._refreshFloatLabels(document.getElementById('modal-task'));
+            Toast.show('Esta nota não tem cliente vinculado. Edite a nota e escolha um cliente antes de virar tarefa.', 'error');
             return;
         }
+
+        this.closeModal('modal-quick-notes', true);
 
         // Nota com cliente: cria a tarefa imediatamente (mesmo dado que o consultor
         // digitaria manualmente) e abre direto em modo edição — libera comentários,
@@ -11856,6 +11864,46 @@ class AppController {
             note.text = text;
         } catch (err) {
             Toast.show('Erro ao editar nota: ' + err.message, 'error');
+        }
+        this._renderQuickNotesLists();
+    }
+
+    _startEditQuickNoteClient(id) {
+        const meta = document.querySelector(`.quick-notes-item[data-id="${id}"] [data-meta-id="${id}"]`);
+        if (!meta || meta.querySelector('select')) return;
+        const note = (this._quickNotesCache || []).find(n => n.id === id);
+        if (!note) return;
+        const select = document.createElement('select');
+        select.className = 'form-control form-control-sm';
+        select.style.cssText = 'display:inline-block;width:auto;max-width:200px;padding:2px 6px;font-size:0.8rem;';
+        const emptyOpt = document.createElement('option');
+        emptyOpt.value = '';
+        emptyOpt.textContent = 'Sem cliente';
+        select.appendChild(emptyOpt);
+        Object.entries(this._quickNotesClientsCache || {}).forEach(([cid, name]) => {
+            const opt = document.createElement('option');
+            opt.value = cid;
+            opt.textContent = name;
+            if (cid === note.clientId) opt.selected = true;
+            select.appendChild(opt);
+        });
+        meta.innerHTML = '';
+        meta.appendChild(select);
+        select.focus();
+        const save = () => this._saveQuickNoteClient(id, select.value || null);
+        select.addEventListener('change', save);
+        select.addEventListener('blur', () => this._renderQuickNotesLists());
+    }
+
+    async _saveQuickNoteClient(id, newClientId) {
+        const note = (this._quickNotesCache || []).find(n => n.id === id);
+        if (!note || newClientId === note.clientId) { this._renderQuickNotesLists(); return; }
+        try {
+            await store.updateQuickNote(id, { clientId: newClientId });
+            note.clientId = newClientId;
+            Toast.show('Cliente da nota atualizado.', 'success');
+        } catch (err) {
+            Toast.show('Erro ao atualizar cliente da nota: ' + err.message, 'error');
         }
         this._renderQuickNotesLists();
     }
