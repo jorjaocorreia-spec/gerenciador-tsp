@@ -2864,7 +2864,12 @@ body.money-hidden .money-value {
    ========================================= */
 #toast-container {
   position: fixed;
-  bottom: 24px;
+  /* FAB de Notas Rápidas (.quick-notes-fab) ocupa o mesmo canto inferior
+     direito (bottom:24px, 52px de altura) — sem essa folga, o toast mais
+     recente da pilha nascia bem em cima do botão, cobrindo-o por completo
+     enquanto o toast não era fechado/expirava. 24px (offset do FAB) + 52px
+     (altura do FAB) + 16px de respiro = fica sempre acima do botão inteiro. */
+  bottom: 92px;
   right: 24px;
   z-index: var(--z-toast);
   display: flex;
