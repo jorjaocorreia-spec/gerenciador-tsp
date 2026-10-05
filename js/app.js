@@ -1099,6 +1099,13 @@ class AppController {
         const btn = document.querySelector('#form-task [type="submit"]');
         if (btn) this._btnPending(btn);
 
+        // Capturado antes do bloco de criação, que zera this._triagingNoteId assim que
+        // resolve a nota — precisamos saber depois (fora do try) se este submit veio de
+        // "Virar Tarefa" sem cliente pré-selecionado, pra reabrir a tarefa recém-criada
+        // em modo edição (comentários/tempo liberados) em vez de só fechar o modal.
+        const wasTriagingNote = !!this._triagingNoteId;
+        let createdTaskId = null;
+
         try {
             if (id) {
                 taskData.id = id;
@@ -1110,6 +1117,7 @@ class AppController {
                 }
             } else {
                 const newTask = await store.addTask(taskData);
+                createdTaskId = newTask.id;
                 // Adiciona nova tarefa ao cache
                 if (this._tasksCache && newTask) {
                     // Garante que o cliente está no mapa de clientes
@@ -1141,6 +1149,13 @@ class AppController {
                 await this.renderAll();
             }
             Toast.show(id ? 'Tarefa atualizada.' : 'Tarefa criada.', 'success');
+            // "Virar Tarefa" numa nota sem cliente: o modal abriu vazio pedindo o cliente
+            // (ver triageQuickNoteAsTask). Agora que a tarefa já existe, reabre a mesma
+            // tarefa em modo edição — dá acesso imediato a comentários/tempo, igual ao
+            // caminho rápido (nota com cliente) que já entra direto em modo edição.
+            if (wasTriagingNote && createdTaskId) {
+                this.handleEditTask(createdTaskId);
+            }
         } catch (err) {
             if (btn) this._btnError(btn);
             Toast.show('Erro ao salvar tarefa: ' + err.message, 'error');
@@ -11746,20 +11761,58 @@ class AppController {
         }
     }
 
-    triageQuickNoteAsTask(id) {
+    async triageQuickNoteAsTask(id) {
         const note = (this._quickNotesCache || []).find(n => n.id === id);
         if (!note) return;
         this.closeModal('modal-quick-notes', true);
-        this._openNewTaskModal();
-        this._triagingNoteId = id;
-        document.getElementById('task-title').value = note.text.slice(0, 120);
-        document.getElementById('task-description').value = note.text;
-        if (note.clientId) {
-            document.getElementById('task-client').value = note.clientId;
-            document.getElementById('task-client').dispatchEvent(new Event('change'));
+
+        // Nota sem cliente vinculado: addTask() exige clientId (obrigatório no banco),
+        // então não dá pra criar direto. Mantém o fluxo antigo — abre o modal de
+        // criação vazio pedindo o cliente; handleTaskSubmit() já reabre a tarefa em
+        // modo edição assim que ela for salva (ver wasTriagingNote ali).
+        if (!note.clientId) {
+            this._openNewTaskModal();
+            this._triagingNoteId = id;
+            document.getElementById('task-title').value = note.text.slice(0, 120);
+            document.getElementById('task-description').value = note.text;
+            if (note.suggestedDate) document.getElementById('task-due-date').value = note.suggestedDate;
+            this._refreshFloatLabels(document.getElementById('modal-task'));
+            return;
         }
-        if (note.suggestedDate) document.getElementById('task-due-date').value = note.suggestedDate;
-        this._refreshFloatLabels(document.getElementById('modal-task'));
+
+        // Nota com cliente: cria a tarefa imediatamente (mesmo dado que o consultor
+        // digitaria manualmente) e abre direto em modo edição — libera comentários,
+        // "adicionar tempo" e histórico na mesma passada, sem precisar salvar e
+        // reabrir depois. Clicar em "Virar Tarefa" já É a decisão de criar a tarefa;
+        // o conteúdo todo já vem da nota.
+        try {
+            this._currentColumns = await store.ensureDefaultColumns(note.clientId).catch(() => []);
+            const newTask = await store.addTask({
+                clientId: note.clientId,
+                title: note.text.slice(0, 120),
+                description: note.text,
+                status: this._currentColumns[0]?.id || 'new',
+                dueDate: note.suggestedDate || '',
+            });
+            if (this._tasksCache) this._tasksCache.push(newTask);
+            if (this._clientsMapCache && !this._clientsMapCache[note.clientId]) {
+                store.getClient(note.clientId).then(c => { if (c) this._clientsMapCache[note.clientId] = c; }).catch(() => {});
+            }
+            // Fire-and-forget (mesmo padrão de handleTaskSubmit): a tarefa já foi criada
+            // com sucesso nesse ponto — se só a resolução da nota falhar (rede/RLS), a
+            // tarefa não deve ser tratada como erro. A nota fica pendente e pode ser
+            // triada de novo depois; não bloqueia nem atrasa a abertura do modo edição.
+            const resolvedAt = new Date().toISOString();
+            store.updateQuickNote(id, { status: 'resolved', resolutionType: 'task', resolvedTaskId: newTask.id, resolvedAt })
+                .then(() => {
+                    Object.assign(note, { status: 'resolved', resolutionType: 'task', resolvedTaskId: newTask.id, resolvedAt });
+                    this._updateQuickNotesBadge();
+                }).catch(() => {});
+            Toast.show('Tarefa criada a partir da nota.', 'success');
+            this.handleEditTask(newTask.id);
+        } catch (err) {
+            Toast.show('Erro ao criar tarefa: ' + err.message, 'error');
+        }
     }
 
     triageQuickNoteAsAgenda(id) {
