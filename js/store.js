@@ -90,6 +90,24 @@ class TSPStore {
         };
     }
 
+    _directClient(r) {
+        return { id: r.id, name: r.name, contact: r.contact || '', notes: r.notes || '',
+            active: r.active !== false, createdAt: r.created_at };
+    }
+
+    _directContract(r) {
+        return { id: r.id, clientId: r.client_id, kind: r.kind, description: r.description || '',
+            totalAmountCents: r.total_amount_cents, installments: r.installments,
+            monthlyAmountCents: r.monthly_amount_cents, dueDay: r.due_day,
+            startMonth: r.start_month, cancelledFrom: r.cancelled_from || null, createdAt: r.created_at };
+    }
+
+    _directCharge(r) {
+        return { id: r.id, contractId: r.contract_id, chargeKey: r.charge_key,
+            competence: r.competence, dueDate: r.due_date, amountCents: Number(r.amount_cents),
+            status: r.status, paidAt: r.paid_at || null, manuallyEdited: !!r.manually_edited };
+    }
+
     _apontamento(r) {
         return { id: r.id, date: r.date,
             startTime: r.start_time || '', endTime: r.end_time || '',
@@ -2118,6 +2136,176 @@ class TSPStore {
         const results = await Promise.all(ops);
         const failed = results.find(r => r.error);
         if (failed) throw failed.error;
+    }
+
+    // ===== Vendas Diretas (Fase 54) =====
+    // Leitura: prefixo get (passa pelo Proxy de Modo Supervisão). NUNCA escrevem.
+    async getDirectClients() {
+        const { data, error } = await this.db.from('direct_clients').select('*')
+            .eq('user_id', this.userId).order('name');
+        if (error) throw error;
+        return data.map(r => this._directClient(r));
+    }
+
+    async getDirectContracts() {
+        const { data, error } = await this.db.from('direct_contracts').select('*')
+            .eq('user_id', this.userId).order('created_at', { ascending: false });
+        if (error) throw error;
+        return data.map(r => this._directContract(r));
+    }
+
+    async getDirectCharges(ym) {
+        const { data, error } = await this.db.from('direct_charges').select('*')
+            .eq('user_id', this.userId).eq('competence', ym).order('due_date');
+        if (error) throw error;
+        return data.map(r => this._directCharge(r));
+    }
+
+    async getDirectOverdue(todayIso) {
+        const { data, error } = await this.db.from('direct_charges').select('*')
+            .eq('user_id', this.userId).eq('status', 'pending').lt('due_date', todayIso).order('due_date');
+        if (error) throw error;
+        return data.map(r => this._directCharge(r));
+    }
+
+    async getDirectPaidInMonth(ym) {
+        const next = TSPDirectSales.addMonths(ym, 1);
+        const { data, error } = await this.db.from('direct_charges').select('*')
+            .eq('user_id', this.userId).eq('status', 'paid')
+            .gte('paid_at', `${ym}-01`).lt('paid_at', `${next}-01`).order('paid_at');
+        if (error) throw error;
+        return data.map(r => this._directCharge(r));
+    }
+
+    async getDirectHistory(monthsBack, endYear, endMonth) {
+        const win = TSPFinancial.monthsWindow(monthsBack, endYear, endMonth);
+        const pad = (n) => String(n).padStart(2, '0');
+        const startYm = `${win[0].year}-${pad(win[0].month)}`;
+        const endYm = `${endYear}-${pad(endMonth)}`;
+        const afterEnd = TSPDirectSales.addMonths(endYm, 1);
+        const [byCompetence, byPaid] = await Promise.all([
+            this.db.from('direct_charges').select('*').eq('user_id', this.userId)
+                .gte('competence', startYm).lte('competence', endYm),
+            this.db.from('direct_charges').select('*').eq('user_id', this.userId).eq('status', 'paid')
+                .gte('paid_at', `${startYm}-01`).lt('paid_at', `${afterEnd}-01`)
+        ]);
+        if (byCompetence.error) throw byCompetence.error;
+        if (byPaid.error) throw byPaid.error;
+        const map = new Map();
+        [...byCompetence.data, ...byPaid.data].forEach(r => map.set(r.id, this._directCharge(r)));
+        return Array.from(map.values());
+    }
+
+    // Escrita
+    async addDirectClient({ name, contact, notes }) {
+        const { data, error } = await this.db.from('direct_clients').insert({
+            user_id: this.userId, name: (name || '').trim(), contact: contact || '', notes: notes || ''
+        }).select().single();
+        if (error) throw error;
+        return this._directClient(data);
+    }
+
+    async updateDirectClient(id, patch) {
+        const payload = {};
+        if (patch.name !== undefined) payload.name = patch.name.trim();
+        if (patch.contact !== undefined) payload.contact = patch.contact;
+        if (patch.notes !== undefined) payload.notes = patch.notes;
+        if (patch.active !== undefined) payload.active = !!patch.active;
+        const { data, error } = await this.db.from('direct_clients').update(payload)
+            .eq('id', id).eq('user_id', this.userId).select().single();
+        if (error) throw error;
+        return this._directClient(data);
+    }
+
+    // charges: [{chargeKey, competence, dueDate, amountCents, manuallyEdited}] já calculadas/editadas pela UI
+    async addDirectService({ clientId, description, totalCents, installments, firstDueDate, charges }) {
+        const { data: contract, error } = await this.db.from('direct_contracts').insert({
+            user_id: this.userId, client_id: clientId, kind: 'service', description: description || '',
+            total_amount_cents: totalCents, installments, start_month: firstDueDate.slice(0, 7)
+        }).select().single();
+        if (error) throw error;
+        const rows = charges.map(c => ({
+            user_id: this.userId, contract_id: contract.id, charge_key: c.chargeKey,
+            competence: c.competence, due_date: c.dueDate, amount_cents: c.amountCents,
+            manually_edited: !!c.manuallyEdited
+        }));
+        const { error: chErr } = await this.db.from('direct_charges').insert(rows);
+        if (chErr) {
+            await this.db.from('direct_contracts').delete().eq('id', contract.id).eq('user_id', this.userId);
+            throw chErr;
+        }
+        return this._directContract(contract);
+    }
+
+    async addDirectSubscription({ clientId, description, monthlyCents, dueDay, startMonth }) {
+        const { data, error } = await this.db.from('direct_contracts').insert({
+            user_id: this.userId, client_id: clientId, kind: 'subscription', description: description || '',
+            monthly_amount_cents: monthlyCents, due_day: dueDay, start_month: startMonth
+        }).select().single();
+        if (error) throw error;
+        return this._directContract(data);
+    }
+
+    async ensureDirectCharges(contractId, untilMonth) {
+        const { error } = await this.db.rpc('ensure_direct_charges', { p_contract_id: contractId, p_until: untilMonth });
+        if (error) throw error;
+    }
+
+    async markDirectChargePaid(id, paidAt) {
+        const { error } = await this.db.from('direct_charges')
+            .update({ status: 'paid', paid_at: paidAt }).eq('id', id).eq('user_id', this.userId);
+        if (error) throw error;
+    }
+
+    async unmarkDirectChargePaid(id) {
+        const { error } = await this.db.from('direct_charges')
+            .update({ status: 'pending', paid_at: null }).eq('id', id).eq('user_id', this.userId);
+        if (error) throw error;
+    }
+
+    async updateDirectCharge(id, { amountCents, dueDate, competence }) {
+        const payload = { manually_edited: true };
+        if (amountCents !== undefined) payload.amount_cents = amountCents;
+        if (dueDate !== undefined) payload.due_date = dueDate;
+        if (competence !== undefined) payload.competence = competence;
+        const { data, error } = await this.db.from('direct_charges').update(payload)
+            .eq('id', id).eq('user_id', this.userId).select().single();
+        if (error) throw error;
+        return this._directCharge(data);
+    }
+
+    async updateDirectContract(id, { description, clientId }) {
+        const payload = {};
+        if (description !== undefined) payload.description = description;
+        if (clientId !== undefined) payload.client_id = clientId;
+        const { data, error } = await this.db.from('direct_contracts').update(payload)
+            .eq('id', id).eq('user_id', this.userId).select().single();
+        if (error) throw error;
+        return this._directContract(data);
+    }
+
+    async adjustDirectContract(id, fromMonth, newCents) {
+        const { error } = await this.db.rpc('adjust_direct_contract',
+            { p_contract_id: id, p_from_month: fromMonth, p_new_amount_cents: newCents });
+        if (error) throw error;
+    }
+
+    async cancelDirectContract(id, fromMonth) {
+        const { error } = await this.db.rpc('cancel_direct_contract',
+            { p_contract_id: id, p_from_month: fromMonth });
+        if (error) throw error;
+    }
+
+    async reactivateDirectContract(id) {
+        const { error } = await this.db.from('direct_contracts')
+            .update({ cancelled_from: null }).eq('id', id).eq('user_id', this.userId);
+        if (error) throw error;
+    }
+
+    async deleteDirectContract(id) {
+        const { error } = await this.db.from('direct_contracts').delete()
+            .eq('id', id).eq('user_id', this.userId);
+        if (error) throw error;
     }
 }
 
