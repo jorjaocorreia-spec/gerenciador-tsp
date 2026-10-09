@@ -67,8 +67,13 @@ GerenciadorTSP/
 │   ├── app.js              # AppController — lógica de UI, handlers, renderização, PDF, migração
 │   ├── store.js            # TSPStore — CRUD Supabase async + stats + backup
 │   ├── ai.js               # TSPAIClient — cliente de IA configurável por usuário (OpenAI/Anthropic)
-│   └── calendar.js         # GoogleCalendarAPI — OAuth e sincronização de eventos
+│   ├── calendar.js         # GoogleCalendarAPI — OAuth e sincronização de eventos
+│   └── direct-sales-calc.js # TSPDirectSales — cálculo puro de Vendas Diretas (parcelas, totais, histórico)
+├── tests/
+│   ├── direct-sales-calc.test.js  # Testes Node de direct-sales-calc.js
+│   └── e2e-direct-sales.js        # E2E Playwright da aba Vendas Diretas
 ├── supabase/
+│   ├── migrations/20261009_direct_sales.sql  # Fase 54: tabelas, RLS, triggers e RPCs de Vendas Diretas
 │   └── functions/
 │       ├── otobo-proxy/index.ts   # Edge Function: proxy OTOBO (evita CORS)
 │       └── ai-proxy/index.ts      # Edge Function: proxy IA (OpenAI + Anthropic, protege API key)
@@ -157,8 +162,12 @@ Todas têm `user_id uuid references auth.users` + RLS ativa (`auth.uid() = user_
 | `otobo_config` | user_id (PK), url, username, password, updated_at |
 | `tickets` | id, user_id, ticket_id, ticket_number, title, status, priority, queue, customer_name, owner, created_at_otobo, updated_at_otobo, raw_data JSONB, linked_client_id, synced_at |
 | `user_ai_config` | user_id (PK), provider (openai\|anthropic), api_key TEXT, model TEXT, updated_at |
+| `direct_clients` | id, user_id, name, contact, notes, active — Vendas Diretas (Fase 54) |
+| `direct_contracts` | id, user_id, client_id, kind (service\|subscription), description, total_cents, installments, monthly_cents, due_day, start_month, cancelled_from, status — FK composta (client_id, user_id) |
+| `direct_charges` | id, user_id, contract_id, charge_key (`m:YYYY-MM`\|`i:N`), competence, amount_cents, due_date, paid_at, manually_edited — UNIQUE (contract_id, charge_key) |
+| `direct_contract_adjustments` | id, user_id, contract_id, from_month, amount_cents — reajustes de mensalidade |
 
-### Fases implementadas (1–48, todas ✅)
+### Fases implementadas (1–54, todas ✅ no código; Fase 54 com migration/deploy pendentes)
 
 | Fases | Funcionalidade |
 |-------|---------------|
@@ -201,6 +210,7 @@ Todas têm `user_id uuid references auth.users` + RLS ativa (`auth.uid() = user_
 | 51 | Solicitações de Tarefa pelo Cliente: Portal do Cliente pode propor tarefas (título/descrição/anexos) que ficam pendentes até o consultor aprovar (entram na 1ª coluna do board) ou rejeitar (com motivo, visível ao cliente); `tasks.requested_by_client`/`approval_status`/`rejection_reason`, RLS de INSERT + trigger `enforce_client_task_request_insert` |
 | 52 | Notas Rápidas: bloco de notas pessoal via FAB flutuante (`#quick-notes-fab`) para capturar ideias/lembretes soltos sem sair da tela atual; painel com abas Pendentes/Histórico, marcação "Hoje" (badge vermelho pulsante), triagem para Tarefa ou Compromisso (pré-preenche o modal de destino e resolve a nota ao salvar) ou "Marcar resolvida" direto; lembrete automático a cada 60 min para notas "Hoje" ainda pendentes; tabela `quick_notes` isolada por `user_id`, sem policy cross-role (nunca visível a Gerente em Modo Supervisão nem ao Portal do Cliente) |
 | 53 | Processos do Cliente: catálogo reutilizável de tipos de processo (`process_types`) + instância por cliente (`client_processes`) com timeline agregada cronológica (tarefas/comentários, agenda, atendimentos, chamados vinculados via `process_id` nullable) e pendências derivadas das tarefas não concluídas; vínculo via select opcional nos modais de Tarefa/Atendimento/Compromisso/Chamado ou retroativo via "Vincular existente"; sem tabela de comunicações — uma comunicação avulsa é uma Tarefa vinculada ao processo |
+| 54 | Vendas Diretas: aba em Financeiro para serviços (à vista/parcelados) e mensalidades fora da Tecinco; cobranças em `direct_charges` geradas por RPC; visível só para jorge.henrique@tecinco.com.br e testes@teste.com (`direct_sales_allowed()` + RLS), nunca para Gerente em Modo Supervisão nem Portal do Cliente. **Migration escrita (`20261009_direct_sales.sql`), mas aplicação em produção e deploy dependem do Jorge (token Supabase expirado) — não verificada em produção** |
 
 ---
 
@@ -561,6 +571,20 @@ Fixes derivados de uma auditoria `/impeccable audit` cobrindo as 13 views e ~25 
 - **`app._activeProcessesByClient` é reconstruído a cada `renderAll()`**, mesmo padrão de cache do resto do app (`_clientsMapCache`, `_agendaEventsCache`, etc.) — os selects "Processo" adicionados aos modais de Tarefa/Atendimento/Compromisso/Chamado leem sempre desse cache, nunca fazem round-trip próprio ao banco. Um processo criado/concluído fora do fluxo desses modais só aparece/desaparece dos selects depois do próximo `renderAll()`.
 - **`_populateProcessSelect(selectId, clientId, selectedId)` (`js/app.js`) decide qual elemento esconder/mostrar (quando o cliente não tem processo ativo) por convenção de `id`** — resolve o wrapper via `document.getElementById(selectId + '-section') || select.closest('.form-group') || select`. Isso significa que qualquer novo select "Processo" adicionado a um modal futuro **precisa** se envolver num elemento com `id="{selectId}-section"` (ex.: `id="task-process-section"` para `id="task-process"`) para o hide/show funcionar corretamente; envolver só num `.form-group` comum também funciona via o fallback, mas um wrapper estilo `.modal-sidebar-section` (sem a classe `.form-group`) **não** esconde corretamente sem o `id` `-section` correspondente. Esse foi um bug real encontrado e corrigido durante a implementação desta fase — o campo do modal de Tarefa nasceu quebrado exatamente dessa forma.
 - **Sem policy cross-role em `process_types`/`client_processes` nesta fase** — nem Gerente em Modo Supervisão, nem Portal do Cliente enxergam processos; mesma cautela de isolamento já documentada para `quick_notes`.
+
+### Vendas Diretas — armadilhas conhecidas
+
+- **Migration escrita, NÃO aplicada/verificada em produção** — `supabase/migrations/20261009_direct_sales.sql` precisa ser aplicada pelo Jorge (token da Management API expirado) e o deploy no Easypanel é manual. Até lá a aba Vendas Diretas falha por tabelas/RPCs ausentes.
+- **A lista de e-mails autorizados existe em DOIS lugares** — função SQL `direct_sales_allowed()` (RLS e RPCs) e `DIRECT_SALES_ALLOWED_EMAILS` em `js/app.js` (visibilidade da aba). Mudar a lista exige migration nova (`CREATE OR REPLACE FUNCTION`) + deploy do JS, juntos. Gerente em Modo Supervisão e Portal do Cliente nunca veem a aba.
+- **FKs compostas `(id, user_id)`** (cliente→contrato→cobrança) impedem referência cruzada entre usuários: a checagem de FK do Postgres ignora RLS, então uma FK simples por `id` deixaria apontar para linha de outro usuário.
+- **`charge_key` (`m:YYYY-MM` mensalidade / `i:N` parcela) é a chave de idempotência** — UNIQUE (contract_id, charge_key) **não pode ser índice parcial**, porque o `upsert`/`ON CONFLICT` não casa com índice parcial. Geração repetida não duplica.
+- **Geração, reajuste e cancelamento são RPCs** (`ensure_direct_charges`, `adjust_direct_contract`, `cancel_direct_contract`) com `FOR UPDATE` no contrato contra corrida. **Métodos `get*` do store NUNCA escrevem** — o Proxy de Modo Supervisão libera tudo que começa com `get`; escrita deve usar prefixo `add/update/mark/ensure/...` (`ensureDirectCharges` fica bloqueado corretamente).
+- **Definições dos totais** (`TSPDirectSales.computeMonthTotals`): Faturado e A receber por **competência** do mês; Recebido por **`paid_at`** no mês; Atrasado é **global** (qualquer vencida e não paga até hoje, independente do mês exibido).
+- **Nada retroativo** — `handleDsServiceSubmit`/`handleDsSubscriptionSubmit` bloqueiam início/vencimento no passado; mensalidade só gera cobranças dali em diante (`ensureUntil`).
+- **`testes@teste.com` tem senha pública no repo** — está na lista só para E2E; nunca lançar dado real nessa conta.
+- **Mês do cabeçalho de Financeiro é compartilhado entre as duas abas** e `renderFinanceiro()` despacha por `app.financeiroTab` (`tecinco`|`direct`, em `sessionStorage`); sem permissão cai para `tecinco`. O logout reseta para `tecinco`.
+- **Triggers**: `trg_direct_contracts_block_delete` bloqueia excluir contrato com cobrança paga; `trg_direct_charges_check_cancel` impede INSERT de cobrança em competência cancelada (`>= cancelled_from`).
+- **Minors conhecidos da migration**: `cancel_direct_contract` pode retroceder `cancelled_from` se chamado de novo com mês anterior; o bloqueio de exclusão também barra o cascade de `auth.users` ao revogar (`manage-users` revoke) um usuário que tenha cobranças pagas (o revoke falha com rollback seguro).
 
 ### Cálculos automáticos
 - Comissão do consultor = 43% do valor pago pelo cliente (`clientPays * 0.43`)
