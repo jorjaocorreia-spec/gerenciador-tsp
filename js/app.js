@@ -7547,8 +7547,40 @@ class AppController {
         }
     }
 
-    // Stub temporário — a Task 7 o substitui pelo gráfico real.
-    _buildDirectSalesChart() { return document.createElement('div'); }
+    _buildDirectSalesChart(history) {
+        const D = TSPDirectSales;
+        const wrap = document.createElement('div');
+        wrap.className = 'glass';
+        wrap.style.padding = '20px 24px';
+        const monthAbbr = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
+        const maxVal = Math.max(...history.map(h => Math.max(h.faturado, h.recebido)), 1);
+        const PRIMARY = 'linear-gradient(180deg,var(--primary-color),var(--secondary-color))';
+        const SKY = 'linear-gradient(180deg,#38bdf8,#0ea5e9)';
+        const bar = (value, bg, label) => `
+            <div class="ds-bar-fill money-value" data-h="${Math.round((value / maxVal) * 100)}"
+                 title="${label}: ${D.formatCents(value)}"
+                 style="width:42%;height:0;background:${bg};border-radius:4px 4px 0 0;transition:height 0.55s ease;"></div>`;
+        const cols = history.map(h => `
+            <div style="display:flex;flex-direction:column;align-items:center;flex:1;gap:6px;">
+                <div style="height:140px;width:100%;display:flex;align-items:flex-end;justify-content:center;gap:3px;">
+                    ${bar(h.faturado, PRIMARY, 'Faturado')}${bar(h.recebido, SKY, 'Recebido')}
+                </div>
+                <span style="font-size:0.72rem;color:var(--text-muted);">${monthAbbr[h.month - 1]}/${String(h.year).slice(2)}</span>
+            </div>`).join('');
+        wrap.innerHTML = `
+            <div style="display:flex;align-items:center;justify-content:space-between;margin:0 0 16px;flex-wrap:wrap;gap:8px;">
+                <h3 style="margin:0;font-size:1rem;">Faturado e recebido por mês</h3>
+                <div style="display:flex;gap:14px;font-size:0.78rem;color:var(--text-muted);">
+                    <span><span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:${PRIMARY};margin-right:4px;"></span>Faturado (competência)</span>
+                    <span><span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:${SKY};margin-right:4px;"></span>Recebido (data do pagamento)</span>
+                </div>
+            </div>
+            <div style="display:flex;align-items:flex-end;gap:4px;">${cols}</div>`;
+        requestAnimationFrame(() => requestAnimationFrame(() => {
+            wrap.querySelectorAll('.ds-bar-fill').forEach(b => { b.style.height = b.dataset.h + '%'; });
+        }));
+        return wrap;
+    }
 
     _dsClientName(clientId) {
         const c = this._ds && this._ds.clients.find(x => x.id === clientId);
