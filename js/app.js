@@ -112,6 +112,7 @@ class AppController {
         this.dsFilter = 'all';
         this.dsHistEndYear = this.financeiroYear;
         this.dsHistEndMonth = this.financeiroMonth;
+        this.dsContractsClientFilter = '';
         this._ds = null;
         this._dsRenderSeq = 0;
         this._financeiroSummary = null;
@@ -7504,12 +7505,23 @@ class AppController {
         const todayIso = D.toIsoLocal(new Date());
         cardsEl.innerHTML = spinnerHtml;
         chartEl.innerHTML = '';
+        ['ds-charges-tbody', 'ds-contracts-tbody'].forEach(tid => {
+            const tb = document.getElementById(tid);
+            if (tb) tb.innerHTML = '';
+        });
 
         try {
             const [clients, contracts] = await Promise.all([store.getDirectClients(), store.getDirectContracts()]);
-            const until = D.ensureUntil(ym, D.currentMonthLocal());
-            await Promise.all(contracts.filter(c => c.kind === 'subscription')
+            let until = D.ensureUntil(ym, D.currentMonthLocal());
+            const maxUntil = D.addMonths(D.currentMonthLocal(), 24);
+            if (until > maxUntil) until = maxUntil;
+            const ensureResults = await Promise.allSettled(contracts.filter(c => c.kind === 'subscription')
                 .map(c => store.ensureDirectCharges(c.id, until)));
+            const ensureFailed = ensureResults.filter(r => r.status === 'rejected');
+            if (ensureFailed.length) {
+                console.error('Falha ao gerar cobranças de mensalidade:', ensureFailed.map(r => r.reason));
+                Toast.show(`Não foi possível gerar cobranças de ${ensureFailed.length} mensalidade(s). Os demais dados foram carregados.`, 'warning');
+            }
             const [charges, overdue, paid, hist] = await Promise.all([
                 store.getDirectCharges(ym),
                 store.getDirectOverdue(todayIso),
@@ -7633,11 +7645,25 @@ class AppController {
         }).join('');
     }
 
+    setDsContractsClientFilter(v) {
+        this.dsContractsClientFilter = v || '';
+        this._renderDsContractsTable();
+    }
+
     _renderDsContractsTable() {
         const tbody = document.getElementById('ds-contracts-tbody');
         if (!tbody || !this._ds) return;
         const D = TSPDirectSales;
-        const { contracts } = this._ds;
+        const { contracts: allContracts, clients } = this._ds;
+        const filterSel = document.getElementById('ds-contracts-client-filter');
+        if (filterSel) {
+            if (this.dsContractsClientFilter && !clients.some(c => c.id === this.dsContractsClientFilter)) this.dsContractsClientFilter = '';
+            filterSel.innerHTML = `<option value="">Todos os clientes</option>` +
+                clients.map(c => `<option value="${c.id}"${c.id === this.dsContractsClientFilter ? ' selected' : ''}>${escapeHtml(c.name)}</option>`).join('');
+        }
+        const contracts = this.dsContractsClientFilter
+            ? allContracts.filter(c => c.clientId === this.dsContractsClientFilter)
+            : allContracts;
         if (!contracts.length) {
             tbody.innerHTML = `<tr><td colspan="6" class="text-muted">Nenhum contrato cadastrado.</td></tr>`;
             return;
@@ -7680,6 +7706,9 @@ class AppController {
         const newName = document.getElementById(newNameId).value.trim();
         if (newName) {
             const created = await store.addDirectClient({ name: newName });
+            document.getElementById(newNameId).value = '';
+            if (this._ds) this._ds.clients.push(created);
+            this._dsFillClientSelect(selectId, created.id);
             return created.id;
         }
         return document.getElementById(selectId).value || null;
@@ -7713,6 +7742,7 @@ class AppController {
     }
 
     dsEditClient(id) {
+        if (!this._ds) return;
         const c = this._ds.clients.find(x => x.id === id);
         if (!c) return;
         document.getElementById('ds-client-id').value = c.id;
@@ -7722,6 +7752,7 @@ class AppController {
     }
 
     async dsToggleClient(id) {
+        if (!this._ds) return;
         const c = this._ds.clients.find(x => x.id === id);
         if (!c) return;
         if (c.active && this._ds.contracts.some(k => k.clientId === id && k.kind === 'subscription' && !k.cancelledFrom)) {
@@ -7737,6 +7768,7 @@ class AppController {
 
     async handleDsClientSubmit(e) {
         e.preventDefault();
+        const btn = e.submitter;
         const id = document.getElementById('ds-client-id').value;
         const data = {
             name: document.getElementById('ds-client-name').value,
@@ -7744,13 +7776,18 @@ class AppController {
             notes: document.getElementById('ds-client-notes').value
         };
         try {
+            if (btn) this._btnPending(btn);
             if (id) await store.updateDirectClient(id, data); else await store.addDirectClient(data);
             await this._dsAfterMutation();
             document.getElementById('form-ds-client').reset();
             document.getElementById('ds-client-id').value = '';
             this._renderDsClientsList();
+            if (btn) await this._btnSuccess(btn);
             Toast.show('Cliente salvo!', 'success');
-        } catch (err) { Toast.show(err.message || 'Erro ao salvar cliente.', 'error'); }
+        } catch (err) {
+            if (btn) this._btnError(btn);
+            Toast.show(err.message || 'Erro ao salvar cliente.', 'error');
+        }
     }
 
     // --- Serviço
@@ -7900,6 +7937,7 @@ class AppController {
     }
 
     async dsUndoPay(btn, id) {
+        if (!this._ds) return;
         const ch = [...this._ds.charges, ...this._ds.paid].find(c => c.id === id);
         const contract = ch && this._ds.contracts.find(c => c.id === ch.contractId);
         const doUndo = async () => {
@@ -7917,6 +7955,7 @@ class AppController {
 
     // --- Editar cobrança isolada
     openDsChargeEdit(id) {
+        if (!this._ds) return;
         const ch = this._ds.charges.find(c => c.id === id) || this._ds.overdue.find(c => c.id === id);
         if (!ch) return;
         document.getElementById('ds-ch-id').value = ch.id;
@@ -7927,8 +7966,10 @@ class AppController {
 
     async handleDsChargeSubmit(e) {
         e.preventDefault();
+        if (!this._ds) return;
         const id = document.getElementById('ds-ch-id').value;
         const ch = this._ds.charges.find(c => c.id === id) || this._ds.overdue.find(c => c.id === id);
+        if (!ch) return;
         const cents = TSPDirectSales.parseMoneyToCents(document.getElementById('ds-ch-amount').value);
         const due = document.getElementById('ds-ch-due').value;
         if (cents === null || !due) { Toast.show('Confira valor e vencimento.', 'error'); return; }
@@ -7946,6 +7987,7 @@ class AppController {
 
     // --- Reajuste / cancelamento / reativação
     openDsAdjust(contractId) {
+        if (!this._ds) return;
         document.getElementById('form-ds-adjust').reset();
         document.getElementById('ds-adj-contract').value = contractId;
         const c = this._ds.contracts.find(x => x.id === contractId);
@@ -7969,6 +8011,7 @@ class AppController {
     }
 
     openDsCancel(contractId) {
+        if (!this._ds) return;
         document.getElementById('ds-cancel-contract').value = contractId;
         const c = this._ds.contracts.find(x => x.id === contractId);
         const m = document.getElementById('ds-cancel-month');
@@ -7995,16 +8038,22 @@ class AppController {
         });
     }
 
-    async dsReactivate(id) {
-        try {
-            await store.reactivateDirectContract(id);
-            await this._dsAfterMutation();
-            Toast.show('Mensalidade reativada.', 'success');
-        } catch (err) { Toast.show(err.message || 'Erro ao reativar.', 'error'); }
+    // Reativar = nova mensalidade pré-preenchida (o contrato cancelado permanece cancelado).
+    dsReactivate(id) {
+        if (!this._ds) return;
+        const c = this._ds.contracts.find(x => x.id === id);
+        if (!c) return;
+        this.openDsSubscription();
+        this._dsFillClientSelect('ds-sub-client', c.clientId);
+        document.getElementById('ds-sub-desc').value = c.description || '';
+        document.getElementById('ds-sub-amount').value = (c.monthlyAmountCents / 100).toFixed(2).replace('.', ',');
+        document.getElementById('ds-sub-dueday').value = c.dueDay;
+        Toast.show('Confira o valor (reajustes anteriores não são copiados) e o mês de início.', 'info');
     }
 
     // --- Editar / excluir contrato
     openDsContractEdit(id) {
+        if (!this._ds) return;
         const c = this._ds.contracts.find(x => x.id === id);
         if (!c) return;
         document.getElementById('ds-ce-id').value = c.id;
@@ -14052,6 +14101,14 @@ document.addEventListener('DOMContentLoaded', async () => {
             window.app._quickNotesCache = null;
             window.app._ds = null;
             window.app._dsRenderSeq = (window.app._dsRenderSeq || 0) + 1;
+            window.app.dsFilter = 'all';
+            window.app.dsHistEndYear = window.app.financeiroYear;
+            window.app.dsHistEndMonth = window.app.financeiroMonth;
+            window.app.dsContractsClientFilter = '';
+            ['ds-charges-tbody', 'ds-contracts-tbody', 'ds-cards', 'ds-chart-container'].forEach(tid => {
+                const el = document.getElementById(tid);
+                if (el) el.innerHTML = '';
+            });
             window.app.financeiroTab = 'tecinco';
             try { sessionStorage.removeItem('financeiroTab'); } catch (e) { /* ignora */ }
             window.app._quickNotesClientsCache = null;

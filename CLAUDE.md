@@ -162,10 +162,10 @@ Todas têm `user_id uuid references auth.users` + RLS ativa (`auth.uid() = user_
 | `otobo_config` | user_id (PK), url, username, password, updated_at |
 | `tickets` | id, user_id, ticket_id, ticket_number, title, status, priority, queue, customer_name, owner, created_at_otobo, updated_at_otobo, raw_data JSONB, linked_client_id, synced_at |
 | `user_ai_config` | user_id (PK), provider (openai\|anthropic), api_key TEXT, model TEXT, updated_at |
-| `direct_clients` | id, user_id, name, contact, notes, active — Vendas Diretas (Fase 54) |
-| `direct_contracts` | id, user_id, client_id, kind (service\|subscription), description, total_cents, installments, monthly_cents, due_day, start_month, cancelled_from, status — FK composta (client_id, user_id) |
-| `direct_charges` | id, user_id, contract_id, charge_key (`m:YYYY-MM`\|`i:N`), competence, amount_cents, due_date, paid_at, manually_edited — UNIQUE (contract_id, charge_key) |
-| `direct_contract_adjustments` | id, user_id, contract_id, from_month, amount_cents — reajustes de mensalidade |
+| `direct_clients` | id, user_id, name, contact, notes, active, created_at — Vendas Diretas (Fase 54) |
+| `direct_contracts` | id, user_id, client_id, kind (service\|subscription), description, total_amount_cents, installments, monthly_amount_cents, due_day, start_month, cancelled_from, created_at — FK composta (client_id, user_id) `ON DELETE NO ACTION`; `start_month`/`cancelled_from` são TEXT `YYYY-MM` |
+| `direct_charges` | id, user_id, contract_id, charge_key (`m:YYYY-MM`\|`i:N`), competence, due_date, amount_cents, status (pending\|paid), paid_at, manually_edited, created_at — UNIQUE (contract_id, charge_key) |
+| `direct_contract_adjustments` | id, user_id, contract_id, from_month, new_amount_cents, created_at — reajustes de mensalidade |
 
 ### Fases implementadas (1–54, todas ✅ no código; Fase 54 com migration/deploy pendentes)
 
@@ -580,10 +580,13 @@ Fixes derivados de uma auditoria `/impeccable audit` cobrindo as 13 views e ~25 
 - **`charge_key` (`m:YYYY-MM` mensalidade / `i:N` parcela) é a chave de idempotência** — UNIQUE (contract_id, charge_key) **não pode ser índice parcial**, porque o `upsert`/`ON CONFLICT` não casa com índice parcial. Geração repetida não duplica.
 - **Geração, reajuste e cancelamento são RPCs** (`ensure_direct_charges`, `adjust_direct_contract`, `cancel_direct_contract`) com `FOR UPDATE` no contrato contra corrida. **Métodos `get*` do store NUNCA escrevem** — o Proxy de Modo Supervisão libera tudo que começa com `get`; escrita deve usar prefixo `add/update/mark/ensure/...` (`ensureDirectCharges` fica bloqueado corretamente).
 - **Definições dos totais** (`TSPDirectSales.computeMonthTotals`): Faturado e A receber por **competência** do mês; Recebido por **`paid_at`** no mês; Atrasado é **global** (qualquer vencida e não paga até hoje, independente do mês exibido).
-- **Nada retroativo** — `handleDsServiceSubmit`/`handleDsSubscriptionSubmit` bloqueiam início/vencimento no passado; mensalidade só gera cobranças dali em diante (`ensureUntil`).
+- **Nada retroativo** — `handleDsServiceSubmit`/`handleDsSubscriptionSubmit` bloqueiam início/vencimento no passado; mensalidade só gera cobranças dali em diante. `ensureUntil(viewMonth, currentMonth)` é o **limite SUPERIOR** da geração (máx. mês visto/atual + 3, e `renderDirectSales` ainda limita a mês corrente + 24); a geração parte sempre do `start_month` do contrato.
+- **Reativar cria um NOVO contrato** — `dsReactivate` abre o modal de nova mensalidade pré-preenchido (cliente, descrição, valor, vencimento; início = mês corrente); o contrato cancelado permanece cancelado (nada retroativo, reajustes antigos não são copiados). `store.reactivateDirectContract` foi removido.
+- **A FK composta `client_id` é `ON DELETE NO ACTION`** (não RESTRICT) — assim o erro de exclusão de cliente com contratos é checado ao fim do comando, igual a RESTRICT na prática para a UI, mas sem a semântica imediata; a UI só inativa clientes, nunca exclui.
 - **`testes@teste.com` tem senha pública no repo** — está na lista só para E2E; nunca lançar dado real nessa conta.
 - **Mês do cabeçalho de Financeiro é compartilhado entre as duas abas** e `renderFinanceiro()` despacha por `app.financeiroTab` (`tecinco`|`direct`, em `sessionStorage`); sem permissão cai para `tecinco`. O logout reseta para `tecinco`.
 - **Triggers**: `trg_direct_contracts_block_delete` bloqueia excluir contrato com cobrança paga; `trg_direct_charges_check_cancel` impede INSERT de cobrança em competência cancelada (`>= cancelled_from`).
+- **Bloqueio de exclusão de contrato com cobrança paga também impede apagar (cascade) um `auth.users` com cobranças pagas** — o `ON DELETE CASCADE` de `user_id` passa pelo mesmo trigger, então `manage-users` revoke de um usuário com pagas falha (rollback seguro).
 - **Minors conhecidos da migration**: `cancel_direct_contract` pode retroceder `cancelled_from` se chamado de novo com mês anterior; o bloqueio de exclusão também barra o cascade de `auth.users` ao revogar (`manage-users` revoke) um usuário que tenha cobranças pagas (o revoke falha com rollback seguro).
 
 ### Cálculos automáticos

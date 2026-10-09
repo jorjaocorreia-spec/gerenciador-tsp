@@ -34,7 +34,7 @@ CREATE TABLE IF NOT EXISTS direct_contracts (
   cancelled_from TEXT CHECK (cancelled_from IS NULL OR cancelled_from ~ '^\d{4}-(0[1-9]|1[0-2])$'),
   created_at TIMESTAMPTZ DEFAULT now(),
   UNIQUE (id, user_id),
-  FOREIGN KEY (client_id, user_id) REFERENCES direct_clients (id, user_id) ON DELETE RESTRICT,
+  FOREIGN KEY (client_id, user_id) REFERENCES direct_clients (id, user_id) ON DELETE NO ACTION,
   CHECK (
     (kind = 'service' AND total_amount_cents IS NOT NULL AND total_amount_cents > 0
        AND installments IS NOT NULL AND installments >= 1

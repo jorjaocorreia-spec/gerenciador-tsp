@@ -114,6 +114,11 @@ run('parseMoneyToCents: formatos BR e inválidos', () => {
     assert.strictEqual(D.parseMoneyToCents('R$ 500'), 50000);
     assert.strictEqual(D.parseMoneyToCents('500,5'), 50050);
     assert.strictEqual(D.parseMoneyToCents('0,01'), 1);
+    assert.strictEqual(D.parseMoneyToCents('500.00'), null);
+    assert.strictEqual(D.parseMoneyToCents('1.50'), null);
+    assert.strictEqual(D.parseMoneyToCents('1500.5'), null);
+    assert.strictEqual(D.parseMoneyToCents('1.500'), 150000);
+    assert.strictEqual(D.parseMoneyToCents('500'), 50000);
     assert.strictEqual(D.parseMoneyToCents('abc'), null);
     assert.strictEqual(D.parseMoneyToCents(''), null);
     assert.strictEqual(D.parseMoneyToCents('10,999'), null);

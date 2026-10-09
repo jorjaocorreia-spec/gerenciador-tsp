@@ -2296,12 +2296,6 @@ class TSPStore {
         if (error) throw error;
     }
 
-    async reactivateDirectContract(id) {
-        const { error } = await this.db.from('direct_contracts')
-            .update({ cancelled_from: null }).eq('id', id).eq('user_id', this.userId);
-        if (error) throw error;
-    }
-
     async deleteDirectContract(id) {
         const { error } = await this.db.from('direct_contracts').delete()
             .eq('id', id).eq('user_id', this.userId);

@@ -1042,6 +1042,7 @@
                 <div class="view-header" style="margin-top:24px;">
                     <div class="view-header-left"><h2 style="margin:0;font-size:1rem;">Contratos</h2></div>
                 </div>
+                <select id="ds-contracts-client-filter" class="form-control" aria-label="Filtrar contratos por cliente" onchange="app.setDsContractsClientFilter(this.value)" style="max-width:260px;margin-bottom:8px;"><option value="">Todos os clientes</option></select>
                 <div style="overflow-x:auto;">
                 <table class="data-table" id="ds-contracts-table">
                     <thead><tr>
@@ -1669,7 +1670,7 @@
                 </div>
                 <div class="form-group">
                     <label class="form-label" for="ds-svc-total">Valor total (R$)</label>
-                    <input type="text" id="ds-svc-total" class="form-control" inputmode="decimal" placeholder="1.500,00" required oninput="app.renderDsServicePreview()">
+                    <input type="text" id="ds-svc-total" class="form-control" inputmode="decimal" placeholder="1.500,00 (use vírgula: 500,00)" required oninput="app.renderDsServicePreview()">
                 </div>
                 <div class="form-group">
                     <label class="form-label" for="ds-svc-n">Nº de parcelas (1 = à vista)</label>
@@ -1706,7 +1707,7 @@
                 </div>
                 <div class="form-group">
                     <label class="form-label" for="ds-sub-amount">Valor mensal (R$)</label>
-                    <input type="text" id="ds-sub-amount" class="form-control" inputmode="decimal" placeholder="500,00" required>
+                    <input type="text" id="ds-sub-amount" class="form-control" inputmode="decimal" placeholder="500,00 (use vírgula)" required>
                 </div>
                 <div class="form-group">
                     <label class="form-label" for="ds-sub-dueday">Dia de vencimento (1-31)</label>
@@ -1748,7 +1749,7 @@
                 <input type="hidden" id="ds-adj-contract">
                 <div class="form-group">
                     <label class="form-label" for="ds-adj-amount">Novo valor mensal (R$)</label>
-                    <input type="text" id="ds-adj-amount" class="form-control" inputmode="decimal" required>
+                    <input type="text" id="ds-adj-amount" class="form-control" inputmode="decimal" placeholder="500,00 (use vírgula)" required>
                 </div>
                 <div class="form-group">
                     <label class="form-label" for="ds-adj-month">A partir de</label>
@@ -1788,7 +1789,7 @@
                 <input type="hidden" id="ds-ch-id">
                 <div class="form-group">
                     <label class="form-label" for="ds-ch-amount">Valor (R$)</label>
-                    <input type="text" id="ds-ch-amount" class="form-control" inputmode="decimal" required>
+                    <input type="text" id="ds-ch-amount" class="form-control" inputmode="decimal" placeholder="500,00 (use vírgula)" required>
                 </div>
                 <div class="form-group">
                     <label class="form-label" for="ds-ch-due">Vencimento</label>

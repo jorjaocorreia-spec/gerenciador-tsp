@@ -1,3 +1,5 @@
+// NOTA: a verificação "consultor FORA da lista de permitidos não consegue inserir nas tabelas direct_*"
+// é MANUAL (não há conta de teste disponível nessa condição); este script não a cobre.
 const { chromium } = require('playwright');
 const assert = require('assert');
 
@@ -105,8 +107,15 @@ async function apiCount(page, table) {
         await page.click('#btn-ds-cancel-confirm');   // 2º clique: confirma
         await page.waitForSelector('#modal-ds-cancel', { state: 'hidden' });
         await page.waitForSelector('#ds-contracts-tbody tr:has-text("Cancelada desde")');
-        await page.locator('#ds-contracts-tbody tr', { hasText: 'E2E Mensal' }).getByText('Reativar').click();
+        // Reativar abre uma NOVA mensalidade pré-preenchida; o contrato cancelado permanece cancelado.
+        await page.locator('#ds-contracts-tbody tr', { hasText: 'Cancelada desde' }).getByText('Reativar').click();
+        await page.waitForSelector('#modal-ds-subscription.active');
+        assert.strictEqual(await page.inputValue('#ds-sub-desc'), 'E2E Mensal');
+        await page.click('#form-ds-subscription button[type=submit]');
+        await page.waitForSelector('#modal-ds-subscription', { state: 'hidden' });
         await page.waitForSelector('#ds-contracts-tbody tr:has-text("E2E Mensal"):has-text("Ativa")');
+        assert.strictEqual(await page.locator('#ds-contracts-tbody tr', { hasText: 'E2E Mensal' }).count(), 2);
+        assert.ok(await page.locator('#ds-contracts-tbody tr', { hasText: 'Cancelada desde' }).count() >= 1);
     });
 
     await step('botão de ocultar valores esconde os valores novos', async () => {
@@ -123,6 +132,39 @@ async function apiCount(page, table) {
         await page.click('#fin-tab-tecinco');
         await page.waitForSelector('#financeiro-table', { state: 'visible' });
         await page.waitForSelector('#financeiro-tbody tr', { timeout: 15000 });
+    });
+
+    await step('FK cruzada: client_id/contract_id inexistentes são rejeitados pelo banco', async () => {
+        const r = await page.evaluate(async () => {
+            const db = window.supabaseClient;
+            const uid = (await db.auth.getUser()).data.user.id;
+            const k = await db.from('direct_contracts').insert({
+                user_id: uid, client_id: crypto.randomUUID(), kind: 'subscription', description: 'x',
+                monthly_amount_cents: 100, due_day: 1, start_month: '2030-01'
+            });
+            const c = await db.from('direct_charges').insert({
+                user_id: uid, contract_id: crypto.randomUUID(), charge_key: 'i:1', competence: '2030-01',
+                due_date: '2030-01-10', amount_cents: 100
+            });
+            return { contract: k.error ? k.error.message : null, charge: c.error ? c.error.message : null };
+        });
+        assert.ok(r.contract, 'insert de contrato com client_id aleatório deveria falhar');
+        assert.ok(r.charge, 'insert de cobrança com contract_id aleatório deveria falhar');
+    });
+
+    await step('banco barra exclusão de contrato com cobrança paga', async () => {
+        const r = await page.evaluate(async () => {
+            const db = window.supabaseClient;
+            const { data: cs } = await db.from('direct_clients').select('id').eq('name', 'E2E Cliente Direto');
+            const { data: ks } = await db.from('direct_contracts').select('id').eq('client_id', cs[0].id).eq('kind', 'service');
+            const { data: chs } = await db.from('direct_charges').select('id').eq('contract_id', ks[0].id).limit(1);
+            const today = new Date().toISOString().slice(0, 10);
+            await db.from('direct_charges').update({ status: 'paid', paid_at: today }).eq('id', chs[0].id);
+            const del = await db.from('direct_contracts').delete().eq('id', ks[0].id);
+            await db.from('direct_charges').update({ status: 'pending', paid_at: null }).eq('id', chs[0].id);
+            return del.error ? del.error.message : null;
+        });
+        assert.ok(r && /pagas/i.test(r), `exclusão deveria ser barrada com mensagem contendo "pagas"; veio: ${r}`);
     });
 
     // ===== Limpeza dos dados do teste (RLS permite apagar o que é seu) =====

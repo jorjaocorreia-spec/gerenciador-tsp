@@ -103,9 +103,10 @@
 
     function parseMoneyToCents(str) {
         if (str === null || str === undefined) return null;
-        const clean = String(str).replace(/R\$/gi, '').replace(/\s/g, '').replace(/\./g, '');
-        if (!/^\d+(,\d{1,2})?$/.test(clean)) return null;
-        const [intPart, decPart = ''] = clean.split(',');
+        const clean = String(str).replace(/R\$/gi, '').replace(/\s/g, '');
+        if (!/^\d{1,3}(\.\d{3})+(,\d{1,2})?$/.test(clean) && !/^\d+(,\d{1,2})?$/.test(clean)) return null;
+        const [rawInt, decPart = ''] = clean.split(',');
+        const intPart = rawInt.replace(/\./g, '');
         return parseInt(intPart, 10) * 100 + parseInt((decPart + '0').slice(0, 2), 10);
     }
 
