@@ -7794,6 +7794,7 @@ class AppController {
                 clientId, description: document.getElementById('ds-svc-desc').value.trim(),
                 totalCents: draft.total, installments: draft.n, firstDueDate: draft.first, charges
             });
+            if (btn) await this._btnSuccess(btn);
             this.closeModal('modal-ds-service');
             await this._dsAfterMutation();
             Toast.show('Venda registrada!', 'success');
@@ -7833,10 +7834,15 @@ class AppController {
                 clientId, description: document.getElementById('ds-sub-desc').value.trim(),
                 monthlyCents: monthly, dueDay, startMonth: start
             });
-            await store.ensureDirectCharges(contract.id, D.ensureUntil(start, D.currentMonthLocal()));
+            let chargesFailed = false;
+            try {
+                await store.ensureDirectCharges(contract.id, D.ensureUntil(start, D.currentMonthLocal()));
+            } catch (genErr) { chargesFailed = true; }
+            if (btn) await this._btnSuccess(btn);
             this.closeModal('modal-ds-subscription');
             await this._dsAfterMutation();
-            Toast.show('Mensalidade cadastrada!', 'success');
+            if (chargesFailed) Toast.show('Mensalidade cadastrada, mas as cobranças serão geradas ao abrir a aba novamente.', 'warning');
+            else Toast.show('Mensalidade cadastrada!', 'success');
         } catch (err) {
             if (btn) this._btnError(btn);
             Toast.show(err.message || 'Erro ao salvar a mensalidade.', 'error');
