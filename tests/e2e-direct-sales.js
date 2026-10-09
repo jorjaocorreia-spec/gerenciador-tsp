@@ -1,0 +1,171 @@
+const { chromium } = require('playwright');
+const assert = require('assert');
+
+const BASE = 'https://jorge-gerenciador-tsp.27pl2o.easypanel.host';
+const TEST_EMAIL = 'testes@teste.com';
+const TEST_PASS = process.env.TSP_TEST_PASSWORD;
+const CLIENT_EMAIL = 'jorjaocorreia@gmail.com';
+const CLIENT_PASS = process.env.TSP_CLIENT_PASSWORD;
+if (!TEST_PASS || !CLIENT_PASS) { console.error('Defina TSP_TEST_PASSWORD e TSP_CLIENT_PASSWORD'); process.exit(1); }
+
+let failed = 0;
+async function step(name, fn) {
+    try { await fn(); console.log(`OK   ${name}`); }
+    catch (e) { failed++; console.error(`FAIL ${name}\n`, e.message); }
+}
+
+async function login(page, email, pass) {
+    await page.goto(`${BASE}/index.html`);
+    await page.fill('#auth-email', email);
+    await page.fill('#auth-password', pass);
+    await page.click('#auth-submit');
+    await page.waitForSelector('#auth-screen', { state: 'hidden', timeout: 20000 });
+}
+
+// Chama a API do Supabase com o JWT da sessão aberta na página
+async function apiCount(page, table) {
+    return page.evaluate(async (t) => {
+        const { data, error } = await window.supabaseClient.from(t).select('id');
+        return { n: data ? data.length : -1, error: error ? error.message : null };
+    }, table);
+}
+
+(async () => {
+    const browser = await chromium.launch({ headless: true });
+
+    // ===== Conta permitida (testes@teste.com) =====
+    const ctx = await browser.newContext();
+    const page = await ctx.newPage();
+    await login(page, TEST_EMAIL, TEST_PASS);
+    await page.click('.nav-item[data-view="financeiro"]');
+
+    await step('aba Vendas Diretas visível para conta permitida', async () => {
+        await page.waitForSelector('#fin-tab-direct', { state: 'visible', timeout: 10000 });
+    });
+
+    await step('abrir aba e ver os 4 cards', async () => {
+        await page.click('#fin-tab-direct');
+        await page.waitForSelector('#ds-cards .stat-card', { timeout: 15000 });
+        assert.strictEqual(await page.locator('#ds-cards .stat-card').count(), 4);
+    });
+
+    await step('criar venda parcelada em 3x com cliente novo', async () => {
+        await page.click('#btn-ds-new-service');
+        await page.fill('#ds-svc-new-client', 'E2E Cliente Direto');
+        await page.fill('#ds-svc-desc', 'E2E Serviço');
+        await page.fill('#ds-svc-total', '300,00');
+        await page.fill('#ds-svc-n', '3');
+        await page.waitForSelector('.ds-svc-row-amount');
+        assert.strictEqual(await page.locator('.ds-svc-row-amount').count(), 3);
+        await page.click('#form-ds-service button[type=submit]');
+        await page.waitForSelector('#modal-ds-service', { state: 'hidden' });
+        await page.waitForSelector('#ds-charges-tbody tr td:has-text("E2E Serviço 1/3")');
+    });
+
+    await step('marcar a parcela 1 como paga e ver Recebido', async () => {
+        const row = page.locator('#ds-charges-tbody tr', { hasText: 'E2E Serviço 1/3' });
+        await row.getByText('Marcar paga').click();
+        await page.click('#form-ds-pay button[type=submit]');
+        await page.waitForSelector('#modal-ds-pay', { state: 'hidden' });
+        await page.waitForSelector('#ds-charges-tbody tr:has-text("Paga em")');
+        const recebido = await page.locator('#ds-cards .stat-card').nth(1).locator('.stat-value').innerText();
+        assert.ok(recebido.includes('100,00'), `Recebido esperado 100,00, veio ${recebido}`);
+    });
+
+    await step('desfazer pagamento volta a pendente', async () => {
+        const row = page.locator('#ds-charges-tbody tr', { hasText: 'E2E Serviço 1/3' });
+        await row.getByText('Desfazer').click();
+        await page.waitForSelector('#ds-charges-tbody tr:has-text("E2E Serviço 1/3"):has-text("Pendente")');
+    });
+
+    await step('criar mensalidade e gerar cobranças', async () => {
+        await page.click('#btn-ds-new-subscription');
+        await page.selectOption('#ds-sub-client', { label: 'E2E Cliente Direto' });
+        await page.fill('#ds-sub-desc', 'E2E Mensal');
+        await page.fill('#ds-sub-amount', '500,00');
+        await page.fill('#ds-sub-dueday', '28');
+        await page.click('#form-ds-subscription button[type=submit]');
+        await page.waitForSelector('#modal-ds-subscription', { state: 'hidden' });
+        await page.waitForSelector('#ds-contracts-tbody tr:has-text("E2E Mensal")');
+    });
+
+    await step('reajustar mensalidade', async () => {
+        const row = page.locator('#ds-contracts-tbody tr', { hasText: 'E2E Mensal' });
+        await row.getByText('Reajustar').click();
+        await page.fill('#ds-adj-amount', '650,00');
+        await page.click('#form-ds-adjust button[type=submit]');
+        await page.waitForSelector('#modal-ds-adjust', { state: 'hidden' });
+        await page.waitForSelector('#ds-charges-tbody tr:has-text("Mensalidade"):has-text("650,00")');
+    });
+
+    await step('cancelar mensalidade (2 passos) e reativar', async () => {
+        const row = page.locator('#ds-contracts-tbody tr', { hasText: 'E2E Mensal' });
+        await row.getByText('Cancelar').click();
+        await page.click('#btn-ds-cancel-confirm');   // 1º clique: pede confirmação
+        await page.click('#btn-ds-cancel-confirm');   // 2º clique: confirma
+        await page.waitForSelector('#modal-ds-cancel', { state: 'hidden' });
+        await page.waitForSelector('#ds-contracts-tbody tr:has-text("Cancelada desde")');
+        await page.locator('#ds-contracts-tbody tr', { hasText: 'E2E Mensal' }).getByText('Reativar').click();
+        await page.waitForSelector('#ds-contracts-tbody tr:has-text("E2E Mensal"):has-text("Ativa")');
+    });
+
+    await step('botão de ocultar valores esconde os valores novos', async () => {
+        await page.click('#btn-toggle-money-fin');
+        assert.ok(await page.evaluate(() => document.body.classList.contains('money-hidden')), 'body sem classe money-hidden');
+        const hiddenCount = await page.evaluate(() =>
+            Array.from(document.querySelectorAll('#financeiro-panel-direct .money-value'))
+                .filter(el => getComputedStyle(el).visibility === 'hidden' || getComputedStyle(el).filter.includes('blur')).length);
+        assert.ok(hiddenCount > 0, 'nenhum .money-value ficou oculto');
+        await page.click('#btn-toggle-money-fin');
+    });
+
+    await step('aba Tecinco continua carregando', async () => {
+        await page.click('#fin-tab-tecinco');
+        await page.waitForSelector('#financeiro-table', { state: 'visible' });
+        await page.waitForSelector('#financeiro-tbody tr', { timeout: 15000 });
+    });
+
+    // ===== Limpeza dos dados do teste (RLS permite apagar o que é seu) =====
+    await step('limpeza: remover dados E2E', async () => {
+        await page.evaluate(async () => {
+            const db = window.supabaseClient;
+            const { data: cs } = await db.from('direct_clients').select('id').eq('name', 'E2E Cliente Direto');
+            for (const c of cs || []) {
+                const { data: ks } = await db.from('direct_contracts').select('id').eq('client_id', c.id);
+                for (const k of ks || []) {
+                    await db.from('direct_charges').update({ status: 'pending', paid_at: null }).eq('contract_id', k.id);
+                    await db.from('direct_contracts').delete().eq('id', k.id);
+                }
+                await db.from('direct_clients').delete().eq('id', c.id);
+            }
+        });
+    });
+    await ctx.close();
+
+    // ===== Isolamento: papel client não vê nem escreve =====
+    const ctx2 = await browser.newContext();
+    const page2 = await ctx2.newPage();
+    await login(page2, CLIENT_EMAIL, CLIENT_PASS);
+    await step('papel client: SELECT nas 4 tabelas volta vazio/negado', async () => {
+        for (const t of ['direct_clients', 'direct_contracts', 'direct_charges', 'direct_contract_adjustments']) {
+            const r = await apiCount(page2, t);
+            assert.ok(r.n === 0 || r.error, `${t} vazou ${r.n} linhas`);
+        }
+    });
+    await step('papel client: INSERT em direct_clients é negado', async () => {
+        const err = await page2.evaluate(async () => {
+            const uid = (await window.supabaseClient.auth.getUser()).data.user.id;
+            const { error } = await window.supabaseClient.from('direct_clients').insert({ user_id: uid, name: 'x' });
+            return error ? error.message : null;
+        });
+        assert.ok(err, 'INSERT deveria ter sido negado pela RLS');
+    });
+    await step('papel client: aba Vendas Diretas oculta', async () => {
+        assert.strictEqual(await page2.locator('#fin-tab-direct').isVisible().catch(() => false), false);
+    });
+    await ctx2.close();
+
+    await browser.close();
+    if (failed) { console.error(`${failed} verificação(ões) falharam`); process.exit(1); }
+    console.log('Todas as verificações passaram');
+})();
