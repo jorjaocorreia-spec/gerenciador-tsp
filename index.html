@@ -971,6 +971,12 @@
                 </div>
             </div>
 
+            <div class="status-filter-tabs" id="financeiro-tabs" role="tablist" aria-label="Origem das receitas" style="display:none; margin-bottom:16px;">
+                <button type="button" class="status-filter-tab active" id="fin-tab-tecinco" role="tab" aria-selected="true" onclick="app.setFinanceiroTab('tecinco')">Tecinco</button>
+                <button type="button" class="status-filter-tab" id="fin-tab-direct" role="tab" aria-selected="false" onclick="app.setFinanceiroTab('direct')">Vendas Diretas</button>
+            </div>
+
+            <div id="financeiro-panel-tecinco">
             <div style="overflow-x: auto;">
             <table class="data-table" id="financeiro-table">
                 <thead>
@@ -1004,6 +1010,56 @@
                 </div>
             </div>
             <div id="financeiro-chart-container"></div>
+            </div>
+
+            <div id="financeiro-panel-direct" style="display:none;">
+                <div class="view-header" style="margin-top:0;">
+                    <div class="view-header-left"><h2 style="margin:0;font-size:1rem;">Vendas Diretas</h2></div>
+                    <div class="view-header-actions">
+                        <button class="btn btn-secondary" id="btn-ds-clients" onclick="app.openDsClients()"><i data-lucide="users"></i> Clientes</button>
+                        <button class="btn btn-secondary" id="btn-ds-new-subscription" onclick="app.openDsSubscription()"><i data-lucide="repeat"></i> Nova mensalidade</button>
+                        <button class="btn btn-primary" id="btn-ds-new-service" onclick="app.openDsService()"><i data-lucide="plus"></i> Nova venda</button>
+                    </div>
+                </div>
+
+                <div id="ds-cards" class="stats-grid" style="margin-bottom:16px;"></div>
+
+                <div class="status-filter-tabs" id="ds-filter" role="tablist" aria-label="Filtrar cobranças" style="margin-bottom:12px;">
+                    <button type="button" class="status-filter-tab active" role="tab" aria-selected="true" data-filter="all" onclick="app.setDsFilter('all')">Todas</button>
+                    <button type="button" class="status-filter-tab" role="tab" aria-selected="false" data-filter="pending" onclick="app.setDsFilter('pending')">Pendentes</button>
+                    <button type="button" class="status-filter-tab" role="tab" aria-selected="false" data-filter="overdue" onclick="app.setDsFilter('overdue')">Atrasadas</button>
+                    <button type="button" class="status-filter-tab" role="tab" aria-selected="false" data-filter="paid" onclick="app.setDsFilter('paid')">Pagas</button>
+                </div>
+                <div style="overflow-x:auto;">
+                <table class="data-table" id="ds-charges-table">
+                    <thead><tr>
+                        <th>Cliente</th><th>Descrição</th><th>Competência</th><th>Vencimento</th><th>Valor</th><th>Status</th><th>Ações</th>
+                    </tr></thead>
+                    <tbody id="ds-charges-tbody"></tbody>
+                </table>
+                </div>
+
+                <div class="view-header" style="margin-top:24px;">
+                    <div class="view-header-left"><h2 style="margin:0;font-size:1rem;">Contratos</h2></div>
+                </div>
+                <div style="overflow-x:auto;">
+                <table class="data-table" id="ds-contracts-table">
+                    <thead><tr>
+                        <th>Cliente</th><th>Tipo</th><th>Descrição</th><th>Valor</th><th>Situação</th><th>Ações</th>
+                    </tr></thead>
+                    <tbody id="ds-contracts-tbody"></tbody>
+                </table>
+                </div>
+
+                <div class="view-header" style="margin-top:24px;">
+                    <div class="view-header-left"><h2 style="margin:0;font-size:1rem;">Histórico (12 meses)</h2></div>
+                    <div class="view-header-actions">
+                        <button id="btn-ds-hist-prev" class="btn-icon" title="12 meses anteriores" onclick="app.dsNavigateHistory(-1)"><i data-lucide="chevron-left"></i></button>
+                        <button id="btn-ds-hist-next" class="btn-icon" title="12 meses seguintes" onclick="app.dsNavigateHistory(1)"><i data-lucide="chevron-right"></i></button>
+                    </div>
+                </div>
+                <div id="ds-chart-container"></div>
+            </div>
         </section>
 
         <!-- VIEW: USUÁRIOS -->
@@ -1561,6 +1617,206 @@
                 <button type="submit" class="btn btn-primary" style="width:100%; margin-top:8px;">
                     <i data-lucide="send" style="width:14px;height:14px"></i> Enviar convite
                 </button>
+            </form>
+        </div>
+    </div>
+
+    <!-- MODAIS: VENDAS DIRETAS -->
+    <div class="modal-overlay" id="modal-ds-clients">
+        <div class="modal glass" style="max-width:520px;">
+            <div class="modal-header">
+                <h2>Clientes de Vendas Diretas</h2>
+                <button class="close-modal" onclick="app.closeModal('modal-ds-clients')"><i data-lucide="x"></i></button>
+            </div>
+            <div id="ds-clients-list" style="margin-bottom:16px;"></div>
+            <form id="form-ds-client" onsubmit="app.handleDsClientSubmit(event)">
+                <input type="hidden" id="ds-client-id">
+                <div class="form-group">
+                    <label class="form-label" for="ds-client-name">Nome</label>
+                    <input type="text" id="ds-client-name" class="form-control" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label" for="ds-client-contact">Contato</label>
+                    <input type="text" id="ds-client-contact" class="form-control">
+                </div>
+                <div class="form-group">
+                    <label class="form-label" for="ds-client-notes">Observações</label>
+                    <textarea id="ds-client-notes" class="form-control" rows="2"></textarea>
+                </div>
+                <button type="submit" class="btn btn-primary" style="width:100%;">Salvar cliente</button>
+            </form>
+        </div>
+    </div>
+
+    <div class="modal-overlay" id="modal-ds-service">
+        <div class="modal glass" style="max-width:560px;">
+            <div class="modal-header">
+                <h2>Nova venda (serviço)</h2>
+                <button class="close-modal" onclick="app.closeModal('modal-ds-service')"><i data-lucide="x"></i></button>
+            </div>
+            <form id="form-ds-service" onsubmit="app.handleDsServiceSubmit(event)">
+                <div class="form-group">
+                    <label class="form-label" for="ds-svc-client">Cliente</label>
+                    <select id="ds-svc-client" class="form-control"></select>
+                </div>
+                <div class="form-group">
+                    <label class="form-label" for="ds-svc-new-client">Ou novo cliente (nome)</label>
+                    <input type="text" id="ds-svc-new-client" class="form-control" placeholder="Preencha para criar e usar este cliente">
+                </div>
+                <div class="form-group">
+                    <label class="form-label" for="ds-svc-desc">Descrição</label>
+                    <input type="text" id="ds-svc-desc" class="form-control" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label" for="ds-svc-total">Valor total (R$)</label>
+                    <input type="text" id="ds-svc-total" class="form-control" inputmode="decimal" placeholder="1.500,00" required oninput="app.renderDsServicePreview()">
+                </div>
+                <div class="form-group">
+                    <label class="form-label" for="ds-svc-n">Nº de parcelas (1 = à vista)</label>
+                    <input type="number" id="ds-svc-n" class="form-control" min="1" max="60" value="1" required oninput="app.renderDsServicePreview()">
+                </div>
+                <div class="form-group">
+                    <label class="form-label" for="ds-svc-first">Vencimento da 1ª parcela</label>
+                    <input type="date" id="ds-svc-first" class="form-control" required onchange="app.renderDsServicePreview()">
+                </div>
+                <div id="ds-svc-preview" style="margin-bottom:12px;"></div>
+                <button type="submit" class="btn btn-primary" style="width:100%;">Salvar venda</button>
+            </form>
+        </div>
+    </div>
+
+    <div class="modal-overlay" id="modal-ds-subscription">
+        <div class="modal glass" style="max-width:480px;">
+            <div class="modal-header">
+                <h2>Nova mensalidade</h2>
+                <button class="close-modal" onclick="app.closeModal('modal-ds-subscription')"><i data-lucide="x"></i></button>
+            </div>
+            <form id="form-ds-subscription" onsubmit="app.handleDsSubscriptionSubmit(event)">
+                <div class="form-group">
+                    <label class="form-label" for="ds-sub-client">Cliente</label>
+                    <select id="ds-sub-client" class="form-control"></select>
+                </div>
+                <div class="form-group">
+                    <label class="form-label" for="ds-sub-new-client">Ou novo cliente (nome)</label>
+                    <input type="text" id="ds-sub-new-client" class="form-control" placeholder="Preencha para criar e usar este cliente">
+                </div>
+                <div class="form-group">
+                    <label class="form-label" for="ds-sub-desc">Descrição</label>
+                    <input type="text" id="ds-sub-desc" class="form-control" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label" for="ds-sub-amount">Valor mensal (R$)</label>
+                    <input type="text" id="ds-sub-amount" class="form-control" inputmode="decimal" placeholder="500,00" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label" for="ds-sub-dueday">Dia de vencimento (1-31)</label>
+                    <input type="number" id="ds-sub-dueday" class="form-control" min="1" max="31" value="10" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label" for="ds-sub-start">Mês de início</label>
+                    <input type="month" id="ds-sub-start" class="form-control" required>
+                </div>
+                <button type="submit" class="btn btn-primary" style="width:100%;">Salvar mensalidade</button>
+            </form>
+        </div>
+    </div>
+
+    <div class="modal-overlay" id="modal-ds-pay">
+        <div class="modal glass" style="max-width:380px;">
+            <div class="modal-header">
+                <h2>Marcar como paga</h2>
+                <button class="close-modal" onclick="app.closeModal('modal-ds-pay')"><i data-lucide="x"></i></button>
+            </div>
+            <form id="form-ds-pay" onsubmit="app.handleDsPaySubmit(event)">
+                <input type="hidden" id="ds-pay-id">
+                <div class="form-group">
+                    <label class="form-label" for="ds-pay-date">Data do pagamento</label>
+                    <input type="date" id="ds-pay-date" class="form-control" required>
+                </div>
+                <button type="submit" class="btn btn-primary" style="width:100%;">Confirmar pagamento</button>
+            </form>
+        </div>
+    </div>
+
+    <div class="modal-overlay" id="modal-ds-adjust">
+        <div class="modal glass" style="max-width:380px;">
+            <div class="modal-header">
+                <h2>Reajustar mensalidade</h2>
+                <button class="close-modal" onclick="app.closeModal('modal-ds-adjust')"><i data-lucide="x"></i></button>
+            </div>
+            <form id="form-ds-adjust" onsubmit="app.handleDsAdjustSubmit(event)">
+                <input type="hidden" id="ds-adj-contract">
+                <div class="form-group">
+                    <label class="form-label" for="ds-adj-amount">Novo valor mensal (R$)</label>
+                    <input type="text" id="ds-adj-amount" class="form-control" inputmode="decimal" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label" for="ds-adj-month">A partir de</label>
+                    <input type="month" id="ds-adj-month" class="form-control" required>
+                </div>
+                <p class="text-muted" style="font-size:0.8rem;">Altera apenas cobranças pendentes e não editadas manualmente a partir desse mês.</p>
+                <button type="submit" class="btn btn-primary" style="width:100%;">Aplicar reajuste</button>
+            </form>
+        </div>
+    </div>
+
+    <div class="modal-overlay" id="modal-ds-cancel">
+        <div class="modal glass" style="max-width:380px;">
+            <div class="modal-header">
+                <h2>Cancelar mensalidade</h2>
+                <button class="close-modal" onclick="app.closeModal('modal-ds-cancel')"><i data-lucide="x"></i></button>
+            </div>
+            <form id="form-ds-cancel" onsubmit="return false;">
+                <input type="hidden" id="ds-cancel-contract">
+                <div class="form-group">
+                    <label class="form-label" for="ds-cancel-month">Cancelar a partir de</label>
+                    <input type="month" id="ds-cancel-month" class="form-control" required>
+                </div>
+                <p class="text-muted" style="font-size:0.8rem;">As cobranças pendentes desse mês em diante serão removidas. As pagas permanecem.</p>
+                <button type="button" id="btn-ds-cancel-confirm" class="btn btn-secondary" style="width:100%;" onclick="app.handleDsCancelSubmit(this)">Cancelar mensalidade</button>
+            </form>
+        </div>
+    </div>
+
+    <div class="modal-overlay" id="modal-ds-charge">
+        <div class="modal glass" style="max-width:380px;">
+            <div class="modal-header">
+                <h2>Editar cobrança</h2>
+                <button class="close-modal" onclick="app.closeModal('modal-ds-charge')"><i data-lucide="x"></i></button>
+            </div>
+            <form id="form-ds-charge" onsubmit="app.handleDsChargeSubmit(event)">
+                <input type="hidden" id="ds-ch-id">
+                <div class="form-group">
+                    <label class="form-label" for="ds-ch-amount">Valor (R$)</label>
+                    <input type="text" id="ds-ch-amount" class="form-control" inputmode="decimal" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label" for="ds-ch-due">Vencimento</label>
+                    <input type="date" id="ds-ch-due" class="form-control" required>
+                </div>
+                <button type="submit" class="btn btn-primary" style="width:100%;">Salvar</button>
+            </form>
+        </div>
+    </div>
+
+    <div class="modal-overlay" id="modal-ds-contract-edit">
+        <div class="modal glass" style="max-width:420px;">
+            <div class="modal-header">
+                <h2>Editar contrato</h2>
+                <button class="close-modal" onclick="app.closeModal('modal-ds-contract-edit')"><i data-lucide="x"></i></button>
+            </div>
+            <form id="form-ds-contract-edit" onsubmit="app.handleDsContractEditSubmit(event)">
+                <input type="hidden" id="ds-ce-id">
+                <div class="form-group">
+                    <label class="form-label" for="ds-ce-client">Cliente</label>
+                    <select id="ds-ce-client" class="form-control"></select>
+                </div>
+                <div class="form-group">
+                    <label class="form-label" for="ds-ce-desc">Descrição</label>
+                    <input type="text" id="ds-ce-desc" class="form-control" required>
+                </div>
+                <p class="text-muted" style="font-size:0.8rem;">Para mudar valores use Reajustar (mensalidade) ou edite a parcela (serviço).</p>
+                <button type="submit" class="btn btn-primary" style="width:100%;">Salvar</button>
             </form>
         </div>
     </div>
@@ -3062,11 +3318,12 @@
     <script src="js/holidays.js?v=1"></script>
     <script src="js/productivity-calc.js?v=1"></script>
     <script src="js/financial-calc.js?v=1"></script>
+    <script src="js/direct-sales-calc.js?v=1"></script>
     <script src="js/cs-commission-calc.js?v=4"></script>
     <script src="js/process-timeline.js"></script>
     <script src="js/store.js?v=36"></script>
     <script src="js/ai.js?v=1"></script>
-    <script src="js/app.js?v=56"></script>
+    <script src="js/app.js?v=57"></script>
 </body>
 
 </html>
