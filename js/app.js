@@ -72,6 +72,10 @@ function compressImageFile(file, maxWidth = 1400) {
     });
 }
 
+// Deve ser idêntica à lista em direct_sales_allowed() (supabase/migrations/20261009_direct_sales.sql).
+// Aqui só controla a visibilidade da aba; quem protege o dado é a RLS.
+const DIRECT_SALES_ALLOWED_EMAILS = ['jorge.henrique@tecinco.com.br', 'testes@teste.com'];
+
 class AppController {
     constructor() {
         this.currentView = 'dashboard';
@@ -104,6 +108,12 @@ class AppController {
         this.financeiroMonth = new Date().getMonth() + 1; // 1-12
         this.financeiroHistEndYear = this.financeiroYear;
         this.financeiroHistEndMonth = this.financeiroMonth;
+        this.financeiroTab = sessionStorage.getItem('financeiroTab') || 'tecinco';
+        this.dsFilter = 'all';
+        this.dsHistEndYear = this.financeiroYear;
+        this.dsHistEndMonth = this.financeiroMonth;
+        this._ds = null;
+        this._dsRenderSeq = 0;
         this._financeiroSummary = null;
         this._financeiroHistory = null;
         this.taskAttachments = []; // [{name, data}] — imagens em base64 do modal de tarefa
@@ -7434,8 +7444,205 @@ class AppController {
         }
     }
 
+    _canUseDirectSales() {
+        if (this.isManagerView || this.userRole === 'client') return false;
+        const email = (Auth.getUserEmail() || '').toLowerCase();
+        return DIRECT_SALES_ALLOWED_EMAILS.includes(email);
+    }
+
+    _applyFinanceiroTabUi() {
+        const isDirect = this.financeiroTab === 'direct';
+        const tec = document.getElementById('financeiro-panel-tecinco');
+        const dir = document.getElementById('financeiro-panel-direct');
+        if (tec) tec.style.display = isDirect ? 'none' : '';
+        if (dir) dir.style.display = isDirect ? '' : 'none';
+        [['fin-tab-tecinco', !isDirect], ['fin-tab-direct', isDirect]].forEach(([id, on]) => {
+            const b = document.getElementById(id);
+            if (!b) return;
+            b.classList.toggle('active', on);
+            b.setAttribute('aria-selected', on ? 'true' : 'false');
+        });
+    }
+
+    setFinanceiroTab(tab) {
+        if (tab === 'direct' && !this._canUseDirectSales()) return;
+        this.financeiroTab = tab;
+        try { sessionStorage.setItem('financeiroTab', tab); } catch (e) { /* ignora */ }
+        this.renderFinanceiro();
+    }
+
+    setDsFilter(f) {
+        this.dsFilter = f;
+        document.querySelectorAll('#ds-filter .status-filter-tab').forEach(b => {
+            const on = b.dataset.filter === f;
+            b.classList.toggle('active', on);
+            b.setAttribute('aria-selected', on ? 'true' : 'false');
+        });
+        this._renderDsChargesTable();
+    }
+
+    dsNavigateHistory(direction) {
+        this.dsHistEndMonth += direction * 12;
+        while (this.dsHistEndMonth > 12) { this.dsHistEndMonth -= 12; this.dsHistEndYear += 1; }
+        while (this.dsHistEndMonth < 1) { this.dsHistEndMonth += 12; this.dsHistEndYear -= 1; }
+        this.renderDirectSales();
+    }
+
+    async renderDirectSales() {
+        if (this.currentView !== 'financeiro' || this.financeiroTab !== 'direct') return;
+        const seq = ++this._dsRenderSeq;
+        const cardsEl = document.getElementById('ds-cards');
+        const chartEl = document.getElementById('ds-chart-container');
+        if (!cardsEl || !chartEl) return;
+
+        const monthNames = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+        const labelEl = document.getElementById('financeiro-month-label');
+        if (labelEl) labelEl.textContent = `${monthNames[this.financeiroMonth - 1]} ${this.financeiroYear}`;
+
+        const D = TSPDirectSales;
+        const ym = `${this.financeiroYear}-${String(this.financeiroMonth).padStart(2, '0')}`;
+        const todayIso = D.toIsoLocal(new Date());
+        cardsEl.innerHTML = spinnerHtml;
+        chartEl.innerHTML = '';
+
+        try {
+            const [clients, contracts] = await Promise.all([store.getDirectClients(), store.getDirectContracts()]);
+            const until = D.ensureUntil(ym, D.currentMonthLocal());
+            await Promise.all(contracts.filter(c => c.kind === 'subscription')
+                .map(c => store.ensureDirectCharges(c.id, until)));
+            const [charges, overdue, paid, hist] = await Promise.all([
+                store.getDirectCharges(ym),
+                store.getDirectOverdue(todayIso),
+                store.getDirectPaidInMonth(ym),
+                store.getDirectHistory(12, this.dsHistEndYear, this.dsHistEndMonth)
+            ]);
+            if (seq !== this._dsRenderSeq) return; // render mais novo já em andamento
+            this._ds = { clients, contracts, charges, overdue, paid, hist, todayIso, ym };
+
+            const totals = D.computeMonthTotals({ charges, paidInMonth: paid, overdue });
+            const card = (label, value, extra = '', tip = '') => `
+                <div class="glass stat-card">
+                    <div class="stat-header"><span class="client-name">${label}${tip}</span></div>
+                    <div class="stat-value money-value" style="font-size:1.4rem;font-weight:700;${extra}">${D.formatCents(value)}</div>
+                </div>`;
+            const recebidoTip = `<span class="info-tooltip info-tooltip--start" tabindex="0" aria-label="Como o Recebido é calculado" aria-describedby="tooltip-ds-recebido"><i data-lucide="info" style="width:14px;height:14px;margin-left:4px;vertical-align:middle;"></i><span class="info-tooltip-text" id="tooltip-ds-recebido" role="tooltip">Recebido soma os pagamentos feitos neste mês (pela data do pagamento), mesmo de cobranças de outros meses. Por isso Faturado menos Recebido pode não ser igual a A receber.</span></span>`;
+            const atrasadoTip = `<span class="info-tooltip info-tooltip--start" tabindex="0" aria-label="Como o Atrasado é calculado" aria-describedby="tooltip-ds-atrasado"><i data-lucide="info" style="width:14px;height:14px;margin-left:4px;vertical-align:middle;"></i><span class="info-tooltip-text" id="tooltip-ds-atrasado" role="tooltip">Atrasado soma todas as cobranças pendentes já vencidas, de qualquer mês.</span></span>`;
+            cardsEl.innerHTML =
+                card('Faturado', totals.faturado) +
+                card('Recebido', totals.recebido, '', recebidoTip) +
+                card('A receber', totals.aReceber) +
+                card('Atrasado', totals.atrasado, totals.atrasado > 0 ? 'color:var(--danger-color);' : '', atrasadoTip);
+
+            this._renderDsChargesTable();
+            this._renderDsContractsTable();
+            chartEl.innerHTML = '';
+            chartEl.appendChild(this._buildDirectSalesChart(D.computeHistory(
+                TSPFinancial.monthsWindow(12, this.dsHistEndYear, this.dsHistEndMonth), hist)));
+            lucide.createIcons();
+        } catch (err) {
+            console.error('Erro ao carregar Vendas Diretas:', err);
+            if (seq !== this._dsRenderSeq) return;
+            cardsEl.innerHTML = `<p class="text-muted">Não foi possível carregar Vendas Diretas: ${escapeHtml(err.message || 'tente novamente.')}</p>`;
+            Toast.show('Erro ao carregar Vendas Diretas.', 'error');
+        }
+    }
+
+    // Stub temporário — a Task 7 o substitui pelo gráfico real.
+    _buildDirectSalesChart() { return document.createElement('div'); }
+
+    _dsClientName(clientId) {
+        const c = this._ds && this._ds.clients.find(x => x.id === clientId);
+        return c ? c.name : '—';
+    }
+
+    _dsChargeDescription(charge) {
+        const contract = this._ds.contracts.find(c => c.id === charge.contractId);
+        if (!contract) return '—';
+        if (contract.kind === 'subscription') return `Mensalidade${contract.description ? ' · ' + contract.description : ''}`;
+        const k = charge.chargeKey.replace('i:', '');
+        return `${contract.description || 'Serviço'} ${k}/${contract.installments}`;
+    }
+
+    _renderDsChargesTable() {
+        const tbody = document.getElementById('ds-charges-tbody');
+        if (!tbody || !this._ds) return;
+        const D = TSPDirectSales;
+        const { charges, overdue, todayIso, contracts } = this._ds;
+        let list;
+        if (this.dsFilter === 'overdue') list = overdue;
+        else if (this.dsFilter === 'pending') list = charges.filter(c => c.status === 'pending');
+        else if (this.dsFilter === 'paid') list = charges.filter(c => c.status === 'paid');
+        else list = charges;
+
+        if (!list.length) {
+            tbody.innerHTML = `<tr><td colspan="7" class="text-muted">Nenhuma cobrança neste filtro.</td></tr>`;
+            return;
+        }
+        const fmtDate = (iso) => iso ? iso.split('-').reverse().join('/') : '—';
+        tbody.innerHTML = list.map(ch => {
+            const contract = contracts.find(c => c.id === ch.contractId);
+            const late = D.isOverdue(ch, todayIso);
+            const status = ch.status === 'paid'
+                ? `Paga em ${fmtDate(ch.paidAt)}`
+                : (late ? '<strong style="color:var(--danger-color);">Atrasada</strong>' : 'Pendente');
+            const actions = ch.status === 'pending'
+                ? `<button class="btn btn-secondary btn-sm" onclick="app.openDsPay('${ch.id}')">Marcar paga</button>
+                   <button class="btn btn-secondary btn-sm" onclick="app.openDsChargeEdit('${ch.id}')">Editar</button>`
+                : `<button class="btn btn-secondary btn-sm" onclick="app.dsUndoPay('${ch.id}')">Desfazer</button>`;
+            return `<tr>
+                <td>${escapeHtml(this._dsClientName(contract ? contract.clientId : null))}</td>
+                <td>${escapeHtml(this._dsChargeDescription(ch))}</td>
+                <td>${ch.competence}</td>
+                <td>${fmtDate(ch.dueDate)}</td>
+                <td><span class="money-value">${D.formatCents(ch.amountCents)}</span></td>
+                <td>${status}</td>
+                <td>${actions}</td>
+            </tr>`;
+        }).join('');
+    }
+
+    _renderDsContractsTable() {
+        const tbody = document.getElementById('ds-contracts-tbody');
+        if (!tbody || !this._ds) return;
+        const D = TSPDirectSales;
+        const { contracts } = this._ds;
+        if (!contracts.length) {
+            tbody.innerHTML = `<tr><td colspan="6" class="text-muted">Nenhum contrato cadastrado.</td></tr>`;
+            return;
+        }
+        tbody.innerHTML = contracts.map(c => {
+            const isSub = c.kind === 'subscription';
+            const valor = isSub ? `${D.formatCents(c.monthlyAmountCents)}/mês` : `${D.formatCents(c.totalAmountCents)} em ${c.installments}x`;
+            const situacao = isSub ? (c.cancelledFrom ? `Cancelada desde ${c.cancelledFrom}` : 'Ativa') : 'Serviço';
+            const subActions = isSub
+                ? `<button class="btn btn-secondary btn-sm" onclick="app.openDsAdjust('${c.id}')">Reajustar</button>
+                   ${c.cancelledFrom
+                        ? `<button class="btn btn-secondary btn-sm" onclick="app.dsReactivate('${c.id}')">Reativar</button>`
+                        : `<button class="btn btn-secondary btn-sm" onclick="app.openDsCancel('${c.id}')">Cancelar</button>`}`
+                : '';
+            return `<tr>
+                <td>${escapeHtml(this._dsClientName(c.clientId))}</td>
+                <td>${isSub ? 'Mensalidade' : 'Serviço'}</td>
+                <td>${escapeHtml(c.description)}</td>
+                <td><span class="money-value">${valor}</span></td>
+                <td>${situacao}</td>
+                <td>
+                    <button class="btn btn-secondary btn-sm" onclick="app.openDsContractEdit('${c.id}')">Editar</button>
+                    ${subActions}
+                    <button class="btn btn-secondary btn-sm" onclick="app.dsDeleteContract(this, '${c.id}')">Excluir</button>
+                </td>
+            </tr>`;
+        }).join('');
+    }
+
     async renderFinanceiro() {
         if (this.currentView !== 'financeiro') return;
+        const canDirect = this._canUseDirectSales();
+        const tabsEl = document.getElementById('financeiro-tabs');
+        if (tabsEl) tabsEl.style.display = canDirect ? 'flex' : 'none';
+        if (!canDirect && this.financeiroTab === 'direct') this.financeiroTab = 'tecinco';
+        this._applyFinanceiroTabUi();
+        if (this.financeiroTab === 'direct') return this.renderDirectSales();
         const tbody = document.getElementById('financeiro-tbody');
         const tfoot = document.getElementById('financeiro-tfoot');
         const chartContainer = document.getElementById('financeiro-chart-container');
@@ -13438,6 +13645,10 @@ document.addEventListener('DOMContentLoaded', async () => {
             window.app._notifications = [];
             window.app._notificationsLastSeenAt = null;
             window.app._quickNotesCache = null;
+            window.app._ds = null;
+            window.app._dsRenderSeq = (window.app._dsRenderSeq || 0) + 1;
+            window.app.financeiroTab = 'tecinco';
+            try { sessionStorage.removeItem('financeiroTab'); } catch (e) { /* ignora */ }
             window.app._quickNotesClientsCache = null;
             if (window.app._quickNotesReminderInterval) {
                 clearInterval(window.app._quickNotesReminderInterval);
