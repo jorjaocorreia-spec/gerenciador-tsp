@@ -7635,6 +7635,373 @@ class AppController {
         }).join('');
     }
 
+    // ===== Vendas Diretas: ações =====
+    _dsFillClientSelect(selectId, selectedId) {
+        const sel = document.getElementById(selectId);
+        const active = (this._ds ? this._ds.clients : []).filter(c => c.active || c.id === selectedId);
+        sel.innerHTML = `<option value="">— selecione —</option>` +
+            active.map(c => `<option value="${c.id}"${c.id === selectedId ? ' selected' : ''}>${escapeHtml(c.name)}</option>`).join('');
+    }
+
+    // Resolve o cliente do modal: novo (por nome) tem prioridade sobre o select.
+    async _dsResolveClientId(selectId, newNameId) {
+        const newName = document.getElementById(newNameId).value.trim();
+        if (newName) {
+            const created = await store.addDirectClient({ name: newName });
+            return created.id;
+        }
+        return document.getElementById(selectId).value || null;
+    }
+
+    _dsAfterMutation() {
+        this._ds = null;
+        return this.renderDirectSales();
+    }
+
+    // --- Clientes
+    openDsClients() {
+        document.getElementById('form-ds-client').reset();
+        document.getElementById('ds-client-id').value = '';
+        this._renderDsClientsList();
+        this.openModal('modal-ds-clients');
+    }
+
+    _renderDsClientsList() {
+        const el = document.getElementById('ds-clients-list');
+        const list = this._ds ? this._ds.clients : [];
+        if (!list.length) { el.innerHTML = '<p class="text-muted">Nenhum cliente cadastrado.</p>'; return; }
+        el.innerHTML = list.map(c => `
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:6px 0;border-bottom:1px solid var(--border-color);">
+                <span>${escapeHtml(c.name)}${c.active ? '' : ' <span class="text-muted">(inativo)</span>'}</span>
+                <span>
+                    <button type="button" class="btn btn-secondary btn-sm" onclick="app.dsEditClient('${c.id}')">Editar</button>
+                    <button type="button" class="btn btn-secondary btn-sm" onclick="app.dsToggleClient('${c.id}')">${c.active ? 'Inativar' : 'Reativar'}</button>
+                </span>
+            </div>`).join('');
+    }
+
+    dsEditClient(id) {
+        const c = this._ds.clients.find(x => x.id === id);
+        if (!c) return;
+        document.getElementById('ds-client-id').value = c.id;
+        document.getElementById('ds-client-name').value = c.name;
+        document.getElementById('ds-client-contact').value = c.contact;
+        document.getElementById('ds-client-notes').value = c.notes;
+    }
+
+    async dsToggleClient(id) {
+        const c = this._ds.clients.find(x => x.id === id);
+        if (!c) return;
+        if (c.active && this._ds.contracts.some(k => k.clientId === id && k.kind === 'subscription' && !k.cancelledFrom)) {
+            Toast.show('Cancele as mensalidades ativas deste cliente antes de inativá-lo.', 'error');
+            return;
+        }
+        try {
+            await store.updateDirectClient(id, { active: !c.active });
+            await this._dsAfterMutation();
+            this._renderDsClientsList();
+        } catch (err) { Toast.show(err.message || 'Erro ao atualizar cliente.', 'error'); }
+    }
+
+    async handleDsClientSubmit(e) {
+        e.preventDefault();
+        const id = document.getElementById('ds-client-id').value;
+        const data = {
+            name: document.getElementById('ds-client-name').value,
+            contact: document.getElementById('ds-client-contact').value,
+            notes: document.getElementById('ds-client-notes').value
+        };
+        try {
+            if (id) await store.updateDirectClient(id, data); else await store.addDirectClient(data);
+            await this._dsAfterMutation();
+            document.getElementById('form-ds-client').reset();
+            document.getElementById('ds-client-id').value = '';
+            this._renderDsClientsList();
+            Toast.show('Cliente salvo!', 'success');
+        } catch (err) { Toast.show(err.message || 'Erro ao salvar cliente.', 'error'); }
+    }
+
+    // --- Serviço
+    openDsService() {
+        document.getElementById('form-ds-service').reset();
+        this._dsFillClientSelect('ds-svc-client', null);
+        const today = TSPDirectSales.toIsoLocal(new Date());
+        const first = document.getElementById('ds-svc-first');
+        first.min = today;
+        first.value = today;
+        document.getElementById('ds-svc-n').value = 1;
+        this.renderDsServicePreview();
+        this.openModal('modal-ds-service');
+    }
+
+    _dsServiceDraft() {
+        const D = TSPDirectSales;
+        const total = D.parseMoneyToCents(document.getElementById('ds-svc-total').value);
+        const n = parseInt(document.getElementById('ds-svc-n').value, 10);
+        const first = document.getElementById('ds-svc-first').value;
+        if (!total || !n || !first) return null;
+        try { return { total, n, first, rows: D.serviceCharges(total, n, first) }; } catch (e) { return null; }
+    }
+
+    renderDsServicePreview() {
+        const el = document.getElementById('ds-svc-preview');
+        const draft = this._dsServiceDraft();
+        if (!draft) { el.innerHTML = '<p class="text-muted" style="font-size:0.8rem;">Preencha valor, parcelas e vencimento para ver a prévia.</p>'; return; }
+        el.innerHTML = `<div style="font-size:0.8rem;margin-bottom:6px;" class="text-muted">Prévia das parcelas (editável):</div>` +
+            draft.rows.map((r, i) => `
+            <div style="display:flex;gap:8px;margin-bottom:6px;align-items:center;">
+                <span style="width:28px;">${i + 1}.</span>
+                <input type="date" class="form-control ds-svc-row-date" aria-label="Vencimento da parcela ${i + 1}" value="${r.dueDate}" min="${document.getElementById('ds-svc-first').min}" oninput="app._dsServiceSumWarning()">
+                <input type="text" class="form-control ds-svc-row-amount money-value" aria-label="Valor da parcela ${i + 1}" value="${(r.amountCents / 100).toFixed(2).replace('.', ',')}" oninput="app._dsServiceSumWarning()">
+            </div>`).join('') + `<div id="ds-svc-sum-warning" style="font-size:0.8rem;color:var(--warning-color);"></div>`;
+    }
+
+    _dsServiceSumWarning() {
+        const draft = this._dsServiceDraft();
+        const el = document.getElementById('ds-svc-sum-warning');
+        if (!draft || !el) return;
+        const sum = Array.from(document.querySelectorAll('.ds-svc-row-amount'))
+            .reduce((acc, i) => acc + (TSPDirectSales.parseMoneyToCents(i.value) || 0), 0);
+        el.textContent = sum === draft.total ? '' :
+            `A soma das parcelas (${TSPDirectSales.formatCents(sum)}) difere do total (${TSPDirectSales.formatCents(draft.total)}).`;
+    }
+
+    async handleDsServiceSubmit(e) {
+        e.preventDefault();
+        const D = TSPDirectSales;
+        const draft = this._dsServiceDraft();
+        if (!draft) { Toast.show('Confira valor, parcelas e vencimento.', 'error'); return; }
+        const today = D.toIsoLocal(new Date());
+        const dates = Array.from(document.querySelectorAll('.ds-svc-row-date')).map(i => i.value);
+        const amounts = Array.from(document.querySelectorAll('.ds-svc-row-amount')).map(i => D.parseMoneyToCents(i.value));
+        if (dates.some(d => !d || d < today) || amounts.some(a => a === null)) {
+            Toast.show('Datas não podem ser anteriores a hoje e valores precisam ser válidos.', 'error');
+            return;
+        }
+        const charges = draft.rows.map((r, i) => ({
+            chargeKey: r.chargeKey,
+            competence: dates[i].slice(0, 7),
+            dueDate: dates[i],
+            amountCents: amounts[i],
+            manuallyEdited: dates[i] !== r.dueDate || amounts[i] !== r.amountCents
+        }));
+        const btn = e.submitter;
+        try {
+            if (btn) this._btnPending(btn);
+            const clientId = await this._dsResolveClientId('ds-svc-client', 'ds-svc-new-client');
+            if (!clientId) { Toast.show('Escolha ou informe o cliente.', 'error'); if (btn) this._btnError(btn); return; }
+            await store.addDirectService({
+                clientId, description: document.getElementById('ds-svc-desc').value.trim(),
+                totalCents: draft.total, installments: draft.n, firstDueDate: draft.first, charges
+            });
+            this.closeModal('modal-ds-service');
+            await this._dsAfterMutation();
+            Toast.show('Venda registrada!', 'success');
+        } catch (err) {
+            if (btn) this._btnError(btn);
+            Toast.show(err.message || 'Erro ao salvar a venda.', 'error');
+        }
+    }
+
+    // --- Mensalidade
+    openDsSubscription() {
+        document.getElementById('form-ds-subscription').reset();
+        this._dsFillClientSelect('ds-sub-client', null);
+        const cur = TSPDirectSales.currentMonthLocal();
+        const start = document.getElementById('ds-sub-start');
+        start.min = cur;
+        start.value = cur;
+        this.openModal('modal-ds-subscription');
+    }
+
+    async handleDsSubscriptionSubmit(e) {
+        e.preventDefault();
+        const D = TSPDirectSales;
+        const monthly = D.parseMoneyToCents(document.getElementById('ds-sub-amount').value);
+        const dueDay = parseInt(document.getElementById('ds-sub-dueday').value, 10);
+        const start = document.getElementById('ds-sub-start').value;
+        if (!monthly || monthly <= 0 || !(dueDay >= 1 && dueDay <= 31) || !start) {
+            Toast.show('Confira valor, dia de vencimento e mês de início.', 'error'); return;
+        }
+        if (start < D.currentMonthLocal()) { Toast.show('O mês de início não pode ser anterior ao mês atual.', 'error'); return; }
+        const btn = e.submitter;
+        try {
+            if (btn) this._btnPending(btn);
+            const clientId = await this._dsResolveClientId('ds-sub-client', 'ds-sub-new-client');
+            if (!clientId) { Toast.show('Escolha ou informe o cliente.', 'error'); if (btn) this._btnError(btn); return; }
+            const contract = await store.addDirectSubscription({
+                clientId, description: document.getElementById('ds-sub-desc').value.trim(),
+                monthlyCents: monthly, dueDay, startMonth: start
+            });
+            await store.ensureDirectCharges(contract.id, D.ensureUntil(start, D.currentMonthLocal()));
+            this.closeModal('modal-ds-subscription');
+            await this._dsAfterMutation();
+            Toast.show('Mensalidade cadastrada!', 'success');
+        } catch (err) {
+            if (btn) this._btnError(btn);
+            Toast.show(err.message || 'Erro ao salvar a mensalidade.', 'error');
+        }
+    }
+
+    // --- Pagamento
+    openDsPay(id) {
+        document.getElementById('ds-pay-id').value = id;
+        document.getElementById('ds-pay-date').value = TSPDirectSales.toIsoLocal(new Date());
+        this.openModal('modal-ds-pay');
+    }
+
+    async handleDsPaySubmit(e) {
+        e.preventDefault();
+        try {
+            await store.markDirectChargePaid(document.getElementById('ds-pay-id').value,
+                document.getElementById('ds-pay-date').value);
+            this.closeModal('modal-ds-pay');
+            await this._dsAfterMutation();
+            Toast.show('Pagamento registrado!', 'success');
+        } catch (err) { Toast.show(err.message || 'Erro ao registrar pagamento.', 'error'); }
+    }
+
+    async dsUndoPay(btn, id) {
+        const ch = [...this._ds.charges, ...this._ds.paid].find(c => c.id === id);
+        const contract = ch && this._ds.contracts.find(c => c.id === ch.contractId);
+        const doUndo = async () => {
+            try {
+                await store.unmarkDirectChargePaid(id);
+                await this._dsAfterMutation();
+            } catch (err) { Toast.show(err.message || "Erro ao desfazer pagamento.", "error"); }
+        };
+        if (contract && contract.cancelledFrom && ch.competence >= contract.cancelledFrom) {
+            this._twostepDelete(btn, doUndo);
+            return;
+        }
+        await doUndo();
+    }
+
+    // --- Editar cobrança isolada
+    openDsChargeEdit(id) {
+        const ch = this._ds.charges.find(c => c.id === id) || this._ds.overdue.find(c => c.id === id);
+        if (!ch) return;
+        document.getElementById('ds-ch-id').value = ch.id;
+        document.getElementById('ds-ch-amount').value = (ch.amountCents / 100).toFixed(2).replace('.', ',');
+        document.getElementById('ds-ch-due').value = ch.dueDate;
+        this.openModal('modal-ds-charge');
+    }
+
+    async handleDsChargeSubmit(e) {
+        e.preventDefault();
+        const id = document.getElementById('ds-ch-id').value;
+        const ch = this._ds.charges.find(c => c.id === id) || this._ds.overdue.find(c => c.id === id);
+        const cents = TSPDirectSales.parseMoneyToCents(document.getElementById('ds-ch-amount').value);
+        const due = document.getElementById('ds-ch-due').value;
+        if (cents === null || !due) { Toast.show('Confira valor e vencimento.', 'error'); return; }
+        const contract = this._ds.contracts.find(c => c.id === ch.contractId);
+        const patch = { amountCents: cents, dueDate: due };
+        // Serviço: competence acompanha o vencimento. Mensalidade: competence é a chave (m:YYYY-MM) e não muda.
+        if (contract && contract.kind === 'service') patch.competence = due.slice(0, 7);
+        try {
+            await store.updateDirectCharge(id, patch);
+            this.closeModal('modal-ds-charge');
+            await this._dsAfterMutation();
+            Toast.show('Cobrança atualizada!', 'success');
+        } catch (err) { Toast.show(err.message || 'Erro ao atualizar cobrança.', 'error'); }
+    }
+
+    // --- Reajuste / cancelamento / reativação
+    openDsAdjust(contractId) {
+        document.getElementById('form-ds-adjust').reset();
+        document.getElementById('ds-adj-contract').value = contractId;
+        const c = this._ds.contracts.find(x => x.id === contractId);
+        const m = document.getElementById('ds-adj-month');
+        m.min = c.startMonth;
+        m.value = TSPDirectSales.currentMonthLocal() < c.startMonth ? c.startMonth : TSPDirectSales.currentMonthLocal();
+        this.openModal('modal-ds-adjust');
+    }
+
+    async handleDsAdjustSubmit(e) {
+        e.preventDefault();
+        const cents = TSPDirectSales.parseMoneyToCents(document.getElementById('ds-adj-amount').value);
+        if (!cents || cents <= 0) { Toast.show('Informe um valor válido.', 'error'); return; }
+        try {
+            await store.adjustDirectContract(document.getElementById('ds-adj-contract').value,
+                document.getElementById('ds-adj-month').value, cents);
+            this.closeModal('modal-ds-adjust');
+            await this._dsAfterMutation();
+            Toast.show('Reajuste aplicado!', 'success');
+        } catch (err) { Toast.show(err.message || 'Erro ao reajustar.', 'error'); }
+    }
+
+    openDsCancel(contractId) {
+        document.getElementById('ds-cancel-contract').value = contractId;
+        const c = this._ds.contracts.find(x => x.id === contractId);
+        const m = document.getElementById('ds-cancel-month');
+        m.min = c.startMonth;
+        m.value = TSPDirectSales.currentMonthLocal() < c.startMonth ? c.startMonth : TSPDirectSales.currentMonthLocal();
+        const btn = document.getElementById('btn-ds-cancel-confirm');
+        if (btn._origDeleteHtml) { btn.innerHTML = btn._origDeleteHtml; btn._origDeleteHtml = null; }
+        btn._confirmDelete = false; clearTimeout(btn._confirmTimer);
+        btn.style.removeProperty('background'); btn.style.removeProperty('border-color');
+        this.openModal('modal-ds-cancel');
+    }
+
+    handleDsCancelSubmit(btn) {
+        const id = document.getElementById('ds-cancel-contract').value;
+        const month = document.getElementById('ds-cancel-month').value;
+        if (!month) { Toast.show('Informe o mês de cancelamento.', 'error'); return; }
+        this._twostepDelete(btn, async () => {
+            try {
+                await store.cancelDirectContract(id, month);
+                this.closeModal('modal-ds-cancel');
+                await this._dsAfterMutation();
+                Toast.show('Mensalidade cancelada.', 'success');
+            } catch (err) { Toast.show(err.message || 'Erro ao cancelar.', 'error'); }
+        });
+    }
+
+    async dsReactivate(id) {
+        try {
+            await store.reactivateDirectContract(id);
+            await this._dsAfterMutation();
+            Toast.show('Mensalidade reativada.', 'success');
+        } catch (err) { Toast.show(err.message || 'Erro ao reativar.', 'error'); }
+    }
+
+    // --- Editar / excluir contrato
+    openDsContractEdit(id) {
+        const c = this._ds.contracts.find(x => x.id === id);
+        if (!c) return;
+        document.getElementById('ds-ce-id').value = c.id;
+        document.getElementById('ds-ce-desc').value = c.description;
+        this._dsFillClientSelect('ds-ce-client', c.clientId);
+        this.openModal('modal-ds-contract-edit');
+    }
+
+    async handleDsContractEditSubmit(e) {
+        e.preventDefault();
+        const clientId = document.getElementById('ds-ce-client').value;
+        if (!clientId) { Toast.show('Escolha o cliente.', 'error'); return; }
+        try {
+            await store.updateDirectContract(document.getElementById('ds-ce-id').value, {
+                description: document.getElementById('ds-ce-desc').value.trim(), clientId
+            });
+            this.closeModal('modal-ds-contract-edit');
+            await this._dsAfterMutation();
+            Toast.show('Contrato atualizado!', 'success');
+        } catch (err) { Toast.show(err.message || 'Erro ao atualizar contrato.', 'error'); }
+    }
+
+    dsDeleteContract(btn, id) {
+        this._twostepDelete(btn, async () => {
+            try {
+                await store.deleteDirectContract(id);
+                await this._dsAfterMutation();
+                Toast.show('Contrato excluído.', 'success');
+            } catch (err) {
+                Toast.show(/pagas/i.test(err.message || '') ? 'Contrato com cobranças pagas não pode ser excluído.' : (err.message || 'Erro ao excluir.'), 'error');
+                await this._dsAfterMutation();
+            }
+        });
+    }
+
     async renderFinanceiro() {
         if (this.currentView !== 'financeiro') return;
         const canDirect = this._canUseDirectSales();
