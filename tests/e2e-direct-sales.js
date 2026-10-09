@@ -119,13 +119,18 @@ async function apiCount(page, table) {
     });
 
     await step('botão de ocultar valores esconde os valores novos', async () => {
+        // O app nasce com valores ocultos por padrão (applyMoneyVisibility); garante o estado "visível"
+        // antes e alterna para "oculto" de forma determinística.
+        const isHidden = () => page.evaluate(() => document.body.classList.contains('money-hidden'));
+        if (await isHidden()) await page.click('#btn-toggle-money-fin');
+        assert.strictEqual(await isHidden(), false, 'valores deveriam estar visíveis');
         await page.click('#btn-toggle-money-fin');
-        assert.ok(await page.evaluate(() => document.body.classList.contains('money-hidden')), 'body sem classe money-hidden');
+        assert.strictEqual(await isHidden(), true, 'body sem classe money-hidden');
+        await page.waitForTimeout(500); // transição de filter de 0.35s
         const hiddenCount = await page.evaluate(() =>
             Array.from(document.querySelectorAll('#financeiro-panel-direct .money-value'))
                 .filter(el => getComputedStyle(el).visibility === 'hidden' || getComputedStyle(el).filter.includes('blur')).length);
         assert.ok(hiddenCount > 0, 'nenhum .money-value ficou oculto');
-        await page.click('#btn-toggle-money-fin');
     });
 
     await step('aba Tecinco continua carregando', async () => {
@@ -184,26 +189,38 @@ async function apiCount(page, table) {
     });
     await ctx.close();
 
-    // ===== Isolamento: papel client não vê nem escreve =====
+    // ===== Isolamento: usuário autenticado FORA da lista de e-mails permitidos =====
+    // jorjaocorreia@gmail.com autentica, mas não está em direct_sales_allowed() (e hoje nem tem papel em
+    // user_roles, então o app a desloga). Por isso usamos um cliente Supabase separado, sem passar pela UI.
     const ctx2 = await browser.newContext();
     const page2 = await ctx2.newPage();
-    await login(page2, CLIENT_EMAIL, CLIENT_PASS);
-    await step('papel client: SELECT nas 4 tabelas volta vazio/negado', async () => {
+    await page2.goto(BASE + '/index.html');
+    await page2.waitForFunction(() => window.supabase && window.TSP_CONFIG && window.TSP_CONFIG.SUPABASE_URL);
+    await step('conta fora da lista: autentica via cliente isolado', async () => {
+        const email = await page2.evaluate(async ({ e, p }) => {
+            window.__iso = window.supabase.createClient(window.TSP_CONFIG.SUPABASE_URL, window.TSP_CONFIG.SUPABASE_ANON_KEY,
+                { auth: { persistSession: false, autoRefreshToken: false, storageKey: 'iso-test' } });
+            const { data, error } = await window.__iso.auth.signInWithPassword({ email: e, password: p });
+            return error ? 'ERRO: ' + error.message : data.user.email;
+        }, { e: CLIENT_EMAIL, p: CLIENT_PASS });
+        assert.strictEqual(email, CLIENT_EMAIL);
+    });
+    await step('conta fora da lista: SELECT nas 4 tabelas volta vazio', async () => {
         for (const t of ['direct_clients', 'direct_contracts', 'direct_charges', 'direct_contract_adjustments']) {
-            const r = await apiCount(page2, t);
-            assert.ok(r.n === 0 || r.error, `${t} vazou ${r.n} linhas`);
+            const r = await page2.evaluate(async (tbl) => {
+                const { data, error } = await window.__iso.from(tbl).select('id');
+                return { n: data ? data.length : -1, error: error ? error.message : null };
+            }, t);
+            assert.ok(r.n === 0 || r.error, t + ' vazou ' + r.n + ' linhas');
         }
     });
-    await step('papel client: INSERT em direct_clients é negado', async () => {
+    await step('conta fora da lista: INSERT com o próprio user_id é negado pela RLS (cláusula de e-mail)', async () => {
         const err = await page2.evaluate(async () => {
-            const uid = (await window.supabaseClient.auth.getUser()).data.user.id;
-            const { error } = await window.supabaseClient.from('direct_clients').insert({ user_id: uid, name: 'x' });
+            const uid = (await window.__iso.auth.getUser()).data.user.id;
+            const { error } = await window.__iso.from('direct_clients').insert({ user_id: uid, name: 'x-nao-deve-existir' });
             return error ? error.message : null;
         });
-        assert.ok(err, 'INSERT deveria ter sido negado pela RLS');
-    });
-    await step('papel client: aba Vendas Diretas oculta', async () => {
-        assert.strictEqual(await page2.locator('#fin-tab-direct').isVisible().catch(() => false), false);
+        assert.ok(err && /row-level security|violates/i.test(err), 'INSERT deveria ser negado pela RLS, veio: ' + err);
     });
     await ctx2.close();
 
