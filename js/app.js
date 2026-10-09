@@ -7588,7 +7588,7 @@ class AppController {
             const actions = ch.status === 'pending'
                 ? `<button class="btn btn-secondary btn-sm" onclick="app.openDsPay('${ch.id}')">Marcar paga</button>
                    <button class="btn btn-secondary btn-sm" onclick="app.openDsChargeEdit('${ch.id}')">Editar</button>`
-                : `<button class="btn btn-secondary btn-sm" onclick="app.dsUndoPay('${ch.id}')">Desfazer</button>`;
+                : `<button class="btn btn-secondary btn-sm" onclick="app.dsUndoPay(this, '${ch.id}')">Desfazer</button>`;
             return `<tr>
                 <td>${escapeHtml(this._dsClientName(contract ? contract.clientId : null))}</td>
                 <td>${escapeHtml(this._dsChargeDescription(ch))}</td>
